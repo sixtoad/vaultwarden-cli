@@ -113,7 +113,7 @@ impl CommandOutcome {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, argy::FromArgValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum OutputFormat {
     Json,
     Env,
@@ -2001,6 +2001,23 @@ pub struct RunOptions<'a> {
 /// decrypted.
 #[allow(clippy::too_many_lines)]
 pub async fn run_with_secrets(options: RunOptions<'_>) -> Result<CommandOutcome> {
+    run_with_secrets_with_output(options, false).await
+}
+
+/// Run a command with injected secrets while discarding the child's standard
+/// output and error streams. This is for a human-controlled provider: callers
+/// receive only the exit status, never child output that could contain a
+/// secret. It must not be exposed as a general agent command.
+#[allow(clippy::too_many_lines)]
+pub async fn run_with_secrets_silently(options: RunOptions<'_>) -> Result<CommandOutcome> {
+    run_with_secrets_with_output(options, true).await
+}
+
+#[allow(clippy::too_many_lines)]
+async fn run_with_secrets_with_output(
+    options: RunOptions<'_>,
+    suppress_child_output: bool,
+) -> Result<CommandOutcome> {
     let RunOptions {
         requested_items,
         search_by_uri,
@@ -2041,7 +2058,7 @@ pub async fn run_with_secrets(options: RunOptions<'_>) -> Result<CommandOutcome>
             }
         }
         if all_items_found_by_id {
-            return run_with_decrypted_outputs(outputs, info_only, command);
+            return run_with_decrypted_outputs(outputs, info_only, command, suppress_child_output);
         }
     }
 
@@ -2175,13 +2192,14 @@ pub async fn run_with_secrets(options: RunOptions<'_>) -> Result<CommandOutcome>
         outputs
     };
 
-    run_with_decrypted_outputs(outputs, info_only, command)
+    run_with_decrypted_outputs(outputs, info_only, command, suppress_child_output)
 }
 
 fn run_with_decrypted_outputs(
     outputs: Vec<CipherOutput>,
     info_only: bool,
     command: &[String],
+    suppress_child_output: bool,
 ) -> Result<CommandOutcome> {
     // Build environment variables from the ciphers
     let mut env_vars = Vec::new();
@@ -2227,10 +2245,17 @@ fn run_with_decrypted_outputs(
         cmd.env(name, value);
     }
 
-    // Run the command and wait for it to complete
-    let status = cmd
-        .status()
-        .with_context(|| format!("Failed to execute command: {}", command[0]))?;
+    // A provider must not copy a protected child's output into the requesting
+    // agent's transport. `output` captures it in memory and drops it before
+    // this function returns; normal CLI use retains inherited streams.
+    let status = if suppress_child_output {
+        cmd.output()
+            .with_context(|| format!("Failed to execute command: {}", command[0]))?
+            .status
+    } else {
+        cmd.status()
+            .with_context(|| format!("Failed to execute command: {}", command[0]))?
+    };
 
     Ok(if status.success() {
         CommandOutcome::Success
@@ -7395,7 +7420,7 @@ mod tests {
                 ssh_fingerprint: None,
             };
 
-            let result = run_with_decrypted_outputs(vec![output], true, &[]);
+            let result = run_with_decrypted_outputs(vec![output], true, &[], false);
             assert!(result.is_ok());
             assert_eq!(result.unwrap().exit_code(), 0);
         }
@@ -7416,7 +7441,7 @@ mod tests {
                 ssh_fingerprint: None,
             };
 
-            let err = run_with_decrypted_outputs(vec![output], false, &[]).unwrap_err();
+            let err = run_with_decrypted_outputs(vec![output], false, &[], false).unwrap_err();
             assert!(err.to_string().contains("No command specified"));
         }
 
@@ -7436,7 +7461,7 @@ mod tests {
                 ssh_fingerprint: None,
             };
 
-            let result = run_with_decrypted_outputs(vec![output], true, &[]);
+            let result = run_with_decrypted_outputs(vec![output], true, &[], false);
             assert!(result.is_ok());
         }
     }
