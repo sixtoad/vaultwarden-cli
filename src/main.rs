@@ -1,32 +1,39 @@
-use argy::{FromArgValue, FromArgs};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use vaultwarden_cli::commands::{self, OutputFormat};
 
 type Result<T> = std::result::Result<T, anyhow::Error>;
 
 /// CLI client for Vaultwarden - retrieve secrets for batch files and environment variables
-#[derive(FromArgs)]
+#[derive(Parser)]
+#[command(name = "vaultwarden-cli")]
 struct Cli {
     /// allow insecure HTTP connections (secrets sent unencrypted).
     /// also settable via `VAULTWARDEN_ALLOW_HTTP=1` env var.
-    #[argy(switch, global)]
+    #[arg(long, global = true)]
     allow_insecure_http: bool,
 
     /// allow decryption of ciphertext without MAC integrity verification.
     /// also settable via `VAULTWARDEN_ALLOW_INSECURE_MAC=1` env var.
-    #[argy(switch, global)]
+    #[arg(long, global = true)]
     allow_insecure_mac: bool,
 
     /// allow plaintext JSON secret output when stdout is redirected or captured.
     /// also settable via `VAULTWARDEN_ALLOW_PLAINTEXT_JSON=true` env var.
-    #[argy(switch, global, env = "VAULTWARDEN_ALLOW_PLAINTEXT_JSON")]
+    #[arg(long, global = true, env = "VAULTWARDEN_ALLOW_PLAINTEXT_JSON")]
     allow_plaintext_json: bool,
 
-    #[argy(subcommand)]
+    #[command(subcommand)]
     command: Commands,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand)]
+impl Cli {
+    #[cfg(test)]
+    fn from_args(_program: &[&str], args: &[&str]) -> std::result::Result<Self, clap::Error> {
+        Self::try_parse_from(std::iter::once("vaultwarden-cli").chain(args.iter().copied()))
+    }
+}
+
+#[derive(Subcommand)]
 enum Commands {
     Login(LoginCommand),
     Unlock(UnlockCommand),
@@ -41,202 +48,205 @@ enum Commands {
     Interpolate(InterpolateCommand),
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "login")]
+#[derive(Args)]
+#[command(name = "login")]
 /// login to Vaultwarden server
 struct LoginCommand {
     /// server URL (e.g., <https://vaultwarden.example.com>)
-    #[argy(option, short = 's')]
+    #[arg(long, short = 's')]
     server: Option<String>,
 
     /// client ID for API authentication
-    #[argy(option, env = "VAULTWARDEN_CLIENT_ID")]
+    #[arg(long, env = "VAULTWARDEN_CLIENT_ID")]
     client_id: Option<String>,
 
     /// client secret for API authentication
-    #[argy(option, env = "VAULTWARDEN_CLIENT_SECRET")]
+    #[arg(long, env = "VAULTWARDEN_CLIENT_SECRET")]
     client_secret: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "unlock")]
+#[derive(Args)]
+#[command(name = "unlock")]
 /// unlock the vault with master password
 struct UnlockCommand {
     /// master password (falls back to `VAULTWARDEN_PASSWORD`, then prompts)
-    #[argy(option, short = 'p', env = "VAULTWARDEN_PASSWORD")]
+    #[arg(long, short = 'p', env = "VAULTWARDEN_PASSWORD")]
     password: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "lock")]
+#[derive(Args)]
+#[command(name = "lock")]
 /// lock the vault (clear decryption keys)
 struct LockCommand {}
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "logout")]
+#[derive(Args)]
+#[command(name = "logout")]
 /// logout from Vaultwarden server
 struct LogoutCommand {}
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "list")]
+#[derive(Args)]
+#[command(name = "list")]
 /// list items in the vault
 struct ListCommand {
     /// object to list
-    #[argy(positional)]
+    #[arg(value_enum)]
     object: Option<ListObject>,
 
     /// filter by item type (login, note, card, identity, ssh)
-    #[argy(option, short = 't', long = "type")]
+    #[arg(long, short = 't')]
     r#type: Option<String>,
 
     /// output list results as JSON
-    #[argy(switch)]
+    #[arg(long)]
     json: bool,
 
     /// search term
-    #[argy(option, short = 's')]
+    #[arg(long, short = 's')]
     search: Option<String>,
 
     /// filter by organization name or ID
-    #[argy(option)]
+    #[arg(long)]
     org: Option<String>,
 
     /// filter by collection name or ID
-    #[argy(option, short = 'c')]
+    #[arg(long, short = 'c')]
     collection: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "get")]
+#[derive(Args)]
+#[command(name = "get")]
 /// get a specific item or secret
 struct GetCommand {
     /// item ID or name to retrieve
-    #[argy(positional)]
+    #[arg()]
     item: String,
 
     /// query for two-position get operations
-    #[argy(positional)]
+    #[arg()]
     query: Option<String>,
 
     /// output format
-    #[argy(option, short = 'f', default = "OutputFormat::Json")]
+    #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Json)]
     format: OutputFormat,
 
     /// output only the username (shorthand for --format username)
-    #[argy(switch, short = 'u')]
+    #[arg(long, short = 'u')]
     username: bool,
 
     /// output only the password (shorthand for --format value)
-    #[argy(switch, short = 'p')]
+    #[arg(long, short = 'p')]
     password: bool,
 
     /// filter by organization name or ID
-    #[argy(option)]
+    #[arg(long)]
     org: Option<String>,
 
     /// filter by collection name or ID
-    #[argy(option)]
+    #[arg(long)]
     collection: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "get-uri")]
+#[derive(Args)]
+#[command(name = "get-uri")]
 /// get a specific item by URI
 struct GetUriCommand {
     /// URI to search for (e.g., github.com)
-    #[argy(positional)]
+    #[arg()]
     uri: String,
 
     /// output format
-    #[argy(option, short = 'f', default = "OutputFormat::Json")]
+    #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Json)]
     format: OutputFormat,
 
     /// output only the username (shorthand for --format username)
-    #[argy(switch, short = 'u')]
+    #[arg(long, short = 'u')]
     username: bool,
 
     /// output only the password (shorthand for --format value)
-    #[argy(switch, short = 'p')]
+    #[arg(long, short = 'p')]
     password: bool,
 
     /// filter by organization name or ID
-    #[argy(option)]
+    #[arg(long)]
     org: Option<String>,
 
     /// filter by collection name or ID
-    #[argy(option)]
+    #[arg(long)]
     collection: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "run")]
+#[derive(Args)]
+#[command(name = "run")]
 /// run a command with secrets injected as environment variables
 struct RunCommand {
     /// item name or ID to inject (repeat flag or use commas for multiple)
-    #[argy(option, alias = "credential-name", value_delimiter = ',')]
+    #[arg(long, alias = "credential-name", value_delimiter = ',')]
     name: Vec<String>,
 
     /// item name or ID to inject when no selector flag is provided
-    #[argy(positional, last)]
+    // Keep accepting implicit item names before the `--` command separator.
+    // The raw argument list is used later to split this vector from the child
+    // command, so this positional intentionally consumes every remaining value.
+    #[arg(num_args = 0..)]
     item: Vec<String>,
 
     /// filter by organization name or ID
-    #[argy(option)]
+    #[arg(long)]
     org: Option<String>,
 
     /// filter by folder name or ID
-    #[argy(option)]
+    #[arg(long)]
     folder: Option<String>,
 
     /// filter by collection name or ID
-    #[argy(option)]
+    #[arg(long)]
     collection: Option<String>,
 
     /// print list of injected environment variables without values
-    #[argy(switch, short = 'i')]
+    #[arg(long, short = 'i')]
     info: bool,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "run-uri")]
+#[derive(Args)]
+#[command(name = "run-uri")]
 /// run a command with secrets from URI match injected as environment variables
 struct RunUriCommand {
     /// URI to search for
-    #[argy(positional)]
+    #[arg()]
     uri: String,
 
     /// print list of injected environment variables without values
-    #[argy(switch, short = 'i')]
+    #[arg(long, short = 'i')]
     info: bool,
 
     /// command to run (use -- to separate from vaultwarden-cli args)
-    #[argy(positional, last)]
+    #[arg(last = true)]
     command: Vec<String>,
 }
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "status")]
+#[derive(Args)]
+#[command(name = "status")]
 /// show current session status
 struct StatusCommand {}
 
-#[derive(FromArgs)]
-#[argy(subcommand, name = "interpolate")]
+#[derive(Args)]
+#[command(name = "interpolate")]
 /// interpolate secrets into a YAML file
 struct InterpolateCommand {
     /// YAML file to interpolate
-    #[argy(option, short = 'f')]
+    #[arg(long, short = 'f')]
     file: String,
 
     /// write the interpolated output to a file instead of stdout
-    #[argy(option, short = 'o')]
+    #[arg(long, short = 'o')]
     output: Option<String>,
 
     /// skip missing secrets and leave placeholders unchanged
-    #[argy(switch, short = 's')]
+    #[arg(long, short = 's')]
     skip_missing: bool,
 }
 
-#[derive(Debug, Clone, Copy, FromArgValue, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
 enum ListObject {
     Items,
 }
@@ -255,7 +265,7 @@ const fn effective_format(format: OutputFormat, username: bool, password: bool) 
 async fn main() {
     let raw_args: Vec<String> = std::env::args().collect();
     let raw_strs: Vec<&str> = raw_args.iter().map(String::as_str).collect();
-    let cli: Cli = argy::from_env();
+    let cli = Cli::parse();
     let result = run_cli(cli, &raw_strs).await;
 
     if let Err(e) = &result {
@@ -942,7 +952,7 @@ mod tests {
             panic!("unsupported list object should be rejected");
         };
 
-        assert!(err.output.contains("expected \"items\""));
+        assert!(err.to_string().contains("possible values"));
     }
 
     #[test]
