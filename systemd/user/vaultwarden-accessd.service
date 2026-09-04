@@ -1,0 +1,14 @@
+[Unit]
+Description=Vaultwarden Access locked provider foundation
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/vaultwarden-accessd --state-root %h/.local/share/vaultwarden-access/provider
+KillMode=control-group
+
+# Later protected request units are created by the systemd user manager, not
+# by agent clients or this service directly. Each must be manager-owned and
+# bind to this unit with BindsTo= and PartOf= plus KillMode=control-group.
+
+[Install]
+WantedBy=default.target
