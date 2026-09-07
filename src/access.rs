@@ -13,6 +13,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod provider;
+pub mod provider_store;
+
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const MAX_OPERATION_ID_LEN: usize = 64;
 pub const MAX_AGENT_ID_LEN: usize = 128;
@@ -111,7 +114,10 @@ impl AccessRequest {
             bail!("operation ID must use lowercase letters, digits, and hyphens")
         }
         if self.operation_revision.len() != 64
-            || !self.operation_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+            || !self
+                .operation_revision
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
         {
             bail!("operation revision must be a SHA-256 hex digest")
         }

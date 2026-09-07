@@ -2675,6 +2675,7 @@ dependencies = [
  "hkdf 0.13.0",
  "hmac 0.13.0",
  "keyring-core",
+ "libc",
  "pbkdf2",
  "predicates",
  "rand",

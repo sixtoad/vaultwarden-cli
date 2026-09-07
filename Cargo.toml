@@ -33,6 +33,7 @@ rsa = { version = "0.10.0-rc.18", features = ["getrandom", "sha1", "sha2"] }
 zeroize = { version = "1.9", features = ["derive"] }
 fs4 = "1.1"
 getrandom = "0.3"
+libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust", "vendored"] }

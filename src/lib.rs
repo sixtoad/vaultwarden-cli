@@ -1,8 +1,8 @@
 //! vaultwarden-cli library
 //!
 
-pub mod api;
 pub mod access;
+pub mod api;
 pub mod commands;
 pub mod config;
 pub mod crypto;
