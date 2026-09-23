@@ -68,7 +68,15 @@ pub struct Provider {
 
 impl Provider {
     pub fn start(root: impl Into<PathBuf>) -> Result<Self, ProviderError> {
-        let mut store = ProviderStore::open(root)?;
+        Self::start_with_cleanup(root, || Ok(()))
+    }
+    /// Run composition-owned authority cleanup under exclusive ownership, before
+    /// fallible durable-state validation. Never invoked for a competing writer.
+    pub fn start_with_cleanup(
+        root: impl Into<PathBuf>,
+        cleanup: impl FnOnce() -> Result<(), ()>,
+    ) -> Result<Self, ProviderError> {
+        let mut store = ProviderStore::open_with_cleanup(root, cleanup)?;
         let state = store.invalidate_unexecuted()?;
         Ok(Self {
             store,
@@ -80,8 +88,8 @@ impl Provider {
         self.lock_state
     }
     pub fn lock(&mut self) -> Result<(), ProviderError> {
-        self.state = self.store.invalidate_unexecuted()?;
         self.lock_state = ProviderLockState::Locked;
+        self.state = self.store.invalidate_unexecuted()?;
         Ok(())
     }
     pub fn shutdown(&mut self) -> Result<(), ProviderError> {
@@ -90,10 +98,20 @@ impl Provider {
 
     /// Checks the registry-owned image before the backend eligibility port and
     /// only advances in-memory authority after durable replacement succeeds.
-    pub fn activate_operation<V: LoginEligibilityVerifier>(
+    #[cfg(test)]
+    pub(crate) fn activate_operation<V: LoginEligibilityVerifier>(
         &mut self,
         draft: OperationPolicyDraft,
         verifier: &V,
+    ) -> Result<String, ProviderError> {
+        self.activate_operation_checked(draft, verifier, || true)
+    }
+
+    pub(crate) fn activate_operation_checked<V: LoginEligibilityVerifier>(
+        &mut self,
+        draft: OperationPolicyDraft,
+        verifier: &V,
+        still_authorized: impl Fn() -> bool,
     ) -> Result<String, ProviderError> {
         let state = self.store.read_state()?;
         let Some(image) = state
@@ -115,6 +133,9 @@ impl Provider {
             {
                 return Err(ProviderError::new(ProviderDiagnostic::CredentialIneligible));
             }
+        }
+        if !still_authorized() {
+            return Err(ProviderError::new(ProviderDiagnostic::CredentialIneligible));
         }
         let revision = policy.revision().to_owned();
         let updated = self.store.upsert_operation(&state, policy)?;
@@ -214,6 +235,31 @@ mod tests {
         provider.state.approved_images.push(image);
         provider.store.write_state(&provider.state).unwrap();
     }
+    #[test]
+    fn startup_cleanup_precedes_registered_image_integrity_validation() {
+        let temp = temp();
+        let root = temp.path().join("provider");
+        let provider = Provider::start(&root).unwrap();
+        let image = test_approved_image(temp.path(), "deploy-image");
+        let path = root.join("provider-state.json");
+        let mut state: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        state["approved_images"] = serde_json::json!([image]);
+        fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+        drop(provider);
+        fs::write(temp.path().join("approved-image"), b"modified executable").unwrap();
+        let cleared = std::cell::Cell::new(false);
+        let result = Provider::start_with_cleanup(&root, || {
+            cleared.set(true);
+            Ok(())
+        });
+        assert_eq!(
+            result.unwrap_err().diagnostic(),
+            ProviderDiagnostic::InvalidState
+        );
+        assert!(cleared.get());
+    }
+
     #[test]
     fn activation_requires_registry_id_and_exact_login_binding() {
         let temp = temp();

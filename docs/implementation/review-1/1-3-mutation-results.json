@@ -1,0 +1,1421 @@
+{
+  "baseline_commit": "91a6a662cdfb6b27edba2ca93cd3735b630a1931",
+  "total": 195,
+  "counts": {
+    "CaughtMutant": 171,
+    "Unviable": 20,
+    "MissedMutant": 4
+  },
+  "mapping": "Latest outcome for file, function, relative mutation position, replacement and genre. Runs 2, 3 and 4; unchanged functions retain completed earlier evidence.",
+  "mutants": [
+    {
+      "mutant": "src/bin/vaultwarden-accessd.rs:27:5: replace main -> ExitCode with Default::default()",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__bin__vaultwarden-accessd.rs_line_27_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__bin__vaultwarden-accessd.rs_line_27_col_5.diff"
+    },
+    {
+      "mutant": "src/bin/vaultwarden-accessd.rs:37:5: replace run -> Result<(), ()> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__bin__vaultwarden-accessd.rs_line_37_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__bin__vaultwarden-accessd.rs_line_37_col_5.diff"
+    },
+    {
+      "mutant": "src/bin/vaultwarden-accessd.rs:90:5: replace clear_previous_launch -> Result<(), ()> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__bin__vaultwarden-accessd.rs_line_90_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__bin__vaultwarden-accessd.rs_line_90_col_5.diff"
+    },
+    {
+      "mutant": "src/bin/vaultwarden-accessd.rs:92:19: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in clear_previous_launch",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__bin__vaultwarden-accessd.rs_line_92_col_19.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__bin__vaultwarden-accessd.rs_line_92_col_19.diff"
+    },
+    {
+      "mutant": "src/bin/vaultwarden-accessd.rs:92:19: replace match guard e.kind() == std::io::ErrorKind::NotFound with false in clear_previous_launch",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__bin__vaultwarden-accessd.rs_line_92_col_19_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__bin__vaultwarden-accessd.rs_line_92_col_19_001.diff"
+    },
+    {
+      "mutant": "src/bin/vaultwarden-accessd.rs:92:28: replace == with != in clear_previous_launch",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__bin__vaultwarden-accessd.rs_line_92_col_28.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__bin__vaultwarden-accessd.rs_line_92_col_28.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:5:58: replace * with +",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__application.rs_line_5_col_58.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__application.rs_line_5_col_58.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:5:58: replace * with /",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_5_col_58_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_5_col_58_001.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:40:9: replace ProviderApplication::revoke -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_40_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_40_col_9.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:45:29: replace || with && in ProviderApplication::revoke",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_45_col_29.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_45_col_29.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:52:9: replace ProviderApplication::admit -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_52_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_52_col_9.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:31: replace match guard self.clock.now() < deadline && !authority.cleanup_failed with true in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_31.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_31.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:31: replace match guard self.clock.now() < deadline && !authority.cleanup_failed with false in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_31_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_31_001.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:59: replace && with || in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_59.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_59.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:48: replace < with == in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_48.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_48.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:48: replace < with > in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_48_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_48_001.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:48: replace < with <= in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_48_002.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_48_002.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:53:62: delete ! in ProviderApplication::admit",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_53_col_62.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_53_col_62.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:62:9: replace ProviderApplication::lock -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_62_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_62_col_9.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:66:9: replace ProviderApplication::status -> Result<SessionStatus, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__application.rs_line_66_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__application.rs_line_66_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `SessionStatus: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/access/application.rs:76:9: replace ProviderApplication::activate_operation -> Result<String, SessionError> with Ok(String::new())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__access__application.rs_line_76_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__access__application.rs_line_76_col_9.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:76:9: replace ProviderApplication::activate_operation -> Result<String, SessionError> with Ok(\"xyzzy\".into())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__access__application.rs_line_76_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__access__application.rs_line_76_col_9_001.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:88:17: replace ProviderApplication::activate_operation::<impl LoginEligibilityVerifier for Verifier<'_>>::is_login_eligible -> Result<bool, LoginEligibilityError> with Ok(true)",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__access__application.rs_line_88_col_17.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__access__application.rs_line_88_col_17.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:88:17: replace ProviderApplication::activate_operation::<impl LoginEligibilityVerifier for Verifier<'_>>::is_login_eligible -> Result<bool, LoginEligibilityError> with Ok(false)",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__access__application.rs_line_88_col_17_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__access__application.rs_line_88_col_17_001.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:112:9: replace ProviderApplication::consume_scoped -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__access__application.rs_line_112_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__access__application.rs_line_112_col_9.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:124:9: replace <impl ApprovalAuthenticator for ProviderApplication>::authenticate -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__application.rs_line_122_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__application.rs_line_122_col_9.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:135:29: replace match guard !lifetime.is_zero() with true in <impl ApprovalAuthenticator for ProviderApplication>::authenticate",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__application.rs_line_133_col_29.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__application.rs_line_133_col_29.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:135:29: replace match guard !lifetime.is_zero() with false in <impl ApprovalAuthenticator for ProviderApplication>::authenticate",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__application.rs_line_133_col_29_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__application.rs_line_133_col_29_001.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:135:29: delete ! in <impl ApprovalAuthenticator for ProviderApplication>::authenticate",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__application.rs_line_133_col_29_002.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__application.rs_line_133_col_29_002.diff"
+    },
+    {
+      "mutant": "src/access/application.rs:140:37: replace >= with < in <impl ApprovalAuthenticator for ProviderApplication>::authenticate",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__application.rs_line_138_col_37.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__application.rs_line_138_col_37.diff"
+    },
+    {
+      "mutant": "src/access/ports.rs:42:9: replace SensitiveString::expose -> &str with \"\"",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__ports.rs_line_42_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__ports.rs_line_42_col_9.diff"
+    },
+    {
+      "mutant": "src/access/ports.rs:42:9: replace SensitiveString::expose -> &str with \"xyzzy\"",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__ports.rs_line_42_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__ports.rs_line_42_col_9_001.diff"
+    },
+    {
+      "mutant": "src/access/ports.rs:47:9: replace <impl fmt::Debug for SensitiveString>::fmt -> fmt::Result with Ok(Default::default())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__ports.rs_line_47_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__ports.rs_line_47_col_9.diff"
+    },
+    {
+      "mutant": "src/access/ports.rs:62:9: replace <impl fmt::Display for SessionError>::fmt -> fmt::Result with Ok(Default::default())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__access__ports.rs_line_62_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__access__ports.rs_line_62_col_9.diff"
+    },
+    {
+      "mutant": "src/access/provider.rs:83:9: replace Provider::lock -> Result<(), ProviderError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__access__provider.rs_line_83_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__access__provider.rs_line_83_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:33:5: replace random -> Result<SensitiveString, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_33_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_33_col_5.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `ports::SensitiveString: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:41:9: replace LoopbackUi::bind -> Result<Self, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_41_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_41_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `LoopbackUi: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:79:9: replace LoopbackUi::serve -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_79_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_79_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:79:15: delete ! in LoopbackUi::serve",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_79_col_15.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_79_col_15.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:81:43: replace match guard peer.ip().is_loopback() with true in LoopbackUi::serve",
+      "outcome": "MissedMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__loopback_ui.rs_line_81_col_43.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__loopback_ui.rs_line_81_col_43.diff",
+      "classification": "Defence-in-depth under supported deployment: the only listener is bound to literal IPv4 127.0.0.1. Tests exercise that listener and the independent launch/cookie/Origin/CSRF boundary. A non-loopback accepted peer would require host routing outside these fixtures; the production peer check is retained."
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:81:43: replace match guard peer.ip().is_loopback() with false in LoopbackUi::serve",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_81_col_43_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_81_col_43_001.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:90:27: replace match guard e.kind() == std::io::ErrorKind::WouldBlock with true in LoopbackUi::serve",
+      "outcome": "MissedMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__loopback_ui.rs_line_90_col_27.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__loopback_ui.rs_line_90_col_27.diff",
+      "classification": "Explicit OS-fault injection gap: tests exercise WouldBlock and successful accepts, but do not force another accept errno. This mutant could retry a broken listener instead of returning BackendUnavailable. Production retains fail-closed error handling; no authentication or backend resolution occurs on this branch. This is not claimed equivalent or caught."
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:90:27: replace match guard e.kind() == std::io::ErrorKind::WouldBlock with false in LoopbackUi::serve",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_90_col_27_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_90_col_27_001.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:90:36: replace == with != in LoopbackUi::serve",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_90_col_36.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_90_col_36.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:99:9: replace LoopbackUi::handle -> Response with Default::default()",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_99_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_99_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `loopback_ui::Response: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:99:35: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_99_col_35.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_99_col_35.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:102:36: replace && with || in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_102_col_36.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_102_col_36.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:102:27: replace == with != in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_102_col_27.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_102_col_27.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:102:52: replace == with != in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_102_col_52.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_102_col_52.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:116:37: replace || with && in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_116_col_37.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_116_col_37.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:116:27: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_116_col_27.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_116_col_27.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:116:65: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_116_col_65.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_116_col_65.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:119:25: replace == with != in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_119_col_25.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_119_col_25.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:121:17: replace || with && in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_121_col_17.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_121_col_17.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:120:47: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_120_col_47.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_120_col_47.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:124:66: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_124_col_66.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_124_col_66.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:146:13: replace || with && in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_146_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_146_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:145:13: replace || with && in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_145_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_145_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:144:12: delete ! in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_144_col_12.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_144_col_12.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:145:47: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_145_col_47.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_145_col_47.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:146:47: replace != with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_146_col_47.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_146_col_47.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:151:13: delete match arm \"/unlock\" in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_151_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_151_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:169:13: delete match arm \"/lock\" in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_169_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_169_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:160:57: replace || with && in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_160_col_57.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_160_col_57.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:160:84: replace > with == in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_160_col_84.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_160_col_84.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:160:84: replace > with < in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_160_col_84_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_160_col_84_001.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:160:84: replace > with >= in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__loopback_ui.rs_line_160_col_84.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__loopback_ui.rs_line_160_col_84.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:174:17: delete match arm Ok(SessionStatus::Unlocked) in LoopbackUi::handle",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_174_col_17.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_174_col_17.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:186:9: replace LoopbackUi::authenticated -> bool with true",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_186_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_186_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:186:9: replace LoopbackUi::authenticated -> bool with false",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_186_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_186_col_9_001.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:189:46: replace == with != in LoopbackUi::authenticated",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_189_col_46.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_189_col_46.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:201:9: replace Request::header -> Option<&str> with None",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_201_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_201_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:201:9: replace Request::header -> Option<&str> with Some(\"\")",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_201_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_201_col_9_001.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:201:9: replace Request::header -> Option<&str> with Some(\"xyzzy\")",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_201_col_9_002.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_201_col_9_002.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:203:34: replace == with != in Request::header",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_203_col_34.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_203_col_34.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:208:5: replace read_request -> Result<Request, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_208_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_208_col_5.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `loopback_ui::Request: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:208:46: replace + with - in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_208_col_46.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_208_col_46.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:208:46: replace + with * in read_request",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_208_col_46_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_208_col_46_001.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0369]: cannot multiply `std::time::Instant` by `Duration`"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:211:24: replace >= with < in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_211_col_24.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_211_col_24.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:229:25: replace || with && in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_229_col_25.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_229_col_25.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:229:20: replace != with == in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_229_col_20.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_229_col_20.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:229:37: replace != with == in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_229_col_37.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_229_col_37.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:238:37: delete ! in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_238_col_37.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_238_col_37.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:241:44: replace || with && in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_241_col_44.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_241_col_44.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:241:52: replace == with != in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_241_col_52.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_241_col_52.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:251:15: replace > with == in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_251_col_15.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_251_col_15.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:251:15: replace > with < in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_251_col_15_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_251_col_15_001.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:251:15: replace > with >= in read_request",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_251_col_15_002.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_251_col_15_002.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:263:5: replace read_before -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_263_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_263_col_5.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:263:11: delete ! in read_before",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_263_col_11.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_263_col_11.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:266:32: delete ! in read_before",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_266_col_32.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_266_col_32.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:274:18: replace == with != in read_before",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_274_col_18.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_274_col_18.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:289:9: replace Response::denied -> Self with Default::default()",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_289_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_289_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `loopback_ui::Response: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:297:9: replace Response::text -> Self with Default::default()",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_297_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_297_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `loopback_ui::Response: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:305:9: replace Response::html -> Self with Default::default()",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_305_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_305_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `loopback_ui::Response: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:313:9: replace Response::encode -> String with String::new()",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_313_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_313_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/loopback_ui.rs:313:9: replace Response::encode -> String with \"xyzzy\".into()",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__loopback_ui.rs_line_313_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__loopback_ui.rs_line_313_col_9_001.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:28:9: replace <impl SessionClock for MonotonicClock>::now -> Duration with Default::default()",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_28_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_28_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:35:9: replace ProviderKeyring::entry -> Result<Entry, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_35_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_35_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `keyring_core::Entry: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/session.rs:40:9: replace ProviderKeyring::bootstrap -> Result<SensitiveString, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_40_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_40_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `ports::SensitiveString: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/session.rs:46:9: replace ProviderKeyring::save -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_46_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_46_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:68:9: replace ProviderKeyring::clear -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_68_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_68_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:76:5: replace load_setup -> Result<Config, SessionError> with Ok(Default::default())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_76_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_76_col_5.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:78:40: replace | with & in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_78_col_40.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_78_col_40.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:78:40: replace | with ^ in load_setup",
+      "outcome": "MissedMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_78_col_40_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_78_col_40_001.diff",
+      "classification": "Equivalent for the Linux constants: O_NOFOLLOW and O_NONBLOCK have disjoint bits, so bitwise OR and XOR produce the same open flags."
+    },
+    {
+      "mutant": "src/adapters/session.rs:87:9: replace || with && in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_87_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_87_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:86:9: replace || with && in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_86_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_86_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:85:9: replace || with && in load_setup",
+      "outcome": "MissedMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_85_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_85_col_9.diff",
+      "classification": "Explicit OS-fixture gap: tests use current-UID regular files and reject modes, hard links and symlinks, but do not supply a readable foreign-UID file or a synchronized nonregular input stream. The mutant weakens the file-type/owner predicate. Production retains both independent checks. This is not claimed equivalent or caught."
+    },
+    {
+      "mutant": "src/adapters/session.rs:84:8: delete ! in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_84_col_8.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_84_col_8.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:85:27: replace != with == in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_85_col_27.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_85_col_27.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:86:36: replace != with == in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_86_col_36.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_86_col_36.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:86:28: replace & with | in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_86_col_28.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_86_col_28.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:86:28: replace & with ^ in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_86_col_28_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_86_col_28_001.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:87:29: replace != with == in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_87_col_29.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_87_col_29.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:96:20: replace > with == in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_96_col_20.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_96_col_20.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:96:20: replace > with < in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_96_col_20_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_96_col_20_001.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:96:20: replace > with >= in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_96_col_20_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_96_col_20_001.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:113:45: replace != with == in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_113_col_45.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_113_col_45.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:121:9: replace || with && in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_121_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_121_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:120:9: replace || with && in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_120_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_120_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:119:9: replace || with && in load_setup",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__session.rs_line_119_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__session.rs_line_119_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:131:5: replace derive_keys -> Result<CryptoKeys, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_131_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_131_col_5.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `CryptoKeys: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/session.rs:136:37: replace || with && in derive_keys",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__adapters__session.rs_line_136_col_37.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__adapters__session.rs_line_136_col_37.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:136:8: delete ! in derive_keys",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_136_col_8.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_136_col_8.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:136:69: replace != with == in derive_keys",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_136_col_69.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_136_col_69.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:152:5: replace bounded_kdf_iterations -> Result<KdfIterations, SessionError> with Ok(Default::default())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_152_col_5.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_152_col_5.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:155:25: replace > with == in bounded_kdf_iterations",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_155_col_25.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_155_col_25.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:155:25: replace > with < in bounded_kdf_iterations",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_155_col_25_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_155_col_25_001.diff"
+    },
+    {
+      "mutant": "src/adapters/session.rs:155:25: replace > with >= in bounded_kdf_iterations",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__session.rs_line_155_col_25_002.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__session.rs_line_155_col_25_002.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:27:9: replace VaultwardenBackend::from_setup -> Result<Self, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_27_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_27_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `VaultwardenBackend: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:66:9: replace VaultwardenBackend::url -> Result<Url, SessionError> with Ok(Default::default())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_66_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_66_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `reqwest::Url: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::new())",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0061]: this function takes 1 argument but 0 arguments were supplied"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::from_iter([vec![]]))",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_001.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0599]: no associated function or constant named `from_iter` found for struct `Zeroizing<_>` in the current scope"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::new(vec![]))",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_002.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_002.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::from(vec![]))",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_003.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_003.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::from_iter([vec![0]]))",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_004.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_004.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0599]: no associated function or constant named `from_iter` found for struct `Zeroizing<_>` in the current scope"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::new(vec![0]))",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_005.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_005.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::from(vec![0]))",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_006.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_006.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::from_iter([vec![1]]))",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_007.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_007.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0599]: no associated function or constant named `from_iter` found for struct `Zeroizing<_>` in the current scope"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::new(vec![1]))",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_008.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_008.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:9: replace VaultwardenBackend::body -> Result<Zeroizing<Vec<u8>>, SessionError> with Ok(Zeroizing::from(vec![1]))",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_9_009.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_9_009.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:71:12: delete ! in VaultwardenBackend::body",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_71_col_12.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_71_col_12.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:79:24: replace > with == in VaultwardenBackend::body",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_79_col_24.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_79_col_24.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:79:24: replace > with < in VaultwardenBackend::body",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_79_col_24_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_79_col_24_001.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:79:24: replace > with >= in VaultwardenBackend::body",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_79_col_24_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_79_col_24_001.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:85:9: replace VaultwardenBackend::metadata -> Result<serde_json::Value, SessionError> with Ok(Default::default())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_85_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_85_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:97:9: replace VaultwardenBackend::selected -> Result<Vec<SensitiveString>, SessionError> with Ok(vec![])",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_97_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_97_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:97:9: replace VaultwardenBackend::selected -> Result<Vec<SensitiveString>, SessionError> with Ok(vec![Default::default()])",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_97_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_97_col_9_001.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `ports::SensitiveString: Default` is not satisfied"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:110:13: replace || with && in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_110_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_110_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:103:13: replace || with && in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_103_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_103_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:102:44: replace != with == in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_102_col_44.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_102_col_44.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:103:16: delete ! in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_103_col_16.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_103_col_16.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:105:23: replace == with != in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_105_col_23.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_105_col_23.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:125:13: replace || with && in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_125_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_125_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:124:13: replace || with && in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_124_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_124_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:123:31: replace != with == in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_123_col_31.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_123_col_31.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:125:16: delete ! in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_125_col_16.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_125_col_16.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:135:43: replace || with && in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__adapters__vaultwarden.rs_line_135_col_43.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__adapters__vaultwarden.rs_line_135_col_43.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:135:16: delete ! in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_135_col_16.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_135_col_16.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:135:73: replace != with == in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_135_col_73.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_135_col_73.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:155:41: replace || with && in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 4,
+      "log": "target/story-1-3-evidence/mutation-run-4/mutants.out/log/src__adapters__vaultwarden.rs_line_155_col_41.log",
+      "diff": "target/story-1-3-evidence/mutation-run-4/mutants.out/diff/src__adapters__vaultwarden.rs_line_155_col_41.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:155:16: delete ! in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_155_col_16.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_155_col_16.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:155:69: replace != with == in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_155_col_69.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_155_col_69.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:171:30: replace == with != in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_171_col_30.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_171_col_30.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:178:60: replace == with != in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_178_col_60.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_178_col_60.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:179:36: replace += with -= in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_179_col_36.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_179_col_36.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:179:36: replace += with *= in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_179_col_36_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_179_col_36_001.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:186:27: replace != with == in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_186_col_27.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_186_col_27.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:198:70: replace == with != in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_198_col_70.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_198_col_70.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:199:42: replace != with == in VaultwardenBackend::selected",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_199_col_42.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_199_col_42.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:213:9: replace <impl ProviderSession for VaultwardenBackend>::probe_compatibility -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_213_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_213_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:219:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_219_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_219_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:218:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_218_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_218_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:217:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_217_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_217_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:216:20: replace != with == in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_216_col_20.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_216_col_20.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:217:34: replace != with == in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_217_col_34.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_217_col_34.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:218:33: replace != with == in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_218_col_33.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_218_col_33.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:219:41: replace != with == in <impl ProviderSession for VaultwardenBackend>::probe_compatibility",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_219_col_41.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_219_col_41.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:227:9: replace <impl ProviderSession for VaultwardenBackend>::unlock -> Result<Duration, SessionError> with Ok(Default::default())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_227_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_227_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:227:12: delete ! in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_227_col_12.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_227_col_12.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:274:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_274_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_274_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:273:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_273_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_273_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:272:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_272_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_272_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:268:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_268_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_268_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:265:13: replace || with && in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_265_col_13.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_265_col_13.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:264:36: replace != with == in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_264_col_36.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_264_col_36.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:266:34: replace != with == in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_266_col_34.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_266_col_34.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:271:46: replace != with == in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_271_col_46.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_271_col_46.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:272:33: replace <= with > in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_272_col_33.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_272_col_33.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:274:16: delete ! in <impl ProviderSession for VaultwardenBackend>::unlock",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_274_col_16.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_274_col_16.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:283:9: replace <impl ProviderSession for VaultwardenBackend>::clear -> Result<(), SessionError> with Ok(())",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_283_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_283_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:290:9: replace <impl SecretBackend for VaultwardenBackend>::eligible -> Result<bool, SessionError> with Ok(true)",
+      "outcome": "CaughtMutant",
+      "evidence_run": 3,
+      "log": "target/story-1-3-evidence/mutation-run-3/mutants.out/log/src__adapters__vaultwarden.rs_line_290_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-3/mutants.out/diff/src__adapters__vaultwarden.rs_line_290_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:290:9: replace <impl SecretBackend for VaultwardenBackend>::eligible -> Result<bool, SessionError> with Ok(false)",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_290_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_290_col_9_001.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:296:9: replace <impl SecretBackend for VaultwardenBackend>::resolve -> Result<Vec<SensitiveString>, SessionError> with Ok(vec![])",
+      "outcome": "CaughtMutant",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_296_col_9.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_296_col_9.diff"
+    },
+    {
+      "mutant": "src/adapters/vaultwarden.rs:296:9: replace <impl SecretBackend for VaultwardenBackend>::resolve -> Result<Vec<SensitiveString>, SessionError> with Ok(vec![Default::default()])",
+      "outcome": "Unviable",
+      "evidence_run": 2,
+      "log": "target/story-1-3-evidence/mutation-run-2/mutants.out/log/src__adapters__vaultwarden.rs_line_296_col_9_001.log",
+      "diff": "target/story-1-3-evidence/mutation-run-2/mutants.out/diff/src__adapters__vaultwarden.rs_line_296_col_9_001.diff",
+      "classification": "Did not compile; not counted as caught.",
+      "compiler_error": "error[E0277]: the trait bound `ports::SensitiveString: Default` is not satisfied"
+    }
+  ]
+}

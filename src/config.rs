@@ -1045,7 +1045,7 @@ fn keyring_entry_for_tokens(client_id: &str) -> Result<Entry> {
     )?)
 }
 
-fn ensure_native_keyring_store() -> Result<()> {
+pub(crate) fn ensure_native_keyring_store() -> Result<()> {
     if keyring_core::get_default_store().is_some() {
         return Ok(());
     }
