@@ -13,8 +13,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod policy;
+pub mod ports;
 pub mod provider;
-pub mod provider_store;
+pub(crate) mod provider_store;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const MAX_OPERATION_ID_LEN: usize = 64;
@@ -113,12 +115,7 @@ impl AccessRequest {
         if !valid_operation_id(&self.operation_id) {
             bail!("operation ID must use lowercase letters, digits, and hyphens")
         }
-        if self.operation_revision.len() != 64
-            || !self
-                .operation_revision
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit())
-        {
+        if !valid_sha256(&self.operation_revision) {
             bail!("operation revision must be a SHA-256 hex digest")
         }
         if self.args.len() > MAX_ARGS {
@@ -240,14 +237,24 @@ fn valid_agent_id(value: &str) -> bool {
         && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
-fn valid_operation_id(value: &str) -> bool {
+pub(crate) fn valid_operation_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= MAX_OPERATION_ID_LEN
         && value.bytes().enumerate().all(|(index, byte)| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || (byte == b'-' && index != 0 && index + 1 != value.len())
+            (index == 0 && byte.is_ascii_lowercase())
+                || (index > 0
+                    && (byte.is_ascii_lowercase()
+                        || byte.is_ascii_digit()
+                        || (byte == b'-' && value.as_bytes()[index - 1] != b'-')))
         })
+        && !value.ends_with('-')
+}
+
+pub(crate) fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn hex_sha256(data: &[u8]) -> String {
@@ -290,6 +297,34 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_non_strict_operation_ids_and_uppercase_revisions() {
+        for operation_id in ["1deploy", "deploy--homelab", "deploy-", "Deploy-homelab"] {
+            assert!(
+                AccessRequest::new_at(
+                    "codex-day-to-day",
+                    operation_id,
+                    REVISION,
+                    Vec::new(),
+                    100,
+                    60,
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            AccessRequest::new_at(
+                "codex-day-to-day",
+                "deploy-homelab",
+                REVISION.to_ascii_uppercase(),
+                Vec::new(),
+                100,
+                60,
+            )
+            .is_err()
+        );
     }
 
     #[test]
