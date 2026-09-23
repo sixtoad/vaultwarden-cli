@@ -1,0 +1,22 @@
+{
+  "Cargo.lock": "f4f5d762305a2fdc22186405eb14e95b918acb381d3b0ddb564134ea99ae6e8c",
+  "Cargo.toml": "b0e33c3232fefcf733e0730db6ba6b0a18a826daf12c3c24281b615fb5722acc",
+  "src/access.rs": "c35cfafaa73305b28965b5f62b6b9122aa476b66f29d70b47335f1ff1aa32d12",
+  "src/access/application.rs": "a21e79e82200aa22ac5e9185ab9e75ce1af8bbadbc68a34feae375674764c640",
+  "src/access/ports.rs": "5a8e76fda69a102ec7eb4b1e6352407f9ab7f1d24f963a69e5071135cc45337b",
+  "src/access/provider.rs": "8921d66a9c372d685f7425c24a4a4ce46d6367ecd681f6a0f15eaf6ad7a53251",
+  "src/adapters/loopback_ui.rs": "ead664ab530267159036c71886a6bc3913a30e33e82de4db7d83bbd70271ab2e",
+  "src/adapters/mod.rs": "4d2535826de4f3ba6495a9007c96e74bf2af78607b1aa5803d67250220215daf",
+  "src/adapters/session.rs": "a4e1ccfb671b09f726cb4322a96f4bd4e7e2ec6dc83b6c0766d1cea614d3b8f3",
+  "src/adapters/vaultwarden.rs": "35c4f2d110190f0f29cb3084e3481f6470c3ca9e7292e60169abd2660cf00881",
+  "src/bin/vaultwarden-accessd.rs": "c26e92936009caa6479a17dd6313d6f55838d35b45b7a4faa50dae86c07b4618",
+  "src/config.rs": "003a568134d6727bc16e4f9ab3372a53f5466e2b33808526de417d29693d0a94",
+  "src/lib.rs": "769d23ac9a0164fec4f6aab842788444ce0bd29c1b30110df0df1b1d77bbff09",
+  "tests/fixtures/provider-tls/README.md": "45fe5840aecf31226edb174a764a546b0bd1c800070144ca6d17cb0ae26d2318",
+  "tests/fixtures/provider-tls/ca.pem": "81b6360ba620bdc9c498ed4b205b61eb09200eeb27d04eb93d139f8636efa779",
+  "tests/fixtures/provider-tls/replacement-key.pem": "bbb2950223cb47a953ce69a8f819ff40ba5b19d199cbc49223333ff437882f11",
+  "tests/fixtures/provider-tls/replacement.pem": "0b41cbbb87153c79c608dd5534baacc1e397cf540b783a601cf3e510a7e73b1f",
+  "tests/fixtures/provider-tls/server-key.pem": "c3dc7d568cf2f765fcbe80793cadc5d75b446f5acf985506b2c76fc1bb13ac0d",
+  "tests/fixtures/provider-tls/server.pem": "6e3bc66892a2208867724f4aefce9f2da64dae44bfb04c7cbafee854d45770a9",
+  "tests/provider_session.rs": "bcc0c7893f8d81757f4b12af0a617744a92f442f5ec939132baa4fc9cb2f994d"
+}

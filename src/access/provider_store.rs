@@ -116,14 +116,26 @@ pub(crate) struct ProviderStore {
 }
 
 impl ProviderStore {
+    #[cfg(test)]
     pub(crate) fn open(root: impl Into<PathBuf>) -> Result<Self, ProviderError> {
-        Self::open_for_owner(root.into(), current_uid())
+        Self::open_with_cleanup(root, || Ok(()))
     }
-    fn open_for_owner(root: PathBuf, owner_uid: u32) -> Result<Self, ProviderError> {
+    pub(crate) fn open_with_cleanup(
+        root: impl Into<PathBuf>,
+        cleanup: impl FnOnce() -> Result<(), ()>,
+    ) -> Result<Self, ProviderError> {
+        Self::open_for_owner_with_cleanup(root.into(), current_uid(), cleanup)
+    }
+    fn open_for_owner_with_cleanup(
+        root: PathBuf,
+        owner_uid: u32,
+        cleanup: impl FnOnce() -> Result<(), ()>,
+    ) -> Result<Self, ProviderError> {
         if !root.exists() {
             create_initial_layout(&root, owner_uid)?;
         }
-        validate_layout(&root, owner_uid)?;
+        validate_dir(&root, owner_uid, true)?;
+        validate_regular_file(&root.join(LOCK_FILE), PRIVATE_FILE_MODE, owner_uid)?;
         let lock = open_existing(&root.join(LOCK_FILE), true)?;
         validate_open_file(&lock, PRIVATE_FILE_MODE, owner_uid)?;
         try_lock_exclusive(&lock)?;
@@ -133,6 +145,9 @@ impl ProviderStore {
             poisoned: false,
             _writer_lock: lock,
         };
+        // The stable writer is held. Revoke crashed-process authority before any
+        // state decoding, permission/integrity checks or lifecycle persistence.
+        cleanup().map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
         store.read_state().map(|_| store)
     }
     pub(crate) fn read_state(&self) -> Result<ProviderState, ProviderError> {

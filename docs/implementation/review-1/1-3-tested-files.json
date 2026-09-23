@@ -1,0 +1,16 @@
+{
+  "Cargo.lock": "f4f5d762305a2fdc22186405eb14e95b918acb381d3b0ddb564134ea99ae6e8c",
+  "Cargo.toml": "b0e33c3232fefcf733e0730db6ba6b0a18a826daf12c3c24281b615fb5722acc",
+  "src/access.rs": "c35cfafaa73305b28965b5f62b6b9122aa476b66f29d70b47335f1ff1aa32d12",
+  "src/access/application.rs": "9970e0c2eb246a6fdb715bfdd1a2a9ed49aa6467e132105d4f798f935c0f1658",
+  "src/access/ports.rs": "5a8e76fda69a102ec7eb4b1e6352407f9ab7f1d24f963a69e5071135cc45337b",
+  "src/access/provider.rs": "3ec894b8ae9d46e0ff99eeb62a6081b6cc87cd10eda33f7e431dc14c5b0d412e",
+  "src/adapters/loopback_ui.rs": "02d7a1956f2f5216e2a91a8aef2e3983f939373917baf0bd1711fd17bde481a9",
+  "src/adapters/mod.rs": "1a77f1ca3cc430f4350eeeb36373273d755991533ee608c48c7f2bf35f14ad20",
+  "src/adapters/session.rs": "afe6613fc553ad78efb64f349046e4a6b213835659f0c9183e8cad1909222950",
+  "src/adapters/vaultwarden.rs": "0f733b08d16762a0c911175089f91afc2435cd38594c47cecd6a367f8bb1ec11",
+  "src/bin/vaultwarden-accessd.rs": "e6f67bbf0070758f35781bf2c58e2d668ea265e78e1e9cd0418ffa98905c0af0",
+  "src/config.rs": "003a568134d6727bc16e4f9ab3372a53f5466e2b33808526de417d29693d0a94",
+  "src/lib.rs": "769d23ac9a0164fec4f6aab842788444ce0bd29c1b30110df0df1b1d77bbff09",
+  "tests/provider_session.rs": "515e5e1569b4abd1d6616f85cadacbd705d3ed24431b02c3a917858a54c0ea73"
+}

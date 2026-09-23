@@ -13,6 +13,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod application;
 pub mod policy;
 pub mod ports;
 pub mod provider;

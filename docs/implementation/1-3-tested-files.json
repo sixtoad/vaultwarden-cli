@@ -1,0 +1,23 @@
+{
+  "Cargo.lock": "f4f5d762305a2fdc22186405eb14e95b918acb381d3b0ddb564134ea99ae6e8c",
+  "Cargo.toml": "b0e33c3232fefcf733e0730db6ba6b0a18a826daf12c3c24281b615fb5722acc",
+  "src/access.rs": "c35cfafaa73305b28965b5f62b6b9122aa476b66f29d70b47335f1ff1aa32d12",
+  "src/access/application.rs": "2d43c615478f0b3eaf17c4deca4bc9878ba6b31516d2ba5a103ece04cd8e87f9",
+  "src/access/ports.rs": "5a8e76fda69a102ec7eb4b1e6352407f9ab7f1d24f963a69e5071135cc45337b",
+  "src/access/provider.rs": "0a3d980898df3f5a92905b91590483747b96375badd2cbcf9f150eff5abfdb5b",
+  "src/access/provider_store.rs": "29745a726e04447751e3ed343f07db275a423b1885ab5026025b592fb34e3ded",
+  "src/adapters/loopback_ui.rs": "b2d15f865a4db0bd2b97ad51ee067ff299227b3f702c14a40bc2fe05733169c9",
+  "src/adapters/mod.rs": "4d2535826de4f3ba6495a9007c96e74bf2af78607b1aa5803d67250220215daf",
+  "src/adapters/session.rs": "f316e3513b8f84f7a1e2612687ee198061fcbd56f9c6b271f965e377d073bc62",
+  "src/adapters/vaultwarden.rs": "ccf8f6bebc2beea2b37159cf0516f715c07fd41381fc000aaf5c6ce8d97ea461",
+  "src/bin/vaultwarden-accessd.rs": "1ef1857c4ea6e0a75d47b603433a396e74355fbc5ff128cd6c21afc678dd5c39",
+  "src/config.rs": "003a568134d6727bc16e4f9ab3372a53f5466e2b33808526de417d29693d0a94",
+  "src/lib.rs": "769d23ac9a0164fec4f6aab842788444ce0bd29c1b30110df0df1b1d77bbff09",
+  "tests/fixtures/provider-tls/README.md": "45fe5840aecf31226edb174a764a546b0bd1c800070144ca6d17cb0ae26d2318",
+  "tests/fixtures/provider-tls/ca.pem": "81b6360ba620bdc9c498ed4b205b61eb09200eeb27d04eb93d139f8636efa779",
+  "tests/fixtures/provider-tls/replacement-key.pem": "bbb2950223cb47a953ce69a8f819ff40ba5b19d199cbc49223333ff437882f11",
+  "tests/fixtures/provider-tls/replacement.pem": "0b41cbbb87153c79c608dd5534baacc1e397cf540b783a601cf3e510a7e73b1f",
+  "tests/fixtures/provider-tls/server-key.pem": "c3dc7d568cf2f765fcbe80793cadc5d75b446f5acf985506b2c76fc1bb13ac0d",
+  "tests/fixtures/provider-tls/server.pem": "6e3bc66892a2208867724f4aefce9f2da64dae44bfb04c7cbafee854d45770a9",
+  "tests/provider_session.rs": "0d7fe8b3e9c838f902e0df7597a7b493c915d179b3f2f7fe0603e713e970fa58"
+}
