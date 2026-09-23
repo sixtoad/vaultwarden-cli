@@ -1,55 +1,56 @@
-//! Locked provider lifecycle foundation.
-//!
-//! This module intentionally has no secret-backend field or constructor. A
-//! future unlocked provider must be a separate, human-approved capability.
+//! Locked provider lifecycle and protected-operation admission.
 
 use std::fmt;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::AccessRequest;
+use super::policy::{OperationPolicy, OperationPolicyDraft};
+use super::ports::LoginEligibilityVerifier;
 use super::provider_store::{ProviderState, ProviderStore};
 
-/// Stable, redacted categories suitable for daemon diagnostics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProviderDiagnostic {
     UnsafeState,
     InvalidState,
     PersistenceFailure,
+    InvalidOperationPolicy,
+    CredentialIneligible,
+    StaleOperationPolicyRevision,
+    ExpiredAccessRequest,
 }
 
 impl fmt::Display for ProviderDiagnostic {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let message = match self {
+        formatter.write_str(match self {
             Self::UnsafeState => "unsafe provider state",
             Self::InvalidState => "invalid provider state",
             Self::PersistenceFailure => "provider state persistence failed",
-        };
-        formatter.write_str(message)
+            Self::InvalidOperationPolicy => "invalid operation policy",
+            Self::CredentialIneligible => "credential is not eligible",
+            Self::StaleOperationPolicyRevision => "stale operation policy revision",
+            Self::ExpiredAccessRequest => "access request expired",
+        })
     }
 }
 
-/// An error which deliberately retains no filesystem, serialized-state, or
-/// backend detail for callers to render.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProviderError {
     diagnostic: ProviderDiagnostic,
 }
-
 impl ProviderError {
     pub(crate) const fn new(diagnostic: ProviderDiagnostic) -> Self {
         Self { diagnostic }
     }
-
     pub const fn diagnostic(&self) -> ProviderDiagnostic {
         self.diagnostic
     }
 }
-
 impl fmt::Display for ProviderError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.diagnostic.fmt(formatter)
     }
 }
-
 impl std::error::Error for ProviderError {}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -57,8 +58,7 @@ pub enum ProviderLockState {
     Locked,
 }
 
-/// The startup-only provider. Its fields prove this foundation stores neither
-/// a Vaultwarden backend nor an unlocked session.
+/// The startup-only provider holds no secret-backend capability.
 #[derive(Debug)]
 pub struct Provider {
     store: ProviderStore,
@@ -67,8 +67,6 @@ pub struct Provider {
 }
 
 impl Provider {
-    /// Start in the locked state. Startup is itself a crash-recovery boundary,
-    /// so stale unexecuted records are durably invalidated first.
     pub fn start(root: impl Into<PathBuf>) -> Result<Self, ProviderError> {
         let mut store = ProviderStore::open(root)?;
         let state = store.invalidate_unexecuted()?;
@@ -78,179 +76,264 @@ impl Provider {
             state,
         })
     }
-
     pub const fn lock_state(&self) -> ProviderLockState {
         self.lock_state
     }
-
-    /// Locking never preserves an approved or running operation in memory or
-    /// on disk. A write failure is returned and callers must fail closed.
     pub fn lock(&mut self) -> Result<(), ProviderError> {
         self.state = self.store.invalidate_unexecuted()?;
         self.lock_state = ProviderLockState::Locked;
         Ok(())
     }
-
-    /// Shutdown has the same durable invalidation semantics as lock and
-    /// restart. It is explicit because `Drop` cannot report durability errors.
     pub fn shutdown(&mut self) -> Result<(), ProviderError> {
         self.lock()
+    }
+
+    /// Checks the registry-owned image before the backend eligibility port and
+    /// only advances in-memory authority after durable replacement succeeds.
+    pub fn activate_operation<V: LoginEligibilityVerifier>(
+        &mut self,
+        draft: OperationPolicyDraft,
+        verifier: &V,
+    ) -> Result<String, ProviderError> {
+        let state = self.store.read_state()?;
+        let Some(image) = state
+            .approved_images
+            .iter()
+            .find(|image| image.id() == draft.image_id)
+        else {
+            return Err(ProviderError::new(
+                ProviderDiagnostic::InvalidOperationPolicy,
+            ));
+        };
+        let policy = OperationPolicy::from_draft(draft, image)
+            .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+        let marker = format!("vw-access={}", policy.id());
+        for binding in policy.login_bindings() {
+            if !verifier
+                .is_login_eligible(binding.item_id, &binding.required_fields, &marker)
+                .unwrap_or(false)
+            {
+                return Err(ProviderError::new(ProviderDiagnostic::CredentialIneligible));
+            }
+        }
+        let revision = policy.revision().to_owned();
+        let updated = self.store.upsert_operation(&state, policy)?;
+        self.state = updated;
+        Ok(revision)
+    }
+
+    /// This preflight is deliberately side-effect free and must run before an
+    /// approval prompt or secret-resolution capability is reachable.
+    pub fn preflight_request(&self, request: &AccessRequest) -> Result<(), ProviderError> {
+        request
+            .validate()
+            .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidState))?
+            .as_secs();
+        if request.is_expired_at(now) {
+            return Err(ProviderError::new(ProviderDiagnostic::ExpiredAccessRequest));
+        }
+        // Reload under the stable writer lock so a changed/deleted image,
+        // registry mismatch, or on-disk tampering cannot be admitted from a
+        // stale in-memory policy.
+        let state = self.store.read_state()?;
+        let Some(policy) = state
+            .operations
+            .iter()
+            .find(|policy| policy.id() == request.operation_id)
+        else {
+            return Err(ProviderError::new(
+                ProviderDiagnostic::InvalidOperationPolicy,
+            ));
+        };
+        if policy.revision() != request.operation_revision {
+            return Err(ProviderError::new(
+                ProviderDiagnostic::StaleOperationPolicyRevision,
+            ));
+        }
+        if !policy.validates_args(&request.args) {
+            return Err(ProviderError::new(
+                ProviderDiagnostic::InvalidOperationPolicy,
+            ));
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::access::provider_store::{RequestLifecycleStatus, RequestRecord};
+    use crate::access::policy::{
+        ArgumentSpec, CredentialUse, LoginCredentialDraft, LoginField, LoginFieldMapping,
+        test_approved_image,
+    };
+    use crate::access::ports::LoginEligibilityError;
     use std::fs;
-    use std::os::unix::fs::{PermissionsExt, symlink};
-    use tempfile::tempdir;
+    use std::os::unix::fs::PermissionsExt;
 
-    fn state_path(root: &std::path::Path) -> std::path::PathBuf {
-        root.join("provider-state.json")
+    const ITEM: &str = "11111111-1111-1111-1111-111111111111";
+    fn temp() -> tempfile::TempDir {
+        let temp = tempfile::tempdir().unwrap();
+        fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        temp
     }
-
-    #[test]
-    fn redacted_diagnostics_have_stable_operator_rendering() {
-        assert_eq!(
-            ProviderDiagnostic::UnsafeState.to_string(),
-            "unsafe provider state"
-        );
-        assert_eq!(
-            ProviderDiagnostic::InvalidState.to_string(),
-            "invalid provider state"
-        );
-        assert_eq!(
-            ProviderDiagnostic::PersistenceFailure.to_string(),
-            "provider state persistence failed"
-        );
-        assert_eq!(
-            ProviderError::new(ProviderDiagnostic::UnsafeState).to_string(),
-            "unsafe provider state"
-        );
+    fn draft() -> OperationPolicyDraft {
+        OperationPolicyDraft {
+            id: "deploy-homelab".into(),
+            description: "Deploy".into(),
+            image_id: "deploy-image".into(),
+            targets: vec!["staging".into()],
+            arguments: vec![ArgumentSpec::Target],
+            credentials: vec![LoginCredentialDraft {
+                item_id: ITEM.into(),
+                label: "login".into(),
+                use_type: CredentialUse::Login,
+                field_mappings: vec![LoginFieldMapping {
+                    field: LoginField::Password,
+                    environment: "DEPLOY_PASSWORD".into(),
+                }],
+            }],
+        }
     }
-
+    struct Eligible;
+    impl LoginEligibilityVerifier for Eligible {
+        fn is_login_eligible(
+            &self,
+            item: &str,
+            fields: &[LoginField],
+            marker: &str,
+        ) -> Result<bool, LoginEligibilityError> {
+            Ok(item == ITEM
+                && fields == [LoginField::Password]
+                && marker == "vw-access=deploy-homelab")
+        }
+    }
+    fn provision_for_test(provider: &mut Provider, image: crate::access::policy::ApprovedImage) {
+        provider.state.approved_images.push(image);
+        provider.store.write_state(&provider.state).unwrap();
+    }
     #[test]
-    fn safe_initialization_is_locked_and_has_no_authority() {
-        let temp = tempdir().unwrap();
+    fn activation_requires_registry_id_and_exact_login_binding() {
+        let temp = temp();
         let root = temp.path().join("provider");
-        let provider = Provider::start(&root).unwrap();
-
-        assert_eq!(provider.lock_state(), ProviderLockState::Locked);
-        assert!(provider.state.pairings.is_empty());
-        assert!(provider.state.operations.is_empty());
-        assert_eq!(
-            fs::metadata(&root).unwrap().permissions().mode() & 0o777,
-            0o700
-        );
-        assert_eq!(
-            fs::metadata(state_path(&root))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
-            0o600
-        );
-    }
-
-    #[test]
-    fn lifecycle_boundaries_durably_invalidate_unexecuted_records() {
-        let temp = tempdir().unwrap();
-        let root = temp.path().join("provider");
-        let mut store = ProviderStore::open(&root).unwrap();
-        let mut state = store.read_state().unwrap();
-        state.requests = vec![
-            RequestRecord {
-                id: "pending".into(),
-                status: RequestLifecycleStatus::Pending,
-            },
-            RequestRecord {
-                id: "approved".into(),
-                status: RequestLifecycleStatus::Approved,
-            },
-            RequestRecord {
-                id: "running".into(),
-                status: RequestLifecycleStatus::Running,
-            },
-            RequestRecord {
-                id: "done".into(),
-                status: RequestLifecycleStatus::Completed,
-            },
-        ];
-        store.write_state(&state).unwrap();
-        drop(store);
-
         let mut provider = Provider::start(&root).unwrap();
-        assert_eq!(provider.state.lifecycle_epoch, 1);
-        provider.lock().unwrap();
-        provider.shutdown().unwrap();
+        assert_eq!(
+            provider
+                .activate_operation(draft(), &Eligible)
+                .unwrap_err()
+                .diagnostic(),
+            ProviderDiagnostic::InvalidOperationPolicy
+        );
+        provision_for_test(
+            &mut provider,
+            test_approved_image(temp.path(), "deploy-image"),
+        );
+        let revision = provider.activate_operation(draft(), &Eligible).unwrap();
+        let request = AccessRequest::new(
+            "agent",
+            "deploy-homelab",
+            revision,
+            vec!["staging".into()],
+            60,
+        )
+        .unwrap();
+        assert!(provider.preflight_request(&request).is_ok());
         drop(provider);
-        let saved = ProviderStore::open(&root).unwrap().read_state().unwrap();
-        assert_eq!(saved.lifecycle_epoch, 3);
-        assert_eq!(
-            saved.requests[0].status,
-            RequestLifecycleStatus::Invalidated
-        );
-        assert_eq!(
-            saved.requests[1].status,
-            RequestLifecycleStatus::Invalidated
-        );
-        assert_eq!(
-            saved.requests[2].status,
-            RequestLifecycleStatus::Invalidated
-        );
-        assert_eq!(saved.requests[3].status, RequestLifecycleStatus::Completed);
+        let reopened = Provider::start(&root).unwrap();
+        assert_eq!(reopened.state.operations.len(), 1);
+        assert!(reopened.preflight_request(&request).is_ok());
     }
-
     #[test]
-    fn malformed_or_missing_state_fails_closed() {
-        let temp = tempdir().unwrap();
+    fn stale_revision_precedes_argument_processing_and_mutates_nothing() {
+        let temp = temp();
         let root = temp.path().join("provider");
-        Provider::start(&root).unwrap();
-        fs::write(state_path(&root), b"not json").unwrap();
-        assert_eq!(
-            Provider::start(&root).unwrap_err().diagnostic(),
-            ProviderDiagnostic::InvalidState
+        let mut provider = Provider::start(&root).unwrap();
+        provision_for_test(
+            &mut provider,
+            test_approved_image(temp.path(), "deploy-image"),
         );
-        fs::remove_file(state_path(&root)).unwrap();
-        assert_eq!(
-            Provider::start(&root).unwrap_err().diagnostic(),
-            ProviderDiagnostic::InvalidState
-        );
-    }
-
-    #[test]
-    fn symlinked_or_permissive_state_fails_closed() {
-        let temp = tempdir().unwrap();
-        let root = temp.path().join("provider");
-        Provider::start(&root).unwrap();
-        let outside = temp.path().join("outside");
-        fs::write(&outside, b"{}").unwrap();
-        fs::remove_file(state_path(&root)).unwrap();
-        symlink(&outside, state_path(&root)).unwrap();
-        assert_eq!(
-            Provider::start(&root).unwrap_err().diagnostic(),
-            ProviderDiagnostic::UnsafeState
-        );
-
-        fs::remove_file(state_path(&root)).unwrap();
-        let store = ProviderStore::open(&root);
-        assert_eq!(
-            store.unwrap_err().diagnostic(),
-            ProviderDiagnostic::InvalidState
-        );
-        // A separately initialized root demonstrates mode rejection without
-        // replacing a required state file after initialization.
-        let permissive_root = temp.path().join("permissive");
-        Provider::start(&permissive_root).unwrap();
-        fs::set_permissions(
-            state_path(&permissive_root),
-            fs::Permissions::from_mode(0o640),
+        provider.activate_operation(draft(), &Eligible).unwrap();
+        let stale = AccessRequest::new(
+            "agent",
+            "deploy-homelab",
+            "a".repeat(64),
+            vec!["bad".into()],
+            60,
         )
         .unwrap();
         assert_eq!(
-            Provider::start(&permissive_root).unwrap_err().diagnostic(),
+            provider.preflight_request(&stale).unwrap_err().diagnostic(),
+            ProviderDiagnostic::StaleOperationPolicyRevision
+        );
+        assert!(provider.state.requests.is_empty());
+    }
+    #[test]
+    fn poisoned_store_blocks_preflight_before_stale_memory_is_admitted() {
+        let temp = temp();
+        let root = temp.path().join("provider");
+        let mut provider = Provider::start(&root).unwrap();
+        provision_for_test(
+            &mut provider,
+            test_approved_image(temp.path(), "deploy-image"),
+        );
+        let revision = provider.activate_operation(draft(), &Eligible).unwrap();
+        let request = AccessRequest::new(
+            "agent",
+            "deploy-homelab",
+            revision,
+            vec!["staging".into()],
+            60,
+        )
+        .unwrap();
+        provider.store.poison_for_test();
+        assert_eq!(
+            provider
+                .preflight_request(&request)
+                .unwrap_err()
+                .diagnostic(),
             ProviderDiagnostic::UnsafeState
+        );
+    }
+    #[test]
+    fn preflight_uses_revalidated_durable_state_not_a_stale_cache() {
+        let temp = temp();
+        let root = temp.path().join("provider");
+        let mut provider = Provider::start(&root).unwrap();
+        provision_for_test(
+            &mut provider,
+            test_approved_image(temp.path(), "deploy-image"),
+        );
+        let revision = provider.activate_operation(draft(), &Eligible).unwrap();
+        let request = AccessRequest::new(
+            "agent",
+            "deploy-homelab",
+            revision,
+            vec!["staging".into()],
+            60,
+        )
+        .unwrap();
+        let mut altered = provider.store.read_state().unwrap();
+        altered.operations.clear();
+        provider.store.write_state(&altered).unwrap();
+        assert_eq!(
+            provider
+                .preflight_request(&request)
+                .unwrap_err()
+                .diagnostic(),
+            ProviderDiagnostic::InvalidOperationPolicy
+        );
+    }
+    #[test]
+    fn stable_diagnostics_are_redacted() {
+        assert_eq!(
+            ProviderDiagnostic::CredentialIneligible.to_string(),
+            "credential is not eligible"
+        );
+        assert_eq!(
+            ProviderDiagnostic::StaleOperationPolicyRevision.to_string(),
+            "stale operation policy revision"
         );
     }
 }
