@@ -1,0 +1,384 @@
+[
+  {
+    "name": "default_lifetime",
+    "file": "src/access/direct_request.rs",
+    "filter": "access::direct_request_tests::",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata"
+    ],
+    "classification": "caught",
+    "source_sha256": "4cd80e475ea8b632bb6da4e8f4625388b2dd2726982a226950fbc04344bebf05"
+  },
+  {
+    "name": "unknown_submission_fields",
+    "file": "src/access/direct_request.rs",
+    "filter": "adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up"
+    ],
+    "classification": "caught",
+    "source_sha256": "4cd80e475ea8b632bb6da4e8f4625388b2dd2726982a226950fbc04344bebf05"
+  },
+  {
+    "name": "session_csrf",
+    "file": "src/adapters/loopback_ui.rs",
+    "filter": "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated"
+    ],
+    "classification": "caught",
+    "source_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11"
+  },
+  {
+    "name": "startup_launch_replay",
+    "file": "src/adapters/loopback_ui.rs",
+    "filter": "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf"
+    ],
+    "classification": "caught",
+    "source_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11"
+  },
+  {
+    "name": "unknown_status_fields",
+    "file": "src/access/direct_request.rs",
+    "filter": "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields"
+    ],
+    "classification": "caught",
+    "source_sha256": "4cd80e475ea8b632bb6da4e8f4625388b2dd2726982a226950fbc04344bebf05"
+  },
+  {
+    "name": "unknown_receipt_fields",
+    "file": "src/access/direct_request.rs",
+    "filter": "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields"
+    ],
+    "classification": "caught",
+    "source_sha256": "4cd80e475ea8b632bb6da4e8f4625388b2dd2726982a226950fbc04344bebf05"
+  },
+  {
+    "name": "unknown_review_fields",
+    "file": "src/access/direct_request.rs",
+    "filter": "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields"
+    ],
+    "classification": "caught",
+    "source_sha256": "4cd80e475ea8b632bb6da4e8f4625388b2dd2726982a226950fbc04344bebf05"
+  },
+  {
+    "name": "persisted_owner_filter",
+    "file": "src/access/provider.rs",
+    "filter": "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human"
+    ],
+    "classification": "caught",
+    "source_sha256": "5103d9bcc5ef196dd19b0b8c8b347123d3fe63d997bc9a6423b4b33e603a699d"
+  },
+  {
+    "name": "status_exit_code_bounds",
+    "file": "src/access/direct_request.rs",
+    "filter": "access::direct_request_tests::status_wire_requires_variant_fields_and_bounded_exit_codes",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::status_wire_requires_variant_fields_and_bounded_exit_codes",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::status_wire_requires_variant_fields_and_bounded_exit_codes"
+    ],
+    "classification": "caught",
+    "source_sha256": "4cd80e475ea8b632bb6da4e8f4625388b2dd2726982a226950fbc04344bebf05"
+  },
+  {
+    "name": "duplicate_request_ids",
+    "file": "src/access/provider_store.rs",
+    "filter": "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently"
+    ],
+    "classification": "caught",
+    "source_sha256": "dfe1dd9f63e9c8956fe664b608ba36145e72363f13ab5872ed9674dd3266be89"
+  },
+  {
+    "name": "stale_pending_epoch",
+    "file": "src/access/provider_store.rs",
+    "filter": "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently"
+    ],
+    "classification": "caught",
+    "source_sha256": "dfe1dd9f63e9c8956fe664b608ba36145e72363f13ab5872ed9674dd3266be89"
+  },
+  {
+    "name": "request_launch_replay",
+    "file": "src/adapters/loopback_ui.rs",
+    "filter": "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact"
+    ],
+    "classification": "caught",
+    "source_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11"
+  },
+  {
+    "name": "launch_capability_256_bits",
+    "file": "src/adapters/loopback_ui.rs",
+    "filter": "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact"
+    ],
+    "classification": "caught",
+    "source_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11"
+  },
+  {
+    "name": "launch_capability_randomness",
+    "file": "src/adapters/loopback_ui.rs",
+    "filter": "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions"
+    ],
+    "classification": "caught",
+    "source_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11"
+  },
+  {
+    "name": "contention_queues_requests",
+    "file": "src/access/application.rs",
+    "filter": "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch"
+    ],
+    "classification": "caught",
+    "source_sha256": "f432311a489f1b93d108929500008129e1941bd53e6447fd6e499d1de38cb90a"
+  },
+  {
+    "name": "post_persistence_revocation_loses_receipt",
+    "file": "src/access/application.rs",
+    "filter": "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch"
+    ],
+    "classification": "caught",
+    "source_sha256": "f432311a489f1b93d108929500008129e1941bd53e6447fd6e499d1de38cb90a"
+  },
+  {
+    "name": "worker_admission_bound_removed",
+    "file": "src/adapters/human_socket.rs",
+    "filter": "adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity",
+    "argv": [
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity"
+    ],
+    "classification": "caught",
+    "source_sha256": "49de8a4afaf7403ee6c3ea9bd998dc86fad81a1f4dc8d0fbe0c395a26edd92c6"
+  },
+  {
+    "name": "configured_lifetime_ignored",
+    "file": "src/bin/vaultwarden-accessd.rs",
+    "filter": "tests::configured_request_lifetime_controls_receipt_and_expiry",
+    "argv": [
+      "cargo",
+      "test",
+      "--bin",
+      "vaultwarden-accessd",
+      "tests::configured_request_lifetime_controls_receipt_and_expiry",
+      "--",
+      "--nocapture"
+    ],
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "compiled_mutant": true,
+    "failed_tests": [
+      "tests::configured_request_lifetime_controls_receipt_and_expiry"
+    ],
+    "classification": "caught",
+    "source_sha256": "44b95029620a41bb2bccb00f25efe85bcef35cff6d1c7cd41dbecde55997b5cf"
+  }
+]

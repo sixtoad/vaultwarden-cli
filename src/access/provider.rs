@@ -96,6 +96,136 @@ impl Provider {
         self.lock()
     }
 
+    pub(crate) fn owner_uid(&self) -> u32 {
+        self.store.owner_uid()
+    }
+    pub(crate) fn create_direct(
+        &mut self,
+        owner: super::direct_request::AuthenticatedHuman,
+        input: super::direct_request::DirectSubmission,
+        now: u64,
+        expires: u64,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
+    {
+        use super::direct_request::*;
+        if !super::valid_operation_id(&input.operation)
+            || input
+                .revision
+                .as_ref()
+                .is_some_and(|v| !super::valid_sha256(v))
+        {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        let mut state = self.store.read_state()?;
+        let policy = state
+            .operations
+            .iter()
+            .find(|p| p.id() == input.operation)
+            .ok_or(DirectRequestError::InvalidRequest)?;
+        if input
+            .revision
+            .as_ref()
+            .is_some_and(|r| r != policy.revision())
+        {
+            return Err(DirectRequestError::StaleRevision);
+        }
+        let args = policy
+            .normalize_args(&input.values)
+            .map_err(|_error| DirectRequestError::InvalidRequest)?;
+        if !still_authorized() {
+            return Err(DirectRequestError::Locked);
+        }
+        let id = super::RequestId::new_random()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .as_str()
+            .to_owned();
+        let review = policy.direct_review(id.clone(), args, expires);
+        let mut direct = DirectRecord {
+            owner_uid: owner.uid(),
+            created_at_unix_seconds: now,
+            lifecycle_epoch: state.lifecycle_epoch,
+            review: review.clone(),
+            binding_digest: String::new(),
+        };
+        direct.seal();
+        state.requests.push(super::provider_store::RequestRecord {
+            id,
+            status: super::provider_store::RequestLifecycleStatus::Pending,
+            direct: Some(direct),
+        });
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(review)
+    }
+    pub(crate) fn expire_direct(
+        &mut self,
+        now: std::time::Duration,
+        deadlines: &std::collections::HashMap<String, std::time::Duration>,
+    ) -> Result<(), ProviderError> {
+        let mut state = self.store.read_state()?;
+        let mut changed = false;
+        for request in &mut state.requests {
+            if let Some(direct) = &mut request.direct
+                && request.status.is_unexecuted()
+                && deadlines
+                    .get(&request.id)
+                    .is_none_or(|deadline| now >= *deadline)
+            {
+                request.status = super::provider_store::RequestLifecycleStatus::Invalidated;
+                direct.review.status = super::direct_request::DirectStatus::Expired;
+                changed = true;
+            }
+        }
+        if changed {
+            self.store.write_state(&state)?;
+        }
+        self.state = state;
+        Ok(())
+    }
+    pub(crate) fn direct_review(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
+    {
+        use super::direct_request::*;
+        if !valid_request_id(id) {
+            return Err(DirectRequestError::NotFound);
+        }
+        self.store
+            .read_state()?
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .filter(|d| d.owner_uid == owner.uid())
+            .map(|d| d.review.clone())
+            .ok_or(DirectRequestError::NotFound)
+    }
+    pub(crate) fn fail_direct_launch(&mut self, id: &str) -> Result<(), ProviderError> {
+        use super::{direct_request::*, provider_store::RequestLifecycleStatus};
+        let mut state = self.store.read_state()?;
+        if let Some(request) = state
+            .requests
+            .iter_mut()
+            .find(|r| r.id == id && r.status == RequestLifecycleStatus::Pending)
+        {
+            request.status = RequestLifecycleStatus::Failed;
+            request
+                .direct
+                .as_mut()
+                .ok_or_else(|| ProviderError::new(ProviderDiagnostic::InvalidState))?
+                .review
+                .status = DirectStatus::Failed {
+                reason: DirectFailure::ReviewUnavailable,
+            };
+            self.store.write_state(&state)?;
+        }
+        self.state = state;
+        Ok(())
+    }
+
     /// Checks the registry-owned image before the backend eligibility port and
     /// only advances in-memory authority after durable replacement succeeds.
     #[cfg(test)]
@@ -124,7 +254,7 @@ impl Provider {
             ));
         };
         let policy = OperationPolicy::from_draft(draft, image)
-            .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+            .map_err(|_error| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
         let marker = format!("vw-access={}", policy.id());
         for binding in policy.login_bindings() {
             if !verifier
@@ -148,10 +278,10 @@ impl Provider {
     pub fn preflight_request(&self, request: &AccessRequest) -> Result<(), ProviderError> {
         request
             .validate()
-            .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+            .map_err(|_error| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidState))?
+            .map_err(|_error| ProviderError::new(ProviderDiagnostic::InvalidState))?
             .as_secs();
         if request.is_expired_at(now) {
             return Err(ProviderError::new(ProviderDiagnostic::ExpiredAccessRequest));

@@ -237,7 +237,7 @@ pub mod tests {
             KdfIterations::new(100_000).expect("non-zero iterations"),
         );
         let stretched = mk.stretch().unwrap();
-        let _ = stretched;
+        let _ignored = stretched;
     }
 
     #[test]

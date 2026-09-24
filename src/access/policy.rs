@@ -207,6 +207,63 @@ impl OperationPolicy {
                         .is_some_and(|number| number >= *minimum && number <= *maximum),
                 })
     }
+    pub(crate) fn normalize_args(
+        &self,
+        values: &[String],
+    ) -> Result<Vec<String>, PolicyValidationError> {
+        if values.iter().any(|v| v.len() > MAX_VALUE_LEN) || !self.validates_args(values) {
+            return Err(PolicyValidationError);
+        }
+        self.arguments
+            .iter()
+            .zip(values)
+            .map(|(spec, value)| match spec {
+                ArgumentSpec::Integer { .. } => value
+                    .parse::<i64>()
+                    .map(|n| n.to_string())
+                    .map_err(|_error| PolicyValidationError),
+                _ => Ok(value.clone()),
+            })
+            .collect()
+    }
+    pub(crate) fn direct_review(
+        &self,
+        id: String,
+        arguments: Vec<String>,
+        expires_at_unix_seconds: u64,
+    ) -> super::direct_request::DirectReview {
+        use super::direct_request::*;
+        let target = self
+            .arguments
+            .iter()
+            .zip(&arguments)
+            .find_map(|(spec, value)| matches!(spec, ArgumentSpec::Target).then(|| value.clone()))
+            .unwrap_or_else(|| "No target argument".into());
+        DirectReview {
+            id,
+            requester: "local human terminal".into(),
+            operation: self.id.clone(),
+            effect: self.description.clone(),
+            target,
+            arguments_digest: arguments_digest(&arguments),
+            arguments,
+            credentials: self
+                .credentials
+                .iter()
+                .map(|c| ReviewCredential {
+                    label: c.label.clone(),
+                    use_type: c.use_type,
+                })
+                .collect(),
+            executable_digest: self.image.sha256.clone(),
+            policy_digest: self.revision.clone(),
+            expires_at_unix_seconds,
+            one_time:
+                "Approving this request would authorize one execution only; approval is unavailable at this stage."
+                    .into(),
+            status: DirectStatus::Pending,
+        }
+    }
     pub(crate) fn validate_integrity(&self) -> Result<(), PolicyValidationError> {
         let image = ApprovedImage::new(
             self.image.image_id.clone(),

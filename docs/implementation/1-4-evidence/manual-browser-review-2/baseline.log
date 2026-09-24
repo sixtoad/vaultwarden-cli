@@ -1,0 +1,34 @@
+{
+  "browser": "firefox/151.0.2",
+  "trustedTLS": true,
+  "automaticArtifactNavigation": true,
+  "keyboardFocus": {
+    "name": "Unlock for up to 15 minutes",
+    "style": "solid",
+    "width": "3px"
+  },
+  "axe": {
+    "violations": [],
+    "passes": 24
+  },
+  "requestReview": "pending -> expired -> expired while locked",
+  "launchReplay": "403",
+  "cookieOnly": "403",
+  "invalidProof": "403",
+  "priorSessionPreserved": true,
+  "concurrentFreshCookieTabs": true,
+  "transientPollingRecovery": true,
+  "immutableDetailsStable": true,
+  "unchangedLiveStatusStable": true,
+  "argumentBoundariesPreserved": true,
+  "screenReaderManual": false,
+  "automationDiagnostics": {
+    "knownCrossOriginOrBlockedFavicon": 6,
+    "categories": [
+      "Error: SecurityError: Permission denied to access property \"__bidi_args\" on cross-origin object",
+      "Error: Error: Permission denied to access property \"length\"",
+      "Error: Content-Security-Policy: The page’s settings blocked the loading of a resource (img-src) at https://127.0.0.1:<port>/favicon.ico because it violates the following directive: “default-src 'none'”"
+    ],
+    "unexpected": 0
+  }
+}

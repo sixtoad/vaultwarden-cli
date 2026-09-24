@@ -14,6 +14,9 @@ use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod application;
+pub mod direct_request;
+#[cfg(test)]
+pub(crate) mod direct_request_tests;
 pub mod policy;
 pub mod ports;
 pub mod provider;
@@ -214,7 +217,7 @@ pub fn decode_public_key(encoded: &str) -> Result<VerifyingKey> {
         .context("agent public key is not valid base64url")?;
     let key_bytes: [u8; 32] = bytes
         .try_into()
-        .map_err(|_| anyhow::anyhow!("agent public key must be 32 bytes"))?;
+        .map_err(|_error| anyhow::anyhow!("agent public key must be 32 bytes"))?;
     VerifyingKey::from_bytes(&key_bytes).context("agent public key is invalid")
 }
 

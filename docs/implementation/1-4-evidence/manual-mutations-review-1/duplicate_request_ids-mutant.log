@@ -1,0 +1,21 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.17s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 1 test
+
+thread 'access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently' (2787640) panicked at src/access/direct_request_tests.rs:825:9:
+assertion `left == right` failed: duplicate
+  left: Ok(Pending)
+ right: Err(Unavailable)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently ... FAILED
+
+failures:
+
+failures:
+    access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.70s
+
+error: test failed, to rerun pass `--lib`

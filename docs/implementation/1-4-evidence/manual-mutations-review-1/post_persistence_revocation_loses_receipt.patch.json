@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/access/application.rs\n+++ src/access/application.rs\n@@ -158,7 +158,7 @@\n         // Observe the deadline before admission so closing during a slow clock or\n         // durable write is checked before any desktop handoff.\n         let request_expired = self.clock.now() >= deadline;\n-        let admission = self.admit(&mut authority);\n+        let admission = self.admit(&mut authority); if admission.is_err() { return Err(DirectRequestError::Locked); }\n         let review = match result {\n             Ok(review) => review,\n             Err(error) => {\n"
+}

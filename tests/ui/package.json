@@ -1,0 +1,10 @@
+{
+  "name": "vaultwarden-access-ui-verification",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node direct-request.mjs" },
+  "devDependencies": {
+    "axe-core": "4.13.0",
+    "puppeteer-core": "25.11.0"
+  }
+}

@@ -485,7 +485,7 @@ impl Drop for LiveTestEnv {
         let delete_url = format!("{}/admin/users/{}/delete", self.server_url, self.user_uuid);
         let admin_login_url = format!("{}/admin", self.server_url);
         let admin_token = self.admin_token.clone();
-        let _ = std::thread::spawn(move || {
+        let _ignored = std::thread::spawn(move || {
             if let Ok(rt) = tokio::runtime::Runtime::new() {
                 rt.block_on(async {
                     install_rustls_crypto_provider();

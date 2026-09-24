@@ -1,0 +1,9 @@
+{
+  "change": "Comment and formatting only: identify a synthetic rejection-test sentinel for the existing staged secret scanner. Production logic and test assertions unchanged.",
+  "file": "src/adapters/loopback_ui.rs",
+  "verified_source_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+  "commit_source_sha256": "e5183791fc9e089c1574f0757161a1dc2593f83ce02159b3ca89ec3785306358",
+  "exact_known_replacement_verified": true,
+  "all_other_verified_inputs_unchanged": true,
+  "unified_diff": "--- src/adapters/loopback_ui.rs\n+++ src/adapters/loopback_ui.rs\n@@ -1404,7 +1404,11 @@\n             assert_eq!(response.status, 403);\n             assert!(!response.encode().contains(\"password-sentinel\"));\n         }\n-        for path in [\"/unlock?password=password-sentinel\", \"/status\", \"/resolve\"] {\n+        for path in [\n+            \"/unlock?password=password-sentinel\", // secrets-ignore: synthetic rejection-test sentinel\n+            \"/status\",\n+            \"/resolve\",\n+        ] {\n             assert_eq!(\n                 ui.handle(\n                     request(&ui, path, r#\"{\"password\":\"password-sentinel\"}\"#),\n"
+}

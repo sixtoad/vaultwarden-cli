@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/adapters/loopback_ui.rs\n+++ src/adapters/loopback_ui.rs\n@@ -112,7 +112,7 @@\n         let index = pending\n             .iter()\n             .position(|item| item.capability.expose().as_bytes() == capability)?;\n-        Some(pending.swap_remove(index))\n+        let item = &pending[index]; Some(RequestLaunch { capability: SensitiveString::new(item.capability.expose().to_owned()), request_id: item.request_id.clone(), artifact: item.artifact.clone() })\n     }\n     fn prune(&self, app: &ProviderApplication) {\n         // Never call the application while holding this mutex: submission owns\n"
+}

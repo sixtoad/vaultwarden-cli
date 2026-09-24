@@ -1,0 +1,19 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.18s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 1 test
+
+thread 'access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields' (2768391) panicked at src/access/direct_request_tests.rs:732:9:
+receipt secret
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields ... FAILED
+
+failures:
+
+failures:
+    access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.21s
+
+error: test failed, to rerun pass `--lib`

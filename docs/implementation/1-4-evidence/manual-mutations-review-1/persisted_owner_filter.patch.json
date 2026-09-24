@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/access/provider.rs\n+++ src/access/provider.rs\n@@ -199,7 +199,7 @@\n             .iter()\n             .find(|r| r.id == id)\n             .and_then(|r| r.direct.as_ref())\n-            .filter(|d| d.owner_uid == owner.uid())\n+            .filter(|_d| { let _ignored = owner; true })\n             .map(|d| d.review.clone())\n             .ok_or(DirectRequestError::NotFound)\n     }\n"
+}

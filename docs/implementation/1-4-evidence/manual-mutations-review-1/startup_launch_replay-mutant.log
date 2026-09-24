@@ -1,0 +1,19 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.07s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 1 test
+
+thread 'adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf' (2759743) panicked at src/adapters/loopback_ui.rs:1236:9:
+assertion failed: ui.launch.is_none()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf ... FAILED
+
+failures:
+
+failures:
+    adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--lib`

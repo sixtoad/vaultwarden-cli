@@ -1,3 +1,5 @@
+pub mod desktop_launch;
+pub mod human_socket;
 pub mod loopback_ui;
 pub mod session;
 pub mod vaultwarden;
@@ -27,7 +29,7 @@ fn buffered_fifo(path: &std::path::Path, contents: &[u8]) -> std::fs::File {
 fn within_test_deadline<T: Send + 'static>(operation: impl FnOnce() -> T + Send + 'static) -> T {
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let _ = sender.send(operation());
+        let _ignored = sender.send(operation());
     });
     receiver
         .recv_timeout(std::time::Duration::from_secs(2))

@@ -1,0 +1,52 @@
+Found 343 mutants to test
+ok       Unmutated baseline in 139s build + 16s test
+MISSED   src/access/application.rs:155:21: replace && with || in ProviderApplication::submit_direct in 26s build + 23s test
+MISSED   src/access/application.rs:125:39: replace < with <= in ProviderApplication::expire_requests in 34s build + 23s test
+MISSED   src/access/application.rs:154:21: replace && with || in ProviderApplication::submit_direct in 14s build + 22s test
+MISSED   src/access/application.rs:154:41: replace < with <= in ProviderApplication::submit_direct in 19s build + 28s test
+MISSED   src/access/application.rs:155:41: replace < with <= in ProviderApplication::submit_direct in 10s build + 26s test
+MISSED   src/access/direct_request.rs:17:9: replace AuthenticatedHuman::uid -> u32 with 0 in 12s build + 27s test
+MISSED   src/access/direct_request.rs:17:9: replace AuthenticatedHuman::uid -> u32 with 1 in 16s build + 23s test
+MISSED   src/access/policy.rs:214:42: replace > with >= in OperationPolicy::normalize_args in 17s build + 25s test
+MISSED   src/access/ports.rs:103:9: replace SessionClock::unix_seconds -> Result<u64, SessionError> with Ok(1) in 26s build + 22s test
+MISSED   src/access/ports.rs:103:9: replace SessionClock::unix_seconds -> Result<u64, SessionError> with Ok(0) in 31s build + 25s test
+MISSED   src/access/provider.rs:212:34: replace && with || in Provider::fail_direct_launch in 17s build + 24s test
+MISSED   src/adapters/desktop_launch.rs:66:40: replace < with <= in run_bounded in 17s build + 22s test
+MISSED   src/adapters/human_socket.rs:31:28: replace * with + in 20s build + 27s test
+MISSED   src/adapters/human_socket.rs:86:23: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in HumanSocket::bind in 13s build + 25s test
+MISSED   src/adapters/human_socket.rs:80:31: replace match guard e.kind() == std::io::ErrorKind::ConnectionRefused with true in HumanSocket::bind in 19s build + 20s test
+MISSED   src/adapters/human_socket.rs:115:25: replace < with > in HumanSocket::serve in 21s build + 30s test
+MISSED   src/adapters/human_socket.rs:117:35: replace |= with &= in HumanSocket::serve in 16s build + 45s test
+MISSED   src/adapters/human_socket.rs:148:27: replace match guard e.kind() == std::io::ErrorKind::WouldBlock with true in HumanSocket::serve in 21s build + 31s test
+MISSED   src/adapters/human_socket.rs:119:27: replace += with *= in HumanSocket::serve in 41s build + 31s test
+MISSED   src/adapters/human_socket.rs:190:53: replace | with & in connect_private in 31s build + 22s test
+MISSED   src/adapters/human_socket.rs:180:46: replace || with && in connect_private in 37s build + 23s test
+MISSED   src/adapters/human_socket.rs:190:53: replace | with ^ in connect_private in 10s build + 22s test
+MISSED   src/adapters/human_socket.rs:190:31: replace | with ^ in connect_private in 10s build + 22s test
+TIMEOUT  src/adapters/human_socket.rs:180:20: replace >= with < in connect_private in 24s build + 120s test
+MISSED   src/adapters/human_socket.rs:194:11: replace < with == in connect_private in 8s build + 21s test
+MISSED   src/adapters/human_socket.rs:194:11: replace < with <= in connect_private in 13s build + 17s test
+TIMEOUT  src/adapters/human_socket.rs:190:31: replace | with & in connect_private in 14s build + 120s test
+TIMEOUT  src/adapters/human_socket.rs:194:11: replace < with > in connect_private in 8s build + 120s test
+MISSED   src/adapters/human_socket.rs:223:9: replace || with && in private_directory in 20s build + 33s test
+MISSED   src/adapters/human_socket.rs:222:9: replace || with && in private_directory in 13s build + 25s test
+MISSED   src/adapters/human_socket.rs:231:5: replace private_socket -> Result<(), HumanTransportError> with Ok(()) in 24s build + 25s test
+MISSED   src/adapters/human_socket.rs:232:9: replace || with && in private_socket in 29s build + 28s test
+TIMEOUT  src/adapters/human_socket.rs:231:8: delete ! in private_socket in 16s build + 120s test
+TIMEOUT  src/adapters/human_socket.rs:232:27: replace != with == in private_socket in 24s build + 120s test
+TIMEOUT  src/adapters/human_socket.rs:233:36: replace != with == in private_socket in 16s build + 120s test
+MISSED   src/adapters/human_socket.rs:252:20: replace || with && in peer_uid in 14s build + 20s test
+TIMEOUT  src/adapters/human_socket.rs:233:28: replace & with | in private_socket in 16s build + 120s test
+TIMEOUT  src/adapters/human_socket.rs:233:28: replace & with ^ in private_socket in 23s build + 120s test
+MISSED   src/adapters/human_socket.rs:259:5: replace peer_uid -> Result<u32, HumanTransportError> with Ok(0) in 17s build + 27s test
+MISSED   src/adapters/human_socket.rs:259:5: replace peer_uid -> Result<u32, HumanTransportError> with Ok(1) in 30s build + 33s test
+MISSED   src/adapters/human_socket.rs:280:18: replace > with >= in read_frame in 18s build + 25s test
+MISSED   src/adapters/human_socket.rs:287:20: replace > with == in write_frame in 28s build + 25s test
+MISSED   src/adapters/human_socket.rs:287:20: replace > with >= in write_frame in 19s build + 29s test
+MISSED   src/adapters/loopback_ui.rs:157:13: replace || with && in LoopbackUi::bind in 19s build + 23s test
+MISSED   src/adapters/loopback_ui.rs:158:13: replace || with && in LoopbackUi::bind in 32s build + 24s test
+MISSED   src/adapters/loopback_ui.rs:244:42: replace >= with < in LoopbackUi::serve in 22s build + 23s test
+MISSED   src/adapters/loopback_ui.rs:246:54: replace + with - in LoopbackUi::serve in 10s build + 28s test
+MISSED   src/adapters/loopback_ui.rs:263:39: replace match guard peer.ip().is_loopback() with true in LoopbackUi::serve in 21s build + 26s test
+MISSED   src/adapters/loopback_ui.rs:298:27: replace match guard e.kind() == std::io::ErrorKind::WouldBlock with true in LoopbackUi::serve in 13s build + 30s test
+343 mutants tested in 76m: 41 missed, 257 caught, 37 unviable, 8 timeouts

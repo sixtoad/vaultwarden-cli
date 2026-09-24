@@ -1,0 +1,79 @@
+[
+  {
+    "name": "clean-package",
+    "argv": [
+      "cargo",
+      "clean",
+      "--package",
+      "vaultwarden-cli"
+    ],
+    "exit": 0,
+    "log": "clean-package.log"
+  },
+  {
+    "name": "format",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "format.log"
+  },
+  {
+    "name": "all-targets",
+    "argv": [
+      "cargo",
+      "test",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "log": "all-targets.log"
+  },
+  {
+    "name": "clippy",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "log": "clippy.log"
+  },
+  {
+    "name": "diff-check",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "diff-check.log"
+  },
+  {
+    "name": "build-cli",
+    "argv": [
+      "cargo",
+      "build",
+      "--bin",
+      "vw-access"
+    ],
+    "exit": 0,
+    "log": "build-cli.log"
+  },
+  {
+    "name": "firefox-accessibility",
+    "argv": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 0,
+    "log": "firefox-accessibility.log"
+  }
+]

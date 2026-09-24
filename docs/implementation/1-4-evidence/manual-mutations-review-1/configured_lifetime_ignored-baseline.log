@@ -1,0 +1,8 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.29s
+     Running unittests src/bin/vaultwarden-accessd.rs (target/debug/deps/vaultwarden_accessd-770ea5ad8284e744)
+
+running 1 test
+test tests::configured_request_lifetime_controls_receipt_and_expiry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.07s

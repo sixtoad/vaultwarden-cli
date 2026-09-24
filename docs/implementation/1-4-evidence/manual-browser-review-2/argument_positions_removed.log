@@ -1,0 +1,37 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ []
+- [
+-   {
+-     name: 'Argument 1',
+-     text: 'staging'
+-   },
+-   {
+-     name: 'Argument 2',
+-     text: 'safe|"quoted"'
+-   },
+-   {
+-     name: 'Argument 3',
+-     text: '3'
+-   }
+- ]
+
+    at file:///tmp/vw-story14-browser-review-00ny_y3j/tests/ui/direct-request.mjs:58:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [],
+  expected: [
+    { text: 'staging', name: 'Argument 1' },
+    { text: 'safe|"quoted"', name: 'Argument 2' },
+    { text: '3', name: 'Argument 3' }
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.3.1

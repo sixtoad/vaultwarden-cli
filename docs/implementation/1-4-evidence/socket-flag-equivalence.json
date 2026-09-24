@@ -1,0 +1,17 @@
+{
+  "platform": "Linux AF_UNIX socket flags",
+  "constants": {
+    "SOCK_STREAM": 1,
+    "SOCK_NONBLOCK": 2048,
+    "SOCK_CLOEXEC": 524288
+  },
+  "pairwise_intersections": [
+    0,
+    0,
+    0
+  ],
+  "original": 526337,
+  "first_or_to_xor": 526337,
+  "second_or_to_xor": 526337,
+  "explanation": "All flag bit sets are disjoint, so either OR-to-XOR replacement computes the identical socket type/flags on the supported Linux boundary."
+}

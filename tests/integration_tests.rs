@@ -541,7 +541,7 @@ mod performance_tests {
     fn test_key_derivation_completes_in_reasonable_time() {
         // With low iterations, derivation should be fast
         let start = Instant::now();
-        let _ = MasterKey::derive(
+        let _ignored = MasterKey::derive(
             "password",
             "user@example.com",
             KdfIterations::new(1000).expect("non-zero iterations"),
@@ -565,7 +565,7 @@ mod performance_tests {
 
         let start = Instant::now();
         for _ in 0..1000 {
-            let _ = master_key.stretch().unwrap();
+            let _ignored = master_key.stretch().unwrap();
         }
         let duration = start.elapsed();
 

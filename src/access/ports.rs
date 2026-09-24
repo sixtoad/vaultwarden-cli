@@ -98,6 +98,18 @@ pub trait ApprovalAuthenticator {
 /// Elapsed monotonic time, unrelated to wall-clock adjustments.
 pub trait SessionClock: Send + Sync {
     fn now(&self) -> std::time::Duration;
+    /// Provider wall time is for display only; deadlines use suspend-aware now().
+    fn unix_seconds(&self) -> Result<u64, SessionError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .map_err(|_error| SessionError::BackendUnavailable)
+    }
+}
+
+/// Desktop-only handoff. Implementations must never expose a URL to request clients.
+pub trait DirectReviewLauncher: Send + Sync {
+    fn launch(&self, request_id: &str) -> Result<(), super::direct_request::DirectRequestError>;
 }
 
 #[cfg(test)]
@@ -125,5 +137,20 @@ mod tests {
                 "[REDACTED]"
             );
         }
+    }
+    #[test]
+    fn production_clock_wall_time_matches_the_current_unix_bracket() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let clock = crate::adapters::session::MonotonicClock::default();
+        let before = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let observed = clock.unix_seconds().unwrap();
+        let after = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!((before..=after).contains(&observed));
     }
 }

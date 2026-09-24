@@ -1,0 +1,583 @@
+
+running 382 tests
+........................................... 43/382
+adapters::human_socket::tests::client_allows_desktop_handoff_longer_than_hostile_input_deadline --- FAILED
+adapters::human_socket::tests::frames_require_eof_reject_oversize_and_bound_slow_input_time --- FAILED
+adapters::human_socket::tests::private_boundary_rejects_unsafe_root_socket_symlink_and_active_listener --- FAILED
+adapters::human_socket::tests::stale_socket_rebinds_and_drop_preserves_replacement_inode --- FAILED
+..... 52/382
+adapters::loopback_ui::tests::parser_bounds_body_and_rejects_ambiguous_framing --- FAILED
+adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up --- FAILED
+adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions --- FAILED
+. 56/382
+adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous --- FAILED
+. 58/382
+adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords --- FAILED
+. 60/382
+adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf --- FAILED
+....... 68/382
+adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input --- FAILED
+. 70/382
+adapters::session::tests::provider_guards_ignore_the_direct_cli_insecure_mac_override --- FAILED
+adapters::vaultwarden::tests::compatibility_is_exact_and_never_fetches_items --- FAILED
+adapters::vaultwarden::tests::organization_binding_uses_only_provisioned_org_keys --- FAILED
+adapters::vaultwarden::tests::personal_and_organization_item_keys_authenticate_before_selected_fields --- FAILED
+. 75/382
+adapters::vaultwarden::tests::provider_lock_and_restart_clear_the_actual_adapter_keyring_session --- FAILED
+adapters::vaultwarden::tests::real_password_keyring_session_and_selective_resolution_stay_redacted --- FAILED
+adapters::vaultwarden::tests::redirect_and_oversized_metadata_fail_closed --- FAILED
+adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items --- FAILED
+adapters::vaultwarden::tests::token_validation_rejects_expired_or_mismatched_authority_before_persistence --- FAILED
+adapters::vaultwarden::tests::response_limit_accepts_exact_boundary_and_rejects_oversized_valid_json --- FAILED
+.... 85/382
+commands::tests::command_state_tests::test_lock_reports_keyring_delete_failure --- FAILED
+commands::tests::command_state_tests::test_logout_clears_config_and_keys --- FAILED
+commands::tests::command_state_tests::test_logout_reports_client_secret_delete_failure --- FAILED
+................... 107/382
+commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refresh_failure --- FAILED
+commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refreshes_successfully --- FAILED
+. 110/382
+commands::tests::ensure_valid_token_tests::test_ensure_valid_token_serializes_concurrent_refresh --- FAILED
+................... 130/382
+commands::tests::get_by_uri_tests::test_get_by_uri_match --- FAILED
+commands::tests::get_by_uri_tests::test_get_by_uri_matches_secondary_uri --- FAILED
+commands::tests::get_by_uri_tests::test_get_by_uri_matches_when_name_does_not_match --- FAILED
+commands::tests::get_by_uri_tests::test_get_by_uri_not_found --- FAILED
+commands::tests::get_by_uri_tests::test_get_by_uri_reports_ambiguous_when_multiple_items_match --- FAILED
+.... 139/382
+commands::tests::get_tests::test_get_allows_id_to_disambiguate_duplicate_names --- FAILED
+commands::tests::get_tests::test_get_by_id --- FAILED
+commands::tests::get_tests::test_get_by_name --- FAILED
+commands::tests::get_tests::test_get_by_name_with_collection_filter_uses_filtered_ciphers --- FAILED
+commands::tests::get_tests::test_get_does_not_fall_back_to_uri_match --- FAILED
+commands::tests::get_tests::test_get_fails_on_duplicate_item_names --- FAILED
+commands::tests::get_tests::test_get_not_found --- FAILED
+.... 150/382
+commands::tests::interpolate_tests::test_interpolate_allows_item_id_to_disambiguate_duplicate_names --- FAILED
+commands::tests::interpolate_tests::test_interpolate_fails_on_case_insensitive_duplicate_item_names --- FAILED
+commands::tests::interpolate_tests::test_interpolate_fails_on_duplicate_item_names --- FAILED
+commands::tests::interpolate_tests::test_interpolate_fails_on_missing_placeholder --- FAILED
+commands::tests::interpolate_tests::test_interpolate_replaces_placeholders --- FAILED
+commands::tests::interpolate_tests::test_interpolate_resolves_placeholder_by_id_with_many_ciphers --- FAILED
+commands::tests::interpolate_tests::test_interpolate_skip_missing_leaves_ambiguous_placeholder_unchanged --- FAILED
+commands::tests::interpolate_tests::test_interpolate_skips_missing_placeholders --- FAILED
+commands::tests::interpolate_tests::test_interpolate_writes_to_output_file --- FAILED
+commands::tests::interpolate_tests::test_run_with_collection_filter_fails_on_selected_missing_org_key --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_allows_id_to_disambiguate_duplicate_names --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_decrypts_filtered_collection_items --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_errors_on_empty_uri_search_input --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_fails_on_duplicate_item_names --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_matches_secondary_uri --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_reports_ambiguous_uri_matches --- FAILED
+commands::tests::interpolate_tests::test_run_with_secrets_returns_child_exit_without_terminating_caller --- FAILED
+commands::tests::list_tests::test_list_invalid_type_filter_errors --- FAILED
+commands::tests::list_tests::test_list_no_filters_shows_all_items --- FAILED
+commands::tests::list_tests::test_list_no_matches --- FAILED
+commands::tests::list_tests::test_list_with_search_filter --- FAILED
+commands::tests::list_tests::test_list_with_type_filter --- FAILED
+commands::tests::login_tests::test_login_fails_on_invalid_credentials --- FAILED
+commands::tests::login_tests::test_login_fails_when_server_unreachable --- FAILED
+commands::tests::login_tests::test_login_rejects_negative_expires_in --- FAILED
+commands::tests::login_tests::test_login_rejects_zero_expires_in --- FAILED
+commands::tests::login_tests::test_login_success_with_provided_credentials --- FAILED
+commands::tests::login_tests::test_login_sync_failure_does_not_persist_logged_in_session --- FAILED
+commands::tests::login_tests::test_login_uses_existing_config_server_and_client_id --- FAILED
+................ 195/382
+adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers --- FAILED
+.............................................................. 258/382
+adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf --- FAILED
+...................... 281/382
+config::tests::keyring_delete_tests::delete_client_secret_ignores_missing_keyring_entry --- FAILED
+config::tests::keyring_delete_tests::delete_client_secret_reports_keyring_delete_failure --- FAILED
+config::tests::keyring_delete_tests::delete_saved_keys_ignores_missing_keyring_entry --- FAILED
+config::tests::keyring_delete_tests::delete_saved_keys_reports_keyring_delete_failure --- FAILED
+config::tests::keyring_delete_tests::delete_saved_tokens_reports_keyring_delete_failure --- FAILED
+...... 292/382
+adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session --- FAILED
+....................................................................................... 380/382
+..
+failures:
+
+---- adapters::human_socket::tests::client_allows_desktop_handoff_longer_than_hostile_input_deadline stdout ----
+
+thread 'adapters::human_socket::tests::client_allows_desktop_handoff_longer_than_hostile_input_deadline' (7092) panicked at src/adapters/human_socket.rs:533:58:
+called `Result::unwrap()` on an `Err` value: HumanTransportError
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::human_socket::tests::frames_require_eof_reject_oversize_and_bound_slow_input_time stdout ----
+
+thread 'adapters::human_socket::tests::frames_require_eof_reject_oversize_and_bound_slow_input_time' (7093) panicked at src/adapters/human_socket.rs:516:33:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::human_socket::tests::private_boundary_rejects_unsafe_root_socket_symlink_and_active_listener stdout ----
+
+thread 'adapters::human_socket::tests::private_boundary_rejects_unsafe_root_socket_symlink_and_active_listener' (7094) panicked at src/adapters/human_socket.rs:473:58:
+called `Result::unwrap()` on an `Err` value: HumanTransportError
+
+---- adapters::human_socket::tests::stale_socket_rebinds_and_drop_preserves_replacement_inode stdout ----
+
+thread 'adapters::human_socket::tests::stale_socket_rebinds_and_drop_preserves_replacement_inode' (7095) panicked at src/adapters/human_socket.rs:503:47:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::loopback_ui::tests::parser_bounds_body_and_rejects_ambiguous_framing stdout ----
+
+thread 'adapters::loopback_ui::tests::parser_bounds_body_and_rejects_ambiguous_framing' (7101) panicked at src/adapters/loopback_ui.rs:1235:82:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up stdout ----
+
+thread 'adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up' (7091) panicked at src/adapters/human_socket.rs:418:47:
+called `Result::unwrap()` on an `Err` value: HumanTransportError
+
+---- adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions stdout ----
+
+thread 'adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions' (7096) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous stdout ----
+
+thread 'adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous' (7097) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords stdout ----
+
+thread 'adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords' (7099) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf stdout ----
+
+thread 'adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf' (7100) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input stdout ----
+
+thread 'adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input' (7102) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- adapters::session::tests::provider_guards_ignore_the_direct_cli_insecure_mac_override stdout ----
+
+thread 'adapters::session::tests::provider_guards_ignore_the_direct_cli_insecure_mac_override' (7114) panicked at src/adapters/session.rs:260:13:
+isolated provider check failed: adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items
+
+running 1 test
+adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items --- FAILED
+
+failures:
+
+---- adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items stdout ----
+
+thread 'adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items' (7125) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 381 filtered out; finished in 0.00s
+
+
+
+
+---- adapters::vaultwarden::tests::compatibility_is_exact_and_never_fetches_items stdout ----
+
+thread 'adapters::vaultwarden::tests::compatibility_is_exact_and_never_fetches_items' (7134) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::vaultwarden::tests::organization_binding_uses_only_provisioned_org_keys stdout ----
+
+thread 'adapters::vaultwarden::tests::organization_binding_uses_only_provisioned_org_keys' (7143) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::vaultwarden::tests::personal_and_organization_item_keys_authenticate_before_selected_fields stdout ----
+
+thread 'adapters::vaultwarden::tests::personal_and_organization_item_keys_authenticate_before_selected_fields' (7152) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::vaultwarden::tests::provider_lock_and_restart_clear_the_actual_adapter_keyring_session stdout ----
+
+thread 'adapters::vaultwarden::tests::provider_lock_and_restart_clear_the_actual_adapter_keyring_session' (7161) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::vaultwarden::tests::real_password_keyring_session_and_selective_resolution_stay_redacted stdout ----
+
+thread 'adapters::vaultwarden::tests::real_password_keyring_session_and_selective_resolution_stay_redacted' (7168) panicked at src/adapters/vaultwarden.rs:439:54:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- adapters::vaultwarden::tests::redirect_and_oversized_metadata_fail_closed stdout ----
+
+thread 'adapters::vaultwarden::tests::redirect_and_oversized_metadata_fail_closed' (7171) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items stdout ----
+
+thread 'adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items' (7172) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::vaultwarden::tests::token_validation_rejects_expired_or_mismatched_authority_before_persistence stdout ----
+
+thread 'adapters::vaultwarden::tests::token_validation_rejects_expired_or_mismatched_authority_before_persistence' (7195) panicked at src/adapters/vaultwarden.rs:679:54:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- adapters::vaultwarden::tests::response_limit_accepts_exact_boundary_and_rejects_oversized_valid_json stdout ----
+
+thread 'adapters::vaultwarden::tests::response_limit_accepts_exact_boundary_and_rejects_oversized_valid_json' (7185) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::command_state_tests::test_lock_reports_keyring_delete_failure stdout ----
+
+thread 'commands::tests::command_state_tests::test_lock_reports_keyring_delete_failure' (7205) panicked at src/commands.rs:3305:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- commands::tests::command_state_tests::test_logout_clears_config_and_keys stdout ----
+
+thread 'commands::tests::command_state_tests::test_logout_clears_config_and_keys' (7206) panicked at src/commands.rs:3339:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- commands::tests::command_state_tests::test_logout_reports_client_secret_delete_failure stdout ----
+
+thread 'commands::tests::command_state_tests::test_logout_reports_client_secret_delete_failure' (7207) panicked at src/commands.rs:3383:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refresh_failure stdout ----
+
+thread 'commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refresh_failure' (7228) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refreshes_successfully stdout ----
+
+thread 'commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refreshes_successfully' (7229) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::ensure_valid_token_tests::test_ensure_valid_token_serializes_concurrent_refresh stdout ----
+
+thread 'commands::tests::ensure_valid_token_tests::test_ensure_valid_token_serializes_concurrent_refresh' (7231) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_by_uri_tests::test_get_by_uri_match stdout ----
+
+thread 'commands::tests::get_by_uri_tests::test_get_by_uri_match' (7251) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_by_uri_tests::test_get_by_uri_matches_secondary_uri stdout ----
+
+thread 'commands::tests::get_by_uri_tests::test_get_by_uri_matches_secondary_uri' (7252) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_by_uri_tests::test_get_by_uri_matches_when_name_does_not_match stdout ----
+
+thread 'commands::tests::get_by_uri_tests::test_get_by_uri_matches_when_name_does_not_match' (7253) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_by_uri_tests::test_get_by_uri_not_found stdout ----
+
+thread 'commands::tests::get_by_uri_tests::test_get_by_uri_not_found' (7254) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_by_uri_tests::test_get_by_uri_reports_ambiguous_when_multiple_items_match stdout ----
+
+thread 'commands::tests::get_by_uri_tests::test_get_by_uri_reports_ambiguous_when_multiple_items_match' (7255) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_allows_id_to_disambiguate_duplicate_names stdout ----
+
+thread 'commands::tests::get_tests::test_get_allows_id_to_disambiguate_duplicate_names' (7260) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_by_id stdout ----
+
+thread 'commands::tests::get_tests::test_get_by_id' (7261) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_by_name stdout ----
+
+thread 'commands::tests::get_tests::test_get_by_name' (7262) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_by_name_with_collection_filter_uses_filtered_ciphers stdout ----
+
+thread 'commands::tests::get_tests::test_get_by_name_with_collection_filter_uses_filtered_ciphers' (7263) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_does_not_fall_back_to_uri_match stdout ----
+
+thread 'commands::tests::get_tests::test_get_does_not_fall_back_to_uri_match' (7264) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_fails_on_duplicate_item_names stdout ----
+
+thread 'commands::tests::get_tests::test_get_fails_on_duplicate_item_names' (7265) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::get_tests::test_get_not_found stdout ----
+
+thread 'commands::tests::get_tests::test_get_not_found' (7266) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_allows_item_id_to_disambiguate_duplicate_names stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_allows_item_id_to_disambiguate_duplicate_names' (7271) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_fails_on_case_insensitive_duplicate_item_names stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_fails_on_case_insensitive_duplicate_item_names' (7272) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_fails_on_duplicate_item_names stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_fails_on_duplicate_item_names' (7273) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_fails_on_missing_placeholder stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_fails_on_missing_placeholder' (7274) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_replaces_placeholders stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_replaces_placeholders' (7275) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_resolves_placeholder_by_id_with_many_ciphers stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_resolves_placeholder_by_id_with_many_ciphers' (7276) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_skip_missing_leaves_ambiguous_placeholder_unchanged stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_skip_missing_leaves_ambiguous_placeholder_unchanged' (7277) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_skips_missing_placeholders stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_skips_missing_placeholders' (7278) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_interpolate_writes_to_output_file stdout ----
+
+thread 'commands::tests::interpolate_tests::test_interpolate_writes_to_output_file' (7279) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_collection_filter_fails_on_selected_missing_org_key stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_collection_filter_fails_on_selected_missing_org_key' (7280) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_allows_id_to_disambiguate_duplicate_names stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_allows_id_to_disambiguate_duplicate_names' (7281) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_decrypts_filtered_collection_items stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_decrypts_filtered_collection_items' (7282) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_errors_on_empty_uri_search_input stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_errors_on_empty_uri_search_input' (7283) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_fails_on_duplicate_item_names stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_fails_on_duplicate_item_names' (7284) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_matches_secondary_uri stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_matches_secondary_uri' (7285) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_reports_ambiguous_uri_matches stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_reports_ambiguous_uri_matches' (7286) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::interpolate_tests::test_run_with_secrets_returns_child_exit_without_terminating_caller stdout ----
+
+thread 'commands::tests::interpolate_tests::test_run_with_secrets_returns_child_exit_without_terminating_caller' (7287) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::list_tests::test_list_invalid_type_filter_errors stdout ----
+
+thread 'commands::tests::list_tests::test_list_invalid_type_filter_errors' (7288) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::list_tests::test_list_no_filters_shows_all_items stdout ----
+
+thread 'commands::tests::list_tests::test_list_no_filters_shows_all_items' (7289) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::list_tests::test_list_no_matches stdout ----
+
+thread 'commands::tests::list_tests::test_list_no_matches' (7290) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::list_tests::test_list_with_search_filter stdout ----
+
+thread 'commands::tests::list_tests::test_list_with_search_filter' (7291) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::list_tests::test_list_with_type_filter stdout ----
+
+thread 'commands::tests::list_tests::test_list_with_type_filter' (7292) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_fails_on_invalid_credentials stdout ----
+
+thread 'commands::tests::login_tests::test_login_fails_on_invalid_credentials' (7293) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_fails_when_server_unreachable stdout ----
+
+thread 'commands::tests::login_tests::test_login_fails_when_server_unreachable' (7294) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_rejects_negative_expires_in stdout ----
+
+thread 'commands::tests::login_tests::test_login_rejects_negative_expires_in' (7295) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_rejects_zero_expires_in stdout ----
+
+thread 'commands::tests::login_tests::test_login_rejects_zero_expires_in' (7296) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_success_with_provided_credentials stdout ----
+
+thread 'commands::tests::login_tests::test_login_success_with_provided_credentials' (7297) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_sync_failure_does_not_persist_logged_in_session stdout ----
+
+thread 'commands::tests::login_tests::test_login_sync_failure_does_not_persist_logged_in_session' (7298) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- commands::tests::login_tests::test_login_uses_existing_config_server_and_client_id stdout ----
+
+thread 'commands::tests::login_tests::test_login_uses_existing_config_server_and_client_id' (7299) panicked at /home/sixtocantolla/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wiremock-0.6.5/src/mock_server/builder.rs:107:46:
+Failed to bind an OS port for a mock server.: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers stdout ----
+
+thread 'adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers' (7103) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf stdout ----
+
+thread 'adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf' (7106) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+---- config::tests::keyring_delete_tests::delete_client_secret_ignores_missing_keyring_entry stdout ----
+
+thread 'config::tests::keyring_delete_tests::delete_client_secret_ignores_missing_keyring_entry' (7407) panicked at src/config.rs:1345:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- config::tests::keyring_delete_tests::delete_client_secret_reports_keyring_delete_failure stdout ----
+
+thread 'config::tests::keyring_delete_tests::delete_client_secret_reports_keyring_delete_failure' (7408) panicked at src/config.rs:1354:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- config::tests::keyring_delete_tests::delete_saved_keys_ignores_missing_keyring_entry stdout ----
+
+thread 'config::tests::keyring_delete_tests::delete_saved_keys_ignores_missing_keyring_entry' (7409) panicked at src/config.rs:1283:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- config::tests::keyring_delete_tests::delete_saved_keys_reports_keyring_delete_failure stdout ----
+
+thread 'config::tests::keyring_delete_tests::delete_saved_keys_reports_keyring_delete_failure' (7410) panicked at src/config.rs:1297:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- config::tests::keyring_delete_tests::delete_saved_tokens_reports_keyring_delete_failure stdout ----
+
+thread 'config::tests::keyring_delete_tests::delete_saved_tokens_reports_keyring_delete_failure' (7411) panicked at src/config.rs:1321:66:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session stdout ----
+
+thread 'adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session' (7107) panicked at src/adapters/loopback_ui.rs:762:88:
+called `Result::unwrap()` on an `Err` value: BackendUnavailable
+
+
+failures:
+    adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up
+    adapters::human_socket::tests::client_allows_desktop_handoff_longer_than_hostile_input_deadline
+    adapters::human_socket::tests::frames_require_eof_reject_oversize_and_bound_slow_input_time
+    adapters::human_socket::tests::private_boundary_rejects_unsafe_root_socket_symlink_and_active_listener
+    adapters::human_socket::tests::stale_socket_rebinds_and_drop_preserves_replacement_inode
+    adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions
+    adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous
+    adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords
+    adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf
+    adapters::loopback_ui::tests::parser_bounds_body_and_rejects_ambiguous_framing
+    adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input
+    adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers
+    adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf
+    adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session
+    adapters::session::tests::provider_guards_ignore_the_direct_cli_insecure_mac_override
+    adapters::vaultwarden::tests::compatibility_is_exact_and_never_fetches_items
+    adapters::vaultwarden::tests::organization_binding_uses_only_provisioned_org_keys
+    adapters::vaultwarden::tests::personal_and_organization_item_keys_authenticate_before_selected_fields
+    adapters::vaultwarden::tests::provider_lock_and_restart_clear_the_actual_adapter_keyring_session
+    adapters::vaultwarden::tests::real_password_keyring_session_and_selective_resolution_stay_redacted
+    adapters::vaultwarden::tests::redirect_and_oversized_metadata_fail_closed
+    adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items
+    adapters::vaultwarden::tests::response_limit_accepts_exact_boundary_and_rejects_oversized_valid_json
+    adapters::vaultwarden::tests::token_validation_rejects_expired_or_mismatched_authority_before_persistence
+    commands::tests::command_state_tests::test_lock_reports_keyring_delete_failure
+    commands::tests::command_state_tests::test_logout_clears_config_and_keys
+    commands::tests::command_state_tests::test_logout_reports_client_secret_delete_failure
+    commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refresh_failure
+    commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refreshes_successfully
+    commands::tests::ensure_valid_token_tests::test_ensure_valid_token_serializes_concurrent_refresh
+    commands::tests::get_by_uri_tests::test_get_by_uri_match
+    commands::tests::get_by_uri_tests::test_get_by_uri_matches_secondary_uri
+    commands::tests::get_by_uri_tests::test_get_by_uri_matches_when_name_does_not_match
+    commands::tests::get_by_uri_tests::test_get_by_uri_not_found
+    commands::tests::get_by_uri_tests::test_get_by_uri_reports_ambiguous_when_multiple_items_match
+    commands::tests::get_tests::test_get_allows_id_to_disambiguate_duplicate_names
+    commands::tests::get_tests::test_get_by_id
+    commands::tests::get_tests::test_get_by_name
+    commands::tests::get_tests::test_get_by_name_with_collection_filter_uses_filtered_ciphers
+    commands::tests::get_tests::test_get_does_not_fall_back_to_uri_match
+    commands::tests::get_tests::test_get_fails_on_duplicate_item_names
+    commands::tests::get_tests::test_get_not_found
+    commands::tests::interpolate_tests::test_interpolate_allows_item_id_to_disambiguate_duplicate_names
+    commands::tests::interpolate_tests::test_interpolate_fails_on_case_insensitive_duplicate_item_names
+    commands::tests::interpolate_tests::test_interpolate_fails_on_duplicate_item_names
+    commands::tests::interpolate_tests::test_interpolate_fails_on_missing_placeholder
+    commands::tests::interpolate_tests::test_interpolate_replaces_placeholders
+    commands::tests::interpolate_tests::test_interpolate_resolves_placeholder_by_id_with_many_ciphers
+    commands::tests::interpolate_tests::test_interpolate_skip_missing_leaves_ambiguous_placeholder_unchanged
+    commands::tests::interpolate_tests::test_interpolate_skips_missing_placeholders
+    commands::tests::interpolate_tests::test_interpolate_writes_to_output_file
+    commands::tests::interpolate_tests::test_run_with_collection_filter_fails_on_selected_missing_org_key
+    commands::tests::interpolate_tests::test_run_with_secrets_allows_id_to_disambiguate_duplicate_names
+    commands::tests::interpolate_tests::test_run_with_secrets_decrypts_filtered_collection_items
+    commands::tests::interpolate_tests::test_run_with_secrets_errors_on_empty_uri_search_input
+    commands::tests::interpolate_tests::test_run_with_secrets_fails_on_duplicate_item_names
+    commands::tests::interpolate_tests::test_run_with_secrets_matches_secondary_uri
+    commands::tests::interpolate_tests::test_run_with_secrets_reports_ambiguous_uri_matches
+    commands::tests::interpolate_tests::test_run_with_secrets_returns_child_exit_without_terminating_caller
+    commands::tests::list_tests::test_list_invalid_type_filter_errors
+    commands::tests::list_tests::test_list_no_filters_shows_all_items
+    commands::tests::list_tests::test_list_no_matches
+    commands::tests::list_tests::test_list_with_search_filter
+    commands::tests::list_tests::test_list_with_type_filter
+    commands::tests::login_tests::test_login_fails_on_invalid_credentials
+    commands::tests::login_tests::test_login_fails_when_server_unreachable
+    commands::tests::login_tests::test_login_rejects_negative_expires_in
+    commands::tests::login_tests::test_login_rejects_zero_expires_in
+    commands::tests::login_tests::test_login_success_with_provided_credentials
+    commands::tests::login_tests::test_login_sync_failure_does_not_persist_logged_in_session
+    commands::tests::login_tests::test_login_uses_existing_config_server_and_client_id
+    config::tests::keyring_delete_tests::delete_client_secret_ignores_missing_keyring_entry
+    config::tests::keyring_delete_tests::delete_client_secret_reports_keyring_delete_failure
+    config::tests::keyring_delete_tests::delete_saved_keys_ignores_missing_keyring_entry
+    config::tests::keyring_delete_tests::delete_saved_keys_reports_keyring_delete_failure
+    config::tests::keyring_delete_tests::delete_saved_tokens_reports_keyring_delete_failure
+
+test result: FAILED. 306 passed; 76 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.50s
+
+error: test failed, to rerun pass `--lib`

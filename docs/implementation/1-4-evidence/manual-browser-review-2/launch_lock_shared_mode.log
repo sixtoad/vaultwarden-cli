@@ -1,0 +1,18 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: only one launch fetch may start before the first cookie is installed
+
+2 !== 1
+
+    at file:///tmp/vw-story14-browser-review-00ny_y3j/tests/ui/direct-request.mjs:79:111 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.3.1

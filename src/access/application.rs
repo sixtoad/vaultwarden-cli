@@ -1,5 +1,5 @@
 //! Serialized session authority. No adapter or caller can obtain resolved values.
-use super::{policy::OperationPolicyDraft, ports::*, provider::Provider};
+use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider::Provider};
 use std::{
     sync::{
         Mutex,
@@ -19,11 +19,14 @@ struct Authority {
     backend: Box<dyn SecretBackend>,
     deadline: Option<Duration>,
     cleanup_failed: bool,
+    request_deadlines: std::collections::HashMap<String, Duration>,
 }
 pub struct ProviderApplication {
     gate: Mutex<Authority>,
     clock: Box<dyn SessionClock>,
     closing: AtomicBool,
+    request_lifetime: Duration,
+    owner: AuthenticatedHuman,
 }
 impl ProviderApplication {
     pub fn new(
@@ -31,21 +34,37 @@ impl ProviderApplication {
         backend: Box<dyn SecretBackend>,
         clock: Box<dyn SessionClock>,
     ) -> Result<Self, SessionError> {
+        Self::new_with_request_lifetime(provider, backend, clock, DEFAULT_REQUEST_LIFETIME)
+    }
+    pub fn new_with_request_lifetime(
+        provider: Provider,
+        backend: Box<dyn SecretBackend>,
+        clock: Box<dyn SessionClock>,
+        request_lifetime: Duration,
+    ) -> Result<Self, SessionError> {
+        if request_lifetime.as_secs() == 0 || request_lifetime > Duration::from_secs(86400) {
+            return Err(SessionError::InvalidRequest);
+        }
+        let owner = AuthenticatedHuman::from_peer_uid(provider.owner_uid());
         let app = Self {
             gate: Mutex::new(Authority {
                 provider,
                 backend,
                 deadline: None,
                 cleanup_failed: true,
+                request_deadlines: std::collections::HashMap::new(),
             }),
             clock,
             closing: AtomicBool::new(false),
+            request_lifetime,
+            owner,
         };
         app.lock()?;
         Ok(app)
     }
     fn revoke(authority: &mut Authority) -> Result<(), SessionError> {
         authority.deadline = None;
+        authority.request_deadlines.clear();
         authority.cleanup_failed = true;
         // Attempt both cleanups even if either fails. Revocation precedes fallible I/O.
         let backend = authority.backend.clear();
@@ -71,7 +90,10 @@ impl ProviderApplication {
         }
     }
     pub fn lock(&self) -> Result<(), SessionError> {
-        let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
         Self::revoke(&mut authority)
     }
     /// Irreversible admission closure for transport failure and process shutdown.
@@ -83,9 +105,132 @@ impl ProviderApplication {
     pub fn close_admission(&self) {
         self.closing.store(true, Ordering::Release);
     }
-    pub fn status(&self) -> Result<SessionStatus, SessionError> {
-        let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+    pub(crate) fn human_owner(&self) -> AuthenticatedHuman {
+        self.owner
+    }
+    fn check_owner(&self, owner: AuthenticatedHuman) -> Result<(), DirectRequestError> {
+        if owner != self.owner {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        Ok(())
+    }
+    fn expire_requests(&self, authority: &mut Authority) -> Result<(), SessionError> {
+        let now = self.clock.now();
+        authority
+            .provider
+            .expire_direct(now, &authority.request_deadlines)
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        authority
+            .request_deadlines
+            .retain(|_, deadline| now < *deadline);
+        Ok(())
+    }
+    pub fn submit_direct(
+        &self,
+        owner: AuthenticatedHuman,
+        input: DirectSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<SubmissionReceipt, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .try_lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        let started = self.clock.now();
+        let deadline = started
+            .checked_add(self.request_lifetime)
+            .ok_or(DirectRequestError::Unavailable)?;
+        let now = self.clock.unix_seconds()?;
+        let expires = now
+            .checked_add(self.request_lifetime.as_secs())
+            .ok_or(DirectRequestError::Unavailable)?;
+        let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let result = authority
+            .provider
+            .create_direct(owner, input, now, expires, || {
+                !self.closing.load(Ordering::Acquire)
+                    && self.clock.now() < session_deadline
+                    && self.clock.now() < deadline
+            });
+        // Once creation succeeds, lifecycle revocation must preserve its receipt.
+        // Observe the deadline before admission so closing during a slow clock or
+        // durable write is checked before any desktop handoff.
+        let request_expired = self.clock.now() >= deadline;
+        let admission = self.admit(&mut authority);
+        let review = match result {
+            Ok(review) => review,
+            Err(error) => {
+                admission?;
+                return Err(error);
+            }
+        };
+        match admission {
+            Ok(()) => {
+                authority
+                    .request_deadlines
+                    .insert(review.id.clone(), deadline);
+            }
+            Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        if admission.is_err() || request_expired {
+            self.expire_requests(&mut authority)?;
+        } else {
+            let launched = launcher.launch(&review.id);
+            if launched.is_err() {
+                authority.provider.fail_direct_launch(&review.id)?;
+            }
+            // A slow desktop can cross either deadline. A handed-off capability
+            // still has to pass the same authority/status check on exchange.
+            match self.admit(&mut authority) {
+                Ok(()) | Err(SessionError::Locked) => {}
+                Err(e) => return Err(e.into()),
+            }
+            self.expire_requests(&mut authority)?;
+        }
+        let review = authority.provider.direct_review(owner, &review.id)?;
+        Ok(SubmissionReceipt {
+            id: review.id,
+            revision: review.policy_digest,
+            arguments_digest: review.arguments_digest,
+            expires_at_unix_seconds: review.expires_at_unix_seconds,
+            status: review.status,
+        })
+    }
+    pub fn direct_status(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.review_direct(owner, id).map(|r| r.status)
+    }
+    pub fn review_direct(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<DirectReview, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
         match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        self.expire_requests(&mut authority)?;
+        authority.provider.direct_review(owner, id)
+    }
+    pub fn status(&self) -> Result<SessionStatus, SessionError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        let admission = self.admit(&mut authority);
+        self.expire_requests(&mut authority)?;
+        match admission {
             Ok(()) => Ok(SessionStatus::Unlocked),
             Err(SessionError::Locked) => Ok(SessionStatus::Locked),
             Err(e) => Err(e),
@@ -94,7 +239,10 @@ impl ProviderApplication {
     /// Registry validation still precedes eligibility; the backend is held behind
     /// the same gate as unlock, expiry, lock and future scoped consumption.
     pub fn activate_operation(&self, draft: OperationPolicyDraft) -> Result<String, SessionError> {
-        let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
         self.admit(&mut authority)?;
         let probe = authority.backend.probe_compatibility();
         self.admit(&mut authority)?;
@@ -124,7 +272,7 @@ impl ProviderApplication {
                         fields,
                         marker,
                     })
-                    .map_err(|_| LoginEligibilityError);
+                    .map_err(|_error| LoginEligibilityError);
                 if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
                     return Err(LoginEligibilityError);
                 }
@@ -145,7 +293,7 @@ impl ProviderApplication {
                 },
                 || !self.closing.load(Ordering::Acquire) && self.clock.now() < deadline,
             )
-            .map_err(|_| SessionError::InvalidRequest);
+            .map_err(|_error| SessionError::InvalidRequest);
         // Failed/slow eligibility revokes the session before returning to callers.
         self.admit(&mut authority)?;
         result
@@ -157,7 +305,10 @@ impl ProviderApplication {
         binding: &CredentialBinding<'_>,
         consume: impl FnOnce(&[SensitiveString]),
     ) -> Result<(), SessionError> {
-        let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
         self.admit(&mut authority)?;
         let probe = authority.backend.probe_compatibility();
         self.admit(&mut authority)?;
@@ -170,7 +321,10 @@ impl ProviderApplication {
 }
 impl ApprovalAuthenticator for ProviderApplication {
     fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError> {
-        let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
         if self.closing.load(Ordering::Acquire) {
             return Err(SessionError::Locked);
         }
@@ -847,5 +1001,143 @@ mod tests {
         observed.incompatible.store(false, Ordering::SeqCst);
         assert_eq!(app.activate_operation(draft()).unwrap().len(), 64);
         assert_eq!(observed.resolutions.load(Ordering::SeqCst), 1);
+    }
+    #[test]
+    fn contending_submissions_are_rejected_without_queued_creation_or_launch() {
+        use crate::access::direct_request_tests::{fixture, input};
+        let fixture = fixture();
+        struct BlockingLauncher {
+            entered: mpsc::Sender<()>,
+            resume: Mutex<mpsc::Receiver<()>>,
+            calls: AtomicUsize,
+        }
+        impl DirectReviewLauncher for BlockingLauncher {
+            fn launch(&self, _: &str) -> Result<(), DirectRequestError> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                self.entered.send(()).unwrap();
+                self.resume
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(5))
+                    .unwrap();
+                Ok(())
+            }
+        }
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let launcher = Arc::new(BlockingLauncher {
+            entered: entered_tx,
+            resume: Mutex::new(resume_rx),
+            calls: AtomicUsize::new(0),
+        });
+        let first = {
+            let app = fixture.app.clone();
+            let launcher = launcher.clone();
+            std::thread::spawn(move || {
+                app.submit_direct(app.human_owner(), input(), launcher.as_ref())
+            })
+        };
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(9));
+        let (send, receive) = mpsc::channel();
+        let mut contenders = Vec::new();
+        for _ in 0..8 {
+            let (app, launcher, barrier, send) = (
+                fixture.app.clone(),
+                launcher.clone(),
+                barrier.clone(),
+                send.clone(),
+            );
+            contenders.push(std::thread::spawn(move || {
+                barrier.wait();
+                send.send(app.submit_direct(app.human_owner(), input(), launcher.as_ref()))
+                    .unwrap();
+            }));
+        }
+        barrier.wait();
+        let outcomes: Vec<_> = (0..8)
+            .map(|_| receive.recv_timeout(Duration::from_secs(2)))
+            .collect();
+        resume_tx.send(()).unwrap();
+        assert_eq!(first.join().unwrap().unwrap().status, DirectStatus::Pending);
+        for contender in contenders {
+            contender.join().unwrap();
+        }
+        for outcome in outcomes {
+            assert_eq!(outcome.unwrap(), Err(DirectRequestError::Unavailable));
+        }
+        assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
+        let state: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(fixture.dir.path().join("provider/provider-state.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(state["requests"].as_array().unwrap().len(), 1);
+    }
+    #[test]
+    fn revocation_immediately_after_persistence_returns_terminal_receipt_without_launch() {
+        use crate::access::direct_request_tests::{Launcher, fixture, input};
+        struct PersistedClock {
+            path: std::path::PathBuf,
+            entered: mpsc::Sender<()>,
+            resume: Mutex<mpsc::Receiver<()>>,
+            fired: AtomicBool,
+            expire: bool,
+        }
+        impl SessionClock for PersistedClock {
+            fn now(&self) -> Duration {
+                let persisted = std::fs::read(&self.path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                    .is_some_and(|state| !state["requests"].as_array().unwrap().is_empty());
+                if persisted && !self.fired.swap(true, Ordering::SeqCst) {
+                    self.entered.send(()).unwrap();
+                    self.resume
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .unwrap();
+                }
+                Duration::from_secs(if persisted && self.expire { 910 } else { 10 })
+            }
+        }
+        for expire in [true, false] {
+            let mut fixture = fixture();
+            let (entered_tx, entered_rx) = mpsc::channel();
+            let (resume_tx, resume_rx) = mpsc::channel();
+            Arc::get_mut(&mut fixture.app).unwrap().clock = Box::new(PersistedClock {
+                path: fixture.dir.path().join("provider/provider-state.json"),
+                entered: entered_tx,
+                resume: Mutex::new(resume_rx),
+                fired: AtomicBool::new(false),
+                expire,
+            });
+            let launcher = Arc::new(Launcher::default());
+            let submission = {
+                let (app, launcher) = (fixture.app.clone(), launcher.clone());
+                std::thread::spawn(move || {
+                    app.submit_direct(app.human_owner(), input(), launcher.as_ref())
+                })
+            };
+            entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            if !expire {
+                fixture.app.close_admission();
+            }
+            resume_tx.send(()).unwrap();
+            let receipt = submission.join().unwrap().unwrap();
+            assert_eq!(receipt.status, DirectStatus::Expired);
+            assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+            assert_eq!(
+                fixture
+                    .app
+                    .direct_status(fixture.app.human_owner(), &receipt.id),
+                Ok(DirectStatus::Expired)
+            );
+            let state: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(fixture.dir.path().join("provider/provider-state.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(state["requests"][0]["id"], receipt.id);
+            assert_eq!(state["requests"].as_array().unwrap().len(), 1);
+        }
     }
 }

@@ -58,7 +58,7 @@ impl ProviderState {
         for image in &self.approved_images {
             image
                 .validate_integrity()
-                .map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+                .map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
         }
         let mut operation_ids: Vec<&str> =
             self.operations.iter().map(OperationPolicy::id).collect();
@@ -69,7 +69,7 @@ impl ProviderState {
         for policy in &self.operations {
             policy
                 .validate_integrity()
-                .map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+                .map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
             let Some(image) = self
                 .approved_images
                 .iter()
@@ -81,6 +81,35 @@ impl ProviderState {
                 return Err(error(ProviderDiagnostic::InvalidState));
             }
         }
+        let mut ids = std::collections::HashSet::new();
+        for request in &self.requests {
+            if !ids.insert(&request.id) {
+                return Err(error(ProviderDiagnostic::InvalidState));
+            }
+            if let Some(direct) = &request.direct {
+                use super::direct_request::DirectStatus;
+                let consistent = matches!(
+                    (&request.status, &direct.review.status),
+                    (RequestLifecycleStatus::Pending, DirectStatus::Pending)
+                        | (RequestLifecycleStatus::Approved, DirectStatus::Approved)
+                        | (RequestLifecycleStatus::Running, DirectStatus::Running)
+                        | (RequestLifecycleStatus::Invalidated, DirectStatus::Expired)
+                        | (RequestLifecycleStatus::Denied, DirectStatus::Denied)
+                        | (
+                            RequestLifecycleStatus::Completed,
+                            DirectStatus::Completed { .. }
+                        )
+                        | (RequestLifecycleStatus::Failed, DirectStatus::Failed { .. })
+                );
+                if !consistent
+                    || !direct.validate(&request.id, self.lifecycle_epoch)
+                    || (request.status.is_unexecuted()
+                        && direct.lifecycle_epoch != self.lifecycle_epoch)
+                {
+                    return Err(error(ProviderDiagnostic::InvalidState));
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -90,6 +119,8 @@ impl ProviderState {
 pub(crate) struct RequestRecord {
     pub(crate) id: String,
     pub(crate) status: RequestLifecycleStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) direct: Option<super::direct_request::DirectRecord>,
 }
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,11 +129,12 @@ pub(crate) enum RequestLifecycleStatus {
     Approved,
     Running,
     Invalidated,
+    Denied,
     Completed,
     Failed,
 }
 impl RequestLifecycleStatus {
-    fn is_unexecuted(self) -> bool {
+    pub(crate) fn is_unexecuted(self) -> bool {
         matches!(self, Self::Pending | Self::Approved | Self::Running)
     }
 }
@@ -147,8 +179,11 @@ impl ProviderStore {
         };
         // The stable writer is held. Revoke crashed-process authority before any
         // state decoding, permission/integrity checks or lifecycle persistence.
-        cleanup().map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        cleanup().map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
         store.read_state().map(|_| store)
+    }
+    pub(crate) fn owner_uid(&self) -> u32 {
+        self.owner_uid
     }
     pub(crate) fn read_state(&self) -> Result<ProviderState, ProviderError> {
         self.ensure_healthy()?;
@@ -157,9 +192,9 @@ impl ProviderStore {
         validate_open_file(&file, PRIVATE_FILE_MODE, self.owner_uid)?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)
-            .map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+            .map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
         let state: ProviderState =
-            serde_json::from_str(&raw).map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+            serde_json::from_str(&raw).map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
         state.validate()?;
         Ok(state)
     }
@@ -167,8 +202,8 @@ impl ProviderStore {
         self.ensure_healthy()?;
         state.validate()?;
         validate_layout(&self.root, self.owner_uid)?;
-        let encoded =
-            serde_json::to_vec(state).map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        let encoded = serde_json::to_vec(state)
+            .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
         let temporary = self.temp_path();
         remove_stale_private_temp(&temporary, self.owner_uid)?;
         let mut file = OpenOptions::new()
@@ -177,22 +212,22 @@ impl ProviderStore {
             .mode(PRIVATE_FILE_MODE)
             .custom_flags(libc::O_NOFOLLOW)
             .open(&temporary)
-            .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+            .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
         if file
             .set_permissions(fs::Permissions::from_mode(PRIVATE_FILE_MODE))
             .and_then(|()| file.write_all(&encoded))
             .and_then(|()| file.sync_all())
             .is_err()
         {
-            let _ = fs::remove_file(&temporary);
+            let _ignored = fs::remove_file(&temporary);
             return Err(error(ProviderDiagnostic::PersistenceFailure));
         }
         if let Err(err) = validate_open_file(&file, PRIVATE_FILE_MODE, self.owner_uid) {
-            let _ = fs::remove_file(&temporary);
+            let _ignored = fs::remove_file(&temporary);
             return Err(err);
         }
         fs::rename(&temporary, self.state_path())
-            .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+            .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
         if sync_directory(&self.root).is_err() {
             self.poisoned = true;
             return Err(error(ProviderDiagnostic::PersistenceFailure));
@@ -208,6 +243,9 @@ impl ProviderStore {
         for request in &mut state.requests {
             if request.status.is_unexecuted() {
                 request.status = RequestLifecycleStatus::Invalidated;
+                if let Some(direct) = &mut request.direct {
+                    direct.review.status = super::direct_request::DirectStatus::Expired;
+                }
             }
         }
         self.write_state(&state)?;
@@ -271,9 +309,9 @@ fn create_initial_layout(root: &Path, owner_uid: u32) -> Result<(), ProviderErro
         .filter(|parent| !parent.as_os_str().is_empty())
         .ok_or_else(|| error(ProviderDiagnostic::UnsafeState))?;
     validate_dir(parent, owner_uid, false)?;
-    fs::create_dir(root).map_err(|_| error(ProviderDiagnostic::UnsafeState))?;
+    fs::create_dir(root).map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
     fs::set_permissions(root, fs::Permissions::from_mode(PRIVATE_DIR_MODE))
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     validate_dir(root, owner_uid, true)?;
     let lock_path = root.join(LOCK_FILE);
     let lock = OpenOptions::new()
@@ -282,16 +320,16 @@ fn create_initial_layout(root: &Path, owner_uid: u32) -> Result<(), ProviderErro
         .mode(PRIVATE_FILE_MODE)
         .custom_flags(libc::O_NOFOLLOW)
         .open(&lock_path)
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     lock.set_permissions(fs::Permissions::from_mode(PRIVATE_FILE_MODE))
         .and_then(|()| lock.sync_all())
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     write_initial_state(root, owner_uid)
 }
 fn write_initial_state(root: &Path, owner_uid: u32) -> Result<(), ProviderError> {
     let state = ProviderState::initial();
-    let encoded =
-        serde_json::to_vec(&state).map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    let encoded = serde_json::to_vec(&state)
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     let temporary = root.join(TEMP_FILE);
     let mut file = OpenOptions::new()
         .write(true)
@@ -299,25 +337,25 @@ fn write_initial_state(root: &Path, owner_uid: u32) -> Result<(), ProviderError>
         .mode(PRIVATE_FILE_MODE)
         .custom_flags(libc::O_NOFOLLOW)
         .open(&temporary)
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     file.set_permissions(fs::Permissions::from_mode(PRIVATE_FILE_MODE))
         .and_then(|()| file.write_all(&encoded))
         .and_then(|()| file.sync_all())
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     validate_open_file(&file, PRIVATE_FILE_MODE, owner_uid)?;
     fs::rename(&temporary, root.join(STATE_FILE))
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     sync_directory(root)
 }
 fn sync_directory(root: &Path) -> Result<(), ProviderError> {
     File::open(root)
         .and_then(|directory| directory.sync_all())
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))
 }
 fn remove_stale_private_temp(path: &Path, owner_uid: u32) -> Result<(), ProviderError> {
     if path.exists() {
         validate_regular_file(path, PRIVATE_FILE_MODE, owner_uid)?;
-        fs::remove_file(path).map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        fs::remove_file(path).map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     }
     Ok(())
 }
@@ -332,7 +370,7 @@ fn validate_dir(
     exact_private_mode: bool,
 ) -> Result<(), ProviderError> {
     let metadata =
-        fs::symlink_metadata(path).map_err(|_| error(ProviderDiagnostic::UnsafeState))?;
+        fs::symlink_metadata(path).map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
     if metadata.file_type().is_symlink()
         || !metadata.is_dir()
         || metadata.uid() != owner_uid
@@ -349,7 +387,7 @@ fn validate_dir(
 }
 fn validate_regular_file(path: &Path, mode: u32, owner_uid: u32) -> Result<(), ProviderError> {
     let metadata =
-        fs::symlink_metadata(path).map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+        fs::symlink_metadata(path).map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
     if metadata.file_type().is_symlink()
         || !metadata.file_type().is_file()
         || metadata.uid() != owner_uid
@@ -366,7 +404,7 @@ fn open_existing(path: &Path, write: bool) -> Result<File, ProviderError> {
         .read(!write)
         .write(write)
         .custom_flags(libc::O_NOFOLLOW);
-    options.open(path).map_err(|_| {
+    options.open(path).map_err(|_error| {
         error(if write {
             ProviderDiagnostic::PersistenceFailure
         } else {
@@ -377,7 +415,7 @@ fn open_existing(path: &Path, write: bool) -> Result<File, ProviderError> {
 fn validate_open_file(file: &File, mode: u32, owner_uid: u32) -> Result<(), ProviderError> {
     let metadata = file
         .metadata()
-        .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
     if !metadata.file_type().is_file()
         || metadata.uid() != owner_uid
         || metadata.mode() & 0o777 != mode
@@ -539,26 +577,32 @@ mod tests {
             RequestRecord {
                 id: "pending".into(),
                 status: RequestLifecycleStatus::Pending,
+                direct: None,
             },
             RequestRecord {
                 id: "approved".into(),
                 status: RequestLifecycleStatus::Approved,
+                direct: None,
             },
             RequestRecord {
                 id: "running".into(),
                 status: RequestLifecycleStatus::Running,
+                direct: None,
             },
             RequestRecord {
                 id: "invalidated".into(),
                 status: RequestLifecycleStatus::Invalidated,
+                direct: None,
             },
             RequestRecord {
                 id: "completed".into(),
                 status: RequestLifecycleStatus::Completed,
+                direct: None,
             },
             RequestRecord {
                 id: "failed".into(),
                 status: RequestLifecycleStatus::Failed,
+                direct: None,
             },
         ];
         store.write_state(&state).unwrap();

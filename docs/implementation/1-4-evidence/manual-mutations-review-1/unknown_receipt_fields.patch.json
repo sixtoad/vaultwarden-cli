@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/access/direct_request.rs\n+++ src/access/direct_request.rs\n@@ -117,7 +117,6 @@\n     }\n }\n #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]\n-#[serde(deny_unknown_fields)]\n pub struct SubmissionReceipt {\n     pub id: String,\n     pub revision: String,\n"
+}

@@ -1,0 +1,9 @@
+Found 149 mutants to test
+ok       Unmutated baseline in 170s build + 20s test
+MISSED   src/access/application.rs:125:39: replace < with <= in ProviderApplication::expire_requests in 16s build + 27s test
+MISSED   src/adapters/desktop_launch.rs:66:40: replace < with <= in run_bounded in 26s build + 25s test
+MISSED   src/adapters/human_socket.rs:209:53: replace | with ^ in connect_private in 12s build + 26s test
+MISSED   src/adapters/human_socket.rs:209:31: replace | with ^ in connect_private in 16s build + 29s test
+MISSED   src/adapters/human_socket.rs:301:5: replace peer_uid -> Result<u32, HumanTransportError> with Ok(0) in 17s build + 25s test
+MISSED   src/adapters/human_socket.rs:301:5: replace peer_uid -> Result<u32, HumanTransportError> with Ok(1) in 16s build + 25s test
+149 mutants tested in 34m: 6 missed, 130 caught, 13 unviable

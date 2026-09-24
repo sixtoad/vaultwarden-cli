@@ -1,0 +1,28 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+warning: constant `MAX_WORKERS` is never used
+  --> src/adapters/human_socket.rs:33:7
+   |
+33 | const MAX_WORKERS: usize = 16;
+   |       ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `vaultwarden-cli` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.98s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 1 test
+
+thread 'adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity' (2827420) panicked at src/adapters/human_socket.rs:1056:9:
+seventeenth connection must be rejected while all sixteen workers are admitted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity ... FAILED
+
+failures:
+
+failures:
+    adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 2.53s
+
+error: test failed, to rerun pass `--lib`

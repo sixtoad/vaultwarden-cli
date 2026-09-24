@@ -1,0 +1,30 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-cli-story-1-4)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.31s
+     Running unittests src/lib.rs (/tmp/vw-story14-ui-transport-target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 23 tests
+test adapters::loopback_ui::tests::accept_retries_only_would_block_and_preserves_fatal_errors ... ok
+test adapters::loopback_ui::tests::direct_request_browser_fixture ... ignored, run with tests/ui/direct-request.mjs and a disposable trusted browser profile
+test adapters::loopback_ui::tests::cleanup_schedule_is_due_initially_then_at_exact_one_second_intervals ... ok
+test adapters::loopback_ui::tests::launch_directory_requires_type_owner_and_mode_independently ... ok
+test adapters::loopback_ui::tests::accepted_connections_require_loopback_peers_before_handoff ... ok
+test adapters::loopback_ui::tests::parser_bounds_body_and_rejects_ambiguous_framing ... ok
+test adapters::loopback_ui::tests::failed_launch_and_invalid_ids_leave_no_reusable_capability_or_artifact ... ok
+test adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous ... ok
+test adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords ... ok
+test adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers ... ok
+test adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact ... ok
+test adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions ... ok
+test adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf ... ok
+test adapters::loopback_ui::tests::tls_identity_rejects_owned_fifo_even_with_valid_certificate_contents ... ok
+test adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input ... ok
+test adapters::loopback_ui::tests::tls_identity_requires_owned_bounded_regular_private_files_and_matching_key ... ok
+test adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session ... ok
+test adapters::loopback_ui::tests::tls_identity_requires_private_single_link_files_and_exact_size_bound ... ok
+test adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf ... ok
+test adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated ... ok
+test adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown ... ok
+test adapters::loopback_ui::tests::request_capabilities_are_bounded_and_never_replace_older_ones ... ok
+test adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions ... ok
+
+test result: ok. 22 passed; 0 failed; 1 ignored; 0 measured; 406 filtered out; finished in 3.57s

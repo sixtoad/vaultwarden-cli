@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/adapters/loopback_ui.rs\n+++ src/adapters/loopback_ui.rs\n@@ -389,8 +389,7 @@\n             };\n         }\n         if !self.authenticated(&request)\n-            || request.header(\"x-csrf-token\")\n-                != self.browser_session(&request).map(|s| s.csrf.expose())\n+            \n             || request.header(\"content-type\") != Some(\"application/json\")\n         {\n             return Response::denied();\n"
+}
