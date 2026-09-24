@@ -1,0 +1,68 @@
+[
+  {
+    "name": "unsafe_html",
+    "source": "src/adapters/loopback_ui.rs",
+    "original_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+    "mutated_sha256": "cc2c21d7f9ea996d96ad8d09dc60eb84a727056bc33f9c23cebfe57bd5aa9fa0",
+    "exit": 1,
+    "compiled_mutant": true,
+    "classification": "caught",
+    "expected_failure_marker": "AssertionError",
+    "log_sha256": "60eea2387b3b6ef53636c3a9b45925d7c39ed9f717e5584c06d1b778bcc2ef1b"
+  },
+  {
+    "name": "launch_lock_shared_mode",
+    "source": "src/adapters/loopback_ui.rs",
+    "original_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+    "mutated_sha256": "018f094a13f99c2fa75d03a8a68f39aa7094abd715cc4b0996aa6f261a00abb9",
+    "exit": 1,
+    "compiled_mutant": true,
+    "classification": "caught",
+    "expected_failure_marker": "only one launch fetch",
+    "log_sha256": "e2b02dd0ce5f0c6b7a17f145bd429714202116b3b677e3eb19f9b33351141b66"
+  },
+  {
+    "name": "poll_retry_removed",
+    "source": "src/adapters/loopback_ui.rs",
+    "original_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+    "mutated_sha256": "79eda0eb687f7e9d39d028195402f83aa6c4c4d7efe1a6b71a3b842447377c76",
+    "exit": 1,
+    "compiled_mutant": true,
+    "classification": "caught",
+    "expected_failure_marker": "TimeoutError",
+    "log_sha256": "90096473e385a3efd3ff1e2b84f70d84538bee159c63dafe40f8063c31f6275d"
+  },
+  {
+    "name": "argument_positions_removed",
+    "source": "src/adapters/loopback_ui.rs",
+    "original_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+    "mutated_sha256": "5beb7671ff792dbf037ae0d0400cc1f386a76ac8c14567a04f208027e3d23e74",
+    "exit": 1,
+    "compiled_mutant": true,
+    "classification": "caught",
+    "expected_failure_marker": "AssertionError",
+    "log_sha256": "5e9f6b229f5c761efce2b10fee2b4c871411f83a5c64802506be73a210173516"
+  },
+  {
+    "name": "details_rebuilt",
+    "source": "src/adapters/loopback_ui.rs",
+    "original_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+    "mutated_sha256": "5ed59a7da4eedc0534264c063a7efdc59703a5fdf6a64b7efb04719b3cf76f81",
+    "exit": 1,
+    "compiled_mutant": true,
+    "classification": "caught",
+    "expected_failure_marker": "AssertionError",
+    "log_sha256": "4dd31dd120aaeed9d548f760b3cc535a5a6289e00680e04be38b76693cc3bf1d"
+  },
+  {
+    "name": "status_reannounced",
+    "source": "src/adapters/loopback_ui.rs",
+    "original_sha256": "26d276122d3ffe6b63198035ea5e226d327df47dc5ee95fcacf234e724198e11",
+    "mutated_sha256": "f362632754c5465e131c0e784291de1c199411963d02fd434ee3b6add6b07c8a",
+    "exit": 1,
+    "compiled_mutant": true,
+    "classification": "caught",
+    "expected_failure_marker": "AssertionError",
+    "log_sha256": "e0562dfb226124233216eaf5e55bd008e0ac4f183642fa29554bb517dfbc7cb8"
+  }
+]

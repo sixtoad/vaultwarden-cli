@@ -1,0 +1,63 @@
+{
+  "frozen_matrix_rows": {
+    "Submit": [
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "access::direct_request_tests::provider_records_preserve_distinct_authenticated_peer_uids",
+      "human_submission_https_review_expiry_and_independent_negative_cases"
+    ],
+    "Reject": [
+      "access::direct_request_tests::each_admission_rejection_has_no_record_and_no_desktop",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "adapters::human_socket::tests::uid_and_private_metadata_reject_each_independent_wrong_condition"
+    ],
+    "Review": [
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields"
+    ],
+    "Expire/revoke": [
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown"
+    ],
+    "Browser attack": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact"
+    ]
+  },
+  "all_covering_tests_executed_and_passed": true,
+  "browser_harness": {
+    "browser": "firefox/151.0.2",
+    "trustedTLS": true,
+    "automaticArtifactNavigation": true,
+    "keyboardFocus": {
+      "name": "Unlock for up to 15 minutes",
+      "style": "solid",
+      "width": "3px"
+    },
+    "axe": {
+      "violations": [],
+      "passes": 22
+    },
+    "requestReview": "pending -> expired -> expired while locked",
+    "launchReplay": "403",
+    "cookieOnly": "403",
+    "invalidProof": "403",
+    "priorSessionPreserved": true,
+    "screenReaderManual": false,
+    "automationDiagnostics": {
+      "knownCrossOriginOrBlockedFavicon": 6,
+      "categories": [
+        "Error: SecurityError: Permission denied to access property \"__bidi_args\" on cross-origin object",
+        "Error: Error: Permission denied to access property \"length\"",
+        "Error: Content-Security-Policy: The page\u2019s settings blocked the loading of a resource (img-src) at https://127.0.0.1:<port>/favicon.ico because it violates the following directive: \u201cdefault-src 'none'\u201d"
+      ],
+      "unexpected": 0
+    }
+  },
+  "ignored_fixtures": {
+    "direct_request_browser_fixture": "explicitly run by successful Firefox harness",
+    "isolated_system_launcher_child": "explicitly run by passing fixed_system_launcher_uses_only_an_isolated_desktop_association",
+    "isolated_descriptor_fixture": "explicitly run twice by passing descriptor_exhaustion_and_valid_zero_are_isolated_in_child_processes"
+  }
+}

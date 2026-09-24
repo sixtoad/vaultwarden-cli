@@ -67,14 +67,14 @@ pub(crate) struct ProviderKeyring;
 impl ProviderKeyring {
     fn entry(account: &str) -> Result<Entry, SessionError> {
         crate::config::ensure_native_keyring_store()
-            .map_err(|_| SessionError::BackendUnavailable)?;
-        Entry::new(KEYRING_SERVICE, account).map_err(|_| SessionError::BackendUnavailable)
+            .map_err(|_error| SessionError::BackendUnavailable)?;
+        Entry::new(KEYRING_SERVICE, account).map_err(|_error| SessionError::BackendUnavailable)
     }
     pub(crate) fn bootstrap(&self) -> Result<SensitiveString, SessionError> {
         Self::entry(BOOTSTRAP_ACCOUNT)?
             .get_password()
             .map(SensitiveString::new)
-            .map_err(|_| SessionError::BackendUnavailable)
+            .map_err(|_error| SessionError::BackendUnavailable)
     }
     pub(crate) fn save(&self, token: &str, keys: &CryptoKeys) -> Result<(), SessionError> {
         use base64::{Engine, engine::general_purpose::STANDARD};
@@ -92,11 +92,11 @@ impl ProviderKeyring {
                 enc_key: &enc_key,
                 mac_key: &mac_key,
             })
-            .map_err(|_| SessionError::BackendUnavailable)?,
+            .map_err(|_error| SessionError::BackendUnavailable)?,
         );
         Self::entry(SESSION_ACCOUNT)?
             .set_password(&record)
-            .map_err(|_| SessionError::BackendUnavailable)
+            .map_err(|_error| SessionError::BackendUnavailable)
     }
     pub(crate) fn clear(&self) -> Result<(), SessionError> {
         match Self::entry(SESSION_ACCOUNT)?.delete_credential() {
@@ -117,10 +117,10 @@ pub(crate) fn load_setup(path: &Path) -> Result<Config, SessionError> {
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)
-        .map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     let metadata = file
         .metadata()
-        .map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     if !metadata.is_file()
         || metadata.uid() != unsafe { libc::geteuid() }
         || metadata.mode() & 0o777 != 0o600
@@ -132,12 +132,12 @@ pub(crate) fn load_setup(path: &Path) -> Result<Config, SessionError> {
     file.by_ref()
         .take(65537)
         .read_to_end(&mut bytes)
-        .map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     if bytes.len() > 65536 {
         return Err(SessionError::BackendUnavailable);
     }
     let raw: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|_| SessionError::BackendUnavailable)?;
+        serde_json::from_slice(&bytes).map_err(|_error| SessionError::BackendUnavailable)?;
     for forbidden in [
         "access_token",
         "refresh_token",
@@ -154,7 +154,7 @@ pub(crate) fn load_setup(path: &Path) -> Result<Config, SessionError> {
         return Err(SessionError::BackendUnavailable);
     }
     let config: Config =
-        serde_json::from_value(raw).map_err(|_| SessionError::BackendUnavailable)?;
+        serde_json::from_value(raw).map_err(|_error| SessionError::BackendUnavailable)?;
     if config.email.as_deref().is_none_or(str::is_empty)
         || config.client_id.as_deref().is_none_or(str::is_empty)
         || config.encrypted_key.is_none()
@@ -185,7 +185,7 @@ pub(crate) fn derive_keys(
         iterations,
     )
     .decrypt_symmetric_key(encrypted)
-    .map_err(|_| SessionError::AuthenticationFailed)
+    .map_err(|_error| SessionError::AuthenticationFailed)
 }
 
 fn bounded_kdf_iterations(config: &Config) -> Result<KdfIterations, SessionError> {
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(failed.observe(|| None), Duration::MAX);
         assert_eq!(failed.observe(|| Some(Duration::ZERO)), Duration::MAX);
         let poisoned = MonotonicClock::default();
-        let _ = std::panic::catch_unwind(|| {
+        let _ignored = std::panic::catch_unwind(|| {
             let _guard = poisoned.0.lock().unwrap();
             panic!("synthetic clock mutex failure");
         });

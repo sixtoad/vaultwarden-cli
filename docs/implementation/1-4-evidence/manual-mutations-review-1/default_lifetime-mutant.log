@@ -1,0 +1,57 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.17s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 19 tests
+test access::direct_request_tests::identifiers_digest_and_closed_contracts_have_independent_vectors ... ok
+
+thread 'access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive' (2748626) panicked at src/access/direct_request_tests.rs:668:5:
+assertion `left == right` failed
+  left: Pending
+ right: Expired
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive ... FAILED
+test access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable ... ok
+test access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human ... ok
+
+thread 'access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive' (2748620) panicked at src/access/direct_request_tests.rs:289:9:
+assertion `left == right` failed
+  left: Ok(Pending)
+ right: Ok(Expired)
+test access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive ... FAILED
+test access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request ... ok
+
+thread 'access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop' (2748607) panicked at src/access/direct_request_tests.rs:890:9:
+assertion `left == right` failed: request_boundary
+  left: Ok(SubmissionReceipt { id: "cnC9IOz9lOlqO8b7D3kihwloPG1p4iCR4tnSalL_g6o", revision: "e35c8dfc6567a35b5fa93c7eab06d0b447aa64ced84b06e88a81c252a87dba33", arguments_digest: "5f7632c79786683ef5cfe8669337fdc0c51d262946238bb39b973984bab2ed4a", expires_at_unix_seconds: 1700000301, status: Pending })
+ right: Err(Locked)
+test access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop ... FAILED
+
+thread 'access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata' (2748738) panicked at src/access/direct_request_tests.rs:155:5:
+assertion `left == right` failed
+  left: 1700000301
+ right: 1700000300
+test access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata ... FAILED
+test access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently ... ok
+test access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority ... ok
+test access::direct_request_tests::status_wire_requires_variant_fields_and_bounded_exit_codes ... ok
+test access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch ... ok
+test access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields ... ok
+test access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal ... ok
+test access::direct_request_tests::provider_constructor_enforces_each_request_lifetime_boundary ... ok
+test access::direct_request_tests::provider_records_preserve_distinct_authenticated_peer_uids ... ok
+test access::direct_request_tests::each_admission_rejection_has_no_record_and_no_desktop ... ok
+test access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected ... ok
+test access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers ... ok
+
+failures:
+
+failures:
+    access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop
+    access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive
+    access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive
+    access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata
+
+test result: FAILED. 15 passed; 4 failed; 0 ignored; 0 measured; 413 filtered out; finished in 3.18s
+
+error: test failed, to rerun pass `--lib`

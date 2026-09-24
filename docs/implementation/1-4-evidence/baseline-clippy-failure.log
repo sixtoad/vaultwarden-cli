@@ -1,0 +1,775 @@
+    Blocking waiting for file lock on build directory
+    Checking vaultwarden-cli v0.5.4 (/tmp/vw-story14-baseline-qc9_70d_)
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/access/application.rs:74:54
+   |
+74 |         let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+   |                                                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+   = note: requested on the command line with `-D clippy::map-err-ignore`
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/access/application.rs:87:54
+   |
+87 |         let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+   |                                                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/access/application.rs:97:54
+   |
+97 |         let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+   |                                                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/application.rs:127:30
+    |
+127 |                     .map_err(|_| LoginEligibilityError);
+    |                              ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/application.rs:148:22
+    |
+148 |             .map_err(|_| SessionError::InvalidRequest);
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/application.rs:160:54
+    |
+160 |         let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+    |                                                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/application.rs:173:54
+    |
+173 |         let mut authority = self.gate.lock().map_err(|_| SessionError::CleanupFailed)?;
+    |                                                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider.rs:127:22
+    |
+127 |             .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider.rs:151:22
+    |
+151 |             .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider.rs:154:22
+    |
+154 |             .map_err(|_| ProviderError::new(ProviderDiagnostic::InvalidState))?
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/access/provider_store.rs:61:26
+   |
+61 |                 .map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+   |                          ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/access/provider_store.rs:72:26
+   |
+72 |                 .map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+   |                          ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:150:27
+    |
+150 |         cleanup().map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                           ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:160:22
+    |
+160 |             .map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:162:48
+    |
+162 |             serde_json::from_str(&raw).map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+    |                                                ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:171:47
+    |
+171 |             serde_json::to_vec(state).map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                                               ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:180:22
+    |
+180 |             .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: non-binding `let` on an expression with `#[must_use]` type
+   --> src/access/provider_store.rs:187:13
+    |
+187 |             let _ = fs::remove_file(&temporary);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider explicitly using expression value
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_must_use
+    = note: requested on the command line with `-D clippy::let-underscore-must-use`
+
+error: non-binding `let` on an expression with `#[must_use]` type
+   --> src/access/provider_store.rs:191:13
+    |
+191 |             let _ = fs::remove_file(&temporary);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider explicitly using expression value
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_must_use
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:195:22
+    |
+195 |             .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:274:34
+    |
+274 |     fs::create_dir(root).map_err(|_| error(ProviderDiagnostic::UnsafeState))?;
+    |                                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:276:18
+    |
+276 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:285:18
+    |
+285 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:288:18
+    |
+288 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:294:44
+    |
+294 |         serde_json::to_vec(&state).map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                                            ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:302:18
+    |
+302 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:306:18
+    |
+306 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:309:18
+    |
+309 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:315:18
+    |
+315 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:320:39
+    |
+320 |         fs::remove_file(path).map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                                       ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:335:44
+    |
+335 |         fs::symlink_metadata(path).map_err(|_| error(ProviderDiagnostic::UnsafeState))?;
+    |                                            ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:352:44
+    |
+352 |         fs::symlink_metadata(path).map_err(|_| error(ProviderDiagnostic::InvalidState))?;
+    |                                            ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:369:32
+    |
+369 |     options.open(path).map_err(|_| {
+    |                                ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access/provider_store.rs:380:18
+    |
+380 |         .map_err(|_| error(ProviderDiagnostic::PersistenceFailure))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/access.rs:217:18
+    |
+217 |         .map_err(|_| anyhow::anyhow!("agent public key must be 32 bytes"))?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/loopback_ui.rs:51:41
+   |
+51 |     getrandom::fill(&mut bytes).map_err(|_| SessionError::BackendUnavailable)?;
+   |                                         ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/loopback_ui.rs:64:22
+   |
+64 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/loopback_ui.rs:67:22
+   |
+67 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/loopback_ui.rs:70:22
+   |
+70 |             .map_err(|_| SessionError::BackendUnavailable)?
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/loopback_ui.rs:84:22
+   |
+84 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/loopback_ui.rs:87:22
+   |
+87 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:108:22
+    |
+108 |             .map_err(|_| SessionError::BackendUnavailable)?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: non-binding `let` on an expression with `#[must_use]` type
+   --> src/adapters/loopback_ui.rs:132:25
+    |
+132 |                         let _ = app.shutdown();
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider explicitly using expression value
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_must_use
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:143:38
+    |
+143 | ...                   .map_err(|_| SessionError::BackendUnavailable)?;
+    |                                ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:148:55
+    |
+148 | ...                   ui.lock().map_err(|_| SessionError::BackendUnavailable)?;
+    |                                         ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: non-binding `let` on an expression with `#[must_use]` type
+   --> src/adapters/loopback_ui.rs:158:25
+    |
+158 |                         let _ = stream.write_all(response.encode().as_bytes());
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider explicitly using expression value
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_must_use
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:297:18
+    |
+297 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:300:18
+    |
+300 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:312:18
+    |
+312 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:328:18
+    |
+328 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:329:59
+    |
+329 |     let key = PrivateKeyDer::from_pem_slice(&key).map_err(|_| SessionError::BackendUnavailable)?;
+    |                                                           ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:333:18
+    |
+333 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:394:59
+    |
+394 |         std::str::from_utf8(&bytes[..header_end]).map_err(|_| SessionError::InvalidRequest)?;
+    |                                                           ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:422:18
+    |
+422 |         .map_err(|_| SessionError::InvalidRequest)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/loopback_ui.rs:442:22
+    |
+442 |             .map_err(|_| SessionError::InvalidRequest)?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/session.rs:70:22
+   |
+70 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/session.rs:71:54
+   |
+71 |         Entry::new(KEYRING_SERVICE, account).map_err(|_| SessionError::BackendUnavailable)
+   |                                                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/session.rs:77:22
+   |
+77 |             .map_err(|_| SessionError::BackendUnavailable)
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/session.rs:95:22
+   |
+95 |             .map_err(|_| SessionError::BackendUnavailable)?,
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/session.rs:99:22
+   |
+99 |             .map_err(|_| SessionError::BackendUnavailable)
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/session.rs:120:18
+    |
+120 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/session.rs:123:18
+    |
+123 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/session.rs:135:18
+    |
+135 |         .map_err(|_| SessionError::BackendUnavailable)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/session.rs:140:48
+    |
+140 |         serde_json::from_slice(&bytes).map_err(|_| SessionError::BackendUnavailable)?;
+    |                                                ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/session.rs:157:45
+    |
+157 |         serde_json::from_value(raw).map_err(|_| SessionError::BackendUnavailable)?;
+    |                                             ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/session.rs:188:14
+    |
+188 |     .map_err(|_| SessionError::AuthenticationFailed)
+    |              ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/vaultwarden.rs:48:18
+   |
+48 |         .map_err(|_| SessionError::BackendUnavailable)?;
+   |                  ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/vaultwarden.rs:65:22
+   |
+65 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/vaultwarden.rs:78:22
+   |
+78 |             .map_err(|_| SessionError::BackendUnavailable)
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/vaultwarden.rs:88:22
+   |
+88 |             .map_err(|_| SessionError::BackendUnavailable)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+  --> src/adapters/vaultwarden.rs:99:22
+   |
+99 |             .map_err(|_| SessionError::Incompatible)?;
+   |                      ^^^
+   |
+   = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:101:22
+    |
+101 |             .map_err(|_| SessionError::Incompatible)
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:100:62
+    |
+100 |         serde_json::from_slice(&Self::body(response).map_err(|_| SessionError::Incompatible)?)
+    |                                                              ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:133:22
+    |
+133 |             .map_err(|_| SessionError::BackendUnavailable)?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:135:22
+    |
+135 |             .map_err(|_| SessionError::BackendUnavailable)?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:153:26
+    |
+153 |                 .map_err(|_| SessionError::BackendUnavailable)?;
+    |                          ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:161:30
+    |
+161 |                     .map_err(|_| SessionError::BackendUnavailable)?,
+    |                              ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:176:34
+    |
+176 |                         .map_err(|_| SessionError::BackendUnavailable)?,
+    |                                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:178:64
+    |
+178 |                 CryptoKeys::from_symmetric_key(&bytes).map_err(|_| SessionError::BackendUnavailable)
+    |                                                                ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:188:26
+    |
+188 |                 .map_err(|_| SessionError::BackendUnavailable)
+    |                          ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:280:22
+    |
+280 |             .map_err(|_| SessionError::AuthenticationFailed)?;
+    |                      ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:284:18
+    |
+284 |         .map_err(|_| SessionError::AuthenticationFailed)?;
+    |                  ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: `map_err(|_|...` wildcard pattern discards the original error
+   --> src/adapters/vaultwarden.rs:282:43
+    |
+282 |             &Self::body(response).map_err(|_| SessionError::AuthenticationFailed)?,
+    |                                           ^^^
+    |
+    = help: consider storing the original error as a source in the new error, or silence this warning using an ignored identifier (`.map_err(|_foo| ...`)
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#map_err_ignore
+
+error: could not compile `vaultwarden-cli` (lib) due to 83 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: non-binding `let` on an expression with `#[must_use]` type
+   --> src/adapters/session.rs:241:9
+    |
+241 | /         let _ = std::panic::catch_unwind(|| {
+242 | |             let _guard = poisoned.0.lock().unwrap();
+243 | |             panic!("synthetic clock mutex failure");
+244 | |         });
+    | |___________^
+    |
+    = help: consider explicitly using expression value
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_must_use
+
+error: non-binding `let` on an expression with `#[must_use]` type
+  --> src/adapters/mod.rs:30:9
+   |
+30 |         let _ = sender.send(operation());
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider explicitly using expression value
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#let_underscore_must_use
+
+error: could not compile `vaultwarden-cli` (lib test) due to 85 previous errors

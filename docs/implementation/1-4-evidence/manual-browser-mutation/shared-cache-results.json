@@ -1,0 +1,74 @@
+{
+  "snapshot": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+  "environment": {
+    "VW_UI_DEPS": "/tmp/vw-story14-browser/node_modules"
+  },
+  "commands": [
+    {
+      "name": "baseline-build-cli",
+      "argv": [
+        "cargo",
+        "build",
+        "--bin",
+        "vw-access"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 166.444
+    },
+    {
+      "name": "baseline-build-fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "--lib",
+        "--no-run"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 24.585
+    },
+    {
+      "name": "baseline-browser",
+      "argv": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 70.424
+    },
+    {
+      "name": "mutant-build-fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "--lib",
+        "--no-run"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 72.42
+    },
+    {
+      "name": "mutant-browser",
+      "argv": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 34.311
+    }
+  ],
+  "mutation": {
+    "source": "src/adapters/loopback_ui.rs",
+    "from": "dd.textContent=text",
+    "to": "dd.innerHTML=text",
+    "original_sha256": "6cdb2e18b87ceedcd357fd62ebf55b14fd9fc894a0ae13d0a2a45cb680c2f094",
+    "mutated_sha256": "bde53d83c68bdaaf9c7f5fbed9b96a423eb724a97e4615fb6e7c2304a7eb5ad3"
+  },
+  "classification": "infrastructure-invalid",
+  "security_assertion": "Inspect failure: security assertion not identified.",
+  "reason": "Shared Cargo target did not rebuild after source mutation; source identity was aliased by concurrent same-package source copies."
+}

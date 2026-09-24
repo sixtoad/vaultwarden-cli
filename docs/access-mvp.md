@@ -123,3 +123,73 @@ worker, clears authority again after joining even on worker failure, and removes
 the launch artifact. Delayed unlock cannot recreate authority after shutdown. Process-manager crash containment for protected children is
 implemented with the later execution/supervisor stories; this story starts no
 protected processes.
+
+## One-time human requests (Story 1.4)
+
+With a provisioned operation and an unlocked provider, use the human terminal
+under the same desktop UID as the provider:
+
+```sh
+export VAULTWARDEN_ACCESS_STATE_ROOT=/path/to/private-provider-directory
+vw-access request deploy -- staging safe 3
+vw-access request deploy --revision <policy-sha256> --no-wait -- staging safe 3
+vw-access status <request-id>
+```
+
+Values are positional, in the operation's Target/Choice/Integer order. Integers
+are normalized to decimal before the provider hashes and stores them. Omitting
+`--revision` binds the current policy; an explicit stale revision rejects before
+creation or desktop handoff. Clients cannot select requester identity, ID,
+creation time, expiry, launch URL, credential binding, or executable.
+
+The request command prints a provider receipt containing only its ID, policy
+revision, normalized argument digest, expiry and status. It then waits and prints
+state changes until terminal. `--no-wait` returns after the receipt. Disconnecting
+does not resubmit or grant approval; use `status` with the printed ID. Parser and
+transport errors use fixed categories and do not echo rejected values. A failed
+desktop handoff is a durable `failed/review_unavailable` receipt; the request is
+never executed.
+
+The private `human.sock` uses mode `0600` inside the provider's checked `0700`
+directory. Linux kernel peer credentials authenticate the human before parsing;
+the client verifies socket ownership, permissions and the server's kernel UID
+before sending values. Agents must remain in separate restricted UIDs. Each
+connection carries a version-1 JSON request, terminated by closing its write
+half. Inputs are limited to 2 MiB and a two-second parsing deadline; the client
+allows ten seconds for validation, persistence and the bounded desktop handoff.
+At most sixteen human request workers are admitted. This is not agent transport.
+
+The provider defaults to a five-minute request lifetime. Configure
+`--request-lifetime-seconds` or
+`VAULTWARDEN_ACCESS_REQUEST_LIFETIME_SECONDS` (1–86400 seconds) at provider startup.
+The provider's suspend-aware monotonic clock enforces the deadline independently
+of displayed Unix time. Session expiry, Lock, restart and shutdown can invalidate
+a request earlier. Expiry runs during polling and on the daemon timer even when
+no terminal is connected. Unlock never revives an expired request. Terminal
+status remains available while locked; no history pruning is introduced.
+
+Each accepted request opens a private `review-<id>.html` desktop artifact through
+the fixed, root-owned `/usr/bin/xdg-open`, with only the artifact path in process
+arguments and null standard streams. The artifact navigates automatically to
+the trusted HTTPS loopback page. The 256-bit capability is exchanged once and
+removed from the browser address bar. Capabilities are request-scoped and become
+unusable on expiry or lifecycle invalidation; consumed, stale and failed-launch
+artifacts are removed. Successful launcher exit confirms handoff, not viewing.
+
+The review displays requester, operation/effect, target, normalized arguments,
+credential labels/use types, executable and policy digests, argument digest,
+expiry, one-time meaning and live textual status. It never includes immutable
+item IDs, field/environment mappings, secrets, backend sessions or process output.
+Review reads require both a browser cookie and independent session-bound proof;
+a cookie-only page never reveals review data or recovers proof. Valid new request
+launches preserve existing browser sessions. Capabilities and browser sessions
+are each bounded to 64; restart refreshes these in-memory browser sessions.
+
+Use Tab/Shift+Tab and Enter for session controls and **Refresh request status**.
+Focus is visibly outlined, controls have names, and status uses an atomic live
+region. Approval and denial are explicitly unavailable in Story 1.4, and no
+operation runs. The closed status protocol already represents pending, approved,
+denied, expired, running, completed (exit code 0–255), and failed (closed reason);
+future outcomes are tested through fixtures without adding decision handlers.
+Legacy schema-v1 `{id,status}` records remain readable by the store but carry no
+human ownership and cannot be queried or reviewed as direct requests.

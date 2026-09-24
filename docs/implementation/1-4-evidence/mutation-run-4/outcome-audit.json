@@ -1,0 +1,715 @@
+[
+  {
+    "mutant": "src/bin/vaultwarden-accessd.rs:51:5: replace run -> Result<(), ()> with Ok(())",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "daemon_missing_keyring_fails_closed_even_without_backend_config"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --test provider_session`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__bin__vaultwarden-accessd.rs_line_51_col_5.log"
+  },
+  {
+    "mutant": "src/bin/vw-access.rs:49:16: replace match guard matches!( error.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion ) with true in main",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "parser_failure_and_help_do_not_echo_rejected_values"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --test human_cli`",
+      "unexpected argument \\'--invalid-private-sentinel\\' found"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__bin__vw-access.rs_line_49_col_16.log"
+  },
+  {
+    "mutant": "src/bin/vw-access.rs:49:16: replace match guard matches!( error.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion ) with false in main",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "subcommand_help_shows_its_static_options_without_argument_values",
+      "parser_failure_and_help_do_not_echo_rejected_values"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --test human_cli`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__bin__vw-access.rs_line_49_col_16_001.log"
+  },
+  {
+    "mutant": "src/bin/vw-access.rs:56:29: replace == with != in main",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "subcommand_help_shows_its_static_options_without_argument_values",
+      "parser_failure_and_help_do_not_echo_rejected_values"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --test human_cli`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__bin__vw-access.rs_line_56_col_29.log"
+  },
+  {
+    "mutant": "src/access/application.rs:134:9: replace ProviderApplication::submit_direct -> Result<SubmissionReceipt, DirectRequestError> with Ok(Default::default())",
+    "summary": "Unviable",
+    "failed_tests": [],
+    "compiler_errors": [
+      "could not compile `vaultwarden-cli` (lib) due to 1 previous error",
+      "the trait bound `direct_request::SubmissionReceipt: Default` is not satisfied"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_134_col_9.log"
+  },
+  {
+    "mutant": "src/access/application.rs:155:21: replace && with || in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_155_col_21.log"
+  },
+  {
+    "mutant": "src/access/application.rs:154:21: replace && with || in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_154_col_21.log"
+  },
+  {
+    "mutant": "src/access/application.rs:153:17: delete ! in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable",
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request",
+      "access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch",
+      "access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected",
+      "access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal",
+      "access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers",
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_153_col_17.log"
+  },
+  {
+    "mutant": "src/access/application.rs:154:41: replace < with == in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable",
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request",
+      "access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch",
+      "access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers",
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_154_col_41.log"
+  },
+  {
+    "mutant": "src/bin/vw-access.rs:46:5: replace main -> ExitCode with Default::default()",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "human_submission_https_review_expiry_and_independent_negative_cases"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --test direct_request`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__bin__vw-access.rs_line_46_col_5.log"
+  },
+  {
+    "mutant": "src/access/application.rs:154:41: replace < with > in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable",
+      "access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request",
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch",
+      "access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal",
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers",
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_154_col_41_001.log"
+  },
+  {
+    "mutant": "src/access/application.rs:154:41: replace < with <= in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_154_col_41_002.log"
+  },
+  {
+    "mutant": "src/access/application.rs:155:41: replace < with == in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request",
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch",
+      "access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal",
+      "access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers",
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_155_col_41.log"
+  },
+  {
+    "mutant": "src/bin/vaultwarden-accessd.rs:126:5: replace configured_application -> Result<ProviderApplication, vaultwarden_cli::access::ports::SessionError> with Ok(Default::default())",
+    "summary": "Unviable",
+    "failed_tests": [],
+    "compiler_errors": [
+      "could not compile `vaultwarden-cli` (bin \"vaultwarden-accessd\") due to 1 previous error",
+      "the trait bound `ProviderApplication: Default` is not satisfied"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__bin__vaultwarden-accessd.rs_line_126_col_5.log"
+  },
+  {
+    "mutant": "src/access/application.rs:155:41: replace < with > in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human",
+      "access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive",
+      "access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently",
+      "access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request",
+      "access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable",
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch",
+      "access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop",
+      "access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority",
+      "access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields",
+      "access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal",
+      "access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers",
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_155_col_41_001.log"
+  },
+  {
+    "mutant": "src/access/application.rs:155:41: replace < with <= in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_155_col_41_002.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:317:9: replace LoopbackUi::handle -> Response with Default::default()",
+    "summary": "Unviable",
+    "failed_tests": [],
+    "compiler_errors": [
+      "could not compile `vaultwarden-cli` (lib test) due to 1 previous error; 1 warning emitted",
+      "could not compile `vaultwarden-cli` (lib) due to 1 previous error; 1 warning emitted",
+      "the trait bound `loopback_ui::Response: Default` is not satisfied"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_317_col_9.log"
+  },
+  {
+    "mutant": "src/access/application.rs:178:31: replace || with && in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_178_col_31.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:317:35: replace != with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_317_col_35.log"
+  },
+  {
+    "mutant": "src/access/application.rs:160:48: replace >= with < in ProviderApplication::submit_direct",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch",
+      "access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request",
+      "access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive",
+      "access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch",
+      "access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__access__application.rs_line_160_col_48.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:320:36: replace && with || in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_320_col_36.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:320:27: replace == with != in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_320_col_27.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:320:52: replace == with != in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_320_col_52.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:345:37: replace || with && in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_345_col_37.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:345:27: replace != with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_345_col_27.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:345:65: replace != with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_345_col_65.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:348:25: replace == with != in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_348_col_25.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:349:47: replace != with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_349_col_47.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:362:20: delete ! in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_362_col_20.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:372:36: replace >= with < in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_372_col_36.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:355:63: replace == with != in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous",
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions",
+      "adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_355_col_63.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:394:13: replace || with && in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_394_col_13.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:392:13: replace || with && in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::desktop_launch::tests::fixed_system_launcher_uses_only_an_isolated_desktop_association",
+      "adapters::desktop_launch::tests::isolated_system_launcher_child"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_392_col_13.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:394:47: replace != with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_394_col_47.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:391:12: delete ! in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_391_col_12.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:393:17: replace != with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_393_col_17.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:398:25: replace == with != in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input",
+      "adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated",
+      "adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_398_col_25.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:412:13: delete match arm \"/unlock\" in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_412_col_13.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:424:13: delete match arm \"/lock\" in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions",
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_424_col_13.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:415:80: replace > with < in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf",
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_415_col_80_001.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:415:53: replace || with && in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_415_col_53.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:415:80: replace > with == in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords",
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_415_col_80.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:415:80: replace > with >= in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_415_col_80_002.log"
+  },
+  {
+    "mutant": "src/adapters/loopback_ui.rs:429:17: delete match arm Ok(SessionStatus::Unlocked) in LoopbackUi::handle",
+    "summary": "CaughtMutant",
+    "failed_tests": [
+      "adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf"
+    ],
+    "compiler_errors": [
+      "test failed, to rerun pass `-p vaultwarden-cli --lib`"
+    ],
+    "suspect_unrelated_failure": false,
+    "log_path": "log/src__adapters__loopback_ui.rs_line_429_col_17.log"
+  }
+]

@@ -45,7 +45,7 @@ impl VaultwardenBackend {
                 .as_deref()
                 .ok_or(SessionError::BackendUnavailable)?,
         )
-        .map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
         let loopback = matches!(base.host_str(), Some("127.0.0.1") | Some("[::1]"));
         if !(base.scheme() == "https" || allow_test_http && base.scheme() == "http" && loopback)
             || !base.username().is_empty()
@@ -62,7 +62,7 @@ impl VaultwardenBackend {
             .connect_timeout(Duration::from_secs(3))
             .no_proxy()
             .build()
-            .map_err(|_| SessionError::BackendUnavailable)?;
+            .map_err(|_error| SessionError::BackendUnavailable)?;
         Ok(Self {
             config,
             client,
@@ -75,7 +75,7 @@ impl VaultwardenBackend {
     fn url(&self, path: &str) -> Result<Url, SessionError> {
         self.base
             .join(path)
-            .map_err(|_| SessionError::BackendUnavailable)
+            .map_err(|_error| SessionError::BackendUnavailable)
     }
     fn body(response: Response) -> Result<Zeroizing<Vec<u8>>, SessionError> {
         if !response.status().is_success() {
@@ -85,7 +85,7 @@ impl VaultwardenBackend {
         response
             .take(1_048_577)
             .read_to_end(&mut bytes)
-            .map_err(|_| SessionError::BackendUnavailable)?;
+            .map_err(|_error| SessionError::BackendUnavailable)?;
         if bytes.len() > 1_048_576 {
             return Err(SessionError::BackendUnavailable);
         }
@@ -96,9 +96,9 @@ impl VaultwardenBackend {
             .client
             .get(self.url(path)?)
             .send()
-            .map_err(|_| SessionError::Incompatible)?;
-        serde_json::from_slice(&Self::body(response).map_err(|_| SessionError::Incompatible)?)
-            .map_err(|_| SessionError::Incompatible)
+            .map_err(|_error| SessionError::Incompatible)?;
+        serde_json::from_slice(&Self::body(response).map_err(|_error| SessionError::Incompatible)?)
+            .map_err(|_error| SessionError::Incompatible)
     }
     fn selected(
         &mut self,
@@ -130,9 +130,9 @@ impl VaultwardenBackend {
             .get(self.url(&format!("api/ciphers/{}", binding.immutable_item_id))?)
             .bearer_auth(token.expose())
             .send()
-            .map_err(|_| SessionError::BackendUnavailable)?;
+            .map_err(|_error| SessionError::BackendUnavailable)?;
         let ProviderCipher { cipher, item_key } = serde_json::from_slice(&Self::body(response)?)
-            .map_err(|_| SessionError::BackendUnavailable)?;
+            .map_err(|_error| SessionError::BackendUnavailable)?;
         if cipher.id.as_str() != binding.immutable_item_id
             || cipher.deleted_date.is_some()
             || !matches!(cipher.cipher_data, Some(CipherData::Login(_)))
@@ -150,7 +150,7 @@ impl VaultwardenBackend {
             }
             let private = keys
                 .decrypt_private_key(private)
-                .map_err(|_| SessionError::BackendUnavailable)?;
+                .map_err(|_error| SessionError::BackendUnavailable)?;
             let encrypted = self
                 .config
                 .org_keys
@@ -158,7 +158,7 @@ impl VaultwardenBackend {
                 .ok_or(SessionError::BackendUnavailable)?;
             Some(
                 CryptoKeys::decrypt_org_key(encrypted, &private)
-                    .map_err(|_| SessionError::BackendUnavailable)?,
+                    .map_err(|_error| SessionError::BackendUnavailable)?,
             )
         } else {
             None
@@ -173,9 +173,10 @@ impl VaultwardenBackend {
                 let bytes = Zeroizing::new(
                     parent_keys
                         .decrypt(encrypted)
-                        .map_err(|_| SessionError::BackendUnavailable)?,
+                        .map_err(|_error| SessionError::BackendUnavailable)?,
                 );
-                CryptoKeys::from_symmetric_key(&bytes).map_err(|_| SessionError::BackendUnavailable)
+                CryptoKeys::from_symmetric_key(&bytes)
+                    .map_err(|_error| SessionError::BackendUnavailable)
             })
             .transpose()?;
         let keys = item_keys.as_ref().unwrap_or(parent_keys);
@@ -185,7 +186,7 @@ impl VaultwardenBackend {
             }
             keys.decrypt_to_string(value)
                 .map(SensitiveString::new)
-                .map_err(|_| SessionError::BackendUnavailable)
+                .map_err(|_error| SessionError::BackendUnavailable)
         };
         let mut marker_matches = 0;
         let mut custom = Vec::new();
@@ -277,11 +278,11 @@ impl ProviderSession for VaultwardenBackend {
             .post(self.url("identity/connect/token")?)
             .form(&params)
             .send()
-            .map_err(|_| SessionError::AuthenticationFailed)?;
+            .map_err(|_error| SessionError::AuthenticationFailed)?;
         let mut token: TokenResponse = serde_json::from_slice(
-            &Self::body(response).map_err(|_| SessionError::AuthenticationFailed)?,
+            &Self::body(response).map_err(|_error| SessionError::AuthenticationFailed)?,
         )
-        .map_err(|_| SessionError::AuthenticationFailed)?;
+        .map_err(|_error| SessionError::AuthenticationFailed)?;
         use zeroize::Zeroize;
         if let Some(refresh) = &mut token.refresh_token {
             refresh.zeroize();

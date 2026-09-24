@@ -1,0 +1,819 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-cli-story-1-4)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.42s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 432 tests
+test access::application::tests::expires_during_resolution_discards_values ... ok
+test access::application::tests::expiry_during_compatibility_probe_prevents_item_resolution ... ok
+test access::application::tests::contending_submissions_are_rejected_without_queued_creation_or_launch ... ok
+test access::application::tests::cleanup_failure_poison_cannot_be_bypassed_by_unlock ... ok
+test access::application::tests::closing_between_eligibility_checks_prevents_next_binding_and_final_persistence ... ok
+test access::application::tests::expiry_exact_boundary_clears_authority_and_token_lifetime_bounds_session ... ok
+test access::application::tests::expiry_across_bindings_and_before_policy_commit_revokes_without_persistence ... ok
+test access::application::tests::persistence_failure_still_clears_backend_and_blocks_renewal ... ok
+test access::application::tests::locked_and_incompatible_never_use_items_or_leak_sentinels ... ok
+test access::application::tests::production_policy_activation_uses_only_owned_unlocked_backend ... ok
+test access::application::tests::lock_serializes_resolution_and_delayed_unlock ... ok
+test access::application::tests::shutdown_discards_delayed_unlock_and_permanently_closes_admission ... ok
+test access::application::tests::lock_restart_and_expiry_invalidate_durable_work ... ok
+test access::direct_request_tests::correctly_sealed_other_owner_record_is_not_disclosed_to_current_human ... ok
+test access::application::tests::unusable_deadlines_clear_newly_created_authority ... ok
+test access::direct_request_tests::exact_metadata_and_input_size_limits_remain_usable ... ok
+test access::direct_request_tests::identifiers_digest_and_closed_contracts_have_independent_vectors ... ok
+test access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch ... ok
+test access::application::tests::slow_backend_errors_revoke_before_propagation ... ok
+test access::direct_request_tests::failed_desktop_handoff_changes_only_its_own_request ... ok
+test access::direct_request_tests::duplicate_ids_and_stale_pending_epochs_are_rejected_independently ... ok
+test access::direct_request_tests::launch_crossing_deadline_returns_terminal_receipt_and_cannot_revive ... ok
+test access::direct_request_tests::owned_submission_canonicalizes_and_projects_only_safe_metadata ... ok
+test access::direct_request_tests::ownerless_legacy_and_other_owner_have_no_authority ... ok
+test access::direct_request_tests::launch_failure_is_durable_closed_and_store_failure_prevents_launch ... ok
+test access::direct_request_tests::admission_change_during_provider_time_read_prevents_record_and_desktop ... ok
+test access::direct_request_tests::status_wire_requires_variant_fields_and_bounded_exit_codes ... ok
+test access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields ... ok
+test access::policy::tests::approved_images_bind_id_path_and_digest_and_reverify_the_file ... ok
+test access::policy::tests::argument_and_credential_components_enforce_closed_safe_grammar ... ok
+test access::policy::tests::draft_accepts_exact_authority_component_limits ... ok
+test access::policy::tests::image_path_and_identity_validation_rejects_all_untrusted_shapes ... ok
+test access::policy::tests::policy_error_is_redacted ... ok
+test access::policy::tests::policy_exposes_exact_login_bindings_and_strictly_validates_arguments ... ok
+test access::policy::tests::rejects_arbitrary_or_expanding_configuration ... ok
+test access::policy::tests::rejects_unknown_login_field_members_and_loader_controlled_destinations ... ok
+test access::policy::tests::revision_is_stable_for_unordered_input_and_changes_for_authority ... ok
+test access::policy::tests::stored_image_is_reverified ... ok
+test access::policy::tests::top_level_draft_validation_rejects_each_authority_expansion ... ok
+test access::ports::tests::diagnostics_are_stable_and_sensitive_debug_is_redacted ... ok
+test access::ports::tests::production_clock_wall_time_matches_the_current_unix_bracket ... ok
+test access::direct_request_tests::semantic_record_guards_are_independent_of_the_integrity_seal ... ok
+test access::direct_request_tests::provider_records_preserve_distinct_authenticated_peer_uids ... ok
+test access::provider::tests::activation_requires_registry_id_and_exact_login_binding ... ok
+test access::provider::tests::stable_diagnostics_are_redacted ... ok
+test access::direct_request_tests::provider_constructor_enforces_each_request_lifetime_boundary ... ok
+test access::provider::tests::poisoned_store_blocks_preflight_before_stale_memory_is_admitted ... ok
+test access::provider_store::tests::directory_and_file_validation_reject_every_unsafe_shape ... ok
+test access::provider_store::tests::empty_legacy_v1_state_loads_with_an_empty_image_registry ... ok
+test access::provider::tests::preflight_uses_revalidated_durable_state_not_a_stale_cache ... ok
+test access::provider_store::tests::opened_handles_are_revalidated_as_regular_private_owner_files ... ok
+test access::provider_store::tests::persistence_helpers_fail_closed_for_invalid_sync_or_stale_temp ... ok
+test access::provider::tests::startup_cleanup_precedes_registered_image_integrity_validation ... ok
+test access::provider_store::tests::post_rename_durability_failure_poisoning_blocks_stale_state_use ... ok
+test access::provider::tests::stale_revision_precedes_argument_processing_and_mutates_nothing ... ok
+test access::provider_store::tests::state_validation_rejects_bad_versions_duplicate_ids_and_unbound_operations ... ok
+test access::provider_store::tests::state_and_stable_lock_are_private ... ok
+test access::provider_store::tests::replacement_preserves_a_complete_state_and_lock_excludes_second_writer ... ok
+test access::tests::public_key_round_trip_preserves_verification_key ... ok
+test access::tests::rejects_arbitrary_command_shaped_operation_id ... ok
+test access::tests::rejects_expired_or_nul_containing_requests ... ok
+test access::tests::rejects_non_strict_operation_ids_and_uppercase_revisions ... ok
+test access::tests::request_digest_binds_agent_operation_revision_and_args ... ok
+test access::provider_store::tests::invalidation_changes_only_unexecuted_request_lifecycle_states ... ok
+test access::tests::signed_request_rejects_tampering ... ok
+test adapters::desktop_launch::tests::child_receives_only_artifact_path_trusted_environment_and_null_streams ... ok
+test adapters::desktop_launch::tests::isolated_system_launcher_child ... ignored, invoked only by the isolated desktop test subprocess
+test access::provider_store::tests::symlinked_lock_or_state_fails_closed ... ok
+test adapters::desktop_launch::tests::nonzero_and_spawn_failure_are_closed_review_errors ... ok
+test adapters::desktop_launch::tests::trust_requires_each_independent_launcher_metadata_condition ... ok
+test adapters::desktop_launch::tests::fixed_system_launcher_uses_only_an_isolated_desktop_association ... ok
+test adapters::human_socket::tests::any_panicked_worker_is_reported_while_running_workers_remain ... ok
+test access::direct_request_tests::deadlines_survive_wall_rollback_and_terminal_states_do_not_revive ... ok
+test adapters::human_socket::tests::connected_transport_descriptor_remains_close_on_exec ... ok
+test adapters::human_socket::tests::descriptor_exhaustion_and_valid_zero_are_isolated_in_child_processes ... ok
+test adapters::human_socket::tests::empty_and_embedded_nul_paths_fail_before_connecting_a_valid_prefix ... ok
+test adapters::human_socket::tests::finished_successful_workers_release_capacity_without_failure ... ok
+test access::provider_store::tests::upsert_replaces_only_the_matching_operation_id ... ok
+test adapters::human_socket::tests::full_live_listener_backlog_is_not_recovered_as_a_stale_socket ... ok
+test adapters::human_socket::tests::isolated_descriptor_fixture ... ignored, isolated process fixture invoked by descriptor regression wrapper
+test adapters::human_socket::tests::literal_two_mebibyte_frame_boundary_is_independent_of_production_constant ... ok
+test adapters::human_socket::tests::only_an_empty_nonblocking_accept_backlog_is_retryable ... ok
+test adapters::human_socket::tests::oversized_path_is_rejected_before_kernel_truncation_can_connect ... ok
+test adapters::human_socket::tests::peer_credentials_require_success_and_complete_structure_independently ... ok
+test adapters::human_socket::tests::private_boundary_rejects_unsafe_root_socket_symlink_and_active_listener ... ok
+test adapters::human_socket::tests::frames_require_eof_reject_oversize_and_bound_slow_input_time ... ok
+test adapters::human_socket::tests::socket_lookup_allows_only_missing_and_rejects_other_errors_before_bind ... ok
+test adapters::human_socket::tests::stale_socket_rebinds_and_drop_preserves_replacement_inode ... ok
+test adapters::human_socket::tests::uid_and_private_metadata_reject_each_independent_wrong_condition ... ok
+test adapters::loopback_ui::tests::accept_retries_only_would_block_and_preserves_fatal_errors ... ok
+test adapters::loopback_ui::tests::accepted_connections_require_loopback_peers_before_handoff ... ok
+test adapters::human_socket::tests::actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up ... ok
+test adapters::loopback_ui::tests::cleanup_schedule_is_due_initially_then_at_exact_one_second_intervals ... ok
+test adapters::desktop_launch::tests::timeout_kills_and_reaps_the_started_child ... ok
+test adapters::loopback_ui::tests::direct_request_browser_fixture ... ignored, run with tests/ui/direct-request.mjs and a disposable trusted browser profile
+test adapters::loopback_ui::tests::failed_launch_and_invalid_ids_leave_no_reusable_capability_or_artifact ... ok
+test adapters::loopback_ui::tests::cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous ... ok
+test adapters::loopback_ui::tests::launch_directory_requires_type_owner_and_mode_independently ... ok
+test adapters::loopback_ui::tests::browser_sessions_survive_new_launches_and_proofs_cannot_cross_sessions ... ok
+test adapters::loopback_ui::tests::parser_bounds_body_and_rejects_ambiguous_framing ... ok
+test adapters::loopback_ui::tests::hostile_requests_never_authenticate_or_reflect_passwords ... ok
+test adapters::human_socket::tests::sixteen_admitted_socket_workers_reject_excess_then_recover_capacity ... ok
+test adapters::loopback_ui::tests::launch_is_private_one_use_and_session_is_bound_to_csrf ... ok
+test adapters::loopback_ui::tests::public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers ... ok
+test adapters::loopback_ui::tests::password_limit_allows_exactly_4096_bytes_without_reflecting_input ... ok
+test adapters::loopback_ui::tests::request_handoff_is_private_one_use_and_launcher_gets_only_artifact ... ok
+test access::direct_request_tests::malformed_new_metadata_and_outcomes_are_rejected ... ok
+test adapters::loopback_ui::tests::pending_request_exchange_review_expiry_and_prune_are_authenticated ... ok
+test adapters::loopback_ui::tests::restart_does_not_accept_old_launch_cookie_or_csrf ... ok
+test adapters::loopback_ui::tests::tls_identity_rejects_owned_fifo_even_with_valid_certificate_contents ... ok
+test access::direct_request_tests::each_admission_rejection_has_no_record_and_no_desktop ... ok
+test adapters::loopback_ui::tests::tls_identity_requires_private_single_link_files_and_exact_size_bound ... ok
+test adapters::session::tests::kdf_cost_is_validated_before_expensive_derivation ... ok
+test adapters::session::tests::production_clock_advances_monotonically ... ok
+test adapters::loopback_ui::tests::tls_identity_requires_owned_bounded_regular_private_files_and_matching_key ... ok
+test adapters::session::tests::provider_keyring_deletes_real_record_and_preserves_cli_and_bootstrap ... ok
+test adapters::session::tests::setup_rejects_authority_and_unsafe_files ... ok
+test adapters::session::tests::setup_rejects_owned_fifo_even_with_valid_complete_configuration ... ok
+test adapters::session::tests::silent_derivation_and_setup_require_supported_authenticated_keys ... ok
+test adapters::session::tests::suspend_clock_boundaries_and_failures_never_extend_authority ... ok
+test adapters::session::tests::valid_setup_still_rejects_authority_unsafe_modes_links_and_oversize ... ok
+test adapters::loopback_ui::tests::stale_request_launch_is_consumed_without_granting_a_browser_session ... ok
+test adapters::loopback_ui::tests::server_removes_expired_launch_without_browser_traffic_before_shutdown ... ok
+test adapters::vaultwarden::tests::organization_binding_uses_only_provisioned_org_keys ... ok
+test access::direct_request_tests::supported_closed_outcomes_project_without_new_decision_handlers ... ok
+test adapters::vaultwarden::tests::compatibility_is_exact_and_never_fetches_items ... ok
+test adapters::vaultwarden::tests::personal_and_organization_item_keys_authenticate_before_selected_fields ... ok
+test adapters::vaultwarden::tests::provider_lock_and_restart_clear_the_actual_adapter_keyring_session ... ok
+test adapters::loopback_ui::tests::request_capabilities_are_bounded_and_never_replace_older_ones ... ok
+test adapters::vaultwarden::tests::real_password_keyring_session_and_selective_resolution_stay_redacted ... ok
+test adapters::vaultwarden::tests::redirect_and_oversized_metadata_fail_closed ... ok
+test commands::tests::cipher_uri_matches_tests::matches_uri_through_login_uris ... ok
+test commands::tests::cipher_uri_matches_tests::returns_false_when_no_uris_present ... ok
+test commands::tests::cipher_uri_matches_tests::uri_match_is_case_insensitive ... ok
+test commands::tests::command_state_tests::test_lock_deletes_saved_keys ... ok
+test adapters::vaultwarden::tests::url_validation_never_echoes_input_or_accepts_credential_urls ... ok
+test adapters::vaultwarden::tests::response_limit_accepts_exact_boundary_and_rejects_oversized_valid_json ... ok
+test adapters::loopback_ui::tests::sixty_four_browser_sessions_allow_existing_review_but_reject_new_sessions ... ok
+test adapters::human_socket::tests::client_allows_desktop_handoff_longer_than_hostile_input_deadline ... ok
+test adapters::vaultwarden::tests::token_validation_rejects_expired_or_mismatched_authority_before_persistence ... ok
+test commands::tests::command_state_tests::test_lock_reports_keyring_delete_failure ... ok
+test commands::tests::command_state_tests::test_logout_clears_config_and_keys ... ok
+test commands::tests::command_state_tests::test_logout_reports_client_secret_delete_failure ... ok
+test commands::tests::decrypt_cipher_tests::test_cipher_type_to_string ... ok
+test commands::tests::command_state_tests::test_logout_when_not_logged_in ... ok
+test commands::tests::decrypt_cipher_tests::test_decrypt_cipher_errors_on_invalid_custom_field_name ... ok
+test commands::tests::decrypt_cipher_tests::test_decrypt_cipher_errors_on_invalid_custom_field_value ... ok
+test commands::tests::decrypt_cipher_tests::test_decrypt_cipher_errors_on_invalid_ssh_fingerprint ... ok
+test commands::tests::decrypt_cipher_tests::test_decrypt_cipher_errors_on_invalid_ssh_private_key ... ok
+test commands::tests::decrypt_cipher_tests::test_decrypt_cipher_no_name_fails ... ok
+test commands::tests::decrypt_cipher_tests::test_decrypt_cipher_errors_on_invalid_ssh_public_key ... ok
+test commands::tests::decrypt_cipher_tests::test_list_env_name_profile_skips_secret_value_decryption ... ok
+test commands::tests::decrypt_cipher_tests::test_interpolation_profile_decrypts_only_requested_component ... ok
+test commands::tests::ensure_unlocked_tests::test_ensure_unlocked_with_keys ... ok
+test commands::tests::command_state_tests::test_status_token_expired ... ok
+test commands::tests::ensure_unlocked_tests::test_ensure_unlocked_without_keys ... ok
+test commands::tests::decrypt_cipher_tests::test_run_env_profile_decrypts_first_uri ... ok
+test commands::tests::command_state_tests::test_status_when_logged_in_locked ... ok
+test commands::tests::command_state_tests::test_status_when_logged_in_unlocked ... ok
+test commands::tests::command_state_tests::test_status_when_not_logged_in ... ok
+test commands::tests::ensure_valid_token_tests::test_ensure_valid_token_errors_when_expired_without_refresh ... ok
+test commands::tests::ensure_valid_token_tests::test_ensure_valid_token_errors_when_not_logged_in ... ok
+test commands::tests::ensure_valid_token_tests::test_token_needs_refresh_with_max_expiry ... ok
+test commands::tests::ensure_valid_token_tests::test_token_needs_refresh_with_min_expiry ... ok
+test commands::tests::ensure_valid_token_tests::test_token_needs_refresh_with_negative_expiry ... ok
+test commands::tests::filter_resolution_tests::test_cipher_matches_filters_allows_no_filters ... ok
+test commands::tests::filter_resolution_tests::test_cipher_matches_filters_checks_org_and_collection ... ok
+test commands::tests::filter_resolution_tests::test_cipher_matches_filters_rejects_nonmatching_folder ... ok
+test commands::tests::filter_resolution_tests::test_resolve_collection_id_errors_without_matching_decrypted_name ... ok
+test commands::tests::filter_resolution_tests::test_resolve_collection_id_matches_exact_id ... ok
+test commands::tests::filter_resolution_tests::test_resolve_collection_id_matches_decrypted_name_with_org_scope ... ok
+test commands::tests::filter_resolution_tests::test_resolve_org_id_errors_when_missing ... ok
+test commands::tests::filter_resolution_tests::test_resolve_collection_id_rejects_ambiguous_decrypted_name_without_org_scope ... ok
+test commands::tests::filter_resolution_tests::test_resolve_org_id_matches_exact_id ... ok
+test commands::tests::filter_resolution_tests::test_resolve_org_id_matches_name_case_insensitively ... ok
+test commands::tests::find_cipher_output_by_uri_tests::errors_when_no_ciphers_match_uri ... ok
+test commands::tests::find_cipher_output_tests::returns_none_when_no_ciphers ... ok
+test commands::tests::find_cipher_output_tests::returns_none_when_predicate_never_matches ... ok
+test commands::tests::find_cipher_output_tests::skips_ciphers_that_fail_filter ... ok
+test commands::tests::find_cipher_output_tests::skips_ciphers_whose_keys_cannot_be_resolved ... ok
+test commands::tests::find_cipher_output_tests::returns_some_when_cipher_matches ... ok
+test commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refresh_failure ... ok
+test adapters::vaultwarden::tests::resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items ... ok
+test commands::tests::ensure_valid_token_tests::test_ensure_valid_token_refreshes_successfully ... ok
+test commands::tests::ensure_valid_token_tests::test_ensure_valid_token_returns_token_when_not_expired ... ok
+test commands::tests::get_cipher_keys_tests::test_get_cipher_keys_missing_org_keys ... ok
+test commands::tests::get_cipher_keys_tests::test_get_cipher_keys_no_keys_at_all ... ok
+test commands::tests::get_cipher_keys_tests::test_get_cipher_keys_org_cipher ... ok
+test commands::tests::get_cipher_keys_tests::test_get_cipher_keys_user_cipher ... ok
+test adapters::session::tests::provider_guards_ignore_the_direct_cli_insecure_mac_override ... ok
+test commands::tests::ensure_valid_token_tests::test_ensure_valid_token_serializes_concurrent_refresh ... ok
+test commands::tests::get_by_uri_tests::test_get_by_uri_match ... ok
+test commands::tests::get_by_uri_tests::test_get_by_uri_matches_secondary_uri ... ok
+test commands::tests::get_by_uri_tests::test_get_by_uri_matches_when_name_does_not_match ... ok
+test commands::tests::get_by_uri_tests::test_get_by_uri_not_found ... ok
+test commands::tests::get_by_uri_tests::test_get_by_uri_reports_ambiguous_when_multiple_items_match ... ok
+test commands::tests::interpolate_helpers_tests::test_parse_placeholder_invalid ... ok
+test commands::tests::interpolate_helpers_tests::test_parse_placeholder_uses_last_dot ... ok
+test commands::tests::interpolate_helpers_tests::test_parse_placeholder_valid ... ok
+test commands::tests::interpolate_helpers_tests::test_resolve_component ... ok
+test commands::tests::get_tests::test_get_allows_id_to_disambiguate_duplicate_names ... ok
+test commands::tests::get_tests::test_get_by_id ... ok
+test commands::tests::get_tests::test_get_by_name ... ok
+test commands::tests::get_tests::test_get_by_name_with_collection_filter_uses_filtered_ciphers ... ok
+test commands::tests::get_tests::test_get_does_not_fall_back_to_uri_match ... ok
+test commands::tests::get_tests::test_get_fails_on_duplicate_item_names ... ok
+test commands::tests::get_tests::test_get_not_found ... ok
+test commands::tests::interpolate_tests::test_interpolate_allows_item_id_to_disambiguate_duplicate_names ... ok
+test commands::tests::interpolate_tests::test_interpolate_fails_on_case_insensitive_duplicate_item_names ... ok
+test commands::tests::interpolate_tests::test_interpolate_fails_on_duplicate_item_names ... ok
+test commands::tests::interpolate_tests::test_interpolate_fails_on_missing_placeholder ... ok
+test commands::tests::interpolate_tests::test_interpolate_replaces_placeholders ... ok
+test commands::tests::interpolate_tests::test_interpolate_resolves_placeholder_by_id_with_many_ciphers ... ok
+test commands::tests::interpolate_tests::test_interpolate_skip_missing_leaves_ambiguous_placeholder_unchanged ... ok
+test commands::tests::interpolate_tests::test_interpolate_skips_missing_placeholders ... ok
+test commands::tests::interpolate_tests::test_interpolate_writes_to_output_file ... ok
+test commands::tests::interpolate_tests::test_run_with_collection_filter_fails_on_selected_missing_org_key ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_allows_id_to_disambiguate_duplicate_names ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_decrypts_filtered_collection_items ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_errors_on_empty_uri_search_input ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_fails_on_duplicate_item_names ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_matches_secondary_uri ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_reports_ambiguous_uri_matches ... ok
+test commands::tests::interpolate_tests::test_run_with_secrets_returns_child_exit_without_terminating_caller ... ok
+test commands::tests::list_tests::test_list_invalid_type_filter_errors ... ok
+test commands::tests::list_tests::test_list_no_filters_shows_all_items ... ok
+test commands::tests::list_tests::test_list_no_matches ... ok
+test commands::tests::list_tests::test_list_with_search_filter ... ok
+test commands::tests::list_tests::test_list_with_type_filter ... ok
+test commands::tests::output_helper_tests::test_cipher_to_env_vars_includes_ssh_fields ... ok
+test commands::tests::output_helper_tests::test_cipher_to_env_vars_includes_standard_and_custom_fields ... ok
+test commands::tests::output_helper_tests::test_cipher_to_env_vars_skips_absent_standard_fields ... ok
+test commands::tests::output_helper_tests::test_format_list_output_json ... ok
+test commands::tests::output_helper_tests::test_format_list_output_json_empty_array ... ok
+test commands::tests::output_helper_tests::test_format_list_output_plain_env_names_match_cipher_to_env_vars ... ok
+test commands::tests::output_helper_tests::test_format_list_output_plain_env_vars ... ok
+test commands::tests::output_helper_tests::test_format_list_output_plain_env_vars_includes_ssh_fields ... ok
+test commands::tests::output_helper_tests::test_format_list_output_plain_env_vars_with_grouped_parents ... ok
+test commands::tests::output_helper_tests::test_format_unmatched_placeholder_warning_deduplicates_and_sorts ... ok
+test commands::tests::output_helper_tests::test_format_unmatched_placeholder_warning_returns_none_when_empty ... ok
+test commands::tests::output_helper_tests::test_resolve_component_errors_for_missing_standard_field ... ok
+test commands::tests::output_helper_tests::test_resolve_component_errors_for_unknown_custom_field ... ok
+test commands::tests::output_helper_tests::test_run_uri_env_and_info_names_for_login_item ... ok
+test commands::tests::output_helper_tests::test_run_uri_env_omitted_when_login_item_has_no_uri ... ok
+test commands::tests::output_helper_tests::test_write_interpolated_output_can_replace_input_path_after_read ... ok
+test commands::tests::output_helper_tests::test_write_interpolated_output_replaces_existing_file_atomically ... ok
+test commands::tests::output_helper_tests::test_write_interpolated_output_reports_write_failure_context ... ok
+test commands::tests::output_helper_tests::test_write_interpolated_output_writes_to_file ... ok
+test commands::tests::plaintext_json_policy_tests::allows_plaintext_json_when_non_interactive_output_is_explicitly_enabled ... ok
+test commands::tests::plaintext_json_policy_tests::allows_plaintext_json_when_stdout_is_terminal ... ok
+test commands::tests::plaintext_json_policy_tests::rejects_plaintext_json_when_stdout_is_captured_without_opt_in ... ok
+test commands::tests::print_cipher_output_tests::test_cipher_to_env_vars_keeps_raw_values_for_direct_injection ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_env ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_env_edge_names_round_trip_through_shell ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_env_preserves_multiline_values ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_env_rejects_nul_values ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_env_shell_quotes_sensitive_values ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_env_uses_portable_names_for_edge_cases ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_json ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_missing_password ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_missing_username ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_password_alias ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_username ... ok
+test commands::tests::print_cipher_output_tests::test_format_cipher_output_value ... ok
+test commands::tests::query_helpers_tests::test_find_cipher_output_finds_match ... ok
+test commands::tests::query_helpers_tests::test_find_cipher_output_no_match ... ok
+test commands::tests::query_helpers_tests::test_get_field_string_none ... ok
+test commands::tests::query_helpers_tests::test_get_field_string_some ... ok
+test commands::tests::query_helpers_tests::test_output_matches_search_name ... ok
+test commands::tests::query_helpers_tests::test_output_matches_search_no_match ... ok
+test commands::tests::query_helpers_tests::test_output_matches_search_uri ... ok
+test commands::tests::query_helpers_tests::test_output_matches_search_username ... ok
+test commands::tests::query_helpers_tests::test_try_decrypt_none ... ok
+test commands::tests::query_helpers_tests::test_try_decrypt_some ... ok
+test commands::tests::resolve_collection_id_missing_keys_tests::errors_when_org_keys_unavailable_for_decrypted_name ... ok
+test commands::tests::run_with_decrypted_outputs_tests::errors_when_no_command_and_not_info_only ... ok
+test commands::tests::run_with_decrypted_outputs_tests::info_only_prints_env_var_names ... ok
+test commands::tests::run_with_decrypted_outputs_tests::info_only_with_empty_env_vars_still_succeeds ... ok
+test commands::tests::sanitize_env_name_tests::test_already_valid_env_name ... ok
+test commands::tests::sanitize_env_name_tests::test_consecutive_special_chars ... ok
+test commands::tests::sanitize_env_name_tests::test_edge_case_names_are_portable_identifiers ... ok
+test commands::tests::sanitize_env_name_tests::test_empty_string ... ok
+test commands::tests::sanitize_env_name_tests::test_lowercase_to_uppercase ... ok
+test commands::tests::sanitize_env_name_tests::test_mixed_input ... ok
+test commands::tests::sanitize_env_name_tests::test_numbers_preserved ... ok
+test commands::tests::sanitize_env_name_tests::test_simple_name ... ok
+test commands::tests::sanitize_env_name_tests::test_spaces_to_underscores ... ok
+test commands::tests::sanitize_env_name_tests::test_special_characters_to_underscores ... ok
+test commands::tests::sanitize_env_name_tests::test_unicode_characters ... ok
+test commands::tests::shell_quote_env_value_tests::test_empty_string ... ok
+test commands::tests::shell_quote_env_value_tests::test_escapes_single_quotes ... ok
+test commands::tests::shell_quote_env_value_tests::test_export_assignment_round_trips_through_shell ... ok
+test commands::tests::shell_quote_env_value_tests::test_no_escaping_needed ... ok
+test commands::tests::shell_quote_env_value_tests::test_preserves_multiline_and_carriage_return_values ... ok
+test commands::tests::shell_quote_env_value_tests::test_quote_followed_by_escaped_sequence ... ok
+test commands::tests::shell_quote_env_value_tests::test_quote_plus_escaped_sequence_round_trips_through_shell ... ok
+test commands::tests::shell_quote_env_value_tests::test_quotes_shell_sensitive_bytes_without_expansion ... ok
+test commands::tests::shell_quote_env_value_tests::test_rejects_nul ... ok
+test commands::tests::time_tests::system_time_to_unix_seconds_rejects_pre_epoch_time ... ok
+test commands::tests::time_tests::system_time_to_unix_seconds_returns_epoch_seconds ... ok
+test commands::tests::token_expiry_from_lifetime_tests::rejects_negative_expires_in ... ok
+test commands::tests::token_expiry_from_lifetime_tests::rejects_overflowing_expires_in ... ok
+test commands::tests::token_expiry_from_lifetime_tests::rejects_zero_expires_in ... ok
+test commands::tests::token_expiry_from_lifetime_tests::returns_valid_expiry ... ok
+test commands::tests::token_needs_refresh_no_expiry_tests::returns_false_when_no_expiry_set ... ok
+test commands::tests::login_tests::test_login_fails_on_invalid_credentials ... ok
+test commands::tests::login_tests::test_login_fails_when_server_unreachable ... ok
+test commands::tests::login_tests::test_login_rejects_negative_expires_in ... ok
+test commands::tests::login_tests::test_login_rejects_zero_expires_in ... ok
+test config::tests::config_state_tests::test_config_default ... ok
+test config::tests::config_state_tests::test_get_server ... ok
+test config::tests::config_state_tests::test_get_server_none ... ok
+test config::tests::config_state_tests::test_is_logged_in_false_when_no_server ... ok
+test config::tests::config_state_tests::test_is_logged_in_false_when_no_token ... ok
+test config::tests::config_state_tests::test_is_logged_in_true_when_both_present ... ok
+test config::tests::config_state_tests::test_is_unlocked_false_when_no_keys ... ok
+test config::tests::config_state_tests::test_is_unlocked_true_when_keys_present ... ok
+test config::tests::file_io_tests::test_clear_config_fields ... ok
+test config::tests::file_io_tests::test_config_dir_returns_path ... ok
+test config::tests::file_io_tests::test_config_path_is_config_json ... ok
+test config::tests::file_io_tests::test_config_save_load_roundtrip ... ok
+test config::tests::file_io_tests::test_delete_keys_file ... ok
+test config::tests::file_io_tests::test_delete_nonexistent_keys_ok ... ok
+test config::tests::file_io_tests::test_keys_path_is_keys_json ... ok
+test config::tests::file_io_tests::test_keys_save_load_roundtrip ... ok
+test config::tests::file_io_tests::test_load_empty_keys_file ... ok
+test config::tests::file_io_tests::test_org_keys_save_load_roundtrip ... ok
+test config::tests::key_retrieval_tests::test_get_keys_for_cipher_no_keys ... ok
+test config::tests::key_retrieval_tests::test_get_keys_for_cipher_org_keys ... ok
+test config::tests::key_retrieval_tests::test_get_keys_for_cipher_org_not_found ... ok
+test config::tests::key_retrieval_tests::test_get_keys_for_cipher_user_keys ... ok
+test config::tests::keyring_delete_tests::delete_client_secret_ignores_missing_keyring_entry ... ok
+test config::tests::keyring_delete_tests::delete_client_secret_reports_keyring_delete_failure ... ok
+test config::tests::keyring_delete_tests::delete_saved_keys_ignores_missing_keyring_entry ... ok
+test config::tests::keyring_delete_tests::delete_saved_keys_reports_keyring_delete_failure ... ok
+test config::tests::keyring_delete_tests::delete_saved_tokens_reports_keyring_delete_failure ... ok
+test config::tests::serialization_tests::test_config_deserialization ... ok
+test config::tests::serialization_tests::test_config_deserialization_maps_zero_and_invalid_kdf_iterations_to_none ... ok
+test config::tests::serialization_tests::test_config_serialization_excludes_crypto_keys ... ok
+test config::tests::serialization_tests::test_config_serialization_excludes_tokens ... ok
+test config::tests::serialization_tests::test_config_with_org_keys ... ok
+test commands::tests::login_tests::test_login_success_with_provided_credentials ... ok
+test commands::tests::login_tests::test_login_sync_failure_does_not_persist_logged_in_session ... ok
+test commands::tests::login_tests::test_login_uses_existing_config_server_and_client_id ... ok
+test crypto::crypto_keys::tests::roundtrip_tests::test_mac_verification_fails_on_tampered_data ... ok
+test crypto::crypto_keys::tests::roundtrip_tests::test_roundtrip_empty_string ... ok
+test crypto::crypto_keys::tests::roundtrip_tests::test_roundtrip_long_text ... ok
+test crypto::crypto_keys::tests::roundtrip_tests::test_roundtrip_simple_text ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_org_key_success ... ok
+test crypto::crypto_keys::tests::roundtrip_tests::test_roundtrip_unicode ... ok
+test crypto::crypto_keys::tests::roundtrip_tests::test_wrong_key_fails_decryption ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_rsa_invalid_format ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_rsa_invalid_base64 ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_private_key_success ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_rsa_type6_success ... ok
+test crypto::crypto_keys::tests::test_decrypt_invalid_base64_ciphertext ... ok
+test crypto::crypto_keys::tests::test_decrypt_invalid_base64_iv ... ok
+test commands::tests::unlock_tests::test_unlock_decrypts_org_keys ... ok
+test commands::tests::unlock_tests::test_unlock_fails_when_not_logged_in ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_rsa_invalid_type ... ok
+test crypto::crypto_keys::tests::test_decrypt_missing_parts ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_rsa_unsupported_type ... ok
+test crypto::crypto_keys::tests::test_decrypt_type2_aes_cbc_with_hmac ... ok
+test crypto::crypto_keys::tests::test_from_symmetric_key_invalid_length ... ok
+test crypto::crypto_keys::tests::test_from_symmetric_key_valid ... ok
+test crypto::crypto_keys::tests::test_decrypt_invalid_encryption_type ... ok
+test crypto::crypto_keys::tests::test_decrypt_invalid_format_no_dot ... ok
+test crypto::crypto_keys::tests::test_decrypt_invalid_type_not_number ... ok
+test crypto::crypto_keys::tests::rsa_roundtrip_tests::test_decrypt_rsa_type4_success ... ok
+test crypto::crypto_keys::tests::test_decrypt_to_string_invalid ... ok
+test crypto::master_key::tests::test_decrypt_symmetric_key_integration ... ok
+test commands::tests::unlock_tests::test_unlock_fails_with_wrong_password ... ok
+test crypto::master_key::tests::test_stretch_produces_stretched_keys ... ok
+test crypto::stretched_keys::tests::test_enc_and_mac_keys_are_different ... ok
+test models::tests::cipher_tests::test_cipher_type_is_enum ... ok
+test models::tests::cipher_tests::test_get_fields_from_direct ... ok
+test models::tests::cipher_tests::test_get_fields_from_nested_data ... ok
+test models::tests::cipher_tests::test_get_name_from_direct_field ... ok
+test models::tests::cipher_tests::test_get_name_from_nested_data ... ok
+test models::tests::cipher_tests::test_get_name_none ... ok
+test models::tests::cipher_tests::test_get_name_prefers_direct_over_nested ... ok
+test models::tests::cipher_tests::test_get_notes_from_direct_field ... ok
+test models::tests::cipher_tests::test_get_notes_from_nested_data ... ok
+test models::tests::cipher_tests::test_get_password_from_login ... ok
+test models::tests::cipher_tests::test_get_password_from_nested_data ... ok
+test models::tests::cipher_tests::test_get_uri_from_login_uris ... ok
+test models::tests::cipher_tests::test_get_uri_from_nested_data_direct ... ok
+test models::tests::cipher_tests::test_get_uri_from_nested_uris_array ... ok
+test models::tests::cipher_tests::test_get_username_from_login ... ok
+test models::tests::cipher_tests::test_get_username_from_nested_data ... ok
+test models::tests::cipher_type_tests::test_cipher_type_display ... ok
+test models::tests::cipher_type_tests::test_cipher_type_from_str_card ... ok
+test models::tests::cipher_type_tests::test_cipher_type_from_str_identity ... ok
+test models::tests::cipher_type_tests::test_cipher_type_from_str_invalid ... ok
+test models::tests::cipher_type_tests::test_cipher_type_from_str_login ... ok
+test models::tests::cipher_type_tests::test_cipher_type_from_str_note ... ok
+test models::tests::cipher_type_tests::test_cipher_type_from_str_ssh ... ok
+test models::tests::cipher_type_tests::test_cipher_type_values ... ok
+test models::tests::deserialization_tests::test_card_data_deserialization ... ok
+test models::tests::deserialization_tests::test_cipher_deserialization_with_login ... ok
+test models::tests::deserialization_tests::test_cipher_deserialization_with_nested_data ... ok
+test models::tests::deserialization_tests::test_cipher_deserialization_with_organization ... ok
+test models::tests::deserialization_tests::test_cipher_with_collection_ids ... ok
+test models::tests::deserialization_tests::test_cipher_with_invalid_field_type_errors ... ok
+test models::tests::deserialization_tests::test_field_data_invalid_type_errors ... ok
+test models::tests::deserialization_tests::test_field_data_missing_type_errors ... ok
+test models::tests::deserialization_tests::test_field_data_types ... ok
+test models::tests::deserialization_tests::test_identity_data_deserialization ... ok
+test models::tests::deserialization_tests::test_profile_with_organizations ... ok
+test models::tests::deserialization_tests::test_sync_response_deserialization ... ok
+test models::tests::deserialization_tests::test_sync_response_with_collections ... ok
+test models::tests::deserialization_tests::test_token_response_deserialization ... ok
+test models::tests::deserialization_tests::test_token_response_lowercase_aliases ... ok
+test models::tests::serialization_tests::test_cipher_output_serialization ... ok
+test models::tests::serialization_tests::test_cipher_output_with_fields ... ok
+test models::tests::serialization_tests::test_cipher_type_deserialization_from_u8 ... ok
+test models::tests::serialization_tests::test_cipher_type_serialization ... ok
+test totp::tests::bare_base32_uses_standard_defaults ... ok
+test totp::tests::formatted_base32_ignores_non_alphabet_characters ... ok
+test totp::tests::invalid_secret_errors_do_not_include_the_seed ... ok
+test totp::tests::invalid_totp_parameters_use_bitwarden_defaults_and_clamps ... ok
+test totp::tests::non_totp_otpauth_uri_is_rejected ... ok
+test totp::tests::otpauth_supports_algorithms_digits_period_and_percent_encoding ... ok
+test totp::tests::percent_decoding_preserves_literal_plus ... ok
+test totp::tests::steam_uses_steam_alphabet_and_length ... ok
+test crypto::master_key::tests::test_derive_basic ... ok
+test crypto::stretched_keys::tests::test_keys_are_32_bytes ... ok
+test crypto::stretched_keys::tests::test_stretch_deterministic ... ok
+test commands::tests::unlock_tests::test_unlock_with_password_argument ... ok
+test crypto::master_key::tests::test_derive_email_case_insensitive ... ok
+test crypto::master_key::tests::test_different_inputs_different_outputs ... ok
+test crypto::master_key::tests::test_different_iterations_different_outputs ... ok
+
+test result: ok. 429 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 29.88s
+
+     Running unittests src/bin/vaultwarden-accessd.rs (target/debug/deps/vaultwarden_accessd-770ea5ad8284e744)
+
+running 9 tests
+test tests::launch_cleanup_accepts_absence_removes_old_capability_and_rejects_failure ... ok
+test tests::either_transport_finishing_requires_provider_shutdown ... ok
+test tests::lifetime_is_provider_configured_with_five_minute_default_and_bounds ... ok
+test tests::worker_success_error_and_panic_all_join_before_final_revocation ... ok
+test tests::no_config_startup_removes_stale_launch_even_when_keyring_cleanup_fails ... ok
+test tests::no_config_startup_clears_injected_keyring_and_cleanup_error_blocks_start ... ok
+test tests::startup_cleans_before_corrupt_missing_or_unsafe_state_and_preserves_competing_owner ... ok
+test tests::configured_request_lifetime_controls_receipt_and_expiry ... ok
+test tests::signal_driver_closes_admission_while_status_waits_on_delayed_unlock ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s
+
+     Running unittests src/main.rs (target/debug/deps/vaultwarden_cli-1d6e2d2dd24f750e)
+
+running 34 tests
+test tests::test_cli_global_allow_plaintext_json_parsing ... ok
+test tests::test_cli_get_totp_two_position_parsing ... ok
+test tests::test_cli_get_password_flag_overrides_format ... ok
+test tests::test_cli_get_uri_parsing ... ok
+test tests::test_cli_get_username_flag_overrides_format ... ok
+test tests::test_cli_list_items_parsing ... ok
+test tests::test_cli_interpolate_parsing ... ok
+test tests::test_cli_list_parsing_with_json ... ok
+test tests::test_cli_list_rejects_unsupported_object ... ok
+test tests::test_cli_run_parsing_with_implicit_name ... ok
+test tests::test_cli_run_parsing_with_comma_separated_implicit_names ... ok
+test tests::test_effective_format_username_override ... ok
+test tests::test_effective_format_password_override ... ok
+test tests::test_result_exit_code_error ... ok
+test tests::test_cli_login_parsing ... ok
+test tests::test_cli_plaintext_json_flag_reaches_command_options ... ok
+test tests::test_cli_unlock_parsing ... ok
+test tests::test_cli_run_parsing ... ok
+test tests::test_effective_format_no_override ... ok
+test tests::test_result_exit_code_success ... ok
+test tests::test_cli_run_parsing_with_multiple_implicit_names ... ok
+test tests::test_result_exit_code_child_status ... ok
+test tests::test_run_cli_dispatches_get_through_sync_lookup ... ok
+test tests::test_run_cli_dispatches_interpolate ... ok
+test tests::test_run_cli_dispatches_list_with_insecure_http_flag ... ok
+test tests::test_run_cli_dispatches_run_uri ... ok
+test tests::test_run_cli_dispatches_run_with_explicit_name ... ok
+test tests::test_run_cli_dispatches_status_success ... ok
+test tests::test_run_cli_dispatches_get_uri_through_sync_lookup ... ok
+test tests::test_run_cli_propagates_command_errors ... ok
+test tests::test_run_cli_rejects_list_without_insecure_http_flag ... ok
+test tests::test_run_cli_reports_config_load_errors ... ok
+test tests::test_run_cli_sets_insecure_mac_library_state ... ok
+test tests::test_run_cli_uses_positional_run_items_only_without_explicit_selector ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+     Running unittests src/bin/vw-access.rs (target/debug/deps/vw_access-10d20806d3fe36e7)
+
+running 3 tests
+test tests::every_provider_rejection_is_an_error_and_never_success_output ... ok
+test tests::no_wait_and_status_parse_without_request_authority_fields ... ok
+test tests::request_defaults_to_wait_and_requires_separator_for_ordered_values ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/api_client.rs (target/debug/deps/api_client-075f5cdb4649f81f)
+
+running 21 tests
+test api_client_from_config_requires_server ... ok
+test api_client_ciphers_sends_bearer_token_and_parses_response ... ok
+test api_client_error_bodies_escape_control_characters ... ok
+test api_client_cipher_by_id_sends_bearer_token_and_parses_response ... ok
+test api_client_from_config_uses_server_from_config ... ok
+test api_client_error_bodies_are_bounded_and_marked_truncated ... ok
+test api_client_check_server_reports_transport_errors ... ok
+test api_client_check_server_returns_false_for_non_success_status ... ok
+test api_client_ciphers_filtered_sends_query_params ... ok
+test api_client_refresh_token_reports_malformed_json ... ok
+test api_client_new_trims_trailing_slash_for_requests ... ok
+test api_client_login_reports_malformed_json ... ok
+test api_client_login_sends_expected_form_fields ... ok
+test support_test_context_builds_binary_command ... ok
+test api_client_login_surfaces_non_success_responses ... ok
+test api_client_sends_client_identification_headers ... ok
+test api_client_refresh_token_surfaces_non_success_responses ... ok
+test api_client_refresh_token_sends_expected_form_fields ... ok
+test api_client_sync_reports_malformed_json ... ok
+test api_client_sync_surfaces_non_success_responses ... ok
+test api_client_sync_sends_bearer_token_and_parses_response ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/cli.rs (target/debug/deps/cli-f6c7b2fd85864c1d)
+
+running 10 tests
+test run_accepts_credential_name_alias ... ok
+test run_accepts_implicit_name_before_double_dash ... ok
+test interpolate_accepts_output_file_option ... ok
+test run_accepts_multiple_implicit_names_before_double_dash ... ok
+test get_uri_subcommand_name_parses ... ok
+test run_accepts_multiple_name_flags ... ok
+test run_accepts_comma_separated_implicit_names_before_double_dash ... ok
+test run_parses_trailing_command_after_double_dash ... ok
+test run_uri_subcommand_name_parses ... ok
+test login_reads_client_credentials_from_environment ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/command_basic.rs (target/debug/deps/command_basic-86ac3345214df762)
+
+running 31 tests
+test get_rejects_unknown_two_position_form_before_vault_access ... ok
+test list_skips_cipher_when_decryption_fails ... ok
+test list_items_returns_empty_json_array ... ok
+test interpolate_skip_missing_reports_unmatched_placeholders_on_stderr ... ok
+test list_uses_sync_ciphers_without_ciphers_endpoint_fallback ... ok
+test get_totp_fallback_ignores_whitespace_only_seed ... ok
+test list_skips_cipher_when_org_keys_are_missing ... ok
+test list_with_org_filter_uses_server_side_org_query ... ok
+test list_with_collection_filter_uses_server_side_collection_query ... ok
+test list_with_no_filters_shows_all_items ... ok
+test list_with_search_filter_matches_decrypted_data ... ok
+test logout_is_a_no_op_when_not_logged_in ... ok
+test list_with_type_filter_shows_only_matching_items ... ok
+test run_requires_a_selector_when_not_searching_by_uri ... ok
+test list_with_type_filter_uses_server_side_type_query ... ok
+test list_with_json_flag_includes_complete_items ... ok
+test run_with_collection_scope_injects_all_matching_items ... ok
+test list_json_requires_opt_in_when_stdout_is_captured ... ok
+test run_injects_env_vars_into_child_process ... ok
+test run_with_comma_separated_implicit_names_injects_multiple_items ... ok
+test run_injects_portable_env_vars_for_edge_case_item_names ... ok
+test status_reports_logged_out_when_no_config_exists ... ok
+test status_reports_unlocked_when_saved_keys_exist ... ok
+test run_with_implicit_name_injects_matching_item ... ok
+test run_with_org_scope_includes_ssh_key_env_vars ... ok
+test run_with_multiple_implicit_names_injects_multiple_items ... ok
+test status_reports_logged_in_locked_details_from_saved_config ... ok
+test run_with_multiple_name_flags_injects_multiple_items ... ok
+test get_totp_supports_id_and_search_errors_without_changing_legacy_get ... ok
+test unlock_fails_when_keys_cannot_be_persisted ... ok
+test unlock_reads_password_from_environment ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.19s
+
+     Running tests/config_edge.rs (target/debug/deps/config_edge-283280d770c4845a)
+
+running 21 tests
+test config_load_fails_for_invalid_config_json ... ok
+test config_load_ignores_invalid_saved_keys_json ... ok
+test config_load_ignores_invalid_saved_key_base64 ... ok
+test config_load_ignores_invalid_saved_tokens_json ... ok
+test config_clear_removes_tokens ... ok
+test config_load_saved_tokens_reports_malformed_file ... ok
+test config_clear_removes_account_metadata_runtime_state_and_saved_keys ... ok
+test config_load_saved_keys_accepts_legacy_file_when_insecure_fallback_is_allowed ... ok
+test config_load_saved_keys_removes_legacy_file_unless_insecure_fallback_is_allowed ... ok
+test config_save_load_round_trips_tokens ... ok
+test config_save_tokens_fails_when_config_dir_is_missing ... ok
+test config_save_tokens_noops_when_access_token_is_absent ... ok
+test config_save_keys_defaults_to_no_persist_without_keyring ... ok
+test config_tokens_not_present_in_config_json_after_save ... ok
+test config_save_keys_removes_stale_legacy_file_after_keyring_success ... ok
+test config_save_keys_fails_when_config_dir_is_missing ... ok
+test config_save_keys_removes_stale_legacy_file_when_no_persist_is_required ... ok
+test config_save_keys_round_trips_when_config_dir_exists ... ok
+test config_save_keys_warns_when_client_id_is_none ... ok
+test scoped_config_dir_override_cleans_up_static_paths_and_lock_path ... ok
+test warning_capture_drain_clears_messages_and_drop_restores_stderr_mode ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/direct_request.rs (target/debug/deps/direct_request-2508ddfe2c11aac7)
+
+running 1 test
+test human_submission_https_review_expiry_and_independent_negative_cases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+
+     Running tests/human_cli.rs (target/debug/deps/human_cli-915dc792011136ce)
+
+running 3 tests
+test unavailable_transport_is_redacted ... ok
+test subcommand_help_shows_its_static_options_without_argument_values ... ok
+test parser_failure_and_help_do_not_echo_rejected_values ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/integration_tests.rs (target/debug/deps/integration_tests-6a0f09659a05a66c)
+
+running 22 tests
+test api_tests::test_refresh_token_endpoint ... ok
+test api_tests::test_login_endpoint_success ... ok
+test crypto_integration_tests::test_symmetric_key_construction ... ok
+test edge_case_tests::test_cipher_type_from_str_edge_cases ... ok
+test edge_case_tests::test_cipher_type_unknown ... ok
+test edge_case_tests::test_cipher_with_null_fields ... ok
+test api_tests::test_sync_endpoint ... ok
+test api_tests::test_sync_unauthorized ... ok
+test api_tests::test_login_endpoint_invalid_credentials ... ok
+test model_integration_tests::test_cipher_with_multiple_uris ... ok
+test model_integration_tests::test_parse_realistic_sync_response ... ok
+test model_integration_tests::test_parse_realistic_token_response ... ok
+test model_integration_tests::test_parse_vaultwarden_nested_format ... ok
+test api_tests::test_api_client_check_server_failure ... ok
+test performance_tests::test_key_derivation_completes_in_reasonable_time ... ok
+test api_tests::test_api_client_check_server_success ... ok
+test edge_case_tests::test_empty_password_derivation ... ok
+test edge_case_tests::test_very_long_password ... ok
+test crypto_integration_tests::test_full_key_derivation_flow ... ok
+test edge_case_tests::test_unicode_password ... ok
+test performance_tests::test_stretch_key_is_fast ... ok
+test crypto_integration_tests::test_different_users_different_keys ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.10s
+
+     Running tests/live_tests.rs (target/debug/deps/live_tests-520e466ad7fb3c49)
+
+running 71 tests
+test get::get_format_env_produces_key_value_pairs ... ok
+test get::get_by_item_id ... ok
+test get::get_by_exact_name_json ... ok
+test get::get_format_json_contains_all_fields ... ok
+test get::get_format_username_outputs_only_username ... ok
+test get::get_json_includes_custom_fields ... ok
+test get::get_not_found_returns_error ... ok
+test get::get_shorthand_password_flag ... ok
+test get::get_format_value_outputs_only_password ... ok
+test get::get_requires_login ... ok
+test get::get_ssh_item_includes_key_fields_in_json ... ok
+test get::get_shorthand_username_flag ... ok
+test get::get_uri_by_exact_domain ... ok
+test get::get_uri_no_match_returns_error ... ok
+test get::get_uri_partial_uri_matches ... ok
+test get::get_uri_with_format_value ... ok
+test interpolate::interpolate_custom_field ... ok
+test interpolate::interpolate_hidden_custom_field ... ok
+test interpolate::interpolate_item_name_is_case_insensitive ... ok
+test interpolate::interpolate_multiple_placeholders_in_one_template ... ok
+test interpolate::interpolate_output_to_file ... ok
+test interpolate::interpolate_missing_placeholder_without_skip_fails ... ok
+test interpolate::interpolate_note_notes_field ... ok
+test interpolate::interpolate_password_placeholder ... ok
+test interpolate::interpolate_output_defaults_to_stdout ... ok
+test interpolate::interpolate_requires_vault_unlocked ... ok
+test interpolate::interpolate_missing_placeholder_with_skip_succeeds ... ok
+test interpolate::interpolate_uri_placeholder ... ok
+test interpolate::interpolate_ssh_public_key ... ok
+test list::list_json_includes_all_fixture_items ... ok
+test list::list_json_output_is_valid_json_array ... ok
+test list::list_requires_login ... ok
+test interpolate::interpolate_username_placeholder ... ok
+test list::list_returns_all_provisioned_items ... ok
+test list::list_search_by_name_prefix ... ok
+test list::list_search_by_username ... ok
+test list::list_search_with_no_matches_prints_no_items_found ... ok
+test list::list_type_and_search_combined ... ok
+test list::list_type_card_shows_only_cards ... ok
+test run::run_comma_separated_names_injects_all ... ok
+test run::run_info_flag_shows_item_names ... ok
+test list::list_type_ssh_shows_only_ssh_keys ... ok
+test list::list_type_login_shows_only_logins ... ok
+test list::list_type_invalid_returns_error ... ok
+test list::list_type_note_shows_only_notes ... ok
+test run::run_injects_vault_vars_into_child_env ... ok
+test run::run_propagates_child_exit_code ... ok
+test run::run_child_receives_whitelisted_vars ... ok
+test run::run_uri_info_flag_reports_matched_item ... ok
+test run::run_uri_injects_vars_for_matching_item ... ok
+test run::run_uri_no_match_fails ... ok
+test run::run_does_not_leak_parent_env_to_child ... ok
+test run::run_requires_vault_unlocked ... ok
+test run::run_with_unknown_item_fails ... ok
+test session::list_requires_vault_unlocked ... ok
+test session::lock_clears_vault_keys ... ok
+test session::lock_when_already_locked_is_graceful ... ok
+test session::get_requires_vault_unlocked ... ok
+test run::run_with_name_flag ... ok
+test session::login_does_not_store_access_token_in_config_json ... ok
+test session::login_with_invalid_client_secret_fails ... ok
+test session::login_with_unreachable_server_fails ... ok
+test session::login_with_valid_credentials ... ok
+test session::logout_clears_session ... ok
+test session::unlock_reads_password_from_env_var ... ok
+test session::logout_when_not_logged_in_is_graceful ... ok
+test session::unlock_with_correct_password_succeeds ... ok
+test session::status_when_logged_in_locked ... ok
+test session::unlock_with_wrong_password_fails ... ok
+test session::status_when_logged_in_unlocked ... ok
+test session::status_when_not_logged_in ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/msrv_docs.rs (target/debug/deps/msrv_docs-94968f2ea8a2e3f7)
+
+running 1 test
+test readme_source_install_msrv_matches_cargo_rust_version ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider_session.rs (target/debug/deps/provider_session-f57b0c4b477ca040)
+
+running 6 tests
+test daemon_missing_keyring_fails_closed_even_without_backend_config ... ok
+test stale_origin_replacement_with_untrusted_identity_receives_no_password ... ok
+test completed_connections_do_not_exhaust_parser_capacity ... ok
+test actual_loopback_exchange_unlock_lock_and_replay_are_redacted ... ok
+test parser_capacity_exhaustion_revokes_authority_and_joins_all_workers ... ok
+test plaintext_cannot_submit_and_slow_clients_do_not_starve_lock ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.57s
+
+     Running tests/safety_checks.rs (target/debug/deps/safety_checks-c46362e1065dbfb9)
+
+running 23 tests
+test key_zeroization::crypto_keys_implements_zeroize ... ok
+test interpolation_output_permissions::interpolation_output_is_owner_readable_and_writable_only ... ok
+test key_zeroization::debug_output_does_not_expose_key_bytes ... ok
+test key_zeroization::crypto_keys_implements_zeroize_on_drop ... ok
+test key_zeroization::zeroize_clears_key_bytes_from_memory ... ok
+test mac_integrity_rejection::allows_ciphertext_without_mac_with_env_var ... ok
+test mac_integrity_rejection::allows_ciphertext_without_mac_with_global_flag ... ok
+test restrictive_file_permissions::broad_tokens_file_permissions_are_repaired_before_load ... ok
+test restrictive_file_permissions::config_file_is_owner_readable_and_writable_only ... ok
+test restrictive_file_permissions::config_directory_is_owner_accessible_only ... ok
+test server_url_validation::rejects_empty_server_url ... ok
+test restrictive_file_permissions::broad_keys_file_permissions_are_repaired_before_legacy_load ... ok
+test server_url_validation::rejects_file_url_scheme ... ok
+test server_url_validation::rejects_ftp_url_scheme ... ok
+test server_url_validation::rejects_gopher_url_scheme ... ok
+test server_url_validation::rejects_http_server_url_by_default ... ok
+test server_url_validation::rejects_javascript_url_scheme ... ok
+test mac_integrity_rejection::rejects_ciphertext_without_mac_by_default ... ok
+test restrictive_file_permissions::keys_file_is_owner_readable_and_writable_only_when_stored_on_disk ... ok
+test server_url_validation::accepts_http_server_url_with_explicit_flag ... ok
+test server_url_validation::accepts_http_server_url_with_env_var ... ok
+test server_url_validation::accepts_https_server_url ... ok
+test api_client_timeouts::api_client_initializes_with_timeouts ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running benches/vaultwarden_cli_bench.rs (target/debug/deps/vaultwarden_cli_bench-b67230b4afe35b5f)
+Testing command parsing matrix
+Success
+
+Testing filter search small
+Success
+
+Testing filter search medium
+Success
+
+Testing filter search large
+Success
+
+Testing import sync json small
+Success
+
+Testing export output json small
+Success
+
+Testing export env small
+Success
+
+Testing import sync json medium
+Success
+
+Testing export output json medium
+Success
+
+Testing export env medium
+Success
+
+Testing import sync json large
+Success
+
+Testing export output json large
+Success
+
+Testing export env large
+Success

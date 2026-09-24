@@ -677,7 +677,7 @@ pub mod tests {
             );
             let decrypted_key = keys.decrypt_private_key(&encrypted).unwrap();
 
-            let _ = decrypted_key.to_pkcs8_der().unwrap();
+            let _ignored = decrypted_key.to_pkcs8_der().unwrap();
         }
 
         #[test]

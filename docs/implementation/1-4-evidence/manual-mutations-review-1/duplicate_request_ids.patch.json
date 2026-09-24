@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/access/provider_store.rs\n+++ src/access/provider_store.rs\n@@ -83,7 +83,7 @@\n         }\n         let mut ids = std::collections::HashSet::new();\n         for request in &self.requests {\n-            if !ids.insert(&request.id) {\n+            if ids.insert(&request.id) && false {\n                 return Err(error(ProviderDiagnostic::InvalidState));\n             }\n             if let Some(direct) = &request.direct {\n"
+}

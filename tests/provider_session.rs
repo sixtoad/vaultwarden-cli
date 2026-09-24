@@ -257,7 +257,7 @@ fn plaintext_cannot_submit_and_slow_clients_do_not_starve_lock() {
     let body = r#"{"password":"plaintext-password-sentinel"}"#;
     raw.write_all(format!("POST /unlock HTTP/1.1\r\nHost: {address}\r\nOrigin: {base}\r\nCookie: {cookie}\r\nX-CSRF-Token: {proof}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",body.len()).as_bytes()).unwrap();
     let mut response = Vec::new();
-    let _ = raw.read_to_end(&mut response);
+    let _ignored = raw.read_to_end(&mut response);
     assert!(!String::from_utf8_lossy(&response).contains("Provider unlocked"));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     app.authenticate(SensitiveString::new("human-test-password".into()))
@@ -415,7 +415,7 @@ fn join_ui(worker: std::thread::JoinHandle<Result<(), SessionError>>) -> Result<
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let result = worker.join().expect("UI worker panicked");
-        let _ = sender.send(result);
+        let _ignored = sender.send(result);
     });
     receiver
         .recv_timeout(Duration::from_secs(8))

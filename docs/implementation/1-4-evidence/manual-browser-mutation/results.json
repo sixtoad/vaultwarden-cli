@@ -1,0 +1,93 @@
+{
+  "snapshot": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+  "private_target": "/tmp/vw-story14-browser-mutant-gxlpgbmo/target",
+  "environment": {
+    "VW_UI_DEPS": "/tmp/vw-story14-browser/node_modules",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "commands": [
+    {
+      "name": "isolated-clean",
+      "argv": [
+        "cargo",
+        "clean",
+        "-p",
+        "vaultwarden-cli"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 0.315
+    },
+    {
+      "name": "isolated-baseline-build-cli",
+      "argv": [
+        "cargo",
+        "build",
+        "--bin",
+        "vw-access"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 88.884
+    },
+    {
+      "name": "isolated-baseline-build-fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "--lib",
+        "--no-run"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 50.832
+    },
+    {
+      "name": "isolated-baseline-browser",
+      "argv": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 25.44
+    },
+    {
+      "name": "isolated-mutant-build-fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "--lib",
+        "--no-run"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 0,
+      "seconds": 9.252
+    },
+    {
+      "name": "isolated-mutant-browser",
+      "argv": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "cwd": "/tmp/vw-story14-browser-mutant-gxlpgbmo",
+      "exit_code": 1,
+      "seconds": 25.592
+    }
+  ],
+  "mutation": {
+    "source": "src/adapters/loopback_ui.rs",
+    "from": "dd.textContent=text",
+    "to": "dd.innerHTML=text",
+    "original_sha256": "6cdb2e18b87ceedcd357fd62ebf55b14fd9fc894a0ae13d0a2a45cb680c2f094",
+    "mutated_sha256": "bde53d83c68bdaaf9c7f5fbed9b96a423eb724a97e4615fb6e7c2304a7eb5ad3"
+  },
+  "classification": "caught",
+  "security_assertion": "Hostile effect metadata creates one img element instead of zero under innerHTML.",
+  "mutant_recompiled": true,
+  "original_worktree_ui_source_unchanged": true,
+  "limitations": [
+    "Synthetic backend and disposable trusted Firefox profile; no manual screen reader.",
+    "Initial shared-cache run infrastructure-invalid; only isolated rerun is classified."
+  ]
+}

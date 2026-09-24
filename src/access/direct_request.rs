@@ -1,0 +1,214 @@
+//! Closed contracts for requests owned by an authenticated local human.
+use super::{hex_sha256, valid_operation_id, valid_sha256};
+use serde::{Deserialize, Serialize};
+
+pub const DEFAULT_REQUEST_LIFETIME: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Constructed only after the transport obtains the peer UID from the kernel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AuthenticatedHuman {
+    uid: u32,
+}
+impl AuthenticatedHuman {
+    pub(crate) fn from_peer_uid(uid: u32) -> Self {
+        Self { uid }
+    }
+    pub(crate) fn uid(self) -> u32 {
+        self.uid
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DirectSubmission {
+    pub operation: String,
+    pub revision: Option<String>,
+    pub values: Vec<String>,
+}
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectRequestError {
+    Unauthorized,
+    Locked,
+    InvalidRequest,
+    StaleRevision,
+    NotFound,
+    Unavailable,
+    ReviewUnavailable,
+}
+impl std::fmt::Display for DirectRequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Unauthorized => "unauthorized human",
+            Self::Locked => "provider locked",
+            Self::InvalidRequest => "invalid request",
+            Self::StaleRevision => "stale policy revision",
+            Self::NotFound => "request unavailable",
+            Self::Unavailable => "provider unavailable",
+            Self::ReviewUnavailable => "review unavailable",
+        })
+    }
+}
+impl std::error::Error for DirectRequestError {}
+impl From<super::ports::SessionError> for DirectRequestError {
+    fn from(e: super::ports::SessionError) -> Self {
+        match e {
+            super::ports::SessionError::Locked => Self::Locked,
+            _ => Self::Unavailable,
+        }
+    }
+}
+impl From<super::provider::ProviderError> for DirectRequestError {
+    fn from(_: super::provider::ProviderError) -> Self {
+        Self::Unavailable
+    }
+}
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectFailure {
+    ReviewUnavailable,
+    ExecutionUnavailable,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "status", rename_all = "snake_case", from = "StrictDirectStatus")]
+pub enum DirectStatus {
+    Pending,
+    Approved,
+    Denied,
+    Expired,
+    Running,
+    Completed { exit_code: i32 },
+    Failed { reason: DirectFailure },
+}
+// Serde internally tagged unit variants ignore extra fields. Empty struct wire
+// variants enforce the closed response contract without changing the public API.
+#[derive(Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+enum StrictDirectStatus {
+    Pending {},
+    Approved {},
+    Denied {},
+    Expired {},
+    Running {},
+    Completed { exit_code: u8 },
+    Failed { reason: DirectFailure },
+}
+impl From<StrictDirectStatus> for DirectStatus {
+    fn from(status: StrictDirectStatus) -> Self {
+        match status {
+            StrictDirectStatus::Pending {} => Self::Pending,
+            StrictDirectStatus::Approved {} => Self::Approved,
+            StrictDirectStatus::Denied {} => Self::Denied,
+            StrictDirectStatus::Expired {} => Self::Expired,
+            StrictDirectStatus::Running {} => Self::Running,
+            StrictDirectStatus::Completed { exit_code } => Self::Completed {
+                exit_code: i32::from(exit_code),
+            },
+            StrictDirectStatus::Failed { reason } => Self::Failed { reason },
+        }
+    }
+}
+impl DirectStatus {
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Denied | Self::Expired | Self::Completed { .. } | Self::Failed { .. }
+        )
+    }
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SubmissionReceipt {
+    pub id: String,
+    pub revision: String,
+    pub arguments_digest: String,
+    pub expires_at_unix_seconds: u64,
+    pub status: DirectStatus,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewCredential {
+    pub label: String,
+    pub use_type: super::policy::CredentialUse,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DirectReview {
+    pub id: String,
+    pub requester: String,
+    pub operation: String,
+    pub effect: String,
+    pub target: String,
+    pub arguments: Vec<String>,
+    pub credentials: Vec<ReviewCredential>,
+    pub executable_digest: String,
+    pub policy_digest: String,
+    pub arguments_digest: String,
+    pub expires_at_unix_seconds: u64,
+    pub one_time: String,
+    pub status: DirectStatus,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DirectRecord {
+    pub owner_uid: u32,
+    pub created_at_unix_seconds: u64,
+    pub lifecycle_epoch: u64,
+    pub review: DirectReview,
+    pub binding_digest: String,
+}
+pub(crate) fn arguments_digest(values: &[String]) -> String {
+    hex_sha256(&serde_json::to_vec(&(1u8, values)).expect("string vector serialization"))
+}
+pub(crate) fn valid_request_id(id: &str) -> bool {
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(id)
+        .is_ok_and(|v| {
+            v.len() == 32 && base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(v) == id
+        })
+}
+impl DirectRecord {
+    pub(crate) fn seal(&mut self) {
+        self.binding_digest = self.digest();
+    }
+    fn digest(&self) -> String {
+        let mut review = self.review.clone();
+        review.status = DirectStatus::Pending;
+        hex_sha256(
+            &serde_json::to_vec(&(
+                1u8,
+                self.owner_uid,
+                self.created_at_unix_seconds,
+                self.lifecycle_epoch,
+                review,
+            ))
+            .expect("record projection serialization"),
+        )
+    }
+    pub(crate) fn validate(&self, id: &str, epoch: u64) -> bool {
+        let r = &self.review;
+        let text = |s: &str| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control);
+        self.binding_digest == self.digest()
+            && valid_request_id(id)
+            && r.id == id
+            && self.owner_uid != u32::MAX
+            && self.lifecycle_epoch <= epoch
+            && self.created_at_unix_seconds < r.expires_at_unix_seconds
+            && r.requester == "local human terminal"
+            && valid_operation_id(&r.operation)
+            && text(&r.effect)
+            && text(&r.target)
+            && r.arguments.len() <= 32
+            && r.arguments.iter().all(|v| text(v))
+            && !r.credentials.is_empty()
+            && r.credentials.len() <= 16
+            && r.credentials.iter().all(|c| text(&c.label))
+            && valid_sha256(&r.executable_digest)
+            && valid_sha256(&r.policy_digest)
+            && r.arguments_digest == arguments_digest(&r.arguments)
+            && r.one_time
+                == "Approving this request would authorize one execution only; approval is unavailable at this stage."
+            && !matches!(r.status, DirectStatus::Completed { exit_code } if !(0..=255).contains(&exit_code))
+    }
+}

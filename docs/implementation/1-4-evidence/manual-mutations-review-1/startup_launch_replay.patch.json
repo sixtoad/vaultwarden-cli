@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/adapters/loopback_ui.rs\n+++ src/adapters/loopback_ui.rs\n@@ -354,7 +354,7 @@\n                 .as_ref()\n                 .is_some_and(|launch| request.body.as_slice() == launch.expose().as_bytes())\n             {\n-                self.launch = None;\n+                // deliberate replay mutant: keep launch capability\n             } else {\n                 let Some(launch) = self.broker.take(&request.body) else {\n                     return Response::denied();\n"
+}

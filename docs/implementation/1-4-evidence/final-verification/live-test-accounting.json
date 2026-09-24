@@ -1,0 +1,17 @@
+{
+  "cargo_reported_passed": 680,
+  "early_return_live_tests": 71,
+  "executed_test_bodies": 609,
+  "failed": 0,
+  "cargo_ignored_fixture_entries": 3,
+  "all_ignored_fixtures_explicitly_exercised": true,
+  "live_gate": "tests/live/env.rs LiveTestEnv::maybe_create returns None if VAULTWARDEN_LIVE_TEST_URL or VAULTWARDEN_LIVE_ADMIN_TOKEN is absent",
+  "live_tests_with_gate": {
+    "get": 16,
+    "list": 13,
+    "run": 12,
+    "session": 16,
+    "interpolate": 14
+  },
+  "live_backend_exercised": false
+}

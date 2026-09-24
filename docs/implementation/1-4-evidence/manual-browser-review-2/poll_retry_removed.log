@@ -1,0 +1,13 @@
+file:///tmp/vw-story14-browser/node_modules/puppeteer-core/lib/puppeteer/common/WaitTask.js:46
+            this.#timeoutError = new TimeoutError(`Waiting failed: ${options.timeout}ms exceeded`);
+                                 ^
+
+TimeoutError: Waiting failed: 30000ms exceeded
+    at new WaitTask (file:///tmp/vw-story14-browser/node_modules/puppeteer-core/lib/puppeteer/common/WaitTask.js:46:34)
+    at BidiFrameRealm.waitForFunction (file:///tmp/vw-story14-browser/node_modules/puppeteer-core/lib/puppeteer/api/Realm.js:49:26)
+    at BidiFrame.waitForFunction (file:///tmp/vw-story14-browser/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:585:43)
+    at BidiFrame.<anonymous> (file:///tmp/vw-story14-browser/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:101:27)
+    at BidiPage.waitForFunction (file:///tmp/vw-story14-browser/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:1537:37)
+    at file:///tmp/vw-story14-browser-review-00ny_y3j/tests/ui/direct-request.mjs:70:16
+
+Node.js v26.3.1

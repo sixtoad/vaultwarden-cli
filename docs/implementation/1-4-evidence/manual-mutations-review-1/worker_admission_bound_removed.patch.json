@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/adapters/human_socket.rs\n+++ src/adapters/human_socket.rs\n@@ -114,7 +114,7 @@\n             }\n             match accepted_connection(self.listener.accept()) {\n                 Ok(Some(stream)) => {\n-                    if workers.len() >= MAX_WORKERS {\n+                    if false {\n                         drop(stream);\n                         continue;\n                     }\n"
+}

@@ -1,0 +1,19 @@
+   Compiling vaultwarden-cli v0.5.4 (/tmp/vw-story14-manual-review-w6onabqc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.83s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-bb956f24ffd0a3e7)
+
+running 1 test
+
+thread 'access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch' (2823921) panicked at src/access/application.rs:1126:54:
+called `Result::unwrap()` on an `Err` value: Locked
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch ... FAILED
+
+failures:
+
+failures:
+    access::application::tests::revocation_immediately_after_persistence_returns_terminal_receipt_without_launch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.22s
+
+error: test failed, to rerun pass `--lib`

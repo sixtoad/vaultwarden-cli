@@ -1,0 +1,95 @@
+{
+  "note": "Readable log copies omit only trailing blank whitespace; original bytes remain in target/story-1-4-evidence/original-presentation-logs. Unified patches are stored as JSON strings to preserve intentional whitespace while passing Git whitespace checks.",
+  "logs": [
+    {
+      "file": "admission-hardening.log",
+      "original_sha256": "fdebb9a56181140ff7020d08028c5930119d56409743362cdee074fe5c043b53",
+      "presentation_sha256": "736c287c16ebe613f8da18eef0ffc25ff95d4c7293c012da384afaca62b97b04"
+    },
+    {
+      "file": "full-suite-before-mutations.log",
+      "original_sha256": "fa25ee3a3b6052384da7bbe889c2df5393d752784ccc085713e5aa87945ef45a",
+      "presentation_sha256": "e19f7fbe5d975542d9b874459af48563fa2b1c24f9309811661fcc2ef9f541de"
+    },
+    {
+      "file": "worker-monitor.log",
+      "original_sha256": "2402ccc8aca1b2cd755a2c8efc4bd4d2ded1b2f32860b4fde18f66fc460b947e",
+      "presentation_sha256": "ca6b447de2f635c1822ac2b9d3d44b71b53bf3cb6a47d2faf55e84476cc9bb7a"
+    },
+    {
+      "file": "real-wall-clock.log",
+      "original_sha256": "bba35d388942f43f5dbbfa7d2a18cbeb71347421914d5ea9701baf2d70715fd9",
+      "presentation_sha256": "fe6694fa9c1f3e18d4e07ab6672414d3b23e2d50ba8b8e424aff822ac7088534"
+    },
+    {
+      "file": "desktop-system.log",
+      "original_sha256": "d4ed15135911e47892bcfeb92b6fa017ba30c03711e6ad8eac512c11b5d842a5",
+      "presentation_sha256": "4bdf7f1a3e68eda50fb9cd48eae9f80a4c8b1ac4c888ff1ac8d1b712fb41ac26"
+    },
+    {
+      "file": "constructor-bounds.log",
+      "original_sha256": "96e897614f69d131f413dfd76937bed28aee8e0f082016d749d191ca2eb53574",
+      "presentation_sha256": "3d2b8ab852e4d9c79df4fce47d4d856f29fdfa377171139388d122362463e562"
+    },
+    {
+      "file": "core-boundaries.log",
+      "original_sha256": "60558bf32c1d0d3850f2deae49760455c14a3375edde55aab16e4072e7de0aa6",
+      "presentation_sha256": "87069a2b079604da8ba432695a4b5305ef03024509e3299e61a77b4d98831f3b"
+    },
+    {
+      "file": "cli-behaviors.log",
+      "original_sha256": "b112e88aadca4f976d3d8ef40d5fb3c9ee3c4b43c1644570860327da50d4add9",
+      "presentation_sha256": "2cc94b5f4a408e5b5307552900732286ebe584ee32d80f1f789b60dc226a2465"
+    },
+    {
+      "file": "socket-hardening.log",
+      "original_sha256": "5300355d9115a2b4917d94b97bc9b11e2ccccf31ca0f19828a4c48cfb0710fd9",
+      "presentation_sha256": "575f68cb23a329064630a35ef5bd280317e938dc718a2ae306d2ff4ac1e8949a"
+    },
+    {
+      "file": "waiting-cli.log",
+      "original_sha256": "34a2c710840363f5dc51ed923ebe85ec412dcd0b291e6c8d6c63f222fa41154a",
+      "presentation_sha256": "145f1a12d7b55ed5cf849a25094d4559c00f0fe51418d7146f11a0a25b0adbfd"
+    },
+    {
+      "file": "ui-transport-survivors-isolated.log",
+      "original_sha256": "dc0e5829a1e73f7f76a2c53c90c1bcbcfd0751754a3498963ce2bec59fe9d136",
+      "presentation_sha256": "213db091bb512c2462acd3f9bfeff29b6eaaa490ee077858582fd90be1f91884"
+    },
+    {
+      "file": "direct-contract-hardening.log",
+      "original_sha256": "a924fbfc52a1dd5aab04bc10b7223cc9807abb50e90ccd96877abc2f4857549b",
+      "presentation_sha256": "1f207340fc73ac6e545541fec5b818bd230b50288141c1b5ad9a83ed41c3bea3"
+    },
+    {
+      "file": "cli-rejections.log",
+      "original_sha256": "fff0282d231fa708bf57e4a10c4201df329816f4fe8dad8ef04238075882c525",
+      "presentation_sha256": "28b8b183c9c8e7b6cf3aa75527dc5c437b4bb7a8628231f82e0ee5ec49b12f1a"
+    },
+    {
+      "file": "state-identity-negatives.log",
+      "original_sha256": "0f461237aed2aa48d5d1a3c5b3c1b50c0dcd3ae978379e8292e7b4c0a6808b93",
+      "presentation_sha256": "38f3b6e062c63af409694d3de0feeac8d37d99f229cc8181ed4828107fb33ef7"
+    },
+    {
+      "file": "uid-vectors.log",
+      "original_sha256": "9937d5722dbb67dbdfe34bf26011a9905f8898d311c8f838a8aa926fc3d51f69",
+      "presentation_sha256": "a3c0ed1148cea2d40a8cb161448d2b07837438598dc3454242c0634b220c50ac"
+    },
+    {
+      "file": "independent-launch-failure.log",
+      "original_sha256": "4c11637565dc734be4f995a66754c0e91f041c2ae08696bfe5e5e6db3ea3dcdc",
+      "presentation_sha256": "03a7fba208cae28dda7b1bab4a58a97ed9064e63409f76f9e7f335ec7b6a9e45"
+    },
+    {
+      "file": "socket-survivors-isolated.log",
+      "original_sha256": "6006b4a3e05fc2274be3f6deeb069b64ca898432e07b50a5553b56fdbc0ed1d6",
+      "presentation_sha256": "3caf5b09f08498848e7072e63dd942f58c0f98293b4d87e5e132c1b67133579f"
+    },
+    {
+      "file": "desktop-helper.log",
+      "original_sha256": "88fc918dcac85be7c8443d4829df3f069e6b7f0542abe7f9bb56f6a2233449d2",
+      "presentation_sha256": "2e77ca90b055d6f5ef03629410286bf91e7fdc947619266950decdb0663d91c7"
+    }
+  ]
+}

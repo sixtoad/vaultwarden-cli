@@ -1,0 +1,3 @@
+{
+  "unified_diff": "--- src/bin/vaultwarden-accessd.rs\n+++ src/bin/vaultwarden-accessd.rs\n@@ -127,7 +127,7 @@\n         provider,\n         backend,\n         clock,\n-        Duration::from_secs(args.request_lifetime_seconds),\n+        Duration::from_secs(300),\n     )\n }\n \n"
+}

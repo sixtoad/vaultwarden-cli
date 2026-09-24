@@ -1,0 +1,3 @@
+Found 44 mutants to test
+ok       Unmutated baseline in 168s build + 23s test
+44 mutants tested in 17m: 41 caught, 3 unviable
