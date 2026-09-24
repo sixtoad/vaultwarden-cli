@@ -258,9 +258,7 @@ impl OperationPolicy {
             executable_digest: self.image.sha256.clone(),
             policy_digest: self.revision.clone(),
             expires_at_unix_seconds,
-            one_time:
-                "Approving this request would authorize one execution only; approval is unavailable at this stage."
-                    .into(),
+            one_time: super::direct_request::ONE_TIME.into(),
             status: DirectStatus::Pending,
         }
     }

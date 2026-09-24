@@ -17,11 +17,11 @@ use std::{
     },
     time::Duration,
 };
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 const MAX_PASSWORD_BYTES: usize = 4096;
 // Every input byte can be encoded as a six-byte JSON Unicode escape.
-const MAX_BODY_BYTES: usize = MAX_PASSWORD_BYTES * 6 + 15;
+const MAX_BODY_BYTES: usize = MAX_PASSWORD_BYTES * 6 + 128;
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -38,6 +38,7 @@ fn deserialize_password<'de, D: serde::Deserializer<'de>>(
 struct BrowserSession {
     cookie: SensitiveString,
     csrf: SensitiveString,
+    decision_generation: u64,
 }
 pub struct LoopbackUi {
     listener: TcpListener,
@@ -47,6 +48,7 @@ pub struct LoopbackUi {
     launch: Option<SensitiveString>,
     sessions: Vec<BrowserSession>,
     broker: Arc<RequestLaunchBroker>,
+    approval_authenticator: Option<Arc<dyn ApprovalAuthenticator + Send + Sync>>,
 }
 const MAX_BROWSER_SESSIONS: usize = 64;
 const MAX_REQUEST_LAUNCHES: usize = 64;
@@ -214,7 +216,70 @@ impl LoopbackUi {
             host,
             launch: Some(launch),
             sessions: Vec::new(),
+            approval_authenticator: None,
         })
+    }
+    pub fn with_approval_authenticator(
+        mut self,
+        authenticator: Arc<dyn ApprovalAuthenticator + Send + Sync>,
+    ) -> Self {
+        self.approval_authenticator = Some(authenticator);
+        self
+    }
+    fn dispatch(ui: &Mutex<Self>, mut request: Request, app: &ProviderApplication) -> Response {
+        let mut locked = match ui.lock() {
+            Ok(locked) => locked,
+            Err(_) => return Response::denied(),
+        };
+        if request.path != "/approve" {
+            return locked.handle(request, app);
+        }
+        if !locked.decision_authorized(&request, app) {
+            return Response::denied();
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct ApprovalInput {
+            request_id: String,
+            #[serde(deserialize_with = "deserialize_password")]
+            password: SensitiveString,
+        }
+        let Ok(input) = serde_json::from_slice::<ApprovalInput>(&request.body) else {
+            return Response::denied();
+        };
+        request.body.zeroize();
+        let Ok(prepared) = app.prepare_approval(app.human_owner(), &input.request_id) else {
+            return Response::denied();
+        };
+        let Some(authenticator) = locked.approval_authenticator.clone() else {
+            return Response::denied();
+        };
+        // Both UI and provider serialization are released during password verification.
+        drop(locked);
+        let authenticated = prepared.authenticate(input.password, authenticator.as_ref());
+        let locked = match ui.lock() {
+            Ok(locked) => locked,
+            Err(_) => return Response::denied(),
+        };
+        if !locked.decision_authorized(&request, app) {
+            return Response::denied();
+        }
+        match authenticated.and_then(|proof| app.commit_approval(proof)) {
+            Ok(DirectStatus::Approved) => {
+                Response::text("Request approved once. Execution has not started.")
+            }
+            _ => Response::denied(),
+        }
+    }
+    fn decision_authorized(&self, request: &Request, app: &ProviderApplication) -> bool {
+        request.method == "POST"
+            && request.header("host") == Some(self.host.as_str())
+            && request.header("origin") == Some(self.origin.as_str())
+            && request.header("content-type") == Some("application/json")
+            && self.browser_session(request).is_some_and(|session| {
+                request.header("x-csrf-token") == Some(session.csrf.expose())
+                    && app.decision_generation().ok() == Some(session.decision_generation)
+            })
     }
     pub fn request_launcher(&self) -> Arc<dyn DirectReviewLauncher> {
         self.broker.clone()
@@ -274,13 +339,10 @@ impl LoopbackUi {
                         let mut stream = rustls::StreamOwned::new(connection, socket);
                         let response = match read_request(&mut stream) {
                             Ok(request) => {
-                                let mut ui = ui
-                                    .lock()
-                                    .map_err(|_error| SessionError::BackendUnavailable)?;
                                 if stop.load(Ordering::Acquire) {
                                     Response::denied()
                                 } else {
-                                    ui.handle(request, app.as_ref())
+                                    Self::dispatch(&ui, request, app.as_ref())
                                 }
                             }
                             Err(_) => Response::denied(),
@@ -323,7 +385,7 @@ impl LoopbackUi {
             // scoped in sessionStorage (cookies themselves are not port-scoped).
             return Response::html(r#"<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Vaultwarden Access</title><style>
 body{font-family:system-ui,sans-serif;max-width:54rem;margin:2rem auto;padding:0 1rem;color:#142033;background:#fff}button,input{font:inherit;margin:.5rem;padding:.6rem}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #124ed0;outline-offset:3px}dt{font-weight:bold;margin-top:1rem}dd{margin:.25rem 0;overflow-wrap:anywhere}#result,#review-status{padding:.75rem;border:2px solid #64748b}[hidden]{display:none}
-</style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Approval and denial are unavailable at this stage. No operation will run.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><button id=refresh type=button>Refresh request status</button></section></main><script>
+</style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Decide this request once. Approval does not start execution at this stage.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><p id=decision-feedback role=status aria-live=polite aria-atomic=true></p><div id=decisions hidden><button id=deny type=button>Deny request</button><button id=begin-approval type=button>Authenticate and approve once</button><form id=approval hidden><label for=approval-password>Master password for this approval</label><input id=approval-password type=password autocomplete=current-password required maxlength=4096><button id=approve type=submit>Approve once</button><button id=cancel-approval type=button>Cancel authentication</button></form></div><button id=refresh type=button>Refresh request status</button></section></main><script>
 (async()=>{
 const result=document.getElementById('result'), input=document.getElementById('password');
 let [capability,requestId]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
@@ -335,11 +397,20 @@ document.getElementById('unlock').hidden=false;document.getElementById('lock').h
 let mutations=Promise.resolve();
 function act(path,password){input.value='';const run=async()=>{try{const body=JSON.stringify({password});password='';let r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});result.textContent='Last action result: '+await r.text();if(requestId)await review();}catch{password='';result.textContent='Last action result: Provider unavailable';}};mutations=mutations.then(run,run);}
 document.getElementById('unlock').onsubmit=e=>{e.preventDefault();act('/unlock',input.value)};document.getElementById('lock').onclick=()=>act('/lock','');
-let loading=false,timer,detailsReady=false,retryDelay=1000;
+let reviewRequest=null,reviewEpoch=0,timer,detailsReady=false,retryDelay=1000,deciding=false,retired=false;
+const decisions=document.getElementById('decisions'),approval=document.getElementById('approval'),approvalPassword=document.getElementById('approval-password'),beginApproval=document.getElementById('begin-approval'),refresh=document.getElementById('refresh'),feedback=document.getElementById('decision-feedback');
+function showFeedback(text){if(!retired)feedback.textContent=text;}
+function decisionControls(unavailable){if(unavailable&&decisions.contains(document.activeElement))refresh.focus();decisions.querySelectorAll('button,input').forEach(control=>control.disabled=unavailable);}
+function invalidateReview(){reviewEpoch++;reviewRequest=null;clearTimeout(timer);}
+function retireSession(){retired=true;approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired. Reopen this request from a fresh launch to continue.';showStatus('Request status unavailable for this browser session.');}
+beginApproval.onclick=()=>{approval.hidden=false;approvalPassword.focus();};
+document.getElementById('cancel-approval').onclick=()=>{approvalPassword.value='';approval.hidden=true;showFeedback('Authentication form cancelled.');beginApproval.focus();review(true);};
+async function decide(path,password){approvalPassword.value='';deciding=true;invalidateReview();decisionControls(true);showFeedback('Submitting decision.');try{const body=JSON.stringify(path==='/approve'?{request_id:requestId,password}:{request_id:requestId});password='';const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});showFeedback(response.ok?'Decision submitted. See the current request status below.':'Decision rejected. Check the request status below.');}catch{password='';showFeedback('Decision response unavailable. Request status below is authoritative; do not resubmit.');}finally{approval.hidden=true;deciding=false;await review(true);refresh.focus();}}
+approval.onsubmit=e=>{e.preventDefault();decide('/approve',approvalPassword.value);};document.getElementById('deny').onclick=()=>decide('/deny','');
 function showStatus(text){const status=document.getElementById('review-status');if(status.textContent!==text)status.textContent=text;}
 function renderDetails(value){const details=document.getElementById('details');for(const [name,text] of [['Request ID',value.id],['Requester',value.requester],['Operation',value.operation],['Effect',value.effect],['Target',value.target],['Permitted arguments',value.arguments],['Credentials and use types',value.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Executable digest',value.executable_digest],['Policy digest',value.policy_digest],['Arguments digest',value.arguments_digest],['Expires at',new Date(value.expires_at_unix_seconds*1000).toISOString()],['One-time meaning',value.one_time]]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;if(Array.isArray(text)){const values=document.createElement('ol');values.id='arguments';for(const [index,value] of text.entries()){const item=document.createElement('li');item.setAttribute('aria-label','Argument '+(index+1));item.textContent=value;values.append(item);}dd.append(values);}else{dd.textContent=text;}details.append(dt,dd);}detailsReady=true;}
-async function review(){if(loading)return;loading=true;clearTimeout(timer);let delay=0;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!r.ok)throw Error();const value=await r.json();if(!detailsReady)renderDetails(value);const state=value.status.status;showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}finally{loading=false;if(delay)timer=setTimeout(review,delay);}}
-if(requestId){document.getElementById('review').hidden=false;document.getElementById('refresh').onclick=review;await review();}
+async function review(force=false){if(force)invalidateReview();if(reviewRequest)return;const request={epoch:reviewEpoch};reviewRequest=request;clearTimeout(timer);let delay=0;const current=()=>reviewRequest===request&&request.epoch===reviewEpoch;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!current())return;if([400,401,403,404].includes(r.status)){retireSession();return;}if(!r.ok)throw Error();const value=await r.json();if(!current()||retired)return;if(!detailsReady)renderDetails(value);const state=value.status.status;decisions.hidden=false;decisionControls(deciding||state!=='pending');if(state!=='pending'){approvalPassword.value='';approval.hidden=true;}showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:state==='approved'?'; approved once; execution has not started':state==='denied'?'; no operation will run':''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{if(current()&&!retired){showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}}finally{if(current()){reviewRequest=null;if(delay&&!retired)timer=setTimeout(review,delay);}}}
+if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=>review();await review();}
 })();</script></html>"#.into());
         }
         if request.method != "POST" || request.header("origin") != Some(self.origin.as_str()) {
@@ -366,10 +437,16 @@ if(requestId){document.getElementById('review').hidden=false;document.getElement
                     return Response::denied();
                 }
             }
-            if let Some(session) = self.browser_session(&request) {
-                return Response::text(session.csrf.expose());
+            let Ok(decision_generation) = app.decision_generation() else {
+                return Response::denied();
+            };
+            let existing_session = self.browser_session_index(&request);
+            if let Some(index) = existing_session
+                && self.sessions[index].decision_generation == decision_generation
+            {
+                return Response::text(self.sessions[index].csrf.expose());
             }
-            if self.sessions.len() >= MAX_BROWSER_SESSIONS {
+            if existing_session.is_none() && self.sessions.len() >= MAX_BROWSER_SESSIONS {
                 return Response::denied();
             }
             let (Ok(cookie), Ok(csrf)) = (random(), random()) else {
@@ -380,7 +457,17 @@ if(requestId){document.getElementById('review').hidden=false;document.getElement
                 cookie.expose()
             );
             let proof = csrf.expose().to_owned();
-            self.sessions.push(BrowserSession { cookie, csrf });
+            let session = BrowserSession {
+                cookie,
+                csrf,
+                decision_generation,
+            };
+            if let Some(index) = existing_session {
+                // A recognized browser rotates its proof without consuming another slot.
+                self.sessions[index] = session;
+            } else {
+                self.sessions.push(session);
+            }
             return Response {
                 status: 200,
                 body: proof,
@@ -406,6 +493,20 @@ if(requestId){document.getElementById('review').hidden=false;document.getElement
             {
                 Some(body) => Response::text(&body),
                 None => Response::denied(),
+            };
+        }
+        if request.path == "/deny" {
+            if !self.decision_authorized(&request, app) {
+                return Response::denied();
+            }
+            let Ok(input) = serde_json::from_slice::<ReviewInput>(&request.body) else {
+                return Response::denied();
+            };
+            return match app.deny_direct(app.human_owner(), &input.request_id) {
+                Ok(DirectStatus::Denied) => {
+                    Response::text("Request denied. No operation will run.")
+                }
+                _ => Response::denied(),
             };
         }
         let result = match request.path.as_str() {
@@ -441,6 +542,10 @@ if(requestId){document.getElementById('review').hidden=false;document.getElement
         self.browser_session(request).is_some()
     }
     fn browser_session(&self, request: &Request) -> Option<&BrowserSession> {
+        self.browser_session_index(request)
+            .map(|index| &self.sessions[index])
+    }
+    fn browser_session_index(&self, request: &Request) -> Option<usize> {
         let cookies = request.header("cookie")?;
         let mut found = None;
         for pair in cookies.split(';') {
@@ -454,7 +559,7 @@ if(requestId){document.getElementById('review').hidden=false;document.getElement
         }
         self.sessions
             .iter()
-            .find(|session| found == Some(session.cookie.expose()))
+            .position(|session| found == Some(session.cookie.expose()))
     }
 }
 
@@ -1177,7 +1282,7 @@ mod tests {
         assert!(ui.broker.pending.lock().unwrap().is_empty());
     }
     #[test]
-    fn public_shell_is_accessible_and_has_no_decision_or_html_injection_handlers() {
+    fn public_shell_is_accessible_and_decision_controls_never_inject_html() {
         let (_dir, mut ui, app, _) = fixture();
         let mut get = request(&ui, "/", "");
         get.method = "GET".into();
@@ -1189,7 +1294,9 @@ mod tests {
             ":focus-visible",
             "Refresh request status",
             "dd.textContent=text",
-            "Approval and denial are unavailable",
+            "Authenticate and approve once",
+            "Cancel authentication",
+            "Master password for this approval",
         ] {
             assert!(page.body.contains(required), "missing {required}");
         }
@@ -1502,7 +1609,7 @@ mod tests {
         for raw in [
             "POST /unlock HTTP/1.1\r\nHost: a\r\nHost: b\r\n\r\n",
             "POST /unlock HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n",
-            "POST /unlock HTTP/1.1\r\nContent-Length: 24592\r\n\r\n",
+            "POST /unlock HTTP/1.1\r\nContent-Length: 24705\r\n\r\n",
             "GET / HTTP/1.0\r\n\r\n",
             "POST / HTTP/1.1\r\nContent-Length: 2\r\n\r\n",
             "POST / HTTP/1.1\r\nContent-Length: -1\r\n\r\n",
@@ -1517,13 +1624,13 @@ mod tests {
         assert_eq!(request.header("host"), Some("127.0.0.1:1"));
         assert_eq!(request.body.as_slice(), b"{}");
         let largest = format!(
-            "POST / HTTP/1.1\r\nContent-Length: 24591\r\n\r\n{}",
-            "x".repeat(24591)
+            "POST / HTTP/1.1\r\nContent-Length: 24704\r\n\r\n{}",
+            "x".repeat(24704)
         );
-        assert_eq!(parse(&largest).unwrap().body.len(), 24591);
+        assert_eq!(parse(&largest).unwrap().body.len(), 24704);
         let complete_oversized = format!(
-            "POST / HTTP/1.1\r\nContent-Length: 24592\r\n\r\n{}",
-            "x".repeat(24592)
+            "POST / HTTP/1.1\r\nContent-Length: 24705\r\n\r\n{}",
+            "x".repeat(24705)
         );
         assert!(read_request(&mut complete_oversized.as_bytes()).is_err());
         let oversized = format!("GET / HTTP/1.1\r\nX-Large: {}\r\n\r\n", "x".repeat(8192));
@@ -1624,6 +1731,331 @@ mod tests {
         );
     }
 
+    fn decision_fixture(
+        authenticator: Arc<dyn ApprovalAuthenticator + Send + Sync>,
+    ) -> (
+        crate::access::direct_request_tests::Fixture,
+        Arc<Mutex<LoopbackUi>>,
+        String,
+    ) {
+        let f = crate::access::direct_request_tests::fixture();
+        let root = f.dir.path().join("provider");
+        let (cert, key) = identity(&root);
+        let mut ui = LoopbackUi::bind(&root.join("launch.html"), &cert, &key)
+            .unwrap()
+            .with_approval_authenticator(authenticator);
+        let id = f
+            .app
+            .submit_direct(
+                f.app.human_owner(),
+                crate::access::direct_request_tests::input(),
+                &crate::access::direct_request_tests::Launcher::default(),
+            )
+            .unwrap()
+            .id;
+        let mut exchange = request(&ui, "/launch", ui.launch.as_ref().unwrap().expose());
+        exchange
+            .headers
+            .iter_mut()
+            .find(|(k, _)| k == "content-type")
+            .unwrap()
+            .1 = "text/plain".into();
+        assert_eq!(ui.handle(exchange, &f.app).status, 200);
+        (f, Arc::new(Mutex::new(ui)), id)
+    }
+    struct ApprovalCheck(AtomicUsize);
+    impl ApprovalAuthenticator for ApprovalCheck {
+        fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            if password.expose() == "approval-sentinel" {
+                Ok(())
+            } else {
+                Err(SessionError::AuthenticationFailed)
+            }
+        }
+    }
+    #[test]
+    fn decision_browser_guards_are_isolated_against_eligible_requests() {
+        for endpoint in ["/approve", "/deny"] {
+            for case in [
+                "cookie_missing",
+                "cookie_wrong",
+                "csrf_missing",
+                "csrf_wrong",
+                "host",
+                "origin",
+                "content_type",
+                "method",
+                "cross_session",
+                "cookie_stale",
+                "csrf_stale",
+                "pair_stale",
+            ] {
+                let check = Arc::new(ApprovalCheck(AtomicUsize::new(0)));
+                let (f, ui, mut id) = decision_fixture(check.clone());
+                let mut locked = ui.lock().unwrap();
+                let old_cookie = locked.sessions[0].cookie.expose().to_owned();
+                let old_csrf = locked.sessions[0].csrf.expose().to_owned();
+                if case.ends_with("stale") {
+                    f.app.lock().unwrap();
+                    f.app
+                        .authenticate(SensitiveString::new("synthetic".into()))
+                        .unwrap();
+                    id = f
+                        .app
+                        .submit_direct(
+                            f.app.human_owner(),
+                            crate::access::direct_request_tests::input(),
+                            &crate::access::direct_request_tests::Launcher::default(),
+                        )
+                        .unwrap()
+                        .id;
+                    locked.sessions.push(BrowserSession {
+                        cookie: random().unwrap(),
+                        csrf: random().unwrap(),
+                        decision_generation: f.app.decision_generation().unwrap(),
+                    });
+                }
+                if case == "cross_session" {
+                    locked.sessions.push(BrowserSession {
+                        cookie: random().unwrap(),
+                        csrf: random().unwrap(),
+                        decision_generation: f.app.decision_generation().unwrap(),
+                    });
+                }
+                let body = if endpoint == "/approve" {
+                    serde_json::json!({"request_id":id,"password":"approval-sentinel"})
+                } else {
+                    serde_json::json!({"request_id":id})
+                }
+                .to_string();
+                let mut req = request(&locked, endpoint, &body);
+                match case {
+                    "cookie_missing" => req.headers.retain(|(k, _)| k != "cookie"),
+                    "csrf_missing" => req.headers.retain(|(k, _)| k != "x-csrf-token"),
+                    "method" => req.method = "GET".into(),
+                    "pair_stale" => {
+                        req.headers
+                            .iter_mut()
+                            .find(|(k, _)| k == "cookie")
+                            .unwrap()
+                            .1 = format!("vw_session={old_cookie}");
+                        req.headers
+                            .iter_mut()
+                            .find(|(k, _)| k == "x-csrf-token")
+                            .unwrap()
+                            .1 = old_csrf.clone();
+                    }
+                    _ => {
+                        let (key, value) = match case {
+                            "cookie_wrong" => ("cookie", "vw_session=wrong".into()),
+                            "csrf_wrong" => ("x-csrf-token", "wrong".into()),
+                            "host" => ("host", "attacker.invalid".into()),
+                            "origin" => ("origin", "https://attacker.invalid".into()),
+                            "content_type" => ("content-type", "text/plain".into()),
+                            "cookie_stale" => ("cookie", format!("vw_session={old_cookie}")),
+                            "csrf_stale" | "cross_session" => ("x-csrf-token", old_csrf.clone()),
+                            _ => panic!("unknown test case"),
+                        };
+                        req.headers.iter_mut().find(|(k, _)| k == key).unwrap().1 = value;
+                    }
+                }
+                drop(locked);
+                assert_eq!(
+                    LoopbackUi::dispatch(&ui, req, &f.app).status,
+                    403,
+                    "{endpoint} {case}"
+                );
+                assert_eq!(check.0.load(Ordering::SeqCst), 0);
+                assert_eq!(
+                    f.app.direct_status(f.app.human_owner(), &id),
+                    Ok(DirectStatus::Pending)
+                );
+                let req = request(&ui.lock().unwrap(), endpoint, &body);
+                assert_eq!(
+                    LoopbackUi::dispatch(&ui, req, &f.app).status,
+                    200,
+                    "positive control {endpoint} {case}"
+                );
+                assert_eq!(
+                    f.app.direct_status(f.app.human_owner(), &id),
+                    Ok(if endpoint == "/approve" {
+                        DirectStatus::Approved
+                    } else {
+                        DirectStatus::Denied
+                    })
+                );
+            }
+        }
+    }
+    #[test]
+    fn decision_browser_authentication_input_is_closed_and_replay_does_not_authenticate() {
+        for value in [
+            serde_json::json!({}),
+            serde_json::json!({"password":""}),
+            serde_json::json!({"password":"wrong"}),
+            serde_json::json!({"password":"x".repeat(4097)}),
+            serde_json::json!({"password":"approval-sentinel","extra":"secret"}),
+        ] {
+            let check = Arc::new(ApprovalCheck(AtomicUsize::new(0)));
+            let (f, ui, id) = decision_fixture(check.clone());
+            let mut body = value;
+            body["request_id"] = id.clone().into();
+            let req = request(&ui.lock().unwrap(), "/approve", &body.to_string());
+            assert_eq!(LoopbackUi::dispatch(&ui, req, &f.app).status, 403);
+            assert_eq!(
+                f.app.direct_status(f.app.human_owner(), &id),
+                Ok(DirectStatus::Pending)
+            );
+            let good =
+                serde_json::json!({"request_id":id,"password":"approval-sentinel"}).to_string();
+            let req = request(&ui.lock().unwrap(), "/approve", &good);
+            assert_eq!(LoopbackUi::dispatch(&ui, req, &f.app).status, 200);
+            let before = check.0.load(Ordering::SeqCst);
+            let req = request(&ui.lock().unwrap(), "/approve", &good);
+            assert_eq!(LoopbackUi::dispatch(&ui, req, &f.app).status, 403);
+            assert_eq!(check.0.load(Ordering::SeqCst), before);
+        }
+    }
+    #[test]
+    fn decision_browser_authentication_allows_lock_and_denial_to_finish() {
+        use std::sync::mpsc;
+        struct Blocked {
+            entered: mpsc::Sender<()>,
+            resume: Mutex<mpsc::Receiver<()>>,
+        }
+        impl ApprovalAuthenticator for Blocked {
+            fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+                self.entered.send(()).unwrap();
+                self.resume.lock().unwrap().recv().unwrap();
+                Ok(())
+            }
+        }
+        for action in [
+            "/lock",
+            "/deny",
+            "rotate_cookie",
+            "rotate_csrf",
+            "generation",
+        ] {
+            let (entered_tx, entered_rx) = mpsc::channel();
+            let (resume_tx, resume_rx) = mpsc::channel();
+            let (f, ui, id) = decision_fixture(Arc::new(Blocked {
+                entered: entered_tx,
+                resume: Mutex::new(resume_rx),
+            }));
+            let approve = request(
+                &ui.lock().unwrap(),
+                "/approve",
+                &serde_json::json!({"request_id":id,"password":"approval-sentinel"}).to_string(),
+            );
+            let worker = {
+                let ui = ui.clone();
+                let app = f.app.clone();
+                std::thread::spawn(move || LoopbackUi::dispatch(&ui, approve, &app))
+            };
+            entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            if action.starts_with('/') {
+                let req = request(
+                    &ui.lock().unwrap(),
+                    action,
+                    &serde_json::json!({"request_id":id}).to_string(),
+                );
+                assert_eq!(LoopbackUi::dispatch(&ui, req, &f.app).status, 200);
+            } else {
+                let mut locked = ui.lock().unwrap();
+                let session = locked.sessions.last_mut().unwrap();
+                match action {
+                    "rotate_cookie" => session.cookie = random().unwrap(),
+                    "rotate_csrf" => session.csrf = random().unwrap(),
+                    "generation" => session.decision_generation += 1,
+                    _ => panic!("unknown test case"),
+                }
+                assert_eq!(
+                    f.app.direct_status(f.app.human_owner(), &id),
+                    Ok(DirectStatus::Pending)
+                );
+            }
+            resume_tx.send(()).unwrap();
+            assert_eq!(worker.join().unwrap().status, 403);
+            assert_eq!(
+                f.app.direct_status(f.app.human_owner(), &id),
+                Ok(match action {
+                    "/lock" => DirectStatus::Expired,
+                    "/deny" => DirectStatus::Denied,
+                    _ => DirectStatus::Pending,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn decision_browser_rotation_reuses_a_slot_and_preserves_terminal_review() {
+        let (f, ui, old_id) = decision_fixture(Arc::new(ApprovalCheck(AtomicUsize::new(0))));
+        let mut ui = ui.lock().unwrap();
+        Arc::get_mut(&mut ui.broker).unwrap().desktop = Box::new(FakeDesktop {
+            fail: false,
+            observed: Arc::new(Mutex::new(Vec::new())),
+        });
+        let mut last_id = String::new();
+        for _ in 0..65 {
+            f.app.lock().unwrap();
+            f.app
+                .authenticate(SensitiveString::new("synthetic".into()))
+                .unwrap();
+            let receipt = f
+                .app
+                .submit_direct(
+                    f.app.human_owner(),
+                    crate::access::direct_request_tests::input(),
+                    ui.request_launcher().as_ref(),
+                )
+                .unwrap();
+            let capability = ui
+                .broker
+                .pending
+                .lock()
+                .unwrap()
+                .last()
+                .unwrap()
+                .capability
+                .expose()
+                .to_owned();
+            let mut exchange = request(&ui, "/launch", &capability);
+            exchange
+                .headers
+                .iter_mut()
+                .find(|(key, _)| key == "content-type")
+                .unwrap()
+                .1 = "text/plain".into();
+            let response = ui.handle(exchange, &f.app);
+            assert_eq!(response.status, 200);
+            assert!(response.cookie.is_some());
+            assert_eq!(ui.sessions.len(), 1);
+            last_id = receipt.id;
+        }
+        let review_request = request(
+            &ui,
+            "/review",
+            &serde_json::json!({"request_id":old_id}).to_string(),
+        );
+        let old_review = ui.handle(review_request, &f.app);
+        assert_eq!(old_review.status, 200);
+        assert_eq!(
+            serde_json::from_str::<crate::access::direct_request::DirectReview>(&old_review.body)
+                .unwrap()
+                .status,
+            DirectStatus::Expired
+        );
+        let deny_request = request(
+            &ui,
+            "/deny",
+            &serde_json::json!({"request_id":last_id}).to_string(),
+        );
+        let denial = ui.handle(deny_request, &f.app);
+        assert_eq!(denial.status, 200);
+    }
+
     /// Test-only process fixture for the reproducible Firefox harness.
     #[test]
     #[ignore = "run with tests/ui/direct-request.mjs and a disposable trusted browser profile"]
@@ -1636,7 +2068,19 @@ mod tests {
         let root = fixture.dir.path().join("provider");
         let (cert, key) = identity(&root);
         let artifact = root.join("launch.html");
-        let mut ui = LoopbackUi::bind(&artifact, &cert, &key).unwrap();
+        struct Authenticator;
+        impl ApprovalAuthenticator for Authenticator {
+            fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError> {
+                if password.expose() == "synthetic-browser-password" {
+                    Ok(())
+                } else {
+                    Err(SessionError::AuthenticationFailed)
+                }
+            }
+        }
+        let mut ui = LoopbackUi::bind(&artifact, &cert, &key)
+            .unwrap()
+            .with_approval_authenticator(Arc::new(Authenticator));
         struct Desktop;
         impl super::super::desktop_launch::DesktopOpener for Desktop {
             fn open(&self, _: &Path) -> Result<(), DirectRequestError> {

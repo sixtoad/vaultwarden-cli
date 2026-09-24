@@ -147,6 +147,8 @@ impl Provider {
             lifecycle_epoch: state.lifecycle_epoch,
             review: review.clone(),
             binding_digest: String::new(),
+            approval: None,
+            audit: Vec::new(),
         };
         direct.seal();
         state.requests.push(super::provider_store::RequestRecord {
@@ -161,19 +163,28 @@ impl Provider {
     pub(crate) fn expire_direct(
         &mut self,
         now: std::time::Duration,
+        wall: impl Fn() -> Result<u64, super::ports::SessionError>,
         deadlines: &std::collections::HashMap<String, std::time::Duration>,
     ) -> Result<(), ProviderError> {
         let mut state = self.store.read_state()?;
         let mut changed = false;
         for request in &mut state.requests {
-            if let Some(direct) = &mut request.direct
-                && request.status.is_unexecuted()
+            if request.direct.is_some()
+                && matches!(
+                    request.status,
+                    super::provider_store::RequestLifecycleStatus::Pending
+                        | super::provider_store::RequestLifecycleStatus::Approved
+                )
                 && deadlines
                     .get(&request.id)
                     .is_none_or(|deadline| now >= *deadline)
             {
-                request.status = super::provider_store::RequestLifecycleStatus::Invalidated;
-                direct.review.status = super::direct_request::DirectStatus::Expired;
+                request.transition(
+                    super::direct_request::DirectStatus::Expired,
+                    super::direct_request::DecisionOutcome::Expired,
+                    wall()
+                        .map_err(|_error| ProviderError::new(ProviderDiagnostic::InvalidState))?,
+                )?;
                 changed = true;
             }
         }
@@ -211,19 +222,98 @@ impl Provider {
             .iter_mut()
             .find(|r| r.id == id && r.status == RequestLifecycleStatus::Pending)
         {
-            request.status = RequestLifecycleStatus::Failed;
-            request
-                .direct
-                .as_mut()
-                .ok_or_else(|| ProviderError::new(ProviderDiagnostic::InvalidState))?
-                .review
-                .status = DirectStatus::Failed {
-                reason: DirectFailure::ReviewUnavailable,
-            };
+            request.transition(
+                DirectStatus::Expired,
+                DecisionOutcome::ReviewUnavailable,
+                super::provider_store::provider_wall_time()?,
+            )?;
             self.store.write_state(&state)?;
         }
         self.state = state;
         Ok(())
+    }
+
+    pub(crate) fn prepare_direct(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::direct_request::ApprovalBinding, super::direct_request::DirectRequestError>
+    {
+        use super::direct_request::*;
+        let state = self.store.read_state()?;
+        let direct = state
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .filter(|d| d.owner_uid == owner.uid())
+            .ok_or(DirectRequestError::NotFound)?;
+        if direct.review.status != DirectStatus::Pending {
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        if direct.lifecycle_epoch != state.lifecycle_epoch {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let policy = state
+            .operations
+            .iter()
+            .find(|p| p.id() == direct.review.operation)
+            .ok_or(DirectRequestError::StaleRevision)?;
+        if policy.revision() != direct.review.policy_digest {
+            return Err(DirectRequestError::StaleRevision);
+        }
+        if !policy.validates_args(&direct.review.arguments) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        Ok(direct.approval_binding())
+    }
+    pub(crate) fn decision_policy(
+        &self,
+        binding: &super::direct_request::ApprovalBinding,
+    ) -> Result<OperationPolicy, super::direct_request::DirectRequestError> {
+        use super::direct_request::*;
+        let owner = AuthenticatedHuman::from_peer_uid(binding.requester_uid);
+        if self.prepare_direct(owner, &binding.request_id)? != *binding {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        self.store
+            .read_state()?
+            .operations
+            .into_iter()
+            .find(|p| p.revision() == binding.policy_digest)
+            .ok_or(DirectRequestError::StaleRevision)
+    }
+    pub(crate) fn decide_direct(
+        &mut self,
+        binding: &super::direct_request::ApprovalBinding,
+        approve: bool,
+        now: u64,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::direct_request::DirectStatus, super::direct_request::DirectRequestError>
+    {
+        use super::direct_request::*;
+        if self.prepare_direct(
+            AuthenticatedHuman::from_peer_uid(binding.requester_uid),
+            &binding.request_id,
+        )? != *binding
+        {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        let mut state = self.store.read_state()?;
+        let request = state
+            .requests
+            .iter_mut()
+            .find(|r| r.id == binding.request_id)
+            .ok_or(DirectRequestError::NotFound)?;
+        let (next, outcome) = if approve {
+            (DirectStatus::Approved, DecisionOutcome::Approved)
+        } else {
+            (DirectStatus::Denied, DecisionOutcome::Denied)
+        };
+        request.transition(next.clone(), outcome, now)?;
+        self.store.write_state_guarded(&state, still_authorized)?;
+        self.state = state;
+        Ok(next)
     }
 
     /// Checks the registry-owned image before the backend eligibility port and

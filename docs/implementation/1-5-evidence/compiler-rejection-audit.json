@@ -1,0 +1,152 @@
+[
+  {
+    "name": "src/access/application.rs:46:9: replace ProviderApplication::new_with_request_lifetime -> Result<Self, SessionError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__application.rs_line_46_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `application::ProviderApplication: Default` is not satisfied\n  --> src/access/application.rs:46:12\n   |\n46 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n   |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n   |\nhelp: the trait `Default` is not implemented for `application::ProviderApplication`\n  --> src/access/application.rs:25:1\n   |\n25 | pub struct ProviderApplication {\n   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous err"
+  },
+  {
+    "name": "src/access/application.rs:224:9: replace ProviderApplication::review_direct -> Result<DirectReview, DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__application.rs_line_224_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectReview: Default` is not satisfied\n   --> src/access/application.rs:224:12\n    |\n224 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectReview`\n   --> src/access/direct_request.rs:140:1\n    |\n140 | pub struct DirectReview {\n    | ^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaus"
+  },
+  {
+    "name": "src/access/application.rs:252:9: replace ProviderApplication::prepare_approval -> Result<PreparedApproval, DirectRequestError> with Ok(Default::default())",
+    "area": "final-library",
+    "log": "log/src__access__application.rs_line_252_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::PreparedApproval: Default` is not satisfied\n   --> src/access/application.rs:252:12\n    |\n252 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::PreparedApproval`\n   --> src/access/direct_request.rs:197:1\n    |\n197 | pub(crate) struct PreparedApproval {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test)"
+  },
+  {
+    "name": "src/access/application.rs:268:9: replace ProviderApplication::commit_approval -> Result<DirectStatus, DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__application.rs_line_268_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectStatus: Default` is not satisfied\n   --> src/access/application.rs:268:12\n    |\n268 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectStatus`\n   --> src/access/direct_request.rs:78:1\n    |\n 78 | pub enum DirectStatus {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by"
+  },
+  {
+    "name": "src/access/application.rs:275:9: replace ProviderApplication::deny_direct -> Result<DirectStatus, DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__application.rs_line_275_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectStatus: Default` is not satisfied\n   --> src/access/application.rs:275:12\n    |\n275 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectStatus`\n   --> src/access/direct_request.rs:78:1\n    |\n 78 | pub enum DirectStatus {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by"
+  },
+  {
+    "name": "src/access/application.rs:282:9: replace ProviderApplication::commit_decision -> Result<DirectStatus, DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__application.rs_line_282_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectStatus: Default` is not satisfied\n   --> src/access/application.rs:282:12\n    |\n282 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectStatus`\n   --> src/access/direct_request.rs:78:1\n    |\n 78 | pub enum DirectStatus {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by"
+  },
+  {
+    "name": "src/access/direct_request.rs:208:9: replace PreparedApproval::authenticate -> Result<AuthenticatedApproval, DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__direct_request.rs_line_208_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::AuthenticatedApproval: Default` is not satisfied\n   --> src/access/direct_request.rs:208:12\n    |\n208 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::AuthenticatedApproval`\n   --> src/access/direct_request.rs:201:1\n    |\n201 | pub(crate) struct AuthenticatedApproval(PreparedApproval);\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could "
+  },
+  {
+    "name": "src/access/direct_request.rs:219:9: replace AuthenticatedApproval::into_prepared -> PreparedApproval with Default::default()",
+    "area": "library",
+    "log": "log/src__access__direct_request.rs_line_219_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::PreparedApproval: Default` is not satisfied\n   --> src/access/direct_request.rs:219:9\n    |\n219 |         Default::default() /* ~ changed by cargo-mutants ~ */\n    |         ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::PreparedApproval`\n   --> src/access/direct_request.rs:197:1\n    |\n197 | pub(crate) struct PreparedApproval {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due "
+  },
+  {
+    "name": "src/access/direct_request.rs:235:9: replace DirectRecord::approval_binding -> ApprovalBinding with Default::default()",
+    "area": "library",
+    "log": "log/src__access__direct_request.rs_line_235_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied\n   --> src/access/direct_request.rs:235:9\n    |\n235 |         Default::default() /* ~ changed by cargo-mutants ~ */\n    |         ^^^^^^^^^^^^^^^^^^ the trait `Default` is not implemented for `direct_request::ApprovalBinding`\n    |\nhelp: consider annotating `direct_request::ApprovalBinding` with `#[derive(Default)]`\n    |\n171 + #[derive(Default)]\n172 | pub(crate) struct ApprovalBinding {\n    |\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due"
+  },
+  {
+    "name": "src/access/policy.rs:235:9: replace OperationPolicy::direct_review -> super::direct_request::DirectReview with Default::default()",
+    "area": "library",
+    "log": "log/src__access__policy.rs_line_235_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectReview: Default` is not satisfied\n   --> src/access/policy.rs:235:9\n    |\n235 |         Default::default() /* ~ changed by cargo-mutants ~ */\n    |         ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectReview`\n   --> src/access/direct_request.rs:140:1\n    |\n140 | pub struct DirectReview {\n    | ^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n  proc"
+  },
+  {
+    "name": "src/access/provider.rs:111:9: replace Provider::create_direct -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__provider.rs_line_111_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectReview: Default` is not satisfied\n   --> src/access/provider.rs:111:12\n    |\n111 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectReview`\n   --> src/access/direct_request.rs:140:1\n    |\n140 | pub struct DirectReview {\n    | ^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused "
+  },
+  {
+    "name": "src/access/provider.rs:242:9: replace Provider::prepare_direct -> Result<super::direct_request::ApprovalBinding, super::direct_request::DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__provider.rs_line_242_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied\n   --> src/access/provider.rs:242:12\n    |\n242 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ the trait `Default` is not implemented for `direct_request::ApprovalBinding`\n    |\nhelp: consider annotating `direct_request::ApprovalBinding` with `#[derive(Default)]`\n   --> src/access/direct_request.rs:171:1\n    |\n171 + #[derive(Default)]\n172 | pub(crate) struct ApprovalBinding {\n    |\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could "
+  },
+  {
+    "name": "src/access/provider.rs:274:9: replace Provider::decision_policy -> Result<OperationPolicy, super::direct_request::DirectRequestError> with Ok(Default::default())",
+    "area": "library",
+    "log": "log/src__access__provider.rs_line_274_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied\n   --> src/access/provider.rs:274:12\n    |\n274 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `policy::OperationPolicy`\n   --> src/access/policy.rs:115:1\n    |\n115 | pub(crate) struct OperationPolicy {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCause"
+  },
+  {
+    "name": "src/access/provider.rs:294:9: replace Provider::decide_direct -> Result<super::direct_request::DirectStatus, super::direct_request::DirectRequestError> with Ok(Default::default())",
+    "area": "final-library",
+    "log": "log/src__access__provider.rs_line_294_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `direct_request::DirectStatus: Default` is not satisfied\n   --> src/access/provider.rs:294:12\n    |\n294 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `direct_request::DirectStatus`\n   --> src/access/direct_request.rs:78:1\n    |\n 78 | pub enum DirectStatus {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n "
+  },
+  {
+    "name": "src/access/provider_store.rs:318:9: replace ProviderStore::invalidate_unexecuted -> Result<ProviderState, ProviderError> with Ok(Default::default())",
+    "area": "final-library",
+    "log": "log/src__access__provider_store.rs_line_318_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `provider_store::ProviderState: Default` is not satisfied\n   --> src/access/provider_store.rs:318:12\n    |\n318 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ the trait `Default` is not implemented for `provider_store::ProviderState`\n    |\nhelp: consider annotating `provider_store::ProviderState` with `#[derive(Default)]`\n    |\n 42 + #[derive(Default)]\n 43 | pub(crate) struct ProviderState {\n    |\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due"
+  },
+  {
+    "name": "src/access/provider_store.rs:387:5: replace error -> ProviderError with Default::default()",
+    "area": "final-library",
+    "log": "log/src__access__provider_store.rs_line_387_col_5.log",
+    "diagnostic": "error[E0277]: the trait bound `ProviderError: Default` is not satisfied\n   --> src/access/provider_store.rs:387:5\n    |\n387 |     Default::default() /* ~ changed by cargo-mutants ~ */\n    |     ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `ProviderError`\n   --> src/access/provider.rs:38:1\n    |\n 38 | pub struct ProviderError {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n  process didn't exit successfully: `/hom"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:155:9: replace LoopbackUi::bind -> Result<Self, SessionError> with Ok(Default::default())",
+    "area": "final-library",
+    "log": "log/src__adapters__loopback_ui.rs_line_155_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `loopback_ui::LoopbackUi: Default` is not satisfied\n   --> src/adapters/loopback_ui.rs:155:12\n    |\n155 |         Ok(Default::default()) /* ~ changed by cargo-mutants ~ */\n    |            ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `loopback_ui::LoopbackUi`\n   --> src/adapters/loopback_ui.rs:43:1\n    |\n 43 | pub struct LoopbackUi {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n  proce"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:226:9: replace LoopbackUi::with_approval_authenticator -> Self with Default::default()",
+    "area": "final-library",
+    "log": "log/src__adapters__loopback_ui.rs_line_226_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `loopback_ui::LoopbackUi: Default` is not satisfied\n   --> src/adapters/loopback_ui.rs:226:9\n    |\n226 |         Default::default() /* ~ changed by cargo-mutants ~ */\n    |         ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `loopback_ui::LoopbackUi`\n   --> src/adapters/loopback_ui.rs:43:1\n    |\n 43 | pub struct LoopbackUi {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n  process didn'"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:230:9: replace LoopbackUi::dispatch -> Response with Default::default()",
+    "area": "final-library",
+    "log": "log/src__adapters__loopback_ui.rs_line_230_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `loopback_ui::Response: Default` is not satisfied\n   --> src/adapters/loopback_ui.rs:230:9\n    |\n230 |         Default::default() /* ~ changed by cargo-mutants ~ */\n    |         ^^^^^^^^^^^^^^^^^^ the trait `Default` is not implemented for `loopback_ui::Response`\n    |\nhelp: consider annotating `loopback_ui::Response` with `#[derive(Default)]`\n    |\n722 + #[derive(Default)]\n723 | struct Response {\n    |\n\nFor more information about this error, try `rustc --explain E0277`.\nwarning: `vaultwarden-cli` (lib test) generated 1 warning\nerror: could not compile `vaultwarden-cli` (lib "
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:335:65: replace + with * in LoopbackUi::serve",
+    "area": "serve-integration",
+    "log": "log/src__adapters__loopback_ui.rs_line_335_col_65_001.log",
+    "diagnostic": "error[E0369]: cannot multiply `std::time::Instant` by `Duration`\n   --> src/adapters/loopback_ui.rs:335:65\n    |\n335 | ...                   deadline: std::time::Instant::now() * /* ~ changed by cargo-mutants ~ */ Duration::from_secs(2),\n    |                                 ------------------------- ^                                    ---------------------- Duration\n    |                                 |\n    |                                 std::time::Instant\n    |\nnote: `std::time::Instant` does not implement `Mul<Duration>`\n   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/time.r"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:350:74: replace + with * in LoopbackUi::serve",
+    "area": "serve-integration",
+    "log": "log/src__adapters__loopback_ui.rs_line_350_col_74_001.log",
+    "diagnostic": "error[E0369]: cannot multiply `std::time::Instant` by `Duration`\n   --> src/adapters/loopback_ui.rs:350:74\n    |\n350 |                         stream.sock.deadline = std::time::Instant::now() * /* ~ changed by cargo-mutants ~ */ Duration::from_secs(2);\n    |                                                ------------------------- ^                                    ---------------------- Duration\n    |                                                |\n    |                                                std::time::Instant\n    |\nnote: `std::time::Instant` does not implement `Mul<Duration>`\n   --> /rustc/48a"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:379:9: replace LoopbackUi::handle -> Response with Default::default()",
+    "area": "final-library",
+    "log": "log/src__adapters__loopback_ui.rs_line_379_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `loopback_ui::Response: Default` is not satisfied\n   --> src/adapters/loopback_ui.rs:379:9\n    |\n379 |         Default::default() /* ~ changed by cargo-mutants ~ */\n    |         ^^^^^^^^^^^^^^^^^^ the trait `Default` is not implemented for `loopback_ui::Response`\n    |\nhelp: consider annotating `loopback_ui::Response` with `#[derive(Default)]`\n    |\n608 + #[derive(Default)]\n609 | struct Response {\n    |\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n  process didn't"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:441:17: replace && with || in LoopbackUi::handle",
+    "area": "final-library",
+    "log": "log/src__adapters__loopback_ui.rs_line_441_col_17.log",
+    "diagnostic": "error: `||` operators are not supported in let chain conditions\n   --> src/adapters/loopback_ui.rs:441:17\n    |\n441 |                 || /* ~ changed by cargo-mutants ~ */ self.sessions[index].decision_generation == decision_generation\n    |                 ^^\n\nerror: could not compile `vaultwarden-cli` (lib test) due to 1 previous error\n\nCaused by:\n  process didn't exit successfully: `/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name vaultwarden_cli --edition=2024 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --e"
+  },
+  {
+    "name": "src/adapters/loopback_ui.rs:541:9: replace LoopbackUi::browser_session -> Option<&BrowserSession> with Some(Box::leak(Box::new(Default::default())))",
+    "area": "final-library",
+    "log": "log/src__adapters__loopback_ui.rs_line_541_col_9_001.log",
+    "diagnostic": "error[E0277]: the trait bound `loopback_ui::BrowserSession: Default` is not satisfied\n   --> src/adapters/loopback_ui.rs:541:33\n    |\n541 |         Some(Box::leak(Box::new(Default::default()))) /* ~ changed by cargo-mutants ~ */\n    |                                 ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound\n    |\nhelp: the trait `Default` is not implemented for `loopback_ui::BrowserSession`\n   --> src/adapters/loopback_ui.rs:38:1\n    |\n 38 | struct BrowserSession {\n    | ^^^^^^^^^^^^^^^^^^^^^\n\nFor more information about this error, try `rustc --explain E0277`.\nerror: could not compile `vaultwarden-cli` (l"
+  },
+  {
+    "name": "src/adapters/vaultwarden.rs:38:9: replace VaultwardenBackend::approval_authenticator -> super::session::PasswordApprovalAuthenticator with Default::default()",
+    "area": "final-library",
+    "log": "log/src__adapters__vaultwarden.rs_line_38_col_9.log",
+    "diagnostic": "error[E0277]: the trait bound `session::PasswordApprovalAuthenticator: Default` is not satisfied\n  --> src/adapters/vaultwarden.rs:38:9\n   |\n38 |         Default::default() /* ~ changed by cargo-mutants ~ */\n   |         ^^^^^^^^^^^^^^^^^^ the trait `Default` is not implemented for `session::PasswordApprovalAuthenticator`\n   |\nhelp: consider annotating `session::PasswordApprovalAuthenticator` with `#[derive(Default)]`\n  --> src/adapters/session.rs:19:1\n   |\n19 + #[derive(Default)]\n20 | pub struct PasswordApprovalAuthenticator {\n   |\n\nFor more information about this error, try `rustc --explain E0277`.\nerror"
+  }
+]

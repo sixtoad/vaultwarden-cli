@@ -1,0 +1,13 @@
+{
+  "files": {
+    "src/adapters/session.rs": {
+      "prior_file_sha256": "8de7b24ab081b331354ea5e7a15d9c0a54288a27e1cfc2d71f65a5a7822f2e87",
+      "only_appended_test_code": true
+    },
+    "src/access/direct_request_tests.rs": {
+      "prior_file_sha256": "7a9a098f781c6f3b3eef5911438d32c695d02adc3fff385d7fc7437ce5fe0b79",
+      "only_appended_test_code": true
+    }
+  },
+  "all_production_and_prior_test_bytes_unchanged": true
+}

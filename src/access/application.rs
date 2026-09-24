@@ -19,6 +19,7 @@ struct Authority {
     backend: Box<dyn SecretBackend>,
     deadline: Option<Duration>,
     cleanup_failed: bool,
+    generation: u64,
     request_deadlines: std::collections::HashMap<String, Duration>,
 }
 pub struct ProviderApplication {
@@ -52,6 +53,7 @@ impl ProviderApplication {
                 backend,
                 deadline: None,
                 cleanup_failed: true,
+                generation: 0,
                 request_deadlines: std::collections::HashMap::new(),
             }),
             clock,
@@ -63,6 +65,10 @@ impl ProviderApplication {
         Ok(app)
     }
     fn revoke(authority: &mut Authority) -> Result<(), SessionError> {
+        authority.generation = authority
+            .generation
+            .checked_add(1)
+            .ok_or(SessionError::CleanupFailed)?;
         authority.deadline = None;
         authority.request_deadlines.clear();
         authority.cleanup_failed = true;
@@ -118,7 +124,11 @@ impl ProviderApplication {
         let now = self.clock.now();
         authority
             .provider
-            .expire_direct(now, &authority.request_deadlines)
+            .expire_direct(
+                now,
+                || self.clock.unix_seconds(),
+                &authority.request_deadlines,
+            )
             .map_err(|_error| SessionError::CleanupFailed)?;
         authority
             .request_deadlines
@@ -222,6 +232,104 @@ impl ProviderApplication {
         }
         self.expire_requests(&mut authority)?;
         authority.provider.direct_review(owner, id)
+    }
+    pub(crate) fn decision_generation(&self) -> Result<u64, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        Ok(authority.generation)
+    }
+    pub(crate) fn prepare_approval(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<PreparedApproval, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        Ok(PreparedApproval {
+            binding: authority.provider.prepare_direct(owner, id)?,
+            generation: authority.generation,
+        })
+    }
+    pub(crate) fn commit_approval(
+        &self,
+        authenticated: AuthenticatedApproval,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.commit_decision(authenticated.into_prepared(), true)
+    }
+    pub(crate) fn deny_direct(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.commit_decision(self.prepare_approval(owner, id)?, false)
+    }
+    fn commit_decision(
+        &self,
+        prepared: PreparedApproval,
+        approve: bool,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        if authority.generation != prepared.generation {
+            return Err(DirectRequestError::Locked);
+        }
+        let binding = &prepared.binding;
+        self.check_owner(AuthenticatedHuman::from_peer_uid(binding.requester_uid))?;
+        let policy = authority.provider.decision_policy(binding)?;
+        if approve {
+            let probe = authority.backend.probe_compatibility();
+            self.admit(&mut authority)?;
+            self.expire_requests(&mut authority)?;
+            probe?;
+            let marker = format!("vw-access={}", policy.id());
+            for login in policy.login_bindings() {
+                let eligible = authority.backend.eligible(&CredentialBinding {
+                    immutable_item_id: login.item_id,
+                    fields: &login.required_fields,
+                    marker: &marker,
+                });
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !eligible.unwrap_or(false) {
+                    return Err(DirectRequestError::Unavailable);
+                }
+            }
+        }
+        let deadline = *authority
+            .request_deadlines
+            .get(&binding.request_id)
+            .ok_or(DirectRequestError::AlreadyDecided)?;
+        let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let now = self.clock.unix_seconds()?;
+        // Revalidate the exact durable binding after potentially slow eligibility.
+        let result = authority.provider.decide_direct(binding, approve, now, || {
+            !self.closing.load(Ordering::Acquire)
+                && self.clock.now() < deadline
+                && self.clock.now() < session_deadline
+        });
+        if result == Err(DirectRequestError::Unavailable) {
+            // All persistence failures close process authority, including uncertain rename durability.
+            self.close_admission();
+            let _ignored = Self::revoke(&mut authority);
+        }
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        result
     }
     pub fn status(&self) -> Result<SessionStatus, SessionError> {
         let mut authority = self

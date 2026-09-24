@@ -11,11 +11,11 @@ const deps=process.env.VW_UI_DEPS || path.join(repo,'tests/ui/node_modules');
 const puppetPackage=JSON.parse(fs.readFileSync(path.join(deps,'puppeteer-core/package.json')));
 const {default:puppeteer}=await import(pathToFileURL(path.join(deps,'puppeteer-core',puppetPackage.main)));
 const axe=fs.readFileSync(path.join(deps,'axe-core/axe.min.js'),'utf8');
-const control=fs.mkdtempSync(path.join(os.tmpdir(),'vw-story14-browser-'));fs.chmodSync(control,0o700);
+const control=fs.mkdtempSync(path.join(os.tmpdir(),'vw-story15-browser-'));fs.chmodSync(control,0o700);
 const profile=path.join(control,'profile');fs.mkdirSync(profile,{mode:0o700});
 const certutil=process.env.CERTUTIL || '/tmp/vw-story13-nss/extracted/usr/bin/certutil';
 execFileSync(certutil,['-N','--empty-password','-d',`sql:${profile}`]);
-execFileSync(certutil,['-A','-n','Story 1.4 synthetic CA','-t','C,,','-i',path.join(repo,'tests/fixtures/provider-tls/ca.pem'),'-d',`sql:${profile}`]);
+execFileSync(certutil,['-A','-n','Story 1.5 synthetic CA','-t','C,,','-i',path.join(repo,'tests/fixtures/provider-tls/ca.pem'),'-d',`sql:${profile}`]);
 const child=spawn('cargo',['test','--lib','adapters::loopback_ui::tests::direct_request_browser_fixture','--','--ignored','--exact'],{cwd:repo,env:{...process.env,VW_UI_TEST_CONTROL:control},stdio:['ignore','pipe','pipe']});
 let childOutput='';child.stdout.on('data',b=>childOutput+=b);child.stderr.on('data',b=>childOutput+=b);
 const closed=new Promise(resolve=>child.on('close',resolve));let browser;
@@ -85,8 +85,11 @@ try{
   for(let index=0;index<tabs.length;index++){const status=await tabs[index].evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,concurrentReceipts[index].id);assert.equal(status,200);}
   await fresh.close();
 
-  const controls=await review.$$eval('button',buttons=>buttons.map(b=>b.textContent));assert(!controls.some(name=>/^(Approve|Deny)$/.test(name)));
-  await review.focus('#password');for(let i=0;i<3;i++)await review.keyboard.press('Tab');assert.equal(await review.evaluate(()=>document.activeElement.id),'refresh');await review.keyboard.press('Enter');
+  // Keyboard cancellation clears password without submitting or changing Pending.
+  await review.focus('#begin-approval');await review.keyboard.press('Enter');await review.keyboard.type('cancelled-password-sentinel');
+  await review.keyboard.press('Tab');await review.keyboard.press('Tab');assert.equal(await review.evaluate(()=>document.activeElement.id),'cancel-approval');await review.keyboard.press('Enter');
+  assert.equal(await review.$eval('#approval-password',e=>e.value),'');assert.equal(await review.evaluate(()=>document.activeElement.id),'begin-approval');assert.equal(run(['status',receipt.id]).state.status,'pending');
+  await review.focus('#refresh');await review.keyboard.press('Enter');
   await review.addScriptTag({content:axe});const audit=await review.evaluate(async()=>{const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});return {violations:r.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.length})),passes:r.passes.length};});assert.deepEqual(audit.violations,[]);
   const cookies=await review.cookies();const cookie=cookies.find(c=>c.name==='vw_session');assert(cookie.secure&&cookie.httpOnly&&cookie.sameSite==='Strict');
   const attacks=await review.evaluate(async({capability,id})=>{
@@ -97,13 +100,142 @@ try{
     const page=await fetch('/').then(r=>r.text());return{replay,noProof,wrongProof,publicLeaks:page.includes(proof)||page.includes(id)};
   },{capability,id:receipt.id});assert.deepEqual(attacks,{replay:403,noProof:403,wrongProof:403,publicLeaks:false});
   // Existing browser session still works after the second request launch.
-  const proofStillWorks=await page.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,receipt.id);assert.equal(proofStillWorks,200);
+  const proofStillWorks=await page.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,receipt.id);assert.equal(proofStillWorks,403); // Pre-unlock session proof was rotated by the new launch.
+  // Distinct requests exercise keyboard denial and authenticated approval.
+  for(const decision of ['deny','approve']){
+    const decided=await submit(['staging','safe','3']);const tab=await browser.newPage();
+    await tab.goto(pathToFileURL(path.join(ready.root,`review-${decided.id}.html`)).href);
+    await tab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+    if(decision==='deny'){await tab.focus('#deny');await tab.keyboard.press('Enter');}
+    else{
+      await tab.focus('#begin-approval');await tab.keyboard.press('Enter');
+      await tab.keyboard.type('synthetic-browser-password');await tab.keyboard.press('Tab');await tab.keyboard.press('Enter');
+    }
+    await tab.waitForFunction(expected=>document.querySelector('#review-status').textContent.includes('Request status: '+expected),{},decision==='deny'?'denied':'approved');
+    assert.equal(await tab.$eval('#approval-password',e=>e.value),'');
+    assert.equal(run(['status',decided.id]).state.status,decision==='deny'?'denied':'approved');
+    assert(await tab.$$eval('#decisions button',buttons=>buttons.every(b=>b.disabled)));
+    assert.match(await tab.$eval('#review-status',e=>e.textContent),decision==='deny'?/no operation will run/:/execution has not started/);
+    const replay=await tab.evaluate(async({id,decision})=>(await fetch('/'+decision,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify(decision==='approve'?{request_id:id,password:'synthetic-browser-password'}:{request_id:id})})).status,{id:decided.id,decision});assert.equal(replay,403);
+    await tab.addScriptTag({content:axe});assert.deepEqual(await tab.evaluate(async()=>(await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>v.id)),[]);
+    await tab.close();
+  }
+  const openDecision=async()=>{
+    const receipt=await submit(['staging','safe','3']);const tab=await browser.newPage();
+    tab.on('pageerror',e=>errors.push(String(e)));
+    await tab.goto(pathToFileURL(path.join(ready.root,`review-${receipt.id}.html`)).href);
+    await tab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+    await tab.evaluate(()=>{
+      const send=window.fetch.bind(window);window.sendDirect=send;window.approvalCalls=0;window.approvalOutgoing=0;window.reviewDelivered=0;window.heldReviews=[];
+      window.fetch=async(url,options)=>{
+        if(url==='/approve'){
+          window.approvalCalls++;
+          if(window.holdApproval){window.approvalHeld=true;await new Promise(resolve=>window.releaseApproval=resolve);}
+          window.approvalOutgoing++;const response=await send(url,options);
+          if(window.discardApprovalResponse){window.deliveredApprovalStatus=response.status;throw new TypeError('synthetic discarded approval response');}
+          return response;
+        }
+        if(url==='/review'){
+          const hold=window.holdNextReview;window.holdNextReview=false;
+          const response=await send(url,options);
+          if(hold){const held={state:(await response.clone().json()).status.status,released:false};window.heldReviews.push(held);window.heldReviewState=held.state;await new Promise(resolve=>{held.release=resolve;window.releaseReview=resolve;});held.released=true;window.heldReviewReleased=true;}
+          window.reviewDelivered++;return response;
+        }
+        return send(url,options);
+      };
+    });
+    return {tab,receipt};
+  };
+  const auditDecision=async tab=>{
+    await tab.addScriptTag({content:axe});
+    assert.deepEqual(await tab.evaluate(async()=>(await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>v.id)),[]);
+  };
+  const typeApproval=async(tab,password='synthetic-browser-password')=>{
+    await tab.focus('#begin-approval');await tab.keyboard.press('Enter');await tab.keyboard.type(password);
+  };
+  const assertUnavailable=async tab=>assert.deepEqual(await tab.evaluate(()=>({password:document.querySelector('#approval-password').value,disabled:['approve','deny','cancel-approval'].every(id=>document.getElementById(id).disabled)})),{password:'',disabled:true});
+  // Hold an actual Pending response across submission; a fresh review must complete
+  // before that obsolete response is released. Also poll Pending during the hold.
+  {
+    const {tab,receipt:held}=await openDecision();await typeApproval(tab);await auditDecision(tab);
+    await tab.evaluate(()=>{window.holdNextReview=true;window.holdApproval=true;document.querySelector('#refresh').click();});
+    await tab.waitForFunction(()=>window.heldReviewState==='pending');
+    await tab.focus('#approve');await tab.keyboard.press('Enter');await tab.waitForFunction(()=>window.approvalHeld);
+    await assertUnavailable(tab);assert.equal(await tab.evaluate(()=>window.approvalOutgoing),0);await auditDecision(tab);
+    const polls=await tab.evaluate(()=>{const n=window.reviewDelivered;document.querySelector('#refresh').click();return n;});
+    await tab.waitForFunction(n=>window.reviewDelivered>n,{},polls);await assertUnavailable(tab);
+    assert.equal(run(['status',held.id]).state.status,'pending');
+    // This second response belongs to the decision epoch and independently proves
+    // completion forces a new review even while its current poll is outstanding.
+    await tab.evaluate(()=>{window.holdNextReview=true;document.querySelector('#refresh').click();});
+    await tab.waitForFunction(()=>window.heldReviews.length===2&&window.heldReviews[1].state==='pending');
+    await assertUnavailable(tab);
+    await tab.evaluate(()=>window.releaseApproval());
+    await tab.waitForFunction(()=>document.querySelector('#review-status').textContent.includes('Request status: approved'));
+    await assertUnavailable(tab);
+    for(const index of [1,0]){
+      await tab.evaluate(index=>window.heldReviews[index].release(),index);await tab.waitForFunction(index=>window.heldReviews[index].released,{},index);
+      assert.match(await tab.$eval('#review-status',e=>e.textContent),/Request status: approved/);await assertUnavailable(tab);
+    }
+    assert.equal(await tab.evaluate(()=>window.approvalOutgoing),1);await tab.close();
+  }
+  // An explicit rejection remains visible through successful Pending polling.
+  {
+    const {tab}=await openDecision();await typeApproval(tab,'wrong-password-sentinel');
+    await tab.focus('#approve');await tab.keyboard.press('Enter');
+    await tab.waitForFunction(()=>document.querySelector('#decision-feedback').textContent.includes('Decision rejected')&&!document.querySelector('#begin-approval').disabled);
+    const message=await tab.$eval('#decision-feedback',e=>e.textContent),polls=await tab.evaluate(()=>window.reviewDelivered);
+    await tab.waitForFunction(n=>window.reviewDelivered>=n+2,{},polls);
+    assert.equal(await tab.$eval('#decision-feedback',e=>e.textContent),message);assert(!message.includes('wrong-password-sentinel'));await tab.close();
+  }
+  // Forward one real approval, discard only its response, and recover using review.
+  {
+    const {tab,receipt:uncertain}=await openDecision();await tab.evaluate(()=>window.discardApprovalResponse=true);await typeApproval(tab);
+    await tab.focus('#approve');await tab.keyboard.press('Enter');
+    await tab.waitForFunction(()=>document.querySelector('#review-status').textContent.includes('Request status: approved'));
+    assert.equal(run(['status',uncertain.id]).state.status,'approved');await assertUnavailable(tab);
+    const message=await tab.$eval('#decision-feedback',e=>e.textContent);assert.match(message,/response unavailable.*do not resubmit/);
+    const polls=await tab.evaluate(()=>window.reviewDelivered);await tab.waitForFunction(n=>window.reviewDelivered>=n+2,{},polls);
+    assert.equal(await tab.$eval('#decision-feedback',e=>e.textContent),message);
+    assert.deepEqual(await tab.evaluate(()=>({calls:window.approvalCalls,outgoing:window.approvalOutgoing,delivered:window.deliveredApprovalStatus})),{calls:1,outgoing:1,delivered:200});await tab.close();
+  }
+  // External completion while an input is focused must move focus to Refresh.
+  // Cancelling after external completion describes only the local form action.
+  for(const cancel of [false,true]){
+    const {tab,receipt:external}=await openDecision();await typeApproval(tab,'cancelled-password-sentinel');
+    await tab.evaluate(()=>{window.holdNextReview=true;document.querySelector('#refresh').click();});
+    await tab.waitForFunction(()=>window.heldReviewState==='pending');
+    assert.equal(await tab.evaluate(async id=>(await window.sendDirect('/deny',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,external.id),200);
+    if(cancel){await tab.focus('#cancel-approval');await tab.keyboard.press('Enter');}
+    else await tab.evaluate(()=>window.releaseReview());
+    await tab.waitForFunction(()=>document.querySelector('#review-status').textContent.includes('Request status: denied'));
+    await assertUnavailable(tab);assert.equal(await tab.evaluate(()=>document.activeElement.id),'refresh');
+    if(cancel){assert.equal(await tab.$eval('#decision-feedback',e=>e.textContent),'Authentication form cancelled.');await tab.evaluate(()=>window.releaseReview());await tab.waitForFunction(()=>window.heldReviewReleased);assert.match(await tab.$eval('#review-status',e=>e.textContent),/Request status: denied/);}
+    await tab.close();
+  }
   fs.writeFileSync(path.join(control,'clock'),'310');await review.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: expired');
   await review.focus('#lock');await review.keyboard.press('Enter');await review.waitForFunction(()=>document.querySelector('#result').textContent.includes('Provider locked'));assert.equal(run(['status',receipt.id]).state.status,'expired');assert.equal(await review.$eval('#review-status',e=>e.textContent),'Request status: expired');
+  // A real lock/unlock and new launch rotates the shared cookie. Old tab proof
+  // must remain retired, with persistent guidance and no cookie-based recovery.
+  {
+    assert.equal(await review.evaluate(async()=>(await fetch('/unlock',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({password:'synthetic-browser-password'})})).status),200);
+    const {tab}=await openDecision();await typeApproval(tab,'retired-password-sentinel');
+    const oldProof=await tab.evaluate(()=>sessionStorage.getItem('vw_proof'));
+    for(const action of ['lock','unlock'])assert.equal(await tab.evaluate(async action=>(await window.sendDirect('/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({password:action==='unlock'?'synthetic-browser-password':''})})).status,action),200);
+    const fresh=await openDecision();assert.notEqual(await fresh.tab.evaluate(()=>sessionStorage.getItem('vw_proof')),oldProof);
+    await tab.evaluate(()=>document.querySelector('#refresh').click());
+    await tab.waitForFunction(()=>document.querySelector('#decision-feedback').textContent.includes('Browser session retired'));
+    await assertUnavailable(tab);assert(await tab.$$eval('#unlock input,#unlock button,#lock',controls=>controls.every(c=>c.disabled)));
+    assert.equal(await tab.evaluate(()=>sessionStorage.getItem('vw_proof')),oldProof);
+    const message=await tab.$eval('#decision-feedback',e=>e.textContent);assert.match(message,/fresh launch/);
+    const polls=await tab.evaluate(()=>{const n=window.reviewDelivered;document.querySelector('#refresh').click();return n;});
+    await tab.waitForFunction(n=>window.reviewDelivered>n,{},polls);assert.equal(await tab.$eval('#decision-feedback',e=>e.textContent),message);await assertUnavailable(tab);
+    await tab.close();await fresh.tab.close();
+  }
   const knownDiagnostics=errors.filter(e=>e.includes('Permission denied to access property \"__bidi_args\"')||e==='Error: Error: Permission denied to access property \"length\"'||(e.includes('Content-Security-Policy')&&e.includes('/favicon.ico')));
   assert.deepEqual(errors.filter(e=>!knownDiagnostics.includes(e)),[]);
-  for(const error of errors)for(const secret of ['synthetic-browser-password',capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
+  for(const error of errors)for(const secret of ['synthetic-browser-password','cancelled-password-sentinel','wrong-password-sentinel','retired-password-sentinel',capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
   const diagnosticCategories=[...new Set(knownDiagnostics.map(e=>e.replace(/https:\/\/127\.0\.0\.1:\d+/g,'https://127.0.0.1:<port>')))];
-  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',priorSessionPreserved:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
+  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
   fs.writeFileSync(path.join(control,'stop'),'stop');assert.equal(await closed,0,childOutput);
 }finally{fs.writeFileSync(path.join(control,'stop'),'stop');await browser?.close();if(child.exitCode===null)child.kill('SIGTERM');}

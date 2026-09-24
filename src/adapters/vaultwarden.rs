@@ -33,6 +33,10 @@ pub struct VaultwardenBackend {
     compatible: bool,
 }
 impl VaultwardenBackend {
+    /// Approval verifies the identical immutable setup snapshot used by this backend.
+    pub fn approval_authenticator(&self) -> super::session::PasswordApprovalAuthenticator {
+        super::session::PasswordApprovalAuthenticator::new(self.config.clone())
+    }
     pub fn from_setup(path: &Path) -> Result<Self, SessionError> {
         ProviderKeyring.clear()?;
         Self::new(load_setup(path)?, false)

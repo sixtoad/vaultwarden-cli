@@ -46,6 +46,12 @@ impl SecretBackend for Backend {
         panic!("no secret resolution")
     }
 }
+struct ApprovalCheck;
+impl ApprovalAuthenticator for ApprovalCheck {
+    fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+        Ok(())
+    }
+}
 struct Launcher(AtomicUsize);
 impl DirectReviewLauncher for Launcher {
     fn launch(&self, _: &str) -> Result<(), DirectRequestError> {
@@ -116,7 +122,9 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600)).unwrap();
     }
     let artifact = root.join("launch.html");
-    let ui = LoopbackUi::bind(&artifact, &cert, &key).unwrap();
+    let ui = LoopbackUi::bind(&artifact, &cert, &key)
+        .unwrap()
+        .with_approval_authenticator(Arc::new(ApprovalCheck));
     let html = std::fs::read_to_string(&artifact).unwrap();
     let url = html
         .split("href=\"")
@@ -324,10 +332,41 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
     assert!(returned, "--no-wait must not poll a pending request");
     assert!(immediate.status.success());
     assert!(immediate.stderr.is_empty());
-    assert!(matches!(
-        serde_json::from_slice::<HumanResponse>(&immediate.stdout).unwrap(),
-        HumanResponse::Submitted { .. }
-    ));
+    let HumanResponse::Submitted {
+        receipt: denied_receipt,
+    } = serde_json::from_slice::<HumanResponse>(&immediate.stdout).unwrap()
+    else {
+        panic!("receipt")
+    };
+    for (path, id) in [("/approve", &receipt.id), ("/deny", &denied_receipt.id)] {
+        let body = if path == "/approve" {
+            serde_json::json!({"request_id":id,"password":"approval-secret-sentinel"})
+        } else {
+            serde_json::json!({"request_id":id})
+        };
+        let send = || {
+            client
+                .post(format!("{base}{path}"))
+                .header("Origin", &base)
+                .header("Cookie", &cookie)
+                .header("X-CSRF-Token", &proof)
+                .header("Content-Type", "application/json")
+                .body(body.to_string())
+                .send()
+                .unwrap()
+        };
+        assert_eq!(send().status().as_u16(), 200);
+        assert_eq!(send().status().as_u16(), 403);
+        let observed = exchange(&root, HumanCommand::Status { id: id.clone() }).unwrap();
+        assert!(
+            matches!(observed, HumanResponse::Status { state } if state == if path == "/approve" {DirectStatus::Approved} else {DirectStatus::Denied})
+        );
+        assert!(
+            !std::fs::read_to_string(&state_path)
+                .unwrap()
+                .contains("approval-secret-sentinel")
+        );
+    }
     // The real CLI emits its durable receipt, then waits without resubmission.
     use std::io::BufRead;
     let mut waiting = std::process::Command::new(env!("CARGO_BIN_EXE_vw-access"))
