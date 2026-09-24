@@ -15,6 +15,26 @@ use std::{
 };
 use zeroize::Zeroizing;
 
+/// Fresh password verification without renewing a provider session or touching keyring state.
+pub struct PasswordApprovalAuthenticator {
+    config: Config,
+}
+impl PasswordApprovalAuthenticator {
+    pub(crate) fn new(config: Config) -> Self {
+        Self { config }
+    }
+}
+impl crate::access::ports::ApprovalAuthenticator for PasswordApprovalAuthenticator {
+    fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError> {
+        if password.expose().is_empty() || password.expose().len() > 4096 {
+            return Err(SessionError::AuthenticationFailed);
+        }
+        let keys = derive_keys(&self.config, &password)?;
+        drop(keys);
+        Ok(())
+    }
+}
+
 pub const KEYRING_SERVICE: &str = "vaultwarden-accessd";
 pub const BOOTSTRAP_ACCOUNT: &str = "bootstrap-client-secret";
 pub const SESSION_ACCOUNT: &str = "revocable-session";
@@ -439,6 +459,44 @@ mod tests {
             ..Config::default()
         };
         let password = || SensitiveString::new("password-sentinel".into());
+        use crate::access::ports::ApprovalAuthenticator;
+        let authenticator = PasswordApprovalAuthenticator::new(config.clone());
+        assert_eq!(authenticator.authenticate(password()), Ok(()));
+        assert_eq!(
+            authenticator.authenticate(SensitiveString::new("wrong".into())),
+            Err(SessionError::AuthenticationFailed)
+        );
+        assert_eq!(
+            authenticator.authenticate(SensitiveString::new(String::new())),
+            Err(SessionError::AuthenticationFailed)
+        );
+        assert_eq!(
+            authenticator.authenticate(SensitiveString::new("x".repeat(4097))),
+            Err(SessionError::AuthenticationFailed)
+        );
+        let longest_password = "x".repeat(4096);
+        let longest_key = MasterKey::derive(&longest_password, "human@example.test", iterations)
+            .stretch()
+            .unwrap();
+        let longest_config = Config {
+            encrypted_key: Some(encrypt_bytes_for_test(
+                &[42; 64],
+                longest_key.enc_key(),
+                longest_key.mac_key(),
+            )),
+            ..config.clone()
+        };
+        assert_eq!(
+            PasswordApprovalAuthenticator::new(longest_config)
+                .authenticate(SensitiveString::new(longest_password)),
+            Ok(())
+        );
+        // Mutating caller-owned configuration cannot replace the approval identity snapshot.
+        let mut changed = config.clone();
+        changed.email = Some("other@example.test".into());
+        assert!(derive_keys(&changed, &password()).is_err());
+        assert_eq!(authenticator.authenticate(password()), Ok(()));
+
         assert_eq!(
             derive_keys(&config, &password()).unwrap().enc_key_bytes(),
             &[42; 32]
@@ -503,5 +561,46 @@ mod tests {
         let link = dir.path().join("link");
         std::os::unix::fs::symlink(&path, &link).unwrap();
         assert!(load_setup(&link).is_err());
+    }
+}
+
+#[cfg(test)]
+mod approval_boundary_tests {
+    use super::*;
+    use crate::{
+        access::ports::ApprovalAuthenticator,
+        crypto::{KdfIterations, crypto_keys::tests::test_helpers::encrypt_bytes_for_test},
+    };
+
+    #[test]
+    fn approval_password_bounds_reject_otherwise_cryptographically_valid_inputs() {
+        let iterations = KdfIterations::new(1).unwrap();
+        for length in [0, 4096, 4097] {
+            let password = "x".repeat(length);
+            let stretched = MasterKey::derive(&password, "human@example.test", iterations)
+                .stretch()
+                .unwrap();
+            let config = Config {
+                email: Some("human@example.test".into()),
+                encrypted_key: Some(encrypt_bytes_for_test(
+                    &[42; 64],
+                    stretched.enc_key(),
+                    stretched.mac_key(),
+                )),
+                kdf_iterations: Some(iterations),
+                ..Config::default()
+            };
+            assert!(derive_keys(&config, &SensitiveString::new(password.clone())).is_ok());
+            assert_eq!(
+                PasswordApprovalAuthenticator::new(config)
+                    .authenticate(SensitiveString::new(password)),
+                if length == 4096 {
+                    Ok(())
+                } else {
+                    Err(SessionError::AuthenticationFailed)
+                },
+                "length={length}",
+            );
+        }
     }
 }

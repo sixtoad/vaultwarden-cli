@@ -1,0 +1,15 @@
+{
+  "generated": 32,
+  "caught": 30,
+  "compiler_rejected": 2,
+  "survivors": 0,
+  "infrastructure_timeouts": 0,
+  "manual_cases": 10,
+  "manual_caught": 10,
+  "new_distinct_manual": 8,
+  "unchanged_function_cases": 198,
+  "browser_wait_assertion_kills": [
+    "submission-review-invalidation",
+    "completion-fresh-review"
+  ]
+}

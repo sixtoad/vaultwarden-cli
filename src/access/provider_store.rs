@@ -22,6 +22,20 @@ const TEMP_FILE: &str = ".provider-state.json.new";
 const STATE_SCHEMA_VERSION: u8 = 1;
 const PRIVATE_DIR_MODE: u32 = 0o700;
 const PRIVATE_FILE_MODE: u32 = 0o600;
+#[cfg(test)]
+type WriteTestHook = std::cell::RefCell<Option<Box<dyn FnMut(u8) -> bool>>>;
+#[cfg(test)]
+thread_local! {
+    pub(crate) static WRITE_TEST_HOOK: WriteTestHook = std::cell::RefCell::new(None);
+}
+#[cfg(test)]
+fn write_test_failure(stage: u8) -> bool {
+    WRITE_TEST_HOOK.with(|hook| {
+        hook.borrow_mut()
+            .as_mut()
+            .is_some_and(|action| action(stage))
+    })
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -122,6 +136,52 @@ pub(crate) struct RequestRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) direct: Option<super::direct_request::DirectRecord>,
 }
+impl RequestRecord {
+    /// The sole mutation path for direct lifecycle and its redacted audit.
+    pub(crate) fn transition(
+        &mut self,
+        next: super::direct_request::DirectStatus,
+        outcome: super::direct_request::DecisionOutcome,
+        now: u64,
+    ) -> Result<(), ProviderError> {
+        use super::direct_request::{DecisionAudit, DirectStatus as S};
+        let direct = self
+            .direct
+            .as_mut()
+            .ok_or_else(|| error(ProviderDiagnostic::InvalidState))?;
+        let legal = matches!(
+            (&direct.review.status, &next),
+            (S::Pending, S::Approved | S::Denied | S::Expired)
+                | (S::Approved, S::Expired | S::Running)
+                | (S::Running, S::Completed { .. } | S::Failed { .. })
+        );
+        if !legal {
+            return Err(error(ProviderDiagnostic::InvalidState));
+        }
+        self.status = match next {
+            S::Pending => return Err(error(ProviderDiagnostic::InvalidState)),
+            S::Approved => RequestLifecycleStatus::Approved,
+            S::Denied => RequestLifecycleStatus::Denied,
+            S::Expired => RequestLifecycleStatus::Invalidated,
+            S::Running => RequestLifecycleStatus::Running,
+            S::Completed { .. } => RequestLifecycleStatus::Completed,
+            S::Failed { .. } => RequestLifecycleStatus::Failed,
+        };
+        if next == S::Approved {
+            direct.approval = Some(direct.approval_binding());
+        }
+        if next == S::Expired {
+            direct.approval = None;
+        }
+        direct.audit.push(DecisionAudit {
+            binding: direct.approval_binding(),
+            at_unix_seconds: now,
+            outcome,
+        });
+        direct.review.status = next;
+        Ok(())
+    }
+}
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum RequestLifecycleStatus {
@@ -199,6 +259,13 @@ impl ProviderStore {
         Ok(state)
     }
     pub(crate) fn write_state(&mut self, state: &ProviderState) -> Result<(), ProviderError> {
+        self.write_state_guarded(state, || true)
+    }
+    pub(crate) fn write_state_guarded(
+        &mut self,
+        state: &ProviderState,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<(), ProviderError> {
         self.ensure_healthy()?;
         state.validate()?;
         validate_layout(&self.root, self.owner_uid)?;
@@ -226,9 +293,22 @@ impl ProviderStore {
             let _ignored = fs::remove_file(&temporary);
             return Err(err);
         }
+        #[cfg(test)]
+        if write_test_failure(0) {
+            return Err(error(ProviderDiagnostic::PersistenceFailure));
+        }
+        if !still_authorized() {
+            let _ignored = fs::remove_file(&temporary);
+            return Err(error(ProviderDiagnostic::PersistenceFailure));
+        }
         fs::rename(&temporary, self.state_path())
             .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
-        if sync_directory(&self.root).is_err() {
+        #[cfg(test)]
+        if write_test_failure(1) {
+            self.poisoned = true;
+            return Err(error(ProviderDiagnostic::PersistenceFailure));
+        }
+        if sync_directory(&self.root).is_err() || !still_authorized() {
             self.poisoned = true;
             return Err(error(ProviderDiagnostic::PersistenceFailure));
         }
@@ -242,9 +322,22 @@ impl ProviderStore {
             .ok_or_else(|| error(ProviderDiagnostic::PersistenceFailure))?;
         for request in &mut state.requests {
             if request.status.is_unexecuted() {
-                request.status = RequestLifecycleStatus::Invalidated;
-                if let Some(direct) = &mut request.direct {
-                    direct.review.status = super::direct_request::DirectStatus::Expired;
+                use super::direct_request::{DecisionOutcome, DirectFailure, DirectStatus};
+                if request.direct.is_some() {
+                    let (next, outcome) = if request.status == RequestLifecycleStatus::Running {
+                        (
+                            DirectStatus::Failed {
+                                reason: DirectFailure::ExecutionUnavailable,
+                            },
+                            DecisionOutcome::ExecutionUnavailable,
+                        )
+                    } else {
+                        (DirectStatus::Expired, DecisionOutcome::Expired)
+                    };
+                    request.transition(next, outcome, provider_wall_time()?)?;
+                } else {
+                    // Historical non-direct records retain their startup semantics.
+                    request.status = RequestLifecycleStatus::Invalidated;
                 }
             }
         }
@@ -292,6 +385,12 @@ impl ProviderStore {
 
 fn error(diagnostic: ProviderDiagnostic) -> ProviderError {
     ProviderError::new(diagnostic)
+}
+pub(crate) fn provider_wall_time() -> Result<u64, ProviderError> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .map_err(|_error| error(ProviderDiagnostic::InvalidState))
 }
 fn current_uid() -> u32 {
     unsafe { libc::geteuid() }

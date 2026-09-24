@@ -35,6 +35,8 @@ pub enum DirectRequestError {
     NotFound,
     Unavailable,
     ReviewUnavailable,
+    AlreadyDecided,
+    AuthenticationFailed,
 }
 impl std::fmt::Display for DirectRequestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -46,6 +48,8 @@ impl std::fmt::Display for DirectRequestError {
             Self::NotFound => "request unavailable",
             Self::Unavailable => "provider unavailable",
             Self::ReviewUnavailable => "review unavailable",
+            Self::AlreadyDecided => "request already decided",
+            Self::AuthenticationFailed => "authentication failed",
         })
     }
 }
@@ -156,6 +160,64 @@ pub(crate) struct DirectRecord {
     pub lifecycle_epoch: u64,
     pub review: DirectReview,
     pub binding_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<ApprovalBinding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audit: Vec<DecisionAudit>,
+}
+/// Internal durable authority; never projected into requester responses.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApprovalBinding {
+    pub request_id: String,
+    pub requester_uid: u32,
+    pub policy_digest: String,
+    pub arguments_digest: String,
+    pub expires_at_unix_seconds: u64,
+    pub lifecycle_epoch: u64,
+    pub record_digest: String,
+}
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum DecisionOutcome {
+    Approved,
+    Denied,
+    Expired,
+    ReviewUnavailable,
+    ExecutionUnavailable,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DecisionAudit {
+    pub binding: ApprovalBinding,
+    pub at_unix_seconds: u64,
+    pub outcome: DecisionOutcome,
+}
+/// Prepared under provider serialization and consumed exactly once in this process.
+pub(crate) struct PreparedApproval {
+    pub(crate) binding: ApprovalBinding,
+    pub(crate) generation: u64,
+}
+pub(crate) struct AuthenticatedApproval(PreparedApproval);
+impl PreparedApproval {
+    pub(crate) fn authenticate(
+        self,
+        password: super::ports::SensitiveString,
+        authenticator: &dyn super::ports::ApprovalAuthenticator,
+    ) -> Result<AuthenticatedApproval, DirectRequestError> {
+        if password.expose().is_empty() || password.expose().len() > 4096 {
+            return Err(DirectRequestError::AuthenticationFailed);
+        }
+        authenticator
+            .authenticate(password)
+            .map_err(|_error| DirectRequestError::AuthenticationFailed)?;
+        Ok(AuthenticatedApproval(self))
+    }
+}
+impl AuthenticatedApproval {
+    pub(crate) fn into_prepared(self) -> PreparedApproval {
+        self.0
+    }
 }
 pub(crate) fn arguments_digest(values: &[String]) -> String {
     hex_sha256(&serde_json::to_vec(&(1u8, values)).expect("string vector serialization"))
@@ -169,6 +231,17 @@ pub(crate) fn valid_request_id(id: &str) -> bool {
         })
 }
 impl DirectRecord {
+    pub(crate) fn approval_binding(&self) -> ApprovalBinding {
+        ApprovalBinding {
+            request_id: self.review.id.clone(),
+            requester_uid: self.owner_uid,
+            policy_digest: self.review.policy_digest.clone(),
+            arguments_digest: self.review.arguments_digest.clone(),
+            expires_at_unix_seconds: self.review.expires_at_unix_seconds,
+            lifecycle_epoch: self.lifecycle_epoch,
+            record_digest: self.binding_digest.clone(),
+        }
+    }
     pub(crate) fn seal(&mut self) {
         self.binding_digest = self.digest();
     }
@@ -190,6 +263,17 @@ impl DirectRecord {
         let r = &self.review;
         let text = |s: &str| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control);
         self.binding_digest == self.digest()
+            && self
+                .approval
+                .as_ref()
+                .is_none_or(|binding| *binding == self.approval_binding())
+            && (!matches!(r.status, DirectStatus::Approved | DirectStatus::Running)
+                || self.approval.is_some()
+                || r.one_time == LEGACY_ONE_TIME)
+            && self
+                .audit
+                .iter()
+                .all(|event| event.binding == self.approval_binding())
             && valid_request_id(id)
             && r.id == id
             && self.owner_uid != u32::MAX
@@ -207,8 +291,11 @@ impl DirectRecord {
             && valid_sha256(&r.executable_digest)
             && valid_sha256(&r.policy_digest)
             && r.arguments_digest == arguments_digest(&r.arguments)
-            && r.one_time
-                == "Approving this request would authorize one execution only; approval is unavailable at this stage."
+            && (r.one_time == ONE_TIME || r.one_time == LEGACY_ONE_TIME)
             && !matches!(r.status, DirectStatus::Completed { exit_code } if !(0..=255).contains(&exit_code))
     }
 }
+
+pub(crate) const LEGACY_ONE_TIME: &str = "Approving this request would authorize one execution only; approval is unavailable at this stage.";
+pub(crate) const ONE_TIME: &str =
+    "Approval authorizes this request once only. Execution is not available yet.";

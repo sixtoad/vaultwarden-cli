@@ -1,0 +1,93 @@
+{
+  "cwd": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-decide-request",
+  "commands": [
+    [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    [
+      "cargo",
+      "test",
+      "--all-targets"
+    ],
+    [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ]
+  ],
+  "browser_env": {
+    "VW_UI_DEPS": "/tmp/vw-story14-browser/node_modules",
+    "LD_LIBRARY_PATH": "/tmp/vw-story13-nss/extracted/usr/lib/x86_64-linux-gnu"
+  },
+  "all_commands_passed": true,
+  "reported_passes": 707,
+  "non_live_executed_tests": 636,
+  "live_early_returns": 71,
+  "ignored": 3,
+  "benchmark_smokes": 13,
+  "post_review_results": [
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "all-targets",
+      "argv": [
+        "cargo",
+        "test",
+        "--all-targets"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "browser",
+      "argv": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "display_log_normalization": "Removed trailing blank EOF lines from readable all-targets.log; exact raw output is retained in post-review-evidence.tar.gz."
+}

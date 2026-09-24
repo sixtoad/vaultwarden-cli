@@ -66,6 +66,7 @@ fn run(args: Args) -> Result<(), ()> {
     };
     // Blocking HTTP construction and destruction stay outside the async runtime.
     let backend = VaultwardenBackend::from_setup(config).map_err(|_error| ())?;
+    let approval_authenticator = Arc::new(backend.approval_authenticator());
     let app = Arc::new(
         configured_application(
             &args,
@@ -82,7 +83,8 @@ fn run(args: Args) -> Result<(), ()> {
         args.ui_tls_cert.as_deref().ok_or(())?,
         args.ui_tls_key.as_deref().ok_or(())?,
     )
-    .map_err(|_error| ())?;
+    .map_err(|_error| ())?
+    .with_approval_authenticator(approval_authenticator);
     let stop = Arc::new(AtomicBool::new(false));
     let human_worker = {
         let app = app.clone();

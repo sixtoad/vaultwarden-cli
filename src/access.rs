@@ -223,16 +223,21 @@ pub fn decode_public_key(encoded: &str) -> Result<VerifyingKey> {
 
 /// The only terminal outcomes an agent may observe. The approved variant does
 /// not contain a bearer token or secret material; it merely tells the agent
-/// that the provider has started the protected operation.
+/// that the request was approved. Only Running announces execution.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum RequestStatus {
     Pending,
-    Approved { approval_digest: String },
+    Approved,
+    Running,
     Denied,
     Expired,
-    Completed { exit_code: i32 },
-    Failed { message: String },
+    Completed {
+        exit_code: i32,
+    },
+    Failed {
+        reason: direct_request::DirectFailure,
+    },
 }
 
 fn valid_agent_id(value: &str) -> bool {

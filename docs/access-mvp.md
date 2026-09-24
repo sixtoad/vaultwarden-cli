@@ -5,8 +5,8 @@ under distinct restricted OS principals. A same-UID agent can read the human's
 memory and keyring and is not a supported secret boundary. The existing direct
 `vaultwarden-cli` remains a separate human-only vault client.
 
-Stories 1.1–1.3 provide private state, constrained operation policy and a locked
-provider with a protected password UI. Request approval, agent transport,
+Stories 1.1–1.5 provide private state, constrained operation policy, a protected
+provider session, and authenticated one-time browser decisions. Agent transport,
 protected execution and platform/WebAuthn authentication are later stories.
 The provider has no agent-facing item lookup, secret export or password command.
 
@@ -182,14 +182,37 @@ expiry, one-time meaning and live textual status. It never includes immutable
 item IDs, field/environment mappings, secrets, backend sessions or process output.
 Review reads require both a browser cookie and independent session-bound proof;
 a cookie-only page never reveals review data or recovers proof. Valid new request
-launches preserve existing browser sessions. Capabilities and browser sessions
+launches preserve current browser sessions; after lock/unlock, a new launch rotates
+the cookie and proof before granting decision authority. Rotation reuses that
+browser’s existing slot. A current authenticated pair can inspect terminal history;
+a retired proof cannot decide new work. Capabilities and browser sessions
 are each bounded to 64; restart refreshes these in-memory browser sessions.
 
 Use Tab/Shift+Tab and Enter for session controls and **Refresh request status**.
 Focus is visibly outlined, controls have names, and status uses an atomic live
-region. Approval and denial are explicitly unavailable in Story 1.4, and no
-operation runs. The closed status protocol already represents pending, approved,
-denied, expired, running, completed (exit code 0–255), and failed (closed reason);
-future outcomes are tested through fixtures without adding decision handlers.
+region. **Deny request** records an immutable denial. **Authenticate and approve
+once** opens a labeled password form. **Cancel authentication** clears that form
+and leaves the request Pending before submission. Submitting disables cancellation:
+a lost response may still mean a decision was committed, so the page polls status
+and never automatically retries approval. Password inputs clear immediately.
+
+Approval verifies the master password against the same immutable setup snapshot
+used by the live backend, without unlocking, renewing its lifetime, changing the
+keyring, resolving values, or executing anything. Password verification releases
+both UI and provider locks, so another browser can deny or lock while it runs.
+Commit rechecks the exact request, authenticated local UID, active policy revision,
+normalized arguments digest, lifecycle generation, credential eligibility and
+provider deadline. Status, the internal approval binding, and a redacted audit event
+are persisted atomically; replays cannot create a second decision. Any uncertain
+persistence closes provider authority until restart.
+
+Approved means **approved once; execution has not started**. Only Running will
+announce execution in a later story. Pending and unexecuted Approved requests expire
+at their monotonic deadline (five minutes by default), on lock or restart. Denied
+and Expired never regain authority. Failed desktop handoffs now become Expired,
+with a redacted review-unavailable audit outcome; historical Failed records remain
+readable and unchanged. Audit contains exact request/UID/digest/expiry bindings,
+provider timestamps and closed outcomes, without password, browser proof, backend
+values, argument values or raw errors. The public status remains tokenless.
 Legacy schema-v1 `{id,status}` records remain readable by the store but carry no
 human ownership and cannot be queried or reviewed as direct requests.

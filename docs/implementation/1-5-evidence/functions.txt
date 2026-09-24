@@ -1,0 +1,45 @@
+  1 run
+  6 ProviderApplication::new_with_request_lifetime
+  2 ProviderApplication::revoke
+  8 ProviderApplication::admit
+  2 ProviderApplication::check_owner
+  4 ProviderApplication::expire_requests
+  1 ProviderApplication::review_direct
+  2 ProviderApplication::decision_generation
+  1 ProviderApplication::prepare_approval
+  1 ProviderApplication::commit_approval
+  1 ProviderApplication::deny_direct
+ 13 ProviderApplication::commit_decision
+  1 <impl std::fmt::Display for DirectRequestError>::fmt
+  5 PreparedApproval::authenticate
+  1 AuthenticatedApproval::into_prepared
+  1 DirectRecord::approval_binding
+ 51 DirectRecord::validate
+  1 OperationPolicy::direct_review
+  7 Provider::create_direct
+  4 Provider::expire_direct
+  4 Provider::fail_direct_launch
+  8 Provider::prepare_direct
+  3 Provider::decision_policy
+  3 Provider::decide_direct
+  4 RequestRecord::transition
+  1 ProviderStore::write_state
+  4 ProviderStore::write_state_guarded
+  2 ProviderStore::invalidate_unexecuted
+  1 error
+  2 provider_wall_time
+  1 src/adapters/loopback_ui.rs:24:54: replace + with -
+  1 src/adapters/loopback_ui.rs:24:54: replace + with *
+  1 src/adapters/loopback_ui.rs:24:50: replace * with +
+  1 src/adapters/loopback_ui.rs:24:50: replace * with /
+  1 LoopbackUi::bind
+  1 LoopbackUi::with_approval_authenticator
+  5 LoopbackUi::dispatch
+ 13 LoopbackUi::decision_authorized
+ 14 LoopbackUi::serve
+ 32 LoopbackUi::handle
+  2 LoopbackUi::authenticated
+  2 LoopbackUi::browser_session
+  5 LoopbackUi::browser_session_index
+  5 <impl crate::access::ports::ApprovalAuthenticator for PasswordApprovalAuthenticator>::authenticate
+  1 VaultwardenBackend::approval_authenticator
