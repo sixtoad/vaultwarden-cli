@@ -158,7 +158,9 @@ impl RequestRecord {
             (S::Pending, S::Approved | S::Denied | S::Expired)
                 | (S::Approved, S::Expired | S::Running)
                 | (S::Running, S::Completed { .. } | S::Failed { .. })
-        );
+        ) || (direct.execution_claimed
+            && direct.review.status == S::Approved
+            && matches!(next, S::Failed { .. }));
         if !legal {
             return Err(error(ProviderDiagnostic::InvalidState));
         }
@@ -174,7 +176,7 @@ impl RequestRecord {
         if next == S::Approved {
             direct.approval = Some(direct.approval_binding());
         }
-        if next == S::Expired {
+        if next.is_terminal() {
             direct.approval = None;
         }
         direct.audit.push(DecisionAudit {

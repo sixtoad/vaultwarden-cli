@@ -72,6 +72,9 @@ impl From<super::provider::ProviderError> for DirectRequestError {
 pub enum DirectFailure {
     ReviewUnavailable,
     ExecutionUnavailable,
+    ExecutionRejected,
+    ExecutionNonzero,
+    ExecutionSignaled,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case", from = "StrictDirectStatus")]
@@ -162,6 +165,8 @@ pub(crate) struct DirectRecord {
     pub binding_digest: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval: Option<ApprovalBinding>,
+    #[serde(default)]
+    pub execution_claimed: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audit: Vec<DecisionAudit>,
 }

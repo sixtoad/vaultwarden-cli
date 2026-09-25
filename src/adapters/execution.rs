@@ -1,5 +1,7 @@
 //! Immutable executable preparation. This does not confer approval or spawn a child.
 
+#[cfg(test)]
+use crate::access::ports::{ChildEnvironment, ExecutionOutcome};
 use crate::access::{
     policy::ExecutionProfile,
     ports::{ExecutionError, ExecutionImage, ProtectedExecution},
@@ -11,6 +13,10 @@ thread_local! {
     pub(crate) static TEST_EXECUTION_ATTEMPTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     pub(crate) static TEST_LAUNCH_ATTEMPTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
+
+#[cfg(test)]
+pub(crate) static TEST_DISCARDED_BYTES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
 
 #[cfg(target_os = "linux")]
 const MAX_IMAGE: u64 = 64 * 1024 * 1024;
@@ -92,6 +98,16 @@ impl PreparedExecutable {
         }
         #[cfg(not(target_os = "linux"))]
         Err(ExecutionError::Unavailable)
+    }
+
+    /// Controlled-fixture execution only.  Production dispatch is deliberately
+    /// unavailable until Story 1.8 supplies manager containment.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn run_fixture(
+        self,
+        environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        linux::run_fixture(self, environment)
     }
 }
 
@@ -393,6 +409,14 @@ mod linux {
         let mut pointers: Vec<_> = argv.iter().map(|arg| arg.as_ptr()).collect();
         pointers.push(std::ptr::null());
         let environment: [*const libc::c_char; 1] = [std::ptr::null()];
+        execute_fd_raw(fd, &pointers, &environment)
+    }
+
+    fn execute_fd_raw(
+        fd: RawFd,
+        argv: &[*const libc::c_char],
+        environment: &[*const libc::c_char],
+    ) -> Result<std::convert::Infallible, ExecutionError> {
         #[cfg(test)]
         TEST_LAUNCH_ATTEMPTS.with(|calls| calls.set(calls.get() + 1));
         unsafe {
@@ -400,12 +424,147 @@ mod linux {
                 libc::SYS_execveat,
                 fd,
                 c"".as_ptr(),
-                pointers.as_ptr(),
+                argv.as_ptr(),
                 environment.as_ptr(),
                 libc::AT_EMPTY_PATH,
             );
         }
         Err(ExecutionError::ExecutionFailed)
+    }
+
+    #[cfg(test)]
+    pub(super) fn run_fixture(
+        prepared: PreparedExecutable,
+        environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        let mut stdout = [-1; 2];
+        let mut stderr = [-1; 2];
+        if unsafe { libc::pipe2(stdout.as_mut_ptr(), libc::O_CLOEXEC) } != 0
+            || unsafe { libc::pipe2(stderr.as_mut_ptr(), libc::O_CLOEXEC) } != 0
+        {
+            for fd in stdout.into_iter().chain(stderr) {
+                if fd >= 0 {
+                    let _ignored = unsafe { libc::close(fd) };
+                }
+            }
+            return Err(ExecutionError::Unavailable);
+        }
+        let mut argv = prepared
+            .argv
+            .iter()
+            .map(|argument| argument.as_ptr())
+            .collect::<Vec<_>>();
+        argv.push(std::ptr::null());
+        let child = unsafe { libc::fork() };
+        if child < 0 {
+            for fd in stdout.into_iter().chain(stderr) {
+                let _ignored = unsafe { libc::close(fd) };
+            }
+            return Err(ExecutionError::Unavailable);
+        }
+        if child == 0 {
+            if unsafe { libc::dup2(stdout[1], libc::STDOUT_FILENO) } < 0
+                || unsafe { libc::dup2(stderr[1], libc::STDERR_FILENO) } < 0
+            {
+                unsafe { libc::_exit(127) }
+            }
+            // A parent may have supplied either standard descriptor as a pipe
+            // endpoint.  After dup2, only close descriptors that are no
+            // longer stdout or stderr; closing `dup2(fd, fd)` would otherwise
+            // silently detach the child stream.
+            for fd in [stdout[0], stdout[1], stderr[0], stderr[1]] {
+                if fd != libc::STDOUT_FILENO && fd != libc::STDERR_FILENO {
+                    unsafe { libc::close(fd) };
+                }
+            }
+            let _ignored =
+                execute_fd_raw(prepared.file.as_raw_fd(), &argv, environment.pointers()).is_err();
+            unsafe { libc::_exit(127) }
+        }
+        unsafe {
+            libc::close(stdout[1]);
+            libc::close(stderr[1]);
+        }
+        let out = std::thread::Builder::new().spawn(move || discard_fd(stdout[0]));
+        let Ok(out) = out else {
+            unsafe {
+                libc::close(stderr[0]);
+                libc::kill(child, libc::SIGKILL);
+            }
+            reap(child);
+            return Err(ExecutionError::Unavailable);
+        };
+        let err = std::thread::Builder::new().spawn(move || discard_fd(stderr[0]));
+        let Ok(err) = err else {
+            unsafe { libc::kill(child, libc::SIGKILL) };
+            reap(child);
+            let _ignored = out.join();
+            return Err(ExecutionError::Unavailable);
+        };
+        let mut status = 0;
+        let waited = loop {
+            let result = unsafe { libc::waitpid(child, &mut status, 0) };
+            if result == child {
+                break Ok(());
+            }
+            if result < 0
+                && std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted
+            {
+                continue;
+            }
+            unsafe { libc::kill(child, libc::SIGKILL) };
+            reap(child);
+            break Err(ExecutionError::ExecutionFailed);
+        };
+        let streams = out
+            .join()
+            .ok()
+            .and_then(Result::ok)
+            .zip(err.join().ok().and_then(Result::ok));
+        waited?;
+        streams.ok_or(ExecutionError::ExecutionFailed)?;
+        if libc::WIFEXITED(status) {
+            return Ok(if libc::WEXITSTATUS(status) == 0 {
+                ExecutionOutcome::ExitedZero
+            } else {
+                ExecutionOutcome::ExitedNonZero
+            });
+        }
+        if libc::WIFSIGNALED(status) {
+            return Ok(ExecutionOutcome::Signaled);
+        }
+        Err(ExecutionError::ExecutionFailed)
+    }
+
+    #[cfg(test)]
+    fn reap(child: libc::pid_t) {
+        let mut status = 0;
+        while unsafe { libc::waitpid(child, &mut status, 0) } < 0
+            && std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted
+        {}
+    }
+
+    #[cfg(test)]
+    fn discard_fd(fd: RawFd) -> Result<(), ExecutionError> {
+        let mut buffer = zeroize::Zeroizing::new([0u8; 8192]);
+        loop {
+            let read = unsafe { libc::read(fd, buffer.as_mut_ptr().cast(), buffer.len()) };
+            if read == 0 {
+                break;
+            }
+            TEST_DISCARDED_BYTES.fetch_add(read as usize, std::sync::atomic::Ordering::Relaxed);
+            if read < 0 {
+                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+                unsafe { libc::close(fd) };
+                return Err(ExecutionError::ExecutionFailed);
+            }
+        }
+        if unsafe { libc::close(fd) } != 0 {
+            return Err(ExecutionError::ExecutionFailed);
+        }
+        Ok(())
     }
 
     fn validate_elf(b: &[u8]) -> Result<(), ExecutionError> {

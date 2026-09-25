@@ -11,6 +11,29 @@ fn image_bytes() -> Vec<u8> {
         0x00, 0x00, 0xeb, 0x05, 0xbf, 0x63, 0x00, 0x00, 0x00, 0xb8, 0x3c, 0x00, 0x00, 0x00, 0x0f,
         0x05,
     ];
+    image_with_code(code)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn output_image_bytes() -> Vec<u8> {
+    // This fixture forks two writers: one emits 128 KiB to stdout while the
+    // other emits 128 KiB to stderr. It is preassembled so the test needs no
+    // toolchain and exercises concurrent pipe draining.
+    let code: &[u8] = &[
+        0xb8, 0x39, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x48, 0x85, 0xc0, 0x74, 0x2c, 0x41, 0xbc, 0x00,
+        0x20, 0x00, 0x00, 0xb8, 0x01, 0x00, 0x00, 0x00, 0xbf, 0x01, 0x00, 0x00, 0x00, 0x48, 0x8d,
+        0x35, 0x41, 0x00, 0x00, 0x00, 0xba, 0x10, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x41, 0xff, 0xcc,
+        0x75, 0xe3, 0xb8, 0x3c, 0x00, 0x00, 0x00, 0x31, 0xff, 0x0f, 0x05, 0x41, 0xbc, 0x00, 0x20,
+        0x00, 0x00, 0xb8, 0x01, 0x00, 0x00, 0x00, 0xbf, 0x02, 0x00, 0x00, 0x00, 0x48, 0x8d, 0x35,
+        0x25, 0x00, 0x00, 0x00, 0xba, 0x10, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x41, 0xff, 0xcc, 0x75,
+        0xe3, 0xb8, 0x3c, 0x00, 0x00, 0x00, 0x31, 0xff, 0x0f, 0x05, b's', b't', b'd', b'o', b'u',
+        b't', b'-', b's', b'e', b'n', b't', b'i', b'n', b'e', b'l', b'\n', b's', b't', b'd', b'e',
+        b'r', b'r', b'-', b's', b'e', b'n', b't', b'i', b'n', b'e', b'l', b'\n',
+    ];
+    image_with_code(code)
+}
+
+fn image_with_code(code: &[u8]) -> Vec<u8> {
     let mut b = vec![0u8; 4096];
     b[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
     b[16..18].copy_from_slice(&2u16.to_le_bytes());
@@ -48,12 +71,18 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> Self {
+        Self::from_bytes(image_bytes())
+    }
+    #[cfg(target_arch = "x86_64")]
+    fn output() -> Self {
+        Self::from_bytes(output_image_bytes())
+    }
+    fn from_bytes(bytes: Vec<u8>) -> Self {
         TEST_EXECUTION_ATTEMPTS.with(|calls| calls.set(0));
         TEST_LAUNCH_ATTEMPTS.with(|calls| calls.set(0));
         let root = tempfile::tempdir().unwrap();
         std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
         let path = root.path().join("image");
-        let bytes = image_bytes();
         std::fs::write(&path, &bytes).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o500)).unwrap();
         Self { root, path, bytes }
@@ -116,6 +145,45 @@ fn valid_image_has_all_seals_and_redacted_debug() {
     assert_eq!(
         unsafe { libc::fchmod(prepared.file.as_raw_fd(), 0o400) },
         -1
+    );
+}
+
+#[test]
+fn fixture_supervision_uses_explicit_environment_and_reaps_the_child() {
+    let fixture = Fixture::new();
+    let prepared = fixture.prepare().unwrap();
+    let environment = ChildEnvironment::from_mappings([(
+        "LOGIN_TOKEN".to_owned(),
+        crate::access::ports::SensitiveString::new("synthetic-sentinel".to_owned()),
+    )])
+    .unwrap();
+    // The fixture accepts an empty environment and exits 42.  A nonzero
+    // result therefore proves the exact explicit environment reached it; the
+    // supervisor still reaped it and retained neither output nor the value.
+    assert_eq!(
+        prepared.run_fixture(environment).unwrap(),
+        ExecutionOutcome::ExitedNonZero
+    );
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn fixture_supervision_discards_large_secret_output_from_both_streams() {
+    crate::adapters::execution::TEST_DISCARDED_BYTES.store(0, std::sync::atomic::Ordering::SeqCst);
+    let fixture = Fixture::output();
+    let prepared = fixture.prepare().unwrap();
+    let environment = ChildEnvironment::from_mappings([(
+        "LOGIN_TOKEN".to_owned(),
+        crate::access::ports::SensitiveString::new("synthetic-secret-sentinel".to_owned()),
+    )])
+    .unwrap();
+    assert_eq!(
+        prepared.run_fixture(environment).unwrap(),
+        ExecutionOutcome::ExitedZero
+    );
+    assert_eq!(
+        crate::adapters::execution::TEST_DISCARDED_BYTES.load(std::sync::atomic::Ordering::SeqCst),
+        256 * 1024,
     );
 }
 

@@ -27,6 +27,8 @@ impl SessionClock for Clock {
     }
 }
 type EligibilityAction = std::cell::RefCell<Option<Box<dyn FnMut() -> Result<bool, SessionError>>>>;
+type ResolutionAction =
+    std::cell::RefCell<Option<Box<dyn FnMut() -> Result<Vec<SensitiveString>, SessionError>>>>;
 thread_local! {
     static ELIGIBILITY_ACTION: EligibilityAction = std::cell::RefCell::new(None);
     static PROBE_ACTION: EligibilityAction = std::cell::RefCell::new(None);
@@ -34,6 +36,7 @@ thread_local! {
     static EXECUTION_CLEAR_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_ELIGIBILITY_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_RESOLUTION_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static RESOLUTION_ACTION: ResolutionAction = std::cell::RefCell::new(None);
     static BACKEND_UNLOCKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 struct Backend;
@@ -70,7 +73,16 @@ impl SecretBackend for Backend {
     }
     fn resolve(&mut self, _: &CredentialBinding<'_>) -> Result<Vec<SensitiveString>, SessionError> {
         EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(calls.get() + 1));
-        panic!("request must not resolve secrets")
+        RESOLUTION_ACTION.with(|action| {
+            action.borrow_mut().as_mut().map_or_else(
+                || {
+                    Ok(vec![SensitiveString::new(
+                        "synthetic-password-sentinel".into(),
+                    )])
+                },
+                |callback| callback(),
+            )
+        })
     }
 }
 pub(crate) struct Fixture {
@@ -1850,6 +1862,84 @@ impl ProtectedExecution for ExecutionPreparation {
         result
     }
 }
+
+#[derive(Default)]
+struct RecordingSupervisor {
+    launches: std::cell::Cell<usize>,
+    environment: std::cell::RefCell<Vec<Vec<u8>>>,
+}
+
+struct UnavailableSupervisor;
+impl ProcessSupervisor<ExecutionPreparation> for UnavailableSupervisor {
+    fn available(&self) -> bool {
+        false
+    }
+    fn supervise(
+        &self,
+        _prepared: ObservedPrepared,
+        _environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        Err(ExecutionError::Unavailable)
+    }
+}
+
+struct OutcomeSupervisor {
+    outcome: Result<ExecutionOutcome, ExecutionError>,
+    launches: std::cell::Cell<usize>,
+}
+impl ProcessSupervisor<ExecutionPreparation> for OutcomeSupervisor {
+    fn available(&self) -> bool {
+        true
+    }
+    fn supervise(
+        &self,
+        _prepared: ObservedPrepared,
+        _environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        self.launches.set(self.launches.get() + 1);
+        self.outcome
+    }
+}
+
+struct InvalidatingSupervisor {
+    invalidate: Box<dyn Fn()>,
+}
+impl ProcessSupervisor<ExecutionPreparation> for InvalidatingSupervisor {
+    fn available(&self) -> bool {
+        true
+    }
+    fn supervise(
+        &self,
+        _prepared: ObservedPrepared,
+        _environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        (self.invalidate)();
+        Ok(ExecutionOutcome::ExitedZero)
+    }
+}
+impl ProcessSupervisor<ExecutionPreparation> for RecordingSupervisor {
+    fn available(&self) -> bool {
+        true
+    }
+    fn supervise(
+        &self,
+        _prepared: ObservedPrepared,
+        environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        self.launches.set(self.launches.get() + 1);
+        *self.environment.borrow_mut() = environment
+            .pointers()
+            .iter()
+            .take_while(|pointer| !pointer.is_null())
+            .map(|pointer| {
+                unsafe { std::ffi::CStr::from_ptr(*pointer) }
+                    .to_bytes()
+                    .to_vec()
+            })
+            .collect();
+        Ok(ExecutionOutcome::ExitedZero)
+    }
+}
 fn approved(f: &Fixture) -> String {
     let id = pending(f);
     assert_eq!(
@@ -1928,6 +2018,328 @@ fn execution_preparation_retains_capability_without_consuming_approval_or_resolv
 }
 
 #[test]
+fn claimed_execution_resolves_after_image_verification_once_into_only_policy_environment() {
+    let f = fixture();
+    let id = approved(&f);
+    let preparer = ExecutionPreparation {
+        after: std::cell::RefCell::new(Some(Box::new(|| {
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        }))),
+        ..Default::default()
+    };
+    let supervisor = RecordingSupervisor::default();
+    assert_eq!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &preparer, &supervisor),
+        Ok(DirectStatus::Completed { exit_code: 0 })
+    );
+    assert_eq!(supervisor.launches.get(), 1);
+    assert_eq!(
+        *supervisor.environment.borrow(),
+        vec![
+            b"LANG=C".to_vec(),
+            b"LC_ALL=C".to_vec(),
+            b"DEPLOY_PASSWORD=synthetic-password-sentinel".to_vec(),
+        ]
+    );
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Completed { exit_code: 0 })
+    );
+    assert_eq!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &preparer, &supervisor),
+        Err(DirectRequestError::AlreadyDecided)
+    );
+    assert_eq!(supervisor.launches.get(), 1);
+    assert_eq!(preparer.calls.get(), 1);
+    let state = serde_json::to_string(&records(&f)).unwrap();
+    assert!(!state.contains("synthetic-password-sentinel"));
+}
+
+#[test]
+fn claimed_execution_returns_only_permitted_terminal_outcomes() {
+    for (outcome, expected) in [
+        (
+            Ok(ExecutionOutcome::ExitedNonZero),
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionNonzero,
+            },
+        ),
+        (
+            Ok(ExecutionOutcome::Signaled),
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionSignaled,
+            },
+        ),
+        (
+            Err(ExecutionError::ExecutionFailed),
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionUnavailable,
+            },
+        ),
+    ] {
+        let f = fixture();
+        let id = approved(&f);
+        let supervisor = OutcomeSupervisor {
+            outcome,
+            launches: std::cell::Cell::new(0),
+        };
+        assert_eq!(
+            f.app.run_execution(
+                f.app.human_owner(),
+                &id,
+                &ExecutionPreparation::default(),
+                &supervisor,
+            ),
+            Err(DirectRequestError::Unavailable)
+        );
+        assert_eq!(supervisor.launches.get(), 1);
+        assert_eq!(f.app.direct_status(f.app.human_owner(), &id), Ok(expected));
+    }
+}
+
+#[test]
+fn claimed_execution_failure_before_launch_is_redacted_terminal_and_never_supervises() {
+    for phase in ["prepare", "probe", "eligible", "resolve", "cardinality"] {
+        let f = fixture();
+        let id = approved(&f);
+        let mut preparer = ExecutionPreparation::default();
+        if phase == "prepare" {
+            preparer.fail = true;
+        }
+        if phase == "probe" {
+            PROBE_ACTION.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(|| Err(SessionError::BackendUnavailable)))
+            });
+        }
+        if phase == "eligible" {
+            ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = Some(Box::new(|| Ok(false))));
+        }
+        if phase == "resolve" {
+            RESOLUTION_ACTION.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(|| Err(SessionError::BackendUnavailable)))
+            });
+        }
+        if phase == "cardinality" {
+            RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = Some(Box::new(|| Ok(vec![]))));
+        }
+        let supervisor = RecordingSupervisor::default();
+        assert_eq!(
+            f.app
+                .run_execution(f.app.human_owner(), &id, &preparer, &supervisor),
+            Err(DirectRequestError::Unavailable),
+            "{phase}"
+        );
+        PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
+        ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = None);
+        RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+        assert_eq!(supervisor.launches.get(), 0, "{phase}");
+        assert_eq!(
+            f.app.direct_status(f.app.human_owner(), &id),
+            Ok(DirectStatus::Failed {
+                reason: DirectFailure::ExecutionUnavailable,
+            }),
+            "{phase}"
+        );
+        assert!(
+            !serde_json::to_string(&records(&f))
+                .unwrap()
+                .contains("synthetic-password-sentinel"),
+            "{phase}"
+        );
+    }
+}
+
+#[test]
+fn claimed_execution_rechecks_live_authority_before_terminal_persistence() {
+    for cause in ["closing", "request_expiry", "session_expiry"] {
+        let f = if cause == "session_expiry" {
+            fixture_with_lifetime(Duration::from_secs(3600))
+        } else {
+            fixture()
+        };
+        let id = approved(&f);
+        let app = f.app.clone();
+        let monotonic = f.monotonic.clone();
+        let supervisor = InvalidatingSupervisor {
+            invalidate: Box::new(move || match cause {
+                "closing" => app.close_admission(),
+                "request_expiry" => monotonic.store(310, Ordering::SeqCst),
+                "session_expiry" => monotonic.store(910, Ordering::SeqCst),
+                _ => panic!("unknown invalidation cause"),
+            }),
+        };
+        assert_eq!(
+            f.app.run_execution(
+                f.app.human_owner(),
+                &id,
+                &ExecutionPreparation::default(),
+                &supervisor,
+            ),
+            Err(DirectRequestError::Unavailable),
+            "{cause}"
+        );
+        let persisted = serde_json::to_string(&records(&f)).unwrap();
+        assert!(!persisted.contains("completed"), "{cause}");
+    }
+}
+
+#[test]
+fn concurrent_claimed_execution_attempts_consume_approval_once() {
+    let f = fixture();
+    let id = approved(&f);
+    let (prepared_tx, prepared_rx) = std::sync::mpsc::channel();
+    let (continue_tx, continue_rx) = std::sync::mpsc::channel();
+    let first_app = f.app.clone();
+    let first_id = id.clone();
+    let first = std::thread::spawn(move || {
+        let preparer = ExecutionPreparation {
+            after: std::cell::RefCell::new(Some(Box::new(move || {
+                prepared_tx.send(()).unwrap();
+                continue_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            }))),
+            ..Default::default()
+        };
+        first_app.run_execution(
+            first_app.human_owner(),
+            &first_id,
+            &preparer,
+            &OutcomeSupervisor {
+                outcome: Ok(ExecutionOutcome::ExitedZero),
+                launches: std::cell::Cell::new(0),
+            },
+        )
+    });
+    prepared_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    let second_app = f.app.clone();
+    let second_id = id.clone();
+    let second = std::thread::spawn(move || {
+        second_app.run_execution(
+            second_app.human_owner(),
+            &second_id,
+            &ExecutionPreparation::default(),
+            &OutcomeSupervisor {
+                outcome: Ok(ExecutionOutcome::ExitedZero),
+                launches: std::cell::Cell::new(0),
+            },
+        )
+    });
+    continue_tx.send(()).unwrap();
+    assert_eq!(
+        first.join().unwrap(),
+        Ok(DirectStatus::Completed { exit_code: 0 })
+    );
+    assert_eq!(
+        second.join().unwrap(),
+        Err(DirectRequestError::AlreadyDecided)
+    );
+}
+
+#[test]
+fn unavailable_supervisor_prevents_claim_resolution_and_launch() {
+    let f = fixture();
+    let id = approved(&f);
+    let before = records(&f);
+    let preparer = ExecutionPreparation::default();
+    assert_eq!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &preparer, &UnavailableSupervisor,),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert_eq!(preparer.calls.get(), 0);
+    EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    assert_eq!(records(&f), before);
+}
+
+#[test]
+fn claimed_execution_lock_intent_racing_resolution_prevents_launch() {
+    let f = fixture();
+    let id = approved(&f);
+    let app = f.app.clone();
+    let observed_epoch = app.revocation_epoch_for_test();
+    let (lock_handle_tx, lock_handle_rx) = std::sync::mpsc::channel();
+    RESOLUTION_ACTION.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || {
+            let lock_app = app.clone();
+            let lock_thread = std::thread::spawn(move || lock_app.lock());
+            while app.revocation_epoch_for_test() == observed_epoch {
+                std::thread::yield_now();
+            }
+            lock_handle_tx.send(lock_thread).unwrap();
+            Ok(vec![SensitiveString::new(
+                "synthetic-password-sentinel".into(),
+            )])
+        }));
+    });
+    let preparer = ExecutionPreparation::default();
+    let supervisor = RecordingSupervisor::default();
+    assert_eq!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &preparer, &supervisor),
+        Err(DirectRequestError::Unavailable)
+    );
+    RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+    assert_eq!(supervisor.launches.get(), 0);
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+    lock_handle_rx
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap()
+        .join()
+        .unwrap()
+        .unwrap();
+    assert!(
+        !serde_json::to_string(&records(&f))
+            .unwrap()
+            .contains("synthetic-password-sentinel")
+    );
+}
+
+#[test]
+fn claimed_execution_claim_and_terminal_persistence_fail_closed() {
+    use super::provider_store::WRITE_TEST_HOOK;
+    for phase in ["claim", "terminal"] {
+        let f = fixture();
+        let id = approved(&f);
+        WRITE_TEST_HOOK.with(|hook| {
+            let mut writes = 0;
+            *hook.borrow_mut() = Some(Box::new(move |stage| {
+                if stage == 0 {
+                    writes += 1;
+                    return (phase == "claim" && writes == 1)
+                        || (phase == "terminal" && writes == 2);
+                }
+                false
+            }));
+        });
+        let preparer = ExecutionPreparation::default();
+        let supervisor = RecordingSupervisor::default();
+        assert_eq!(
+            f.app
+                .run_execution(f.app.human_owner(), &id, &preparer, &supervisor),
+            Err(DirectRequestError::Unavailable),
+            "{phase}"
+        );
+        WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+        if phase == "claim" {
+            assert_eq!(preparer.calls.get(), 0);
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+            assert_eq!(supervisor.launches.get(), 0);
+        } else {
+            assert_eq!(preparer.calls.get(), 1);
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+            assert_eq!(supervisor.launches.get(), 1);
+        }
+        assert!(
+            !serde_json::to_string(&records(&f))
+                .unwrap()
+                .contains("synthetic-password-sentinel")
+        );
+    }
+}
+
+#[test]
 fn execution_rejects_each_nonapproved_state_before_image_or_backend_work() {
     for state in [
         DirectStatus::Pending,
@@ -1943,13 +2355,18 @@ fn execution_rejects_each_nonapproved_state_before_image_or_backend_work() {
         let id = approved(&f);
         write_execution_record(&f, |record| record.review.status = state.clone());
         let preparer = ExecutionPreparation::default();
+        let supervisor = OutcomeSupervisor {
+            outcome: Ok(ExecutionOutcome::ExitedZero),
+            launches: std::cell::Cell::new(0),
+        };
         assert!(
             f.app
-                .prepare_execution(f.app.human_owner(), &id, &preparer)
+                .run_execution(f.app.human_owner(), &id, &preparer, &supervisor)
                 .is_err(),
             "{state:?}"
         );
         assert_eq!(preparer.calls.get(), 0);
+        assert_eq!(supervisor.launches.get(), 0);
         EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
         EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
         assert_execution_quiet();

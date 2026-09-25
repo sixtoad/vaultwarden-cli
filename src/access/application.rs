@@ -3,7 +3,7 @@ use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider:
 use std::{
     sync::{
         Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -26,6 +26,9 @@ pub struct ProviderApplication {
     gate: Mutex<Authority>,
     clock: Box<dyn SessionClock>,
     closing: AtomicBool,
+    /// Published before `lock` waits for the serialized backend gate. A
+    /// resolver which started before that request must not launch afterwards.
+    revocation_epoch: AtomicU64,
     request_lifetime: Duration,
     owner: AuthenticatedHuman,
 }
@@ -58,6 +61,7 @@ impl ProviderApplication {
             }),
             clock,
             closing: AtomicBool::new(false),
+            revocation_epoch: AtomicU64::new(0),
             request_lifetime,
             owner,
         };
@@ -96,6 +100,7 @@ impl ProviderApplication {
         }
     }
     pub fn lock(&self) -> Result<(), SessionError> {
+        self.revocation_epoch.fetch_add(1, Ordering::AcqRel);
         let mut authority = self
             .gate
             .lock()
@@ -113,6 +118,10 @@ impl ProviderApplication {
     }
     pub(crate) fn human_owner(&self) -> AuthenticatedHuman {
         self.owner
+    }
+    #[cfg(test)]
+    pub(crate) fn revocation_epoch_for_test(&self) -> u64 {
+        self.revocation_epoch.load(Ordering::Acquire)
     }
     fn check_owner(&self, owner: AuthenticatedHuman) -> Result<(), DirectRequestError> {
         if owner != self.owner {
@@ -274,8 +283,131 @@ impl ProviderApplication {
     ) -> Result<DirectStatus, DirectRequestError> {
         self.commit_decision(self.prepare_approval(owner, id)?, false)
     }
-    /// Produces immutable bytes only. Story 1.7 must atomically consume approval
-    /// and revalidate live authority before dispatching them or resolving secrets.
+    /// Claims an approved decision exactly once, then resolves only its policy
+    /// selected values into an explicit child environment.  A production caller
+    /// with no containment supervisor is rejected before any secret lookup.
+    #[allow(dead_code)] // Wired by the containment composition in Story 1.8.
+    pub(crate) fn run_execution<P: ProtectedExecution, S: ProcessSupervisor<P>>(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+        preparer: &P,
+        supervisor: &S,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.check_owner(owner)?;
+        if !supervisor.available() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        // Capture before waiting for the serialized gate. `lock` publishes its
+        // revocation first, so a lock request racing with this admission makes
+        // this execution stale even if the caller has not acquired the gate.
+        let revocation_epoch = self.revocation_epoch.load(Ordering::Acquire);
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.execution_live_current(&mut authority, id, revocation_epoch)?;
+        let deadline = *authority
+            .request_deadlines
+            .get(id)
+            .ok_or(DirectRequestError::AlreadyDecided)?;
+        let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let live = || {
+            !self.closing.load(Ordering::Acquire)
+                && self.revocation_epoch.load(Ordering::Acquire) == revocation_epoch
+                && self.clock.now() < deadline
+                && self.clock.now() < session_deadline
+        };
+        let binding = authority.provider.claim_execution(owner, id, live)?;
+        let result = (|| {
+            let (_, policy, argv) = self.execution_authority_current(
+                &mut authority,
+                owner,
+                id,
+                Some(&binding),
+                revocation_epoch,
+            )?;
+            let prepared = preparer
+                .prepare(policy.execution_image(), argv)
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            self.execution_authority_current(
+                &mut authority,
+                owner,
+                id,
+                Some(&binding),
+                revocation_epoch,
+            )?;
+            authority.backend.probe_compatibility()?;
+            self.execution_live_current(&mut authority, id, revocation_epoch)?;
+            let marker = format!("vw-access={}", policy.id());
+            let mut mappings = Vec::new();
+            for login in policy.login_bindings() {
+                let credential = CredentialBinding {
+                    immutable_item_id: login.item_id,
+                    fields: &login.required_fields,
+                    marker: &marker,
+                };
+                let eligible = authority.backend.eligible(&credential).unwrap_or(false);
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                if !eligible {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                let values = authority.backend.resolve(&credential)?;
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                if values.len() != login.mappings.len() {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                mappings.extend(
+                    login
+                        .mappings
+                        .iter()
+                        .map(|mapping| mapping.environment.clone())
+                        .zip(values),
+                );
+            }
+            let environment = ChildEnvironment::from_mappings(mappings)
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            self.execution_authority_current(
+                &mut authority,
+                owner,
+                id,
+                Some(&binding),
+                revocation_epoch,
+            )?;
+            let outcome = supervisor
+                .supervise(prepared, environment)
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            self.execution_live_current(&mut authority, id, revocation_epoch)?;
+            Ok(match outcome {
+                ExecutionOutcome::ExitedZero => DirectStatus::Completed { exit_code: 0 },
+                ExecutionOutcome::ExitedNonZero => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionNonzero,
+                },
+                ExecutionOutcome::Signaled => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionSignaled,
+                },
+            })
+        })();
+        let terminal = result.unwrap_or(DirectStatus::Failed {
+            reason: DirectFailure::ExecutionUnavailable,
+        });
+        let persisted = authority
+            .provider
+            .finish_execution(&binding, terminal.clone(), live);
+        if persisted.is_err() {
+            self.close_admission();
+            let _ignored = Self::revoke(&mut authority);
+            return Err(DirectRequestError::Unavailable);
+        }
+        match terminal {
+            DirectStatus::Completed { .. } => Ok(terminal),
+            _ => Err(DirectRequestError::Unavailable),
+        }
+    }
+
+    /// Compatibility helper retained for Story 1.6 test evidence.  It verifies
+    /// an approved request but cannot consume it; new code must use
+    /// `run_execution` with a supervisor.
     #[allow(dead_code)]
     pub(crate) fn prepare_execution<P: ProtectedExecution>(
         &self,
@@ -332,6 +464,19 @@ impl ProviderApplication {
         }
         Ok(candidate)
     }
+    fn execution_authority_current(
+        &self,
+        authority: &mut Authority,
+        owner: AuthenticatedHuman,
+        id: &str,
+        expected: Option<&ApprovalBinding>,
+        revocation_epoch: u64,
+    ) -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError>
+    {
+        let candidate = self.execution_authority(authority, owner, id, expected)?;
+        self.execution_live_current(authority, id, revocation_epoch)?;
+        Ok(candidate)
+    }
     // Backend calls need live admission and this request's monotonic deadline,
     // not another full registry read/hash. Durable binding checks surround image
     // preparation and successful return, independently of credential count.
@@ -352,6 +497,18 @@ impl ProviderApplication {
             self.admit(authority)?;
             expiry?;
             return Err(DirectRequestError::AlreadyDecided);
+        }
+        Ok(())
+    }
+    fn execution_live_current(
+        &self,
+        authority: &mut Authority,
+        id: &str,
+        revocation_epoch: u64,
+    ) -> Result<(), DirectRequestError> {
+        self.execution_live(authority, id)?;
+        if self.revocation_epoch.load(Ordering::Acquire) != revocation_epoch {
+            return Err(DirectRequestError::Locked);
         }
         Ok(())
     }
