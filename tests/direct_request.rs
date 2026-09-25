@@ -1,4 +1,6 @@
 //! Real Unix + trusted HTTPS boundaries with a synthetic backend; no real account.
+#![cfg(target_os = "linux")]
+
 use std::{
     os::unix::fs::PermissionsExt,
     sync::{

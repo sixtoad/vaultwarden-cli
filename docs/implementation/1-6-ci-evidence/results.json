@@ -1,0 +1,147 @@
+{
+  "base_commit": "a66afaefbdeaba69493014e5f684434522700bef",
+  "local_commands": [
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.221,
+      "log": "/tmp/vw-story16-ci-verification/0.log",
+      "env_overrides": {
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-refinement-target",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_TEST_THREADS": "4"
+      }
+    },
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 404.421,
+      "log": "/tmp/vw-story16-ci-verification/1.log",
+      "env_overrides": {
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-refinement-target",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_TEST_THREADS": "4"
+      }
+    },
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 42.454,
+      "log": "/tmp/vw-story16-ci-verification/2.log",
+      "env_overrides": {
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-refinement-target",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_TEST_THREADS": "4"
+      }
+    },
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "rustup",
+        "run",
+        "1.88.0",
+        "cargo",
+        "test",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 346.048,
+      "log": "/tmp/vw-story16-ci-verification/3.log",
+      "env_overrides": {
+        "CARGO_TARGET_DIR": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-exact-protected-executable/target/msrv188",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_TEST_THREADS": "4",
+        "RUSTUP_HOME": "/tmp/vw-story16-rustup"
+      }
+    }
+  ],
+  "counts": [
+    {
+      "log": "1.log",
+      "reported_passes": 774,
+      "executed_non_live": 703,
+      "live_account_early_returns": 71,
+      "suites": 16,
+      "benchmark_smoke_checks": 13,
+      "library_ignored": 9,
+      "ignored_fixtures_parent_invoked": 8,
+      "browser_fixture_not_run": 1
+    },
+    {
+      "log": "3.log",
+      "reported_passes": 774,
+      "executed_non_live": 703,
+      "live_account_early_returns": 71,
+      "suites": 16,
+      "benchmark_smoke_checks": 13,
+      "library_ignored": 9,
+      "ignored_fixtures_parent_invoked": 8,
+      "browser_fixture_not_run": 1
+    }
+  ],
+  "security": {
+    "audit": {
+      "argv": [
+        "cargo-audit",
+        "audit",
+        "--json"
+      ],
+      "version": "0.22.2",
+      "exit_code": 0,
+      "reported_vulnerabilities": 0,
+      "configuration": ".cargo/audit.toml unchanged; existing RSA advisory ignore retained",
+      "warnings": [
+        "existing yanked dev dependency chacha20 0.10.1"
+      ]
+    },
+    "deny": {
+      "argv": [
+        "cargo-deny",
+        "check",
+        "all"
+      ],
+      "version": "0.20.2",
+      "exit_code": 0,
+      "configuration": "deny.toml unchanged",
+      "all_four_categories": "ok",
+      "release_archive_sha256": "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f",
+      "release": "https://github.com/EmbarkStudios/cargo-deny/releases/tag/0.20.2",
+      "warnings": "Existing duplicate dependency and yanked dev-dependency warnings; no suppressions added"
+    }
+  },
+  "verified_inputs_during_full_runs": 69,
+  "source_unchanged_during_full_runs": true,
+  "post_run_changes": [
+    ".github/workflows/ci.yml",
+    "tests/unsupported_provider_platform.rs"
+  ],
+  "post_run_changes_scope": "Only CI Windows regression-test invocation and refinements in the non-Linux-only integration test. All production Rust, dependencies and Linux test inputs remain identical to both completed full suites. Formatting checked again. Native execution is verified by the subsequent PR CI run; do not treat this local Linux run as a non-Linux test.",
+  "native_ci": "See latest checks on https://github.com/sixtoad/vaultwarden-cli/pull/24; pending at local evidence packaging."
+}

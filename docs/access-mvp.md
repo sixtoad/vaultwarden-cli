@@ -11,6 +11,18 @@ preparation. Agent transport, protected dispatch and platform/WebAuthn authentic
 are later stories.
 The provider has no agent-facing item lookup, secret export or password command.
 
+## Supported platform
+
+The provider and human terminal client (`vaultwarden-accessd` and `vw-access`)
+require Linux. Their access and adapter library modules are compiled only on Linux.
+On other platforms both binaries exit unsuccessfully with a fixed unsupported-platform
+message, before parsing arguments or accessing provider state, keyrings or transports.
+The general `vaultwarden-cli` retains its existing cross-platform support. Native
+macOS and Windows provider transports require future platform-specific adapters;
+there is no fallback that relaxes Linux ownership, socket or execution checks.
+Protected executable preparation has additional kernel and image requirements
+specified below.
+
 ## Human setup and launch
 
 1. Choose a provider-owned state directory outside agent workspaces. Its parent

@@ -33,6 +33,7 @@ jobs:
   test:
     name: Test
     strategy:
+      fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-latest"]
         rust: ["stable", "beta"]
@@ -97,6 +98,9 @@ jobs:
       - name: Build (native)
         if: ${{ !matrix.cross }}
         run: cargo build --target ${{ matrix.target }}
+      - name: Reject unsupported provider use on Windows
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        run: cargo test --locked --target x86_64-pc-windows-msvc --test unsupported_provider_platform
 
   coverage:
     name: Coverage (Tarpaulin)

@@ -1,4 +1,6 @@
 //! Transport-level boundary tests; no public production secret-resolution hook.
+#![cfg(target_os = "linux")]
+
 use std::{
     os::unix::fs::PermissionsExt,
     sync::{

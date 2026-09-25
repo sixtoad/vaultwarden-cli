@@ -1,16 +1,20 @@
 //! Human terminal client. Outputs contain only provider-owned receipts and states.
+#[cfg(target_os = "linux")]
 use clap::{Parser, Subcommand, error::ErrorKind};
+#[cfg(target_os = "linux")]
 use std::{
     io::{self, Write},
     path::PathBuf,
     process::ExitCode,
     time::Duration,
 };
+#[cfg(target_os = "linux")]
 use vaultwarden_cli::{
     access::direct_request::DirectSubmission,
     adapters::human_socket::{HumanCommand, HumanResponse, exchange},
 };
 
+#[cfg(target_os = "linux")]
 #[derive(Parser)]
 #[command(
     name = "vw-access",
@@ -24,6 +28,7 @@ struct Args {
     #[command(subcommand)]
     command: Command,
 }
+#[cfg(target_os = "linux")]
 #[derive(Subcommand)]
 enum Command {
     /// Submit and wait for a terminal status (approval is unavailable at this stage).
@@ -42,6 +47,7 @@ enum Command {
     /// Read a request's redacted status, including while the provider is locked.
     Status { id: String },
 }
+#[cfg(target_os = "linux")]
 fn main() -> ExitCode {
     let args = match Args::try_parse() {
         Ok(args) => args,
@@ -73,6 +79,7 @@ fn main() -> ExitCode {
         }
     }
 }
+#[cfg(target_os = "linux")]
 fn run(args: Args) -> Result<(), String> {
     let (command, wait) = match args.command {
         Command::Request {
@@ -124,6 +131,7 @@ fn run(args: Args) -> Result<(), String> {
     }
     Ok(())
 }
+#[cfg(target_os = "linux")]
 fn reject_error(response: &HumanResponse) -> Result<(), String> {
     match response {
         HumanResponse::Rejected { reason } => Err(reason.to_string()),
@@ -133,6 +141,7 @@ fn reject_error(response: &HumanResponse) -> Result<(), String> {
         _ => Ok(()),
     }
 }
+#[cfg(target_os = "linux")]
 fn output(response: &HumanResponse) -> Result<(), String> {
     let encoded = serde_json::to_vec(response).map_err(|_error| "provider response unavailable")?;
     let mut stdout = io::stdout().lock();
@@ -142,7 +151,7 @@ fn output(response: &HumanResponse) -> Result<(), String> {
         .and_then(|()| stdout.flush())
         .map_err(|_error| "output unavailable".into())
 }
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     #[test]
@@ -268,4 +277,10 @@ mod tests {
             Ok(())
         );
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn main() -> std::process::ExitCode {
+    eprintln!("vw-access: unsupported platform; requires Linux");
+    std::process::ExitCode::FAILURE
 }

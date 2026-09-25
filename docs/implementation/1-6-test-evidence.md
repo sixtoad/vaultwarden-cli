@@ -1,5 +1,10 @@
 # Story 1.6 verification evidence
 
+This records the implementation approved and published in `a66afaefbdeaba69493014e5f684434522700bef`.
+The subsequent CI platform/dependency correction and its current verification are
+recorded in [CI follow-up evidence](1-6-ci-follow-up.md). The original source
+fingerprints and mutation archive below are preserved as historical evidence.
+
 Status: implementation, required verification and all three workflow review layers
 complete. The user accepted the completed implementation and evidence by requesting
 publication of the pull request on 2026-09-25.
