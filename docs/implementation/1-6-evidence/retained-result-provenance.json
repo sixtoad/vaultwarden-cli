@@ -1,0 +1,1052 @@
+{
+  "retained_generated": 249,
+  "retained_manual": 53,
+  "unchanged_scoped_ranges": 38,
+  "named_original_oracles_passing_both_toolchains": 109,
+  "old_authority_manual_cases_replaced_not_silently_carried": true,
+  "basis": "Exact unchanged function/constant bodies and retained patch locations; final ordinary oracles pass. Changed function scopes are freshly mutated. Portable authority fixture replaced by explicit Linux application integration for FD behavior.",
+  "production_provenance": [
+    {
+      "file": "src/access/application.rs",
+      "function": "ProviderApplication::admit",
+      "first_line": 84,
+      "last_line": 97,
+      "sha256": "d11c35273f1aa3cfd1bf00f418d4e745e7a00adbf833819295cf09372d47719b",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 84,
+      "historical_last_line": 97
+    },
+    {
+      "file": "src/access/application.rs",
+      "function": "ProviderApplication::check_owner",
+      "first_line": 117,
+      "last_line": 122,
+      "sha256": "ea4900ab8580cccab8e424d36fbedd524cf735190cc31e9150759b6c9f9dd54f",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 117,
+      "historical_last_line": 122
+    },
+    {
+      "file": "src/access/application.rs",
+      "function": "ProviderApplication::expire_requests",
+      "first_line": 123,
+      "last_line": 137,
+      "sha256": "14ec0b976a8891b55160311e39497f3bf0e254dee0ef156b172d81f36c163f26",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 123,
+      "historical_last_line": 137
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": null,
+      "first_line": 26,
+      "last_line": 26,
+      "sha256": "7669bdf7afb72309abaa07d67c1ae01a936f196d370a9e8afa887426ae761b0c",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 26,
+      "historical_last_line": 26
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "ApprovedImage::validate_integrity",
+      "first_line": 94,
+      "last_line": 103,
+      "sha256": "901f45dd170f59edf7f4a532997b4bc33e598b36998f69a361ca9d6df40ebcf1",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 94,
+      "historical_last_line": 103
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "OperationPolicy::from_draft",
+      "first_line": 177,
+      "last_line": 204,
+      "sha256": "c48ab326bd7d65d89b01cdd501efc80fd794c58f41f4fc92c9c4d6d313c65a14",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 177,
+      "historical_last_line": 204
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "OperationPolicy::image_matches",
+      "first_line": 215,
+      "last_line": 221,
+      "sha256": "f50b16d31f2ed517ce0b1677b4e00886737f9f1386d7d2a0aa585ac4df930a91",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 215,
+      "historical_last_line": 221
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "OperationPolicy::execution_image",
+      "first_line": 222,
+      "last_line": 229,
+      "sha256": "9755714fdc20417e163fd12d4fd0d16da12cc081d03a079453bf8cf60d8411c7",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 222,
+      "historical_last_line": 229
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "OperationPolicy::validates_args",
+      "first_line": 240,
+      "last_line": 254,
+      "sha256": "2acc28c265f94c0bf002f64c4f8b5d45da98fa7069cf6fc0dc74545836db65d4",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 240,
+      "historical_last_line": 254
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "OperationPolicy::normalize_args",
+      "first_line": 255,
+      "last_line": 273,
+      "sha256": "715cb6974977865e63f492d56036d3ca53225b8ab862861a658afb5190e20d75",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 255,
+      "historical_last_line": 273
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "OperationPolicy::validate_integrity",
+      "first_line": 310,
+      "last_line": 334,
+      "sha256": "788896431629bcc6f8dc95bc07b4d6b8d6d2b5708ae16f3a270387361a0edd26",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 310,
+      "historical_last_line": 334
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "<impl TryFrom<StoredOperationPolicy> for OperationPolicy>::try_from",
+      "first_line": 356,
+      "last_line": 380,
+      "sha256": "7ad196449e69d28d71b17bd8d5be3ae033e362be1372bb235c5fb1ac07ff6526",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 356,
+      "historical_last_line": 380
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "valid_image_path",
+      "first_line": 406,
+      "last_line": 418,
+      "sha256": "a7f8c8c35f91755853fc46f9eaddadfba65b3135d12dc7ec77aac3dd1206f4b9",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 406,
+      "historical_last_line": 418
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "nonsymlink_regular",
+      "first_line": 489,
+      "last_line": 513,
+      "sha256": "b008dafe9382bd10b667d8cc715624da8bc17084d71e3fb8cb43048a8f7a6d56",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 481,
+      "historical_last_line": 505
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "revision_for",
+      "first_line": 652,
+      "last_line": 688,
+      "sha256": "57cddff1719180ce4bf4bcc089e85b30080f70d48a288d549ab83373e975d501",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 644,
+      "historical_last_line": 680
+    },
+    {
+      "file": "src/access/ports.rs",
+      "function": "<impl fmt::Display for ExecutionError>::fmt",
+      "first_line": 42,
+      "last_line": 53,
+      "sha256": "e293c6b366e49e23ee5a44dea7c375329e7f33b6c0d055ad333e7607e2d43345",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 42,
+      "historical_last_line": 53
+    },
+    {
+      "file": "src/access/provider.rs",
+      "function": "Provider::approved_execution",
+      "first_line": 270,
+      "last_line": 328,
+      "sha256": "b3e847eca7f9661e38228bc72b1397ed501b74854ad1931d213fac51c29f940f",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 270,
+      "historical_last_line": 328
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": null,
+      "first_line": 16,
+      "last_line": 16,
+      "sha256": "7cef4264de1f1f33cc970884cc768e39318f823ba901d7b77cf75bfc32e6e21d",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 15,
+      "historical_last_line": 15
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": null,
+      "first_line": 18,
+      "last_line": 18,
+      "sha256": "70c61c53883ea08e3aa3867b503e62634ae1d60893dc9f5c486d647ccc4f2659",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 17,
+      "historical_last_line": 17
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "<impl fmt::Debug for PreparedExecutable>::fmt",
+      "first_line": 30,
+      "last_line": 32,
+      "sha256": "813ff0058d26f6661ec3d3996d990b7fcaa3c557d7b6b953a9e186a55a4367b9",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 29,
+      "historical_last_line": 31
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "<impl ProtectedExecution for LinuxExecutablePreparer>::prepare",
+      "first_line": 37,
+      "last_line": 63,
+      "sha256": "8cdccf42720d60dfd0fe1dbfa1aa7210ba160f026d5ddcbd96483d4e4dadd6c8",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 36,
+      "historical_last_line": 62
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "checked_arguments",
+      "first_line": 66,
+      "last_line": 82,
+      "sha256": "5f81301f84b4b93087057df9c42243c27f9a3b3ae9441570ccca01efb68d2e4a",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 65,
+      "historical_last_line": 81
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "PreparedExecutable::execute",
+      "first_line": 85,
+      "last_line": 95,
+      "sha256": "96302707d888a4978aaff68c8e17cd1c1980c251c35cd97d1d9ed0252380b2b5",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 84,
+      "historical_last_line": 94
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": null,
+      "first_line": 150,
+      "last_line": 150,
+      "sha256": "e2a5e54255e1ea8e8fb32c7e0995ee65d56dde7f33c4511c7655834eff96555b",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 118,
+      "historical_last_line": 118
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": null,
+      "first_line": 149,
+      "last_line": 149,
+      "sha256": "741c231e4a297903f8e8f71d340f9f60bc495fd54216ab4631b1508f4aabe91a",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 117,
+      "historical_last_line": 117
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": null,
+      "first_line": 148,
+      "last_line": 148,
+      "sha256": "382dcb58e0cad98a3974092d8f62d8d229d8a5e7ffb09fa84eb508244982ea7e",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 116,
+      "historical_last_line": 116
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": null,
+      "first_line": 147,
+      "last_line": 147,
+      "sha256": "61e41a7ec256073cb3381c64ce1d58e04e75e02d9ded6f13d714a3b5aa21a5c9",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 115,
+      "historical_last_line": 115
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::open_at",
+      "first_line": 152,
+      "last_line": 170,
+      "sha256": "349a6ec18fbe18beab70a50089c3c84df061dfe7edb8da7595baed17580bc1e8",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 120,
+      "historical_last_line": 138
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::directory_ok",
+      "first_line": 172,
+      "last_line": 180,
+      "sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 140,
+      "historical_last_line": 148
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::components",
+      "first_line": 182,
+      "last_line": 205,
+      "sha256": "ad137ffad9b7090135e4c187773d4c179fc31572b77faa46e00fc193f416d5ee",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 150,
+      "historical_last_line": 173
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::open_source",
+      "first_line": 207,
+      "last_line": 239,
+      "sha256": "55ccc9fe27a0b9ee0c433fafe28ec37c0664759a8e180968ca6bec3584c49c21",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 175,
+      "historical_last_line": 207
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::open_relative",
+      "first_line": 241,
+      "last_line": 270,
+      "sha256": "7e862f4c60c1a123d78ed52f013c58b42b3a0900e9b2869c0059da1bf6315064",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 209,
+      "historical_last_line": 238
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::source_metadata",
+      "first_line": 272,
+      "last_line": 280,
+      "sha256": "b5d655170fa1dd2c62479884825ad5dec1f1727e800e4e69c3f27ba82b14772c",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 240,
+      "historical_last_line": 248
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::source_ok",
+      "first_line": 282,
+      "last_line": 290,
+      "sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 250,
+      "historical_last_line": 258
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::snapshot",
+      "first_line": 301,
+      "last_line": 370,
+      "sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 269,
+      "historical_last_line": 338
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::seal_fd",
+      "first_line": 372,
+      "last_line": 381,
+      "sha256": "69bbcc1c0498b91fe9df1b9ec0c94e52add57a66b80a583752be4356f9b23307",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 340,
+      "historical_last_line": 349
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::execute_fd",
+      "first_line": 383,
+      "last_line": 409,
+      "sha256": "d1ea0f7a9aa93d118cbee2346324e80f51ae10a219a3510ad18a69d913e61c89",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 351,
+      "historical_last_line": 377
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::validate_elf",
+      "first_line": 411,
+      "last_line": 415,
+      "sha256": "357f33de8f65af3798d61aeb571711ab4a1eb4f67825b331ff18b34960786c48",
+      "identical_to_initial_mutation_source": true,
+      "retained_after_review1": true,
+      "historical_first_line": 379,
+      "historical_last_line": 383
+    },
+    {
+      "file": "src/access/application.rs",
+      "function": "ProviderApplication::prepare_execution",
+      "first_line": 277,
+      "last_line": 315,
+      "sha256": "611c7cba0634409a30246d676d0c7f1e6db409c091b0c60d00aa2e47f2caa03f",
+      "freshly_mutated_after_review1": true
+    },
+    {
+      "file": "src/access/application.rs",
+      "function": "ProviderApplication::execution_authority",
+      "first_line": 316,
+      "last_line": 334,
+      "sha256": "a57c7859d08a66bba0818423d143e6c41cd738e5375d8efcfa52b7111beac1dc",
+      "freshly_mutated_after_review1": true
+    },
+    {
+      "file": "src/access/application.rs",
+      "function": "ProviderApplication::execution_live",
+      "first_line": 338,
+      "last_line": 357,
+      "sha256": "5b5b478aab2830b4bc4dbe02034f046a94399ca2167d655ab96cd1c106d14076",
+      "freshly_mutated_after_review1": true
+    },
+    {
+      "file": "src/access/policy.rs",
+      "function": "executable_identity_matches",
+      "first_line": 427,
+      "last_line": 487,
+      "sha256": "c2c9e396ed23ddbfd64a3a77ccde5c820025df734283f0a558c6545fdb1cdf7e",
+      "freshly_mutated_after_review1": true
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::checked_userspace_mapping_end",
+      "first_line": 419,
+      "last_line": 442,
+      "sha256": "52592b5100a8d411cdbf6196826b4d4abd4605c731643b9cb889e356e178acc7",
+      "freshly_mutated_after_review1": true
+    },
+    {
+      "file": "src/adapters/execution.rs",
+      "function": "linux::validate_elf_for_page_size",
+      "first_line": 444,
+      "last_line": 577,
+      "sha256": "ea6e1a3ac09ac574b8bfb7dd6b09c1f6cbefddbe31cb0c9463d0dfad4333cd27",
+      "freshly_mutated_after_review1": true
+    }
+  ],
+  "manual_patch_proof": [
+    {
+      "id": "source_allow_owner_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_group_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_other_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_setuid",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_setgid",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_sticky",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_missing_owner_read",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_allow_missing_owner_execute",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_skip_regular_type",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_skip_owner",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::source_ok",
+          "whole_body_sha256": "443dd6fa8426f2666b5a56a8fc2b09a4a9833338cb2e3bf0d58975372a4d0089",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "ancestor_allow_group_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "ancestor_allow_other_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "ancestor_allow_setuid",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "ancestor_allow_setgid",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "ancestor_allow_sticky",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "private_directory_allow_group_read",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "private_directory_allow_group_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "private_directory_allow_group_execute",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "private_directory_allow_other_read",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "private_directory_allow_other_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "private_directory_allow_other_execute",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::directory_ok",
+          "whole_body_sha256": "497ee50fcac95951da1d4fe3c34f9a853d6e5e06217cce916a22623148231295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "nofollow_leaf_removed",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::open_at",
+          "whole_body_sha256": "349a6ec18fbe18beab70a50089c3c84df061dfe7edb8da7595baed17580bc1e8",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "nofollow_directories_removed",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::open_at",
+          "whole_body_sha256": "349a6ec18fbe18beab70a50089c3c84df061dfe7edb8da7595baed17580bc1e8",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "open_remove_o_nonblock",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::open_at",
+          "whole_body_sha256": "349a6ec18fbe18beab70a50089c3c84df061dfe7edb8da7595baed17580bc1e8",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "open_remove_o_cloexec",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::open_at",
+          "whole_body_sha256": "349a6ec18fbe18beab70a50089c3c84df061dfe7edb8da7595baed17580bc1e8",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "open_remove_o_noctty",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::open_at",
+          "whole_body_sha256": "349a6ec18fbe18beab70a50089c3c84df061dfe7edb8da7595baed17580bc1e8",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "memfd_remove_mfd_cloexec",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "memfd_remove_mfd_allow_sealing",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "memfd_remove_mfd_exec",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_remove_f_seal_write",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "3559d8dcf75c0645cea010efaf897020066e238779e8428708fefa189e387bd2",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_remove_f_seal_grow",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "3559d8dcf75c0645cea010efaf897020066e238779e8428708fefa189e387bd2",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_remove_f_seal_shrink",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "3559d8dcf75c0645cea010efaf897020066e238779e8428708fefa189e387bd2",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_remove_f_seal_exec",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "3559d8dcf75c0645cea010efaf897020066e238779e8428708fefa189e387bd2",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_remove_f_seal_seal",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "3559d8dcf75c0645cea010efaf897020066e238779e8428708fefa189e387bd2",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_skip_installation",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "seal_skip_readback",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::seal_fd",
+          "whole_body_sha256": "69bbcc1c0498b91fe9df1b9ec0c94e52add57a66b80a583752be4356f9b23307",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "exec_skip_descriptor_seal_guard",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::execute_fd",
+          "whole_body_sha256": "d1ea0f7a9aa93d118cbee2346324e80f51ae10a219a3510ad18a69d913e61c89",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "retain_mutable_source_descriptor",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "digest_bypass",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "sealed_fd_leak_on_digest_rejection",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "source_fd_leak_after_prepare",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "skip_final_elf_verification",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "exec_remove_empty_path_flag",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::execute_fd",
+          "whole_body_sha256": "d1ea0f7a9aa93d118cbee2346324e80f51ae10a219a3510ad18a69d913e61c89",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "verify_before_sealing_order",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "image_protocol_limit_expansion",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "e83026d0b90f34580aa9eda5f29df98a951c38e43b797db325bfb5c44d4a3b94",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "argv_count_protocol_limit_expansion",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "a9d02ccf61ab4cb233cf3c6ea75f032291a037572da40a130c2c83ce977f3374",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "argv_bytes_protocol_limit_expansion",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "57acc53b43bf08d9deb31428f88f024766b6ec64efcfd7fb4528dc46e069d673",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "exec_nonempty_environment",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::execute_fd",
+          "whole_body_sha256": "d1ea0f7a9aa93d118cbee2346324e80f51ae10a219a3510ad18a69d913e61c89",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "exec_omits_policy_argv0",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::execute_fd",
+          "whole_body_sha256": "d1ea0f7a9aa93d118cbee2346324e80f51ae10a219a3510ad18a69d913e61c89",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "snapshot_stability_checks_removed",
+      "file": "src/adapters/execution.rs",
+      "proof": [
+        {
+          "function": "linux::snapshot",
+          "whole_body_sha256": "bf138b6efad37af9ac7c2c0f86d565d7148d6462d516916aeb5779ebafd7f30b",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "constructor_skips_root_spelling_validation",
+      "file": "src/access/policy.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "9c7814859e388ce83a010ce594e37023b2a36bdc6b51bd98e22e36e683e22295",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "constructor_skips_root_containment",
+      "file": "src/access/policy.rs",
+      "proof": [
+        {
+          "constant_or_module_fragment_sha256": "64650d0e4603d685379f4a7b85ad0912bc585f24c170238f552cd2eb6cbadb66",
+          "unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "policy_skips_registry_root_equality",
+      "file": "src/access/policy.rs",
+      "proof": [
+        {
+          "function": "OperationPolicy::image_matches",
+          "whole_body_sha256": "f50b16d31f2ed517ce0b1677b4e00886737f9f1386d7d2a0aa585ac4df930a91",
+          "unchanged": true
+        }
+      ]
+    }
+  ],
+  "limits": "Retained results concern exact unchanged production bodies/constant fragments, with their original named failure oracles passing in both final ordinary suites. These are not described as rerun; every changed function was refreshed. Historical names/line positions remain in raw logs; current source ranges are mapped here."
+}

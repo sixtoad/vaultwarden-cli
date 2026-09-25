@@ -1,0 +1,7 @@
+{
+  "unchanged_linux_production_ranges": 44,
+  "inventory_reference": "../1-6-evidence/mutation-source-provenance.json",
+  "previous_distinct_mutants": 585,
+  "not_rerun": true,
+  "new_platform_boundary_not_covered_by_old_mutations": true
+}

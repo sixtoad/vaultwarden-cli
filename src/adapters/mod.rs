@@ -1,4 +1,7 @@
 pub mod desktop_launch;
+// The verified adapter is intentionally unwired until Story 1.7 supervised dispatch.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) mod execution;
 pub mod human_socket;
 pub mod loopback_ui;
 pub mod session;

@@ -5,10 +5,23 @@ under distinct restricted OS principals. A same-UID agent can read the human's
 memory and keyring and is not a supported secret boundary. The existing direct
 `vaultwarden-cli` remains a separate human-only vault client.
 
-Stories 1.1–1.5 provide private state, constrained operation policy, a protected
-provider session, and authenticated one-time browser decisions. Agent transport,
-protected execution and platform/WebAuthn authentication are later stories.
+Stories 1.1–1.6 provide private state, constrained operation policy, a protected
+provider session, authenticated one-time browser decisions and immutable executable
+preparation. Agent transport, protected dispatch and platform/WebAuthn authentication
+are later stories.
 The provider has no agent-facing item lookup, secret export or password command.
+
+## Supported platform
+
+The provider and human terminal client (`vaultwarden-accessd` and `vw-access`)
+require Linux. Their access and adapter library modules are compiled only on Linux.
+On other platforms both binaries exit unsuccessfully with a fixed unsupported-platform
+message, before parsing arguments or accessing provider state, keyrings or transports.
+The general `vaultwarden-cli` retains its existing cross-platform support. Native
+macOS and Windows provider transports require future platform-specific adapters;
+there is no fallback that relaxes Linux ownership, socket or execution checks.
+Protected executable preparation has additional kernel and image requirements
+specified below.
 
 ## Human setup and launch
 
@@ -216,3 +229,94 @@ provider timestamps and closed outcomes, without password, browser proof, backen
 values, argument values or raw errors. The public status remains tokenless.
 Legacy schema-v1 `{id,status}` records remain readable by the store but carry no
 human ownership and cannot be queried or reviewed as direct requests.
+
+## Exact executable preparation (Story 1.6)
+
+Approved operations can now be prepared internally as an owned immutable executable
+image. Preparation rechecks the current Approved record, exact approval binding,
+authenticated owner, lifecycle epoch, active policy, canonical arguments and target,
+monotonic deadlines, unlocked session, compatibility and every credential's
+eligibility. It repeats those checks after filesystem and backend work. Preparation
+resolves no credentials and starts no protected child. The retained image conveys
+no approval authority; later dispatch must atomically consume the one-time decision
+and revalidate authority before resolving credentials.
+
+Preparation performs three normal durable state reads, independent of credential
+count. Each state snapshot still incurs the pre-existing image rehashing during
+deserialization and validation while holding the authority gate. That repeated
+work scales with registry image bytes and policy bindings; large registries can
+therefore delay a Lock waiting for the gate even with the bounded read count.
+
+The supported execution profile is **Linux 6.3+**, with executable memfds and
+WRITE/GROW/SHRINK/EXEC/SEAL support, and native little-endian ELF64 **ET_EXEC**
+(x86-64 or AArch64). Each private image binding requires an explicit
+`execution_root` and `profile: "reviewed_self_contained_elf64_v1"`, as well as its
+absolute path and SHA-256 digest. The profile is the provider operator's declaration
+that the pinned artifact was reviewed as self-contained: it uses no interpreter,
+helper, plugin, runtime-loaded code or mutable executable dependency. ELF structure
+and hashing cannot establish arbitrary program behavior; a statically linked
+interpreter does not satisfy this declaration. Scripts, dynamic executables,
+static PIE, unsupported profiles, writable executable segments and executable
+stack declarations are rejected. The parser checks ELF identification, native
+machine/type/version and header sizes; program/section-table bounds and selected
+section extents/alignment; load file/memory sizes, alignment, ordering and
+page-rounded nonoverlap; and an entry in file-backed executable-load bytes.
+Images violating those checks are rejected. This is not complete ELF ABI metadata
+validation: unused section-name and null-section semantics are not certified,
+and unused section names are not consulted for loading.
+
+This version also restricts every load mapping, including its page-rounded end,
+to the lower 47-bit userspace minus the final native page on x86-64, and the lower
+36-bit userspace on AArch64. The end is exclusive; the entry must lie in file-backed
+bytes of an executable load. These conservative profile limits follow Linux 6.3's
+[ELF load checks and page rounding](https://github.com/torvalds/linux/blob/v6.3/fs/binfmt_elf.c),
+[x86-64 TASK_SIZE and DEFAULT_MAP_WINDOW](https://github.com/torvalds/linux/blob/v6.3/arch/x86/include/asm/page_64_types.h),
+and AArch64's [TASK_SIZE definition](https://github.com/torvalds/linux/blob/v6.3/arch/arm64/include/asm/processor.h)
+and [36-bit configuration for 16 KiB pages](https://github.com/torvalds/linux/blob/v6.3/arch/arm64/Kconfig).
+Kernels with larger address spaces do not widen this profile. Passing structural
+validation does not guarantee execution: address allocation and kernel security
+policy can still refuse the image.
+
+Every execution-root ancestor is traversed through a checked directory descriptor.
+Ancestors must be root- or provider-owned with no group/other write or special
+permission bits; sticky-directory exceptions are not supported. The execution root
+and descendants must be provider-owned mode `0700`. Sources must be regular,
+provider-owned, owner-readable/executable and have no write or special bits.
+Images are limited to 64 MiB. The adapter copies the checked descriptor to a private
+executable memfd, applies and reads back every required seal, then verifies SHA-256
+and ELF structure on that sealed object. Path replacement and source writes cannot
+change retained bytes. Errors close descriptors and expose fixed redacted categories.
+
+The execution primitive consumes this descriptor with `execveat(AT_EMPTY_PATH)`,
+explicit policy-derived arguments and an empty environment. It replaces its already
+supervised calling process and has no production spawn path. Secret injection,
+approval consumption, process supervision and descendant containment remain in
+Stories 1.7/1.8. Unsupported kernels, disabled executable memfds, seccomp or LSM
+refusal fail closed without a pathname or legacy-command fallback.
+
+Existing populated image bindings lack the required declaration and must be
+re-provisioned. They are rejected without rewriting user data or silently assigning
+a profile. Empty default state remains supported. Root, profile, image identity
+and policy fields are bound into the new policy revision; old approvals cannot
+be reused with a newly provisioned policy.
+Story 1.6 provides no operator-facing command to migrate or re-provision populated
+legacy state; provisioning integration is later work. Manually editing persisted
+fields or revisions, moving a live store, or reusing approvals is not a supported
+recovery procedure.
+
+Linux tests need secure temporary ancestry because shared `/tmp` is deliberately
+rejected. The checked-in wrapper creates and cleans a dedicated mode `0700`
+directory beneath a provider-owned `HOME`, after checking its ancestry, and
+preserves command arguments and exit status. Run the complete suite with:
+
+```sh
+./scripts/with-secure-test-tmpdir.sh cargo test --all-targets
+```
+
+Linux CI and `just test`, `just check`, `just pre-commit`, and `just coverage` use
+the same wrapper. It leaves non-Linux commands and temporary-directory behavior
+unchanged. Use a home with no symlink ancestry, owned by the provider, with only
+root/provider-owned ancestors and no group/other write or special permission bits;
+the wrapper never changes shared directory permissions. Linux 6.3+ executable
+memfd support is required for the positive adapter tests; unavailable fixtures
+fail instead of being silently skipped.

@@ -1,4 +1,6 @@
 //! Real process checks: parser errors cannot reflect terminal-provided values.
+#![cfg(target_os = "linux")]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 #[test]

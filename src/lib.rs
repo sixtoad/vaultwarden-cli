@@ -1,7 +1,9 @@
 //! vaultwarden-cli library
 //!
 
+#[cfg(target_os = "linux")]
 pub mod access;
+#[cfg(target_os = "linux")]
 pub mod adapters;
 pub mod api;
 pub mod commands;

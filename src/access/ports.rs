@@ -4,6 +4,56 @@ use std::fmt;
 
 use super::policy::LoginField;
 
+/// Provider-owned image selection. Never accepted from a request client.
+#[allow(dead_code)] // Story 1.7 connects preparation to supervised dispatch.
+pub(crate) struct ExecutionImage<'a> {
+    pub(crate) root: &'a std::path::Path,
+    pub(crate) path: &'a std::path::Path,
+    pub(crate) sha256: &'a str,
+    pub(crate) profile: super::policy::ExecutionProfile,
+}
+
+#[allow(dead_code)]
+/// Preparation owns a noncloneable bytes capability; it grants no approval.
+/// The adapter chooses its opaque resource type, keeping OS handles out of core.
+pub(crate) trait ProtectedExecution {
+    type Prepared;
+    fn prepare(
+        &self,
+        image: ExecutionImage<'_>,
+        argv: Vec<String>,
+    ) -> Result<Self::Prepared, ExecutionError>;
+}
+
+/// Closed diagnostics deliberately contain no OS error, image path or argv.
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ExecutionError {
+    InvalidImage,
+    UnsafePath,
+    UnsafeSource,
+    DigestMismatch,
+    UnsupportedImage,
+    Unavailable,
+    InvalidArguments,
+    ExecutionFailed,
+}
+impl fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::InvalidImage => "invalid executable image",
+            Self::UnsafePath => "unsafe executable location",
+            Self::UnsafeSource => "unsafe executable source",
+            Self::DigestMismatch => "executable digest mismatch",
+            Self::UnsupportedImage => "unsupported executable image",
+            Self::Unavailable => "executable preparation unavailable",
+            Self::InvalidArguments => "invalid executable arguments",
+            Self::ExecutionFailed => "descriptor execution failed",
+        })
+    }
+}
+impl std::error::Error for ExecutionError {}
+
 /// The only login metadata the policy application may request from a secret
 /// backend.  It names an immutable backend item and standard login fields; it
 /// never transports an item object or a secret value.

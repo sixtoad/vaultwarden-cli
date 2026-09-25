@@ -1,4 +1,6 @@
+#[cfg(target_os = "linux")]
 use clap::Parser;
+#[cfg(target_os = "linux")]
 use std::{
     path::PathBuf,
     process::ExitCode,
@@ -8,6 +10,7 @@ use std::{
     },
     time::Duration,
 };
+#[cfg(target_os = "linux")]
 use vaultwarden_cli::{
     access::{application::ProviderApplication, provider::Provider},
     adapters::{
@@ -18,6 +21,7 @@ use vaultwarden_cli::{
     },
 };
 
+#[cfg(target_os = "linux")]
 #[derive(Debug, Parser)]
 #[command(name = "vaultwarden-accessd")]
 struct Args {
@@ -37,6 +41,7 @@ struct Args {
     #[arg(long, requires = "ui_tls_cert", requires = "backend_config")]
     ui_tls_key: Option<PathBuf>,
 }
+#[cfg(target_os = "linux")]
 fn main() -> ExitCode {
     let args = Args::parse();
     match run(args) {
@@ -47,6 +52,7 @@ fn main() -> ExitCode {
         }
     }
 }
+#[cfg(target_os = "linux")]
 fn run(args: Args) -> Result<(), ()> {
     let runtime = tokio::runtime::Runtime::new().map_err(|_error| ())?;
     let (mut interrupt, mut term) = runtime.block_on(async {
@@ -119,6 +125,7 @@ fn run(args: Args) -> Result<(), ()> {
     cleanup.and(artifact_cleanup)
 }
 
+#[cfg(target_os = "linux")]
 fn configured_application(
     args: &Args,
     provider: Provider,
@@ -133,6 +140,7 @@ fn configured_application(
     )
 }
 
+#[cfg(target_os = "linux")]
 fn transport_finished<U, H>(
     ui: &std::thread::JoinHandle<U>,
     human: &std::thread::JoinHandle<H>,
@@ -141,6 +149,7 @@ fn transport_finished<U, H>(
 }
 
 /// Signal reception stays on the async driver; gate-taking status runs elsewhere.
+#[cfg(target_os = "linux")]
 async fn monitor_shutdown(
     app: Arc<ProviderApplication>,
     signal: impl std::future::Future<Output = ()>,
@@ -164,6 +173,7 @@ async fn monitor_shutdown(
     app.close_admission();
 }
 
+#[cfg(target_os = "linux")]
 fn join_then_revoke(
     worker: std::thread::JoinHandle<Result<(), vaultwarden_cli::access::ports::SessionError>>,
     revoke: impl FnOnce() -> Result<(), ()>,
@@ -176,6 +186,7 @@ fn join_then_revoke(
     cleanup.and(serving)
 }
 
+#[cfg(target_os = "linux")]
 fn initialize_provider(
     root: &std::path::Path,
     clear: impl FnOnce() -> Result<(), vaultwarden_cli::access::ports::SessionError>,
@@ -188,6 +199,7 @@ fn initialize_provider(
     .map_err(|_error| ())
 }
 
+#[cfg(target_os = "linux")]
 fn clear_previous_launch(path: &std::path::Path) -> Result<(), ()> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
@@ -196,7 +208,7 @@ fn clear_previous_launch(path: &std::path::Path) -> Result<(), ()> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 
@@ -567,17 +579,17 @@ mod tests {
         app.authenticate(SensitiveString::new("synthetic".into()))
             .unwrap();
         let image = dir.path().join("image");
-        let bytes = std::fs::read("/usr/bin/true").unwrap();
-        std::fs::write(&image, &bytes).unwrap();
-        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
-        let digest: String = sha2::Sha256::digest(&bytes)
+        let bytes: &[u8] = b"\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00\x01\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x01\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x78\x00\x00\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\xb8\x3c\x00\x00\x00\xbf\x00\x00\x00\x00\x0f\x05";
+        std::fs::write(&image, bytes).unwrap();
+        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o500)).unwrap();
+        let digest: String = sha2::Sha256::digest(bytes)
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect();
         let state_path = root.join("provider-state.json");
         let mut state: serde_json::Value =
             serde_json::from_slice(&std::fs::read(&state_path).unwrap()).unwrap();
-        state["approved_images"] = serde_json::json!([{"id":"image","path":image,"sha256":digest}]);
+        state["approved_images"] = serde_json::json!([{"id":"image","execution_root":dir.path(),"path":image,"sha256":digest,"profile":"reviewed_self_contained_elf64_v1"}]);
         std::fs::write(state_path, serde_json::to_vec(&state).unwrap()).unwrap();
         app.activate_operation(OperationPolicyDraft {
             id: "deploy".into(),
@@ -642,4 +654,10 @@ mod tests {
         worker.join().unwrap().unwrap();
         app.shutdown().unwrap();
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn main() -> std::process::ExitCode {
+    eprintln!("vaultwarden-accessd: unsupported platform; requires Linux");
+    std::process::ExitCode::FAILURE
 }

@@ -23,6 +23,7 @@ const MAX_CREDENTIALS: usize = 16;
 const MAX_FIELD_MAPPINGS: usize = 8;
 const MAX_TARGET_LEN: usize = 256;
 const MAX_VALUE_LEN: usize = 256;
+const MAX_PRELIMINARY_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
 const ELF_MAGIC: &[u8; 4] = b"\x7fELF";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -36,25 +37,48 @@ pub struct OperationPolicyDraft {
     pub credentials: Vec<LoginCredentialDraft>,
 }
 
+/// Provider declaration that the pinned artifact was reviewed to contain no
+/// interpreter, helper, plugin or runtime code dependencies. ELF inspection
+/// cannot establish that behavioral promise on its own.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionProfile {
+    ReviewedSelfContainedElf64V1,
+}
+
 /// Provider-private registry state; this story intentionally has no public
 /// provisioning or inspection API.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApprovedImage {
     id: String,
+    execution_root: String,
     path: String,
     sha256: String,
+    profile: ExecutionProfile,
 }
 
 impl ApprovedImage {
     pub(crate) fn new(
         id: String,
+        execution_root: String,
         path: String,
         sha256: String,
+        profile: ExecutionProfile,
     ) -> Result<Self, PolicyValidationError> {
-        let image = Self { id, path, sha256 };
+        let image = Self {
+            id,
+            execution_root,
+            path,
+            sha256,
+            profile,
+        };
         if !valid_operation_id(&image.id)
+            || !valid_image_path(&image.execution_root)
             || !valid_image_path(&image.path)
+            || !Path::new(&image.path)
+                .strip_prefix(&image.execution_root)
+                .is_ok_and(|relative| !relative.as_os_str().is_empty())
             || !valid_sha256(&image.sha256)
             || !executable_identity_matches(Path::new(&image.path), &image.sha256)
         {
@@ -68,7 +92,14 @@ impl ApprovedImage {
     }
 
     pub(crate) fn validate_integrity(&self) -> Result<(), PolicyValidationError> {
-        Self::new(self.id.clone(), self.path.clone(), self.sha256.clone()).map(|_| ())
+        Self::new(
+            self.id.clone(),
+            self.execution_root.clone(),
+            self.path.clone(),
+            self.sha256.clone(),
+            self.profile,
+        )
+        .map(|_| ())
     }
 }
 
@@ -126,8 +157,10 @@ pub(crate) struct OperationPolicy {
 #[serde(deny_unknown_fields)]
 struct ResolvedImage {
     image_id: String,
+    execution_root: String,
     path: String,
     sha256: String,
+    profile: ExecutionProfile,
 }
 
 #[derive(Debug)]
@@ -153,6 +186,8 @@ impl OperationPolicy {
         canonicalize_draft(&mut draft);
         let image = ResolvedImage {
             image_id: approved.id.clone(),
+            execution_root: approved.execution_root.clone(),
+            profile: approved.profile,
             path: approved.path.clone(),
             sha256: approved.sha256.clone(),
         };
@@ -179,8 +214,18 @@ impl OperationPolicy {
     }
     pub(crate) fn image_matches(&self, image: &ApprovedImage) -> bool {
         self.image.image_id == image.id
+            && self.image.execution_root == image.execution_root
+            && self.image.profile == image.profile
             && self.image.path == image.path
             && self.image.sha256 == image.sha256
+    }
+    pub(crate) fn execution_image(&self) -> super::ports::ExecutionImage<'_> {
+        super::ports::ExecutionImage {
+            root: Path::new(&self.image.execution_root),
+            path: Path::new(&self.image.path),
+            sha256: &self.image.sha256,
+            profile: self.image.profile,
+        }
     }
     pub(crate) fn login_bindings(&self) -> impl Iterator<Item = LoginBindingRef<'_>> {
         self.credentials.iter().map(|credential| LoginBindingRef {
@@ -265,8 +310,10 @@ impl OperationPolicy {
     pub(crate) fn validate_integrity(&self) -> Result<(), PolicyValidationError> {
         let image = ApprovedImage::new(
             self.image.image_id.clone(),
+            self.image.execution_root.clone(),
             self.image.path.clone(),
             self.image.sha256.clone(),
+            self.image.profile,
         )?;
         let rebuilt = Self::from_draft(
             OperationPolicyDraft {
@@ -309,8 +356,10 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
     fn try_from(stored: StoredOperationPolicy) -> Result<Self, Self::Error> {
         let image = ApprovedImage::new(
             stored.image.image_id.clone(),
+            stored.image.execution_root.clone(),
             stored.image.path.clone(),
             stored.image.sha256.clone(),
+            stored.image.profile,
         )?;
         let policy = Self::from_draft(
             OperationPolicyDraft {
@@ -368,6 +417,13 @@ fn valid_image_path(value: &str) -> bool {
             .all(|component| matches!(component, Component::RootDir | Component::Normal(_)))
 }
 
+// These provisioning/persistence checks are preliminary only. The execution
+// adapter must independently verify descriptor traversal, ownership, modes,
+// sealed bytes and the supported ELF profile before yielding a capability.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static TEST_IMAGE_HASH_BYTES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
 fn executable_identity_matches(path: &Path, expected: &str) -> bool {
     let Some(metadata) = nonsymlink_regular(path) else {
         return false;
@@ -376,16 +432,22 @@ fn executable_identity_matches(path: &Path, expected: &str) -> bool {
         return false;
     }
     let mut options = OpenOptions::new();
-    options.read(true).custom_flags(libc::O_NOFOLLOW);
-    let Ok(mut file) = options.open(path) else {
+    options
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    let Ok(file) = options.open(path) else {
         return false;
     };
     let Ok(opened) = file.metadata() else {
         return false;
     };
-    if !opened.file_type().is_file() || opened.mode() & 0o111 == 0 {
+    if !opened.file_type().is_file()
+        || opened.mode() & 0o111 == 0
+        || opened.len() > MAX_PRELIMINARY_IMAGE_BYTES
+    {
         return false;
     }
+    let mut file = file.take(MAX_PRELIMINARY_IMAGE_BYTES + 1);
     let mut header = [0_u8; 16];
     if file.read_exact(&mut header).is_err()
         || header[..4] != *ELF_MAGIC
@@ -397,11 +459,22 @@ fn executable_identity_matches(path: &Path, expected: &str) -> bool {
     }
     let mut digest = Sha256::new();
     digest.update(header);
+    #[cfg(test)]
+    TEST_IMAGE_HASH_BYTES.with(|count| count.set(count.get() + header.len() as u64));
+    let mut total = header.len() as u64;
     let mut buffer = [0_u8; 8192];
     loop {
         match file.read(&mut buffer) {
             Ok(0) => break,
-            Ok(read) => digest.update(&buffer[..read]),
+            Ok(read) => {
+                total += read as u64;
+                if total > MAX_PRELIMINARY_IMAGE_BYTES {
+                    return false;
+                }
+                digest.update(&buffer[..read]);
+                #[cfg(test)]
+                TEST_IMAGE_HASH_BYTES.with(|count| count.set(count.get() + read as u64));
+            }
             Err(_) => return false,
         }
     }
@@ -521,7 +594,7 @@ fn valid_environment(value: &str) -> bool {
 fn valid_display_text(value: &str, maximum: usize) -> bool {
     !value.is_empty()
         && value.len() <= maximum
-        && !value.contains(' ')
+        && !value.contains('\0')
         && !value.chars().any(char::is_control)
 }
 fn valid_value(value: &str, maximum: usize) -> bool {
@@ -603,7 +676,7 @@ fn revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
         .collect();
     hex_digest(
         &serde_json::to_vec(&Projection {
-            version: 1,
+            version: 2,
             id: &draft.id,
             image,
             targets: &draft.targets,
@@ -624,12 +697,30 @@ fn hex_digest(data: &[u8]) -> String {
 pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
     const IMAGE: &[u8] = b"\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00\x01\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x01\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x78\x00\x00\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\xb8\x3c\x00\x00\x00\xbf\x00\x00\x00\x00\x0f\x05";
     let path = root.join("approved-image");
-    fs::write(&path, IMAGE).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    if path.exists() {
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    #[cfg(target_arch = "aarch64")]
+    let native_image = {
+        let mut bytes = IMAGE.to_vec();
+        bytes[18..20].copy_from_slice(&183u16.to_le_bytes());
+        bytes[120..132].copy_from_slice(&[
+            0x00, 0x00, 0x80, 0xd2, 0xa8, 0x0b, 0x80, 0xd2, 0x01, 0x00, 0x00, 0xd4,
+        ]);
+        bytes
+    };
+    #[cfg(target_arch = "aarch64")]
+    let image = native_image.as_slice();
+    #[cfg(not(target_arch = "aarch64"))]
+    let image = IMAGE;
+    fs::write(&path, image).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o500)).unwrap();
     ApprovedImage::new(
         id.into(),
+        root.to_str().unwrap().into(),
         path.into_os_string().into_string().unwrap(),
-        hex_digest(IMAGE),
+        hex_digest(image),
+        ExecutionProfile::ReviewedSelfContainedElf64V1,
     )
     .unwrap()
 }
@@ -695,11 +786,13 @@ mod tests {
                 &canonical,
                 &ResolvedImage {
                     image_id: "deploy-image".into(),
+                    execution_root: "/opt/vw-access".into(),
+                    profile: ExecutionProfile::ReviewedSelfContainedElf64V1,
                     path: "/opt/vw-access/deploy".into(),
                     sha256: "a".repeat(64),
                 },
             ),
-            "d5c9504382ca17dc992db82b3c587b2513edfad17a37cd0d63f7bb73a0a4d768"
+            "517d83ff82fac249a5f19c3306e77ae09af57468e73915273ae4f5f49642c99d"
         );
         let mut reordered = draft();
         reordered.targets.reverse();
@@ -722,6 +815,118 @@ mod tests {
                 .revision()
         );
     }
+    #[test]
+    fn root_and_profile_are_mandatory_and_part_of_the_execution_binding() {
+        let root = root();
+        let nested = root.path().join("images");
+        fs::create_dir(&nested).unwrap();
+        let image = test_approved_image(&nested, "deploy-image");
+        let policy = OperationPolicy::from_draft(draft(), &image).unwrap();
+        let mut other_root = image.clone();
+        other_root.execution_root = root.path().to_str().unwrap().into();
+        assert!(other_root.validate_integrity().is_ok());
+        assert!(!policy.image_matches(&other_root));
+        assert_ne!(
+            policy.revision(),
+            OperationPolicy::from_draft(draft(), &other_root)
+                .unwrap()
+                .revision()
+        );
+        let execution = policy.execution_image();
+        assert_eq!(execution.root, nested);
+        assert_eq!(execution.path, Path::new(&image.path));
+        assert_eq!(execution.sha256, image.sha256);
+        assert_eq!(
+            execution.profile,
+            ExecutionProfile::ReviewedSelfContainedElf64V1
+        );
+
+        for field in ["execution_root", "profile"] {
+            let mut stored_image = serde_json::to_value(&image).unwrap();
+            stored_image.as_object_mut().unwrap().remove(field);
+            assert!(serde_json::from_value::<ApprovedImage>(stored_image).is_err());
+            let mut stored_policy = serde_json::to_value(&policy).unwrap();
+            stored_policy["image"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(serde_json::from_value::<OperationPolicy>(stored_policy).is_err());
+        }
+        let mut stored = serde_json::to_value(&image).unwrap();
+        stored["profile"] = serde_json::json!("unreviewed_elf64");
+        assert!(serde_json::from_value::<ApprovedImage>(stored).is_err());
+        let mut stored = serde_json::to_value(&policy).unwrap();
+        stored["image"]["profile"] = serde_json::json!("reviewed_self_contained_elf64_v2");
+        assert!(serde_json::from_value::<OperationPolicy>(stored).is_err());
+        let mut stored = serde_json::to_value(&policy).unwrap();
+        stored["image"]["execution_root"] = serde_json::json!(root.path());
+        assert!(serde_json::from_value::<OperationPolicy>(stored).is_err());
+    }
+
+    #[test]
+    fn execution_root_must_be_canonical_and_contain_the_image() {
+        let root = root();
+        let image = test_approved_image(root.path(), "deploy-image");
+        for invalid in [
+            "relative".to_owned(),
+            format!("{}/..", image.execution_root),
+            image.path.clone(),
+            format!("{}-other", image.execution_root),
+        ] {
+            assert!(
+                ApprovedImage::new(
+                    image.id.clone(),
+                    invalid,
+                    image.path.clone(),
+                    image.sha256.clone(),
+                    image.profile
+                )
+                .is_err()
+            );
+        }
+        let (parent, leaf) = image.execution_root.rsplit_once('/').unwrap();
+        for noncanonical in [
+            format!("{}/.", image.execution_root),
+            format!("{}/", image.execution_root),
+            format!("{parent}//{leaf}"),
+            format!("{}//", image.execution_root),
+        ] {
+            // Path containment normalizes these spellings, so it cannot mask
+            // omission of the constructor's independent canonical-root guard.
+            let relative = Path::new(&image.path).strip_prefix(&noncanonical).unwrap();
+            assert!(!relative.as_os_str().is_empty());
+            assert!(
+                ApprovedImage::new(
+                    image.id.clone(),
+                    noncanonical.clone(),
+                    image.path.clone(),
+                    image.sha256.clone(),
+                    image.profile,
+                )
+                .is_err(),
+                "noncanonical root {noncanonical}"
+            );
+        }
+    }
+
+    #[test]
+    fn preliminary_checks_reject_oversized_source_without_reading_it() {
+        let root = root();
+        let image = test_approved_image(root.path(), "deploy-image");
+        fs::set_permissions(&image.path, fs::Permissions::from_mode(0o700)).unwrap();
+        OpenOptions::new()
+            .write(true)
+            .open(&image.path)
+            .unwrap()
+            .set_len(MAX_PRELIMINARY_IMAGE_BYTES + 1)
+            .unwrap();
+        fs::set_permissions(&image.path, fs::Permissions::from_mode(0o500)).unwrap();
+        assert!(!executable_identity_matches(
+            Path::new(&image.path),
+            &image.sha256
+        ));
+    }
+
     #[test]
     fn rejects_arbitrary_or_expanding_configuration() {
         let root = root();
@@ -766,6 +971,7 @@ mod tests {
         let root = root();
         let image = test_approved_image(root.path(), "deploy-image");
         let policy = OperationPolicy::from_draft(draft(), &image).unwrap();
+        fs::set_permissions(&image.path, fs::Permissions::from_mode(0o600)).unwrap();
         fs::write(root.path().join("approved-image"), b"changed").unwrap();
         assert!(policy.validate_integrity().is_err());
     }
@@ -782,16 +988,18 @@ mod tests {
             id: "other-image".into(),
             path: image.path.clone(),
             sha256: image.sha256.clone(),
+            ..image.clone()
         };
         assert!(!policy.image_matches(&different_id));
 
         let second_path = root.path().join("second-approved-image");
         fs::copy(&image.path, &second_path).unwrap();
-        fs::set_permissions(&second_path, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(&second_path, fs::Permissions::from_mode(0o500)).unwrap();
         let different_path = ApprovedImage {
             id: image.id.clone(),
             path: second_path.into_os_string().into_string().unwrap(),
             sha256: image.sha256.clone(),
+            ..image.clone()
         };
         assert!(!policy.image_matches(&different_path));
 
@@ -799,6 +1007,7 @@ mod tests {
             id: image.id.clone(),
             path: image.path.clone(),
             sha256: "0".repeat(64),
+            ..image.clone()
         };
         assert!(!policy.image_matches(&different_digest));
         assert!(different_digest.validate_integrity().is_err());
@@ -1134,5 +1343,101 @@ mod tests {
             PolicyValidationError.to_string(),
             "invalid operation policy"
         );
+    }
+    #[test]
+    fn preliminary_image_limit_uses_independent_literal_boundaries() {
+        let root = root();
+        let image = test_approved_image(root.path(), "deploy-image");
+        fs::set_permissions(&image.path, fs::Permissions::from_mode(0o700)).unwrap();
+        let writer = OpenOptions::new().write(true).open(&image.path).unwrap();
+        writer.set_len(67_108_864).unwrap();
+        fs::set_permissions(&image.path, fs::Permissions::from_mode(0o500)).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(fs::read(&image.path).unwrap());
+        let expected: String = hasher
+            .clone()
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert!(executable_identity_matches(
+            Path::new(&image.path),
+            &expected
+        ));
+        writer.set_len(67_108_865).unwrap();
+        hasher.update([0u8]);
+        let expected: String = hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert!(!executable_identity_matches(
+            Path::new(&image.path),
+            &expected
+        ));
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn preliminary_open_flags_are_required_by_the_syscall_contract() {
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "access::policy::tests::preliminary_open_flags_child",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("VW_PRELIMINARY_OPEN_FLAGS_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(
+            child.status.success(),
+            "{} {}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr)
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "isolated preliminary open-flag contract; parent harness only"]
+    fn preliminary_open_flags_child() {
+        assert_eq!(
+            std::env::var("VW_PRELIMINARY_OPEN_FLAGS_CHILD").unwrap(),
+            "1"
+        );
+        let root = root();
+        let image = test_approved_image(root.path(), "deploy-image");
+        assert!(executable_identity_matches(
+            Path::new(&image.path),
+            &image.sha256
+        ));
+        let required = (libc::O_NOFOLLOW | libc::O_NONBLOCK) as u32;
+        let instruction = |code, jt, jf, k| libc::sock_filter { code, jt, jf, k };
+        let mut filter = [
+            instruction(0x20, 0, 0, 0),
+            instruction(0x15, 0, 4, libc::SYS_openat as u32),
+            instruction(0x20, 0, 0, 32),
+            instruction(0x54, 0, 0, required),
+            instruction(0x15, 1, 0, required),
+            instruction(0x06, 0, 0, 0x00050000 | libc::EPERM as u32),
+            instruction(0x06, 0, 0, 0x7fff0000),
+        ];
+        let program = libc::sock_fprog {
+            len: filter.len() as u16,
+            filter: filter.as_mut_ptr(),
+        };
+        assert_eq!(
+            unsafe { libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) },
+            0
+        );
+        assert_eq!(unsafe { libc::prctl(libc::PR_SET_SECCOMP, 2, &program) }, 0);
+        // This checks actual syscall flags on a valid regular image. It does not
+        // claim a real FIFO replacement race or rely on a hung-test timeout.
+        assert!(executable_identity_matches(
+            Path::new(&image.path),
+            &image.sha256
+        ));
+        std::fs::remove_file(&image.path).unwrap();
+        std::fs::remove_dir(root.path()).unwrap();
     }
 }

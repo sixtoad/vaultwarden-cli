@@ -25,8 +25,12 @@ const PRIVATE_FILE_MODE: u32 = 0o600;
 #[cfg(test)]
 type WriteTestHook = std::cell::RefCell<Option<Box<dyn FnMut(u8) -> bool>>>;
 #[cfg(test)]
+type ReadTestHook = std::cell::RefCell<Option<Box<dyn FnMut() -> bool>>>;
+#[cfg(test)]
 thread_local! {
     pub(crate) static WRITE_TEST_HOOK: WriteTestHook = std::cell::RefCell::new(None);
+    pub(crate) static READ_TEST_HOOK: ReadTestHook = std::cell::RefCell::new(None);
+    pub(crate) static TEST_STATE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 #[cfg(test)]
 fn write_test_failure(stage: u8) -> bool {
@@ -246,6 +250,8 @@ impl ProviderStore {
         self.owner_uid
     }
     pub(crate) fn read_state(&self) -> Result<ProviderState, ProviderError> {
+        #[cfg(test)]
+        TEST_STATE_READS.with(|count| count.set(count.get() + 1));
         self.ensure_healthy()?;
         validate_layout(&self.root, self.owner_uid)?;
         let mut file = open_existing(&self.state_path(), false)?;
@@ -253,6 +259,10 @@ impl ProviderStore {
         let mut raw = String::new();
         file.read_to_string(&mut raw)
             .map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
+        #[cfg(test)]
+        if READ_TEST_HOOK.with(|hook| hook.borrow_mut().as_mut().is_some_and(|action| action())) {
+            return Err(error(ProviderDiagnostic::InvalidState));
+        }
         let state: ProviderState =
             serde_json::from_str(&raw).map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
         state.validate()?;
@@ -600,6 +610,57 @@ mod tests {
         .unwrap();
         assert!(ProviderStore::open(&root).is_ok());
     }
+    #[test]
+    fn legacy_populated_bindings_require_reprovisioning_without_rewriting_state() {
+        let temp = temp();
+        let root = temp.path().join("provider");
+        let mut store = ProviderStore::open(&root).unwrap();
+        let image = test_approved_image(temp.path(), "deploy-image");
+        let mut state = store.read_state().unwrap();
+        state.approved_images.push(image.clone());
+        state.operations.push(operation(&image, "staging"));
+        store.write_state(&state).unwrap();
+        drop(store);
+        let complete = serde_json::to_value(state).unwrap();
+        for (collection, nested) in [("approved_images", false), ("operations", true)] {
+            for missing in ["execution_root", "profile"] {
+                let mut legacy = complete.clone();
+                let image = if nested {
+                    &mut legacy[collection][0]["image"]
+                } else {
+                    &mut legacy[collection][0]
+                };
+                image.as_object_mut().unwrap().remove(missing);
+                let bytes = serde_json::to_vec(&legacy).unwrap();
+                fs::write(root.join(STATE_FILE), &bytes).unwrap();
+                assert_eq!(
+                    ProviderStore::open(&root).unwrap_err().diagnostic(),
+                    ProviderDiagnostic::InvalidState
+                );
+                assert_eq!(fs::read(root.join(STATE_FILE)).unwrap(), bytes);
+            }
+        }
+    }
+
+    #[test]
+    fn registry_root_changes_do_not_match_a_previously_bound_operation() {
+        let temp = temp();
+        let nested = temp.path().join("images");
+        fs::create_dir(&nested).unwrap();
+        let image = test_approved_image(&nested, "deploy-image");
+        let mut state = ProviderState::initial();
+        state.operations.push(operation(&image, "staging"));
+        let mut changed = serde_json::to_value(image).unwrap();
+        changed["execution_root"] = serde_json::json!(temp.path());
+        state
+            .approved_images
+            .push(serde_json::from_value(changed).unwrap());
+        assert_eq!(
+            state.validate().unwrap_err().diagnostic(),
+            ProviderDiagnostic::InvalidState
+        );
+    }
+
     #[test]
     fn replacement_preserves_a_complete_state_and_lock_excludes_second_writer() {
         let temp = temp();

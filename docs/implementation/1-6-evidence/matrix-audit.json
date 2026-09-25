@@ -1,0 +1,235 @@
+[
+  {
+    "acceptance_behavior": "Approved preparation retains owned bytes, leaves approval untouched, resolves no secrets or child",
+    "tests": [
+      "access::direct_request_tests::execution_preparation_retains_capability_without_consuming_approval_or_resolving",
+      "access::direct_request_tests::execution_application_integrates_real_owned_linux_preparation"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Exact descriptor execution, explicit argv and empty environment",
+    "tests": [
+      "adapters::execution::linux::tests::descriptor_execution_subprocess"
+    ],
+    "explicitly_invoked_fixtures": [
+      {
+        "child": "execution_child",
+        "passing_parent": "descriptor_execution_subprocess"
+      }
+    ],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Every invalid status, target/arguments, policy/effect/credential binding",
+    "tests": [
+      "access::direct_request_tests::execution_rejects_each_nonapproved_state_before_image_or_backend_work",
+      "access::direct_request_tests::execution_rejects_independently_resealed_semantic_changes_before_preparation"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Approval binding, owner, epoch, locked/shutdown/reunlock, expiry equality, restart and stale active policy",
+    "tests": [
+      "access::direct_request_tests::execution_rejects_binding_epoch_lock_shutdown_restart_and_deadline_equality",
+      "access::direct_request_tests::execution_preparation_rejects_actual_restart_and_changed_active_policy",
+      "access::direct_request_tests::execution_validity_at_last_second_and_failed_preparation_are_independent"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Authority invalidated by preparation, durable read or backend work",
+    "tests": [
+      "access::direct_request_tests::execution_revalidates_authority_and_exact_binding_after_slow_preparation",
+      "access::direct_request_tests::execution_rechecks_compatibility_and_each_credential_without_resolution",
+      "access::application::tests::execution_post_read_deadlines_precede_the_first_preparation_call",
+      "access::direct_request_tests::execution_failed_durable_reads_still_clear_invalidated_authority",
+      "access::direct_request_tests::execution_failed_request_expiry_write_still_clears_invalidated_authority",
+      "access::direct_request_tests::execution_final_durable_validation_rejects_edits_during_backend_work"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Concurrency and prepared-resource release",
+    "tests": [
+      "access::direct_request_tests::execution_preparation_releases_owned_bytes_when_admission_closes_on_another_thread"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Final/root/descendant/ancestor symlinks",
+    "tests": [
+      "adapters::execution::linux::tests::symlinks_at_leaf_root_descendant_and_ancestor_are_rejected"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Regular file, owner and individual write/special/read/execute bits",
+    "tests": [
+      "adapters::execution::linux::tests::invalid_paths_and_special_sources_fail_without_blocking",
+      "adapters::execution::linux::tests::source_owner_check_is_independent_of_path_and_other_metadata",
+      "adapters::execution::linux::tests::independent_source_mode_guards",
+      "adapters::execution::linux::tests::independent_root_and_descendant_mode_guards",
+      "adapters::execution::linux::tests::each_private_directory_permission_bit_is_rejected_independently",
+      "adapters::execution::linux::tests::directory_ownership_and_ancestor_permissions_are_independent",
+      "adapters::execution::linux::tests::full_preparer_rejects_each_unsafe_execution_root_ancestor_permission"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Hash, digest syntax, malformed/unsupported closure, size and argv",
+    "tests": [
+      "adapters::execution::linux::tests::wrong_digest_and_invalid_digest_are_distinct_closed_failures",
+      "adapters::execution::linux::tests::each_unsupported_or_malformed_elf_is_rejected_with_matching_hash",
+      "adapters::execution::linux::tests::dependency_and_executable_stack_headers_are_rejected_beside_a_valid_load",
+      "adapters::execution::linux::tests::malformed_section_contents_and_overlapping_loads_are_rejected",
+      "adapters::execution::linux::tests::load_mapping_validation_uses_the_host_page_size",
+      "adapters::execution::linux::tests::truncated_and_oversized_sources_fail",
+      "adapters::execution::linux::tests::arguments_are_bounded_and_nul_free"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Invalid, closed, unavailable/unsealable descriptors and cleanup",
+    "tests": [
+      "adapters::execution::linux::tests::invalid_and_unsealable_descriptors_fail_closed",
+      "adapters::execution::linux::tests::descriptor_cleanup_subprocess",
+      "adapters::execution::linux::tests::unavailable_memfd_and_sealing_syscalls_close_resources"
+    ],
+    "explicitly_invoked_fixtures": [
+      {
+        "child": "cleanup_child",
+        "passing_parent": "descriptor_cleanup_subprocess"
+      },
+      {
+        "child": "syscall_failure_child",
+        "passing_parent": "unavailable_memfd_and_sealing_syscalls_close_resources"
+      }
+    ],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "In-place modification and pathname replacement around copy/seal/hash/execution",
+    "tests": [
+      "adapters::execution::linux::tests::source_changes_during_copy_reject_before_capability",
+      "adapters::execution::linux::tests::pathname_replacement_and_source_write_after_copy_do_not_replace_verified_bytes",
+      "adapters::execution::linux::tests::channel_coordinated_writer_cannot_change_the_retained_object",
+      "adapters::execution::linux::tests::descriptor_execution_subprocess"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Immutable bytes, mode and redacted diagnostics",
+    "tests": [
+      "adapters::execution::linux::tests::valid_image_has_all_seals_and_redacted_debug"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Exact protocol boundaries and descriptor0",
+    "tests": [
+      "adapters::execution::linux::tests::literal_protocol_limits_are_independent_of_implementation_constants",
+      "adapters::execution::linux::tests::snapshot_contract_accepts_literal_64_mib_pinned_image",
+      "access::policy::tests::preliminary_image_limit_uses_independent_literal_boundaries",
+      "adapters::execution::linux::tests::descriptor_zero_is_valid_for_open_and_snapshot_subprocess"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Independent seals, syscall flags, and error categories",
+    "tests": [
+      "adapters::execution::linux::tests::descriptor_execution_rejects_each_independently_missing_seal_before_syscall",
+      "adapters::execution::linux::tests::literal_seal_set_and_descriptor_flags_are_required",
+      "adapters::execution::linux::tests::seal_readback_failure_closes_resources_before_capability",
+      "adapters::execution::linux::tests::preparation_explicitly_requests_executable_memfd_and_no_controlling_terminal",
+      "adapters::execution::linux::tests::execution_error_labels_are_stable_and_redacted",
+      "access::policy::tests::preliminary_open_flags_are_required_by_the_syscall_contract"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "ELF header/table/section/load/entry boundaries",
+    "tests": [
+      "adapters::execution::linux::tests::elf_boundaries_reject_every_truncated_header_without_panicking",
+      "adapters::execution::linux::tests::elf_boundaries_program_table_count_and_extent",
+      "adapters::execution::linux::tests::elf_boundaries_section_table_metadata_and_extent",
+      "adapters::execution::linux::tests::elf_boundaries_second_section_fields_and_nobits_semantics",
+      "adapters::execution::linux::tests::elf_boundaries_entry_and_independent_second_load",
+      "adapters::execution::linux::tests::elf_userspace_profiles_have_independent_literal_bounds_and_rounding",
+      "adapters::execution::linux::tests::elf_userspace_high_load_is_rejected_with_matching_hash_and_valid_entry",
+      "adapters::execution::linux::tests::elf_userspace_end_and_entry_boundaries_have_matching_hashes",
+      "adapters::execution::linux::tests::elf_userspace_boundaries_account_for_supported_page_rounding"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Failure ordering and conservative source-change rejection",
+    "tests": [
+      "access::direct_request_tests::execution_failed_io_still_revokes_expired_or_closed_authority_before_returning",
+      "access::direct_request_tests::execution_legacy_approval_has_a_stable_closed_rejection_category",
+      "adapters::execution::linux::tests::sealing_precedes_both_digest_and_format_rejection",
+      "adapters::execution::linux::tests::snapshot_contract_rejects_same_byte_rewrite_with_changed_timestamp"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Policy revision and legacy persistence",
+    "tests": [
+      "access::policy::tests::root_and_profile_are_mandatory_and_part_of_the_execution_binding",
+      "access::policy::tests::execution_root_must_be_canonical_and_contain_the_image",
+      "access::provider_store::tests::legacy_populated_bindings_require_reprovisioning_without_rewriting_state",
+      "access::provider_store::tests::registry_root_changes_do_not_match_a_previously_bound_operation"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Every particular policy-bound credential, required field and operation marker is checked by the actual backend",
+    "tests": [
+      "adapters::vaultwarden::tests::preparation_rechecks_each_policy_credential_with_the_real_backend"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  },
+  {
+    "acceptance_behavior": "Durable registry validation work remains independent of credential count",
+    "tests": [
+      "access::direct_request_tests::execution_durable_validation_work_is_independent_of_credential_count"
+    ],
+    "explicitly_invoked_fixtures": [],
+    "stable_passed": true,
+    "rust_1_88_passed": true
+  }
+]

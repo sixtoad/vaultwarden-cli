@@ -1,0 +1,43 @@
+{
+  "generated_inventory": 506,
+  "generated_retained_unchanged": 249,
+  "generated_refreshed": 257,
+  "generated_refresh_outcomes": {
+    "caught": 230,
+    "missed": 19,
+    "timeout": 3,
+    "unviable": 5
+  },
+  "generated_final": {
+    "caught": 443,
+    "equivalent": 23,
+    "compiler-rejected": 23,
+    "equivalent-to-approved-race-contract": 9,
+    "equivalent-to-protected-execution-contract": 8
+  },
+  "manual_distinct": 79,
+  "manual_retained_unchanged": 53,
+  "manual_refreshed": 25,
+  "manual_final": {
+    "caught": 77,
+    "equivalent-to-preparation-authority-contract": 2
+  },
+  "boundary_reruns": 6,
+  "build_timeout_reruns": 3,
+  "counts_are_distinct_mutations_not_attempts": true,
+  "unresolved": [],
+  "combined": {
+    "caught": 520,
+    "documented_equivalent_or_redundant": 42,
+    "compiler_rejected": 23,
+    "unresolved": 0
+  },
+  "manual_review2_added": 1,
+  "review2_retention": {
+    "previous_distinct_results_retained": 584,
+    "unchanged_production": true,
+    "only_verified_input_changed": "src/adapters/execution/linux/tests.rs",
+    "original_named_oracles_passing_current_suites": 125,
+    "new_manual_caught": 1
+  }
+}

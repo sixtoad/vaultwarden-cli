@@ -559,6 +559,259 @@ mod tests {
         }
     }
     #[test]
+    fn preparation_rechecks_each_policy_credential_with_the_real_backend() {
+        use super::super::session::{BOOTSTRAP_ACCOUNT, KEYRING_SERVICE, MonotonicClock};
+        use crate::access::{
+            application::ProviderApplication,
+            direct_request::{DirectStatus, DirectSubmission},
+            direct_request_tests::Launcher,
+            policy::{
+                ArgumentSpec, CredentialUse, LoginCredentialDraft, LoginFieldMapping,
+                OperationPolicyDraft, test_approved_image,
+            },
+            provider::Provider,
+        };
+        use std::{
+            os::unix::fs::PermissionsExt,
+            sync::{
+                Arc, Mutex,
+                atomic::{AtomicUsize, Ordering},
+            },
+        };
+
+        // Only observe resolve; item selection and eligibility remain the actual adapter.
+        struct ObserveBackend {
+            inner: VaultwardenBackend,
+            resolutions: Arc<AtomicUsize>,
+        }
+        impl ProviderSession for ObserveBackend {
+            fn probe_compatibility(&mut self) -> Result<(), SessionError> {
+                self.inner.probe_compatibility()
+            }
+            fn unlock(&mut self, password: SensitiveString) -> Result<Duration, SessionError> {
+                self.inner.unlock(password)
+            }
+            fn clear(&mut self) -> Result<(), SessionError> {
+                self.inner.clear()
+            }
+        }
+        impl SecretBackend for ObserveBackend {
+            fn eligible(&mut self, binding: &CredentialBinding<'_>) -> Result<bool, SessionError> {
+                self.inner.eligible(binding)
+            }
+            fn resolve(
+                &mut self,
+                _: &CredentialBinding<'_>,
+            ) -> Result<Vec<SensitiveString>, SessionError> {
+                self.resolutions.fetch_add(1, Ordering::SeqCst);
+                panic!("preparation must not resolve secrets")
+            }
+        }
+        struct Permit;
+        impl ApprovalAuthenticator for Permit {
+            fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+                Ok(())
+            }
+        }
+        struct Prepared(Arc<AtomicUsize>);
+        impl Drop for Prepared {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        struct Preparation(Arc<AtomicUsize>);
+        impl ProtectedExecution for Preparation {
+            type Prepared = Prepared;
+            fn prepare(
+                &self,
+                _: ExecutionImage<'_>,
+                argv: Vec<String>,
+            ) -> Result<Prepared, ExecutionError> {
+                assert_eq!(argv, ["deploy-contract", "staging"]);
+                Ok(Prepared(self.0.clone()))
+            }
+        }
+
+        const SECOND: &str = "22222222-2222-2222-2222-222222222222";
+        let _guard = crate::KEYRING_TEST_LOCK.lock().unwrap();
+        let previous = keyring_core::unset_default_store();
+        keyring_core::set_default_store(keyring_core::mock::Store::new().unwrap());
+        keyring_core::Entry::new(KEYRING_SERVICE, BOOTSTRAP_ACCOUNT)
+            .unwrap()
+            .set_password("bootstrap-sentinel")
+            .unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let server = rt.block_on(MockServer::start());
+        metadata(&rt, &server, serde_json::json!("1.36.0"), supported());
+        rt.block_on(
+            Mock::given(path("/identity/connect/token"))
+                .and(method("POST"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "access_token":"session-sentinel", "token_type":"Bearer", "expires_in":900
+                })))
+                .mount(&server),
+        );
+        let encrypted = |value: &str| encrypt(value.as_bytes(), &[42; 32], &[42; 32]);
+        let first = serde_json::json!({"Id":ITEM,"Type":1,
+            "Login":{"Password":encrypted("first-secret-sentinel")},
+            "Fields":[{"Name":encrypted("vw-access"),"Value":encrypted("deploy-contract"),"Type":0}]});
+        let valid_second = serde_json::json!({"Id":SECOND,"Type":1,
+        "Login":{"Username":encrypted("second-user"),"Password":encrypted("second-secret-sentinel")},
+        "Fields":[
+            {"Name":encrypted("vw-access"),"Value":encrypted("deploy-contract"),"Type":0},
+            {"Name":encrypted("deployment-token"),"Value":encrypted("custom-secret-sentinel"),"Type":1}
+        ]});
+        let second = Arc::new(Mutex::new(valid_second.clone()));
+        rt.block_on(
+            Mock::given(path(format!("/api/ciphers/{ITEM}")))
+                .and(method("GET"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(first))
+                .mount(&server),
+        );
+        let response = second.clone();
+        rt.block_on(
+            Mock::given(path(format!("/api/ciphers/{SECOND}")))
+                .and(method("GET"))
+                .respond_with(move |_: &wiremock::Request| {
+                    ResponseTemplate::new(200).set_body_json(response.lock().unwrap().clone())
+                })
+                .mount(&server),
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let resolutions = Arc::new(AtomicUsize::new(0));
+        let app = ProviderApplication::new(
+            Provider::start(dir.path().join("provider")).unwrap(),
+            Box::new(ObserveBackend {
+                inner: VaultwardenBackend::new(setup(server.uri()), true).unwrap(),
+                resolutions: resolutions.clone(),
+            }),
+            Box::<MonotonicClock>::default(),
+        )
+        .unwrap();
+        app.authenticate(SensitiveString::new("password-sentinel".into()))
+            .unwrap();
+        let state_path = dir.path().join("provider/provider-state.json");
+        let mut state: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&state_path).unwrap()).unwrap();
+        state["approved_images"] =
+            serde_json::json!([test_approved_image(dir.path(), "contract-image")]);
+        std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
+        let credential = |id: &str, fields: Vec<(LoginField, &str)>| LoginCredentialDraft {
+            item_id: id.into(),
+            label: "Contract login".into(),
+            use_type: CredentialUse::Login,
+            field_mappings: fields
+                .into_iter()
+                .map(|(field, environment)| LoginFieldMapping {
+                    field,
+                    environment: environment.into(),
+                })
+                .collect(),
+        };
+        app.activate_operation(OperationPolicyDraft {
+            id: "deploy-contract".into(),
+            description: "Credential contract fixture".into(),
+            image_id: "contract-image".into(),
+            targets: vec!["staging".into()],
+            arguments: vec![ArgumentSpec::Target],
+            credentials: vec![
+                credential(ITEM, vec![(LoginField::Password, "FIRST_PASSWORD")]),
+                credential(
+                    SECOND,
+                    vec![
+                        (LoginField::Username, "SECOND_USERNAME"),
+                        (
+                            LoginField::Custom {
+                                name: "deployment-token".into(),
+                            },
+                            "SECOND_TOKEN",
+                        ),
+                    ],
+                ),
+            ],
+        })
+        .unwrap();
+        let owner = app.human_owner();
+        let id = app
+            .submit_direct(
+                owner,
+                DirectSubmission {
+                    operation: "deploy-contract".into(),
+                    revision: None,
+                    values: vec!["staging".into()],
+                },
+                &Launcher::default(),
+            )
+            .unwrap()
+            .id;
+        let approval = app
+            .prepare_approval(owner, &id)
+            .unwrap()
+            .authenticate(SensitiveString::new("approval-sentinel".into()), &Permit)
+            .unwrap();
+        assert_eq!(app.commit_approval(approval), Ok(DirectStatus::Approved));
+        let drops = Arc::new(AtomicUsize::new(0));
+        let preparation = Preparation(drops.clone());
+        for (index, variant) in [
+            "valid",
+            "deleted",
+            "marker",
+            "username",
+            "custom",
+            "valid-again",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut item = valid_second.clone();
+            match variant {
+                "deleted" => item["DeletedDate"] = "2026-09-23T00:00:00Z".into(),
+                "marker" => item["Fields"][0]["Value"] = encrypted("other-operation").into(),
+                "username" => {
+                    item["Login"].as_object_mut().unwrap().remove("Username");
+                }
+                "custom" => {
+                    item["Fields"].as_array_mut().unwrap().pop();
+                }
+                _ => {}
+            }
+            *second.lock().unwrap() = item;
+            let before = rt.block_on(server.received_requests()).unwrap().len();
+            super::super::execution::TEST_EXECUTION_ATTEMPTS.with(|n| n.set(0));
+            super::super::execution::TEST_LAUNCH_ATTEMPTS.with(|n| n.set(0));
+            let result = app.prepare_execution(owner, &id, &preparation);
+            assert_eq!(result.is_ok(), variant.starts_with("valid"), "{variant}");
+            drop(result);
+            assert_eq!(drops.load(Ordering::SeqCst), index + 1, "{variant}");
+            let requests = rt.block_on(server.received_requests()).unwrap();
+            let selected: Vec<_> = requests[before..]
+                .iter()
+                .filter(|r| r.url.path().starts_with("/api/ciphers/"))
+                .map(|r| r.url.path().to_owned())
+                .collect();
+            assert_eq!(
+                selected,
+                [
+                    format!("/api/ciphers/{ITEM}"),
+                    format!("/api/ciphers/{SECOND}")
+                ],
+                "{variant}"
+            );
+            assert_eq!(resolutions.load(Ordering::SeqCst), 0, "{variant}");
+            super::super::execution::TEST_EXECUTION_ATTEMPTS.with(|n| assert_eq!(n.get(), 0));
+            super::super::execution::TEST_LAUNCH_ATTEMPTS.with(|n| assert_eq!(n.get(), 0));
+        }
+        app.shutdown().unwrap();
+        drop(app);
+        if let Some(previous) = previous {
+            keyring_core::set_default_store(previous);
+        } else {
+            keyring_core::unset_default_store();
+        }
+    }
+    #[test]
     fn resolution_rejects_wrong_deleted_unmarked_or_ambiguous_items() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let server = rt.block_on(MockServer::start());

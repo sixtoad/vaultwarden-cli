@@ -274,6 +274,87 @@ impl ProviderApplication {
     ) -> Result<DirectStatus, DirectRequestError> {
         self.commit_decision(self.prepare_approval(owner, id)?, false)
     }
+    /// Produces immutable bytes only. Story 1.7 must atomically consume approval
+    /// and revalidate live authority before dispatching them or resolving secrets.
+    #[allow(dead_code)]
+    pub(crate) fn prepare_execution<P: ProtectedExecution>(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+        preparer: &P,
+    ) -> Result<P::Prepared, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let (binding, policy, argv) = self.execution_authority(&mut authority, owner, id, None)?;
+        let preparation = preparer.prepare(policy.execution_image(), argv);
+        self.execution_authority(&mut authority, owner, id, Some(&binding))?;
+        let prepared = preparation.map_err(|_error| DirectRequestError::Unavailable)?;
+
+        self.execution_live(&mut authority, id)?;
+        let compatibility = authority.backend.probe_compatibility();
+        self.execution_live(&mut authority, id)?;
+        compatibility?;
+        let marker = format!("vw-access={}", policy.id());
+        for login in policy.login_bindings() {
+            self.execution_live(&mut authority, id)?;
+            let eligible = authority.backend.eligible(&CredentialBinding {
+                immutable_item_id: login.item_id,
+                fields: &login.required_fields,
+                marker: &marker,
+            });
+            self.execution_live(&mut authority, id)?;
+            if !eligible.unwrap_or(false) {
+                return Err(DirectRequestError::Unavailable);
+            }
+        }
+        self.execution_authority(&mut authority, owner, id, Some(&binding))?;
+        Ok(prepared)
+    }
+    fn execution_authority(
+        &self,
+        authority: &mut Authority,
+        owner: AuthenticatedHuman,
+        id: &str,
+        expected: Option<&ApprovalBinding>,
+    ) -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError>
+    {
+        self.execution_live(authority, id)?;
+        let candidate = authority.provider.approved_execution(owner, id);
+        // Durable reads can themselves take time; never start the next I/O on
+        // the strength of authority checked before that read.
+        self.execution_live(authority, id)?;
+        let candidate = candidate?;
+        if expected.is_some_and(|binding| binding != &candidate.0) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        Ok(candidate)
+    }
+    // Backend calls need live admission and this request's monotonic deadline,
+    // not another full registry read/hash. Durable binding checks surround image
+    // preparation and successful return, independently of credential count.
+    fn execution_live(
+        &self,
+        authority: &mut Authority,
+        id: &str,
+    ) -> Result<(), DirectRequestError> {
+        self.admit(authority)?;
+        if authority
+            .request_deadlines
+            .get(id)
+            .is_none_or(|deadline| self.clock.now() >= *deadline)
+        {
+            let expiry = self.expire_requests(authority);
+            // Cleanup must run even when expiry persistence failed while the
+            // session expired or admission closed during that I/O.
+            self.admit(authority)?;
+            expiry?;
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        Ok(())
+    }
     fn commit_decision(
         &self,
         prepared: PreparedApproval,
@@ -1246,6 +1327,76 @@ mod tests {
             .unwrap();
             assert_eq!(state["requests"][0]["id"], receipt.id);
             assert_eq!(state["requests"].as_array().unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn execution_post_read_deadlines_precede_the_first_preparation_call() {
+        use crate::access::direct_request_tests::{Launcher, fixture, input};
+        struct Permit;
+        impl ApprovalAuthenticator for Permit {
+            fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+                Ok(())
+            }
+        }
+        struct AfterReadClock {
+            calls: AtomicUsize,
+            observed: u64,
+        }
+        impl SessionClock for AfterReadClock {
+            fn now(&self) -> Duration {
+                // Initial admission and request expiry see live authority. The
+                // third clock read is after the potentially slow durable read.
+                let call = self.calls.fetch_add(1, Ordering::SeqCst);
+                Duration::from_secs(if call < 2 { 10 } else { self.observed })
+            }
+            fn unix_seconds(&self) -> Result<u64, SessionError> {
+                Ok(1700000000)
+            }
+        }
+        #[derive(Default)]
+        struct ObservePreparation(AtomicUsize);
+        impl ProtectedExecution for ObservePreparation {
+            type Prepared = ();
+            fn prepare(&self, _: ExecutionImage<'_>, _: Vec<String>) -> Result<(), ExecutionError> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        for (session, observed, accepted) in [
+            (false, 309, true),
+            (false, 310, false),
+            (true, 909, true),
+            (true, 910, false),
+        ] {
+            let mut f = fixture();
+            if session {
+                Arc::get_mut(&mut f.app).unwrap().request_lifetime = Duration::from_secs(3600);
+            }
+            let owner = f.app.human_owner();
+            let id = f
+                .app
+                .submit_direct(owner, input(), &Launcher::default())
+                .unwrap()
+                .id;
+            let approval = f
+                .app
+                .prepare_approval(owner, &id)
+                .unwrap()
+                .authenticate(SensitiveString::new("synthetic".into()), &Permit)
+                .unwrap();
+            f.app.commit_approval(approval).unwrap();
+            Arc::get_mut(&mut f.app).unwrap().clock = Box::new(AfterReadClock {
+                calls: AtomicUsize::new(0),
+                observed,
+            });
+            let preparer = ObservePreparation::default();
+            let result = f.app.prepare_execution(owner, &id, &preparer);
+            assert_eq!(
+                result.is_ok(),
+                accepted,
+                "session={session}, observed={observed}"
+            );
+            assert_eq!(preparer.0.load(Ordering::SeqCst), usize::from(accepted));
         }
     }
 }

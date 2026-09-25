@@ -267,6 +267,65 @@ impl Provider {
         }
         Ok(direct.approval_binding())
     }
+    /// Rebuild approved authority from one durable snapshot. A returned image
+    /// selection is only preparation input; it never consumes approval.
+    #[allow(dead_code)] // Story 1.7 consumes preparation under live authority.
+    pub(crate) fn approved_execution(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+    ) -> Result<
+        (
+            super::direct_request::ApprovalBinding,
+            OperationPolicy,
+            Vec<String>,
+        ),
+        super::direct_request::DirectRequestError,
+    > {
+        use super::direct_request::*;
+        let state = self.store.read_state()?;
+        let direct = state
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .filter(|d| d.owner_uid == owner.uid())
+            .ok_or(DirectRequestError::NotFound)?;
+        if direct.review.status != DirectStatus::Approved {
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        let binding = direct.approval_binding();
+        if direct.lifecycle_epoch != state.lifecycle_epoch
+            || direct.approval.as_ref() != Some(&binding)
+            || direct.review.one_time != ONE_TIME
+        {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let policy = state
+            .operations
+            .iter()
+            .find(|p| p.id() == direct.review.operation)
+            .ok_or(DirectRequestError::StaleRevision)?;
+        if policy.revision() != direct.review.policy_digest {
+            return Err(DirectRequestError::StaleRevision);
+        }
+        let arguments = policy
+            .normalize_args(&direct.review.arguments)
+            .map_err(|_error| DirectRequestError::InvalidRequest)?;
+        let mut expected = policy.direct_review(
+            id.to_owned(),
+            arguments.clone(),
+            direct.review.expires_at_unix_seconds,
+        );
+        expected.status = DirectStatus::Approved;
+        if arguments != direct.review.arguments || expected != direct.review {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        let mut argv = Vec::with_capacity(arguments.len() + 1);
+        argv.push(policy.id().to_owned());
+        argv.extend(arguments);
+        Ok((binding, policy.clone(), argv))
+    }
     pub(crate) fn decision_policy(
         &self,
         binding: &super::direct_request::ApprovalBinding,
@@ -467,6 +526,11 @@ mod tests {
         state["approved_images"] = serde_json::json!([image]);
         fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
         drop(provider);
+        fs::set_permissions(
+            temp.path().join("approved-image"),
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
         fs::write(temp.path().join("approved-image"), b"modified executable").unwrap();
         let cleared = std::cell::Cell::new(false);
         let result = Provider::start_with_cleanup(&root, || {
