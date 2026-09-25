@@ -29,23 +29,38 @@ impl SessionClock for Clock {
 type EligibilityAction = std::cell::RefCell<Option<Box<dyn FnMut() -> Result<bool, SessionError>>>>;
 thread_local! {
     static ELIGIBILITY_ACTION: EligibilityAction = std::cell::RefCell::new(None);
+    static PROBE_ACTION: EligibilityAction = std::cell::RefCell::new(None);
+    static EXECUTION_PROBE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static EXECUTION_CLEAR_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static EXECUTION_ELIGIBILITY_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static EXECUTION_RESOLUTION_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static BACKEND_UNLOCKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 struct Backend;
 impl ProviderSession for Backend {
     fn probe_compatibility(&mut self) -> Result<(), SessionError> {
-        Ok(())
+        EXECUTION_PROBE_CALLS.with(|calls| calls.set(calls.get() + 1));
+        PROBE_ACTION
+            .with(|action| {
+                action
+                    .borrow_mut()
+                    .as_mut()
+                    .map_or(Ok(true), |callback| callback())
+            })
+            .map(|_| ())
     }
     fn unlock(&mut self, _: SensitiveString) -> Result<Duration, SessionError> {
         BACKEND_UNLOCKS.with(|count| count.set(count.get() + 1));
         Ok(Duration::from_secs(900))
     }
     fn clear(&mut self) -> Result<(), SessionError> {
+        EXECUTION_CLEAR_CALLS.with(|calls| calls.set(calls.get() + 1));
         Ok(())
     }
 }
 impl SecretBackend for Backend {
     fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| calls.set(calls.get() + 1));
         ELIGIBILITY_ACTION.with(|action| {
             action
                 .borrow_mut()
@@ -54,6 +69,7 @@ impl SecretBackend for Backend {
         })
     }
     fn resolve(&mut self, _: &CredentialBinding<'_>) -> Result<Vec<SensitiveString>, SessionError> {
+        EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(calls.get() + 1));
         panic!("request must not resolve secrets")
     }
 }
@@ -1784,5 +1800,866 @@ fn decision_denied_and_clock_expired_audits_bind_exact_redacted_metadata() {
         }
         assert!(f.app.deny_direct(f.app.human_owner(), &id).is_err());
         assert_eq!(records(&f), state);
+    }
+}
+
+#[derive(Default)]
+struct ExecutionPreparation {
+    dropped: Arc<AtomicUsize>,
+    calls: std::cell::Cell<usize>,
+    after: std::cell::RefCell<Option<Box<dyn FnOnce()>>>,
+    fail: bool,
+}
+struct ObservedPrepared {
+    dropped: Arc<AtomicUsize>,
+}
+impl std::fmt::Debug for ObservedPrepared {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ObservedPrepared([REDACTED])")
+    }
+}
+impl Drop for ObservedPrepared {
+    fn drop(&mut self) {
+        self.dropped.fetch_add(1, Ordering::SeqCst);
+    }
+}
+fn assert_execution_quiet() {
+    use crate::adapters::execution::{TEST_EXECUTION_ATTEMPTS, TEST_LAUNCH_ATTEMPTS};
+    TEST_EXECUTION_ATTEMPTS.with(|calls| assert_eq!(calls.get(), 0));
+    TEST_LAUNCH_ATTEMPTS.with(|calls| assert_eq!(calls.get(), 0));
+}
+impl ProtectedExecution for ExecutionPreparation {
+    type Prepared = ObservedPrepared;
+    fn prepare(
+        &self,
+        _: ExecutionImage<'_>,
+        argv: Vec<String>,
+    ) -> Result<Self::Prepared, ExecutionError> {
+        self.calls.set(self.calls.get() + 1);
+        assert_eq!(argv, ["deploy", "staging", "safe", "3"]);
+        let result = if self.fail {
+            Err(ExecutionError::Unavailable)
+        } else {
+            Ok(ObservedPrepared {
+                dropped: self.dropped.clone(),
+            })
+        };
+        if let Some(after) = self.after.borrow_mut().take() {
+            after();
+        }
+        result
+    }
+}
+fn approved(f: &Fixture) -> String {
+    let id = pending(f);
+    assert_eq!(
+        f.app.commit_approval(approval(f, &id)),
+        Ok(DirectStatus::Approved)
+    );
+    EXECUTION_PROBE_CALLS.with(|calls| calls.set(0));
+    EXECUTION_CLEAR_CALLS.with(|calls| calls.set(0));
+    EXECUTION_ELIGIBILITY_CALLS.with(|calls| calls.set(0));
+    EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(0));
+    crate::adapters::execution::TEST_EXECUTION_ATTEMPTS.with(|calls| calls.set(0));
+    crate::adapters::execution::TEST_LAUNCH_ATTEMPTS.with(|calls| calls.set(0));
+    id
+}
+fn write_execution_record(f: &Fixture, change: impl FnOnce(&mut DirectRecord)) {
+    let mut state = records(f);
+    let mut direct: DirectRecord =
+        serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
+    change(&mut direct);
+    direct.seal();
+    let binding = direct.approval_binding();
+    if direct.approval.is_some() {
+        direct.approval = Some(binding.clone());
+    }
+    for event in &mut direct.audit {
+        event.binding = binding.clone();
+    }
+    assert!(direct.validate(
+        &direct.review.id,
+        state["lifecycle_epoch"].as_u64().unwrap()
+    ));
+    state["requests"][0]["direct"] = serde_json::to_value(&direct).unwrap();
+    state["requests"][0]["status"] = match direct.review.status {
+        DirectStatus::Pending => "pending",
+        DirectStatus::Approved => "approved",
+        DirectStatus::Running => "running",
+        DirectStatus::Denied => "denied",
+        DirectStatus::Expired => "invalidated",
+        DirectStatus::Completed { .. } => "completed",
+        DirectStatus::Failed { .. } => "failed",
+    }
+    .into();
+    std::fs::write(
+        f.dir.path().join("provider/provider-state.json"),
+        serde_json::to_vec(&state).unwrap(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn execution_preparation_retains_capability_without_consuming_approval_or_resolving() {
+    let f = fixture();
+    let id = approved(&f);
+    let before = records(&f);
+    let preparer = ExecutionPreparation::default();
+    let prepared = f
+        .app
+        .prepare_execution(f.app.human_owner(), &id, &preparer)
+        .unwrap();
+    assert_eq!(format!("{prepared:?}"), "ObservedPrepared([REDACTED])");
+    assert_eq!(preparer.calls.get(), 1);
+    EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    assert_execution_quiet();
+    assert_eq!(records(&f), before);
+    drop(prepared);
+    assert_eq!(preparer.dropped.load(Ordering::SeqCst), 1);
+    // An image is not a replay token: preparation leaves the one-time decision
+    // untouched. Dispatch must consume that decision independently in Story 1.7.
+    drop(
+        f.app
+            .prepare_execution(f.app.human_owner(), &id, &preparer)
+            .unwrap(),
+    );
+    assert_eq!(records(&f), before);
+}
+
+#[test]
+fn execution_rejects_each_nonapproved_state_before_image_or_backend_work() {
+    for state in [
+        DirectStatus::Pending,
+        DirectStatus::Denied,
+        DirectStatus::Expired,
+        DirectStatus::Running,
+        DirectStatus::Completed { exit_code: 0 },
+        DirectStatus::Failed {
+            reason: DirectFailure::ExecutionUnavailable,
+        },
+    ] {
+        let f = fixture();
+        let id = approved(&f);
+        write_execution_record(&f, |record| record.review.status = state.clone());
+        let preparer = ExecutionPreparation::default();
+        assert!(
+            f.app
+                .prepare_execution(f.app.human_owner(), &id, &preparer)
+                .is_err(),
+            "{state:?}"
+        );
+        assert_eq!(preparer.calls.get(), 0);
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+    }
+}
+
+#[test]
+fn execution_rejects_independently_resealed_semantic_changes_before_preparation() {
+    for case in [
+        "owner",
+        "policy",
+        "target",
+        "arguments",
+        "noncanonical",
+        "digest",
+        "effect",
+        "credentials",
+        "legacy",
+    ] {
+        let f = fixture();
+        let id = approved(&f);
+        write_execution_record(&f, |record| match case {
+            "owner" => record.owner_uid += 1,
+            "policy" => record.review.policy_digest = "a".repeat(64),
+            "target" => record.review.target = "production".into(),
+            "arguments" => {
+                record.review.arguments[1] = "unsafe".into();
+                record.review.arguments_digest = arguments_digest(&record.review.arguments);
+            }
+            "noncanonical" => {
+                record.review.arguments[2] = "+0003".into();
+                record.review.arguments_digest = arguments_digest(&record.review.arguments);
+            }
+            "digest" => record.review.executable_digest = "a".repeat(64),
+            "effect" => record.review.effect = "another effect".into(),
+            "credentials" => record.review.credentials[0].label = "another login".into(),
+            "legacy" => record.review.one_time = LEGACY_ONE_TIME.into(),
+            _ => panic!("unknown case"),
+        });
+        let preparer = ExecutionPreparation::default();
+        assert!(
+            f.app
+                .prepare_execution(f.app.human_owner(), &id, &preparer)
+                .is_err(),
+            "{case}"
+        );
+        assert_eq!(preparer.calls.get(), 0, "{case}");
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+    }
+}
+
+#[test]
+fn execution_rejects_binding_epoch_lock_shutdown_restart_and_deadline_equality() {
+    for case in [
+        "binding", "epoch", "owner", "locked", "shutdown", "reunlock", "deadline",
+    ] {
+        let f = fixture();
+        let id = approved(&f);
+        let mut owner = f.app.human_owner();
+        match case {
+            "binding" | "epoch" => {
+                let mut state = records(&f);
+                if case == "binding" {
+                    state["requests"][0]["direct"]["approval"]["record_digest"] =
+                        "a".repeat(64).into();
+                } else {
+                    state["lifecycle_epoch"] =
+                        (state["lifecycle_epoch"].as_u64().unwrap() + 1).into();
+                }
+                std::fs::write(
+                    f.dir.path().join("provider/provider-state.json"),
+                    serde_json::to_vec(&state).unwrap(),
+                )
+                .unwrap();
+            }
+            "owner" => owner = AuthenticatedHuman::from_peer_uid(owner.uid() + 1),
+            "locked" => f.app.lock().unwrap(),
+            "shutdown" => f.app.shutdown().unwrap(),
+            "reunlock" => {
+                f.app.lock().unwrap();
+                f.app
+                    .authenticate(SensitiveString::new("synthetic-password".into()))
+                    .unwrap();
+            }
+            "deadline" => {
+                f.wall.store(1, Ordering::SeqCst);
+                f.monotonic.store(310, Ordering::SeqCst);
+            }
+            _ => panic!("unknown case"),
+        }
+        let preparer = ExecutionPreparation::default();
+        let result = f.app.prepare_execution(owner, &id, &preparer);
+        assert!(result.is_err(), "{case}");
+        if case == "owner" {
+            assert!(matches!(result, Err(DirectRequestError::Unauthorized)));
+        }
+        assert_eq!(preparer.calls.get(), 0);
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+    }
+}
+
+#[test]
+fn execution_revalidates_authority_and_exact_binding_after_slow_preparation() {
+    for case in [
+        "request_expiry",
+        "session_expiry",
+        "closing",
+        "binding",
+        "failed_expired",
+    ] {
+        let f = if case == "session_expiry" {
+            fixture_with_lifetime(Duration::from_secs(3600))
+        } else {
+            fixture()
+        };
+        let id = approved(&f);
+        let clock = f.monotonic.clone();
+        let app = Arc::downgrade(&f.app);
+        let path = f.dir.path().join("provider/provider-state.json");
+        let preparer = ExecutionPreparation {
+            after: std::cell::RefCell::new(Some(Box::new(move || match case {
+                "request_expiry" | "failed_expired" => clock.store(310, Ordering::SeqCst),
+                "session_expiry" => clock.store(910, Ordering::SeqCst),
+                "closing" => app.upgrade().unwrap().close_admission(),
+                "binding" => {
+                    let mut state: serde_json::Value =
+                        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+                    let mut record: DirectRecord =
+                        serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
+                    record.created_at_unix_seconds -= 1;
+                    record.seal();
+                    let binding = record.approval_binding();
+                    record.approval = Some(binding.clone());
+                    for event in &mut record.audit {
+                        event.binding = binding.clone();
+                    }
+                    assert!(record.validate(
+                        &record.review.id,
+                        state["lifecycle_epoch"].as_u64().unwrap()
+                    ));
+                    state["requests"][0]["direct"] = serde_json::to_value(record).unwrap();
+                    std::fs::write(path, serde_json::to_vec(&state).unwrap()).unwrap();
+                }
+                _ => panic!("unknown case"),
+            }))),
+            fail: case == "failed_expired",
+            ..Default::default()
+        };
+        assert!(
+            f.app
+                .prepare_execution(f.app.human_owner(), &id, &preparer)
+                .is_err(),
+            "{case}"
+        );
+        assert_eq!(preparer.calls.get(), 1);
+        EXECUTION_PROBE_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_eq!(
+            preparer.dropped.load(Ordering::SeqCst),
+            usize::from(!preparer.fail)
+        );
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+    }
+}
+
+#[test]
+fn execution_rechecks_compatibility_and_each_credential_without_resolution() {
+    for phase in ["probe", "first", "second"] {
+        for outcome in [
+            "failure",
+            "ineligible",
+            "request_expiry",
+            "session_expiry",
+            "closing",
+        ] {
+            if phase == "probe" && outcome == "ineligible" {
+                continue;
+            }
+            let f = if outcome == "session_expiry" {
+                fixture_with_lifetime(Duration::from_secs(3600))
+            } else {
+                fixture()
+            };
+            let mut draft = operation_draft();
+            let mut second = draft.credentials[0].clone();
+            second.item_id = "22222222-2222-2222-2222-222222222222".into();
+            second.field_mappings[0].environment = "SECOND_PASSWORD".into();
+            draft.credentials.push(second);
+            f.app.activate_operation(draft).unwrap();
+            let id = approved(&f);
+            let clock = f.monotonic.clone();
+            let app = Arc::downgrade(&f.app);
+            let mut calls = 0;
+            let callback = Box::new(move || {
+                calls += 1;
+                if phase == "second" && calls == 1 {
+                    return Ok(true);
+                }
+                match outcome {
+                    "failure" => Err(SessionError::BackendUnavailable),
+                    "ineligible" => Ok(false),
+                    "request_expiry" => {
+                        clock.store(310, Ordering::SeqCst);
+                        Ok(true)
+                    }
+                    "session_expiry" => {
+                        clock.store(910, Ordering::SeqCst);
+                        Ok(true)
+                    }
+                    "closing" => {
+                        app.upgrade().unwrap().close_admission();
+                        Ok(true)
+                    }
+                    _ => panic!("unknown outcome"),
+                }
+            });
+            if phase == "probe" {
+                PROBE_ACTION.with(|hook| *hook.borrow_mut() = Some(callback));
+            } else {
+                ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = Some(callback));
+            }
+            let preparer = ExecutionPreparation::default();
+            let result = f.app.prepare_execution(f.app.human_owner(), &id, &preparer);
+            PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
+            ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = None);
+            assert!(result.is_err(), "{phase}/{outcome}");
+            assert_eq!(preparer.calls.get(), 1);
+            assert_eq!(preparer.dropped.load(Ordering::SeqCst), 1);
+            EXECUTION_ELIGIBILITY_CALLS.with(|calls| {
+                assert_eq!(
+                    calls.get(),
+                    match phase {
+                        "probe" => 0,
+                        "first" => 1,
+                        _ => 2,
+                    }
+                )
+            });
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+            assert_execution_quiet();
+        }
+    }
+}
+
+#[test]
+fn execution_validity_at_last_second_and_failed_preparation_are_independent() {
+    let f = fixture();
+    let id = approved(&f);
+    f.monotonic.store(309, Ordering::SeqCst);
+    f.wall.store(1, Ordering::SeqCst);
+    drop(
+        f.app
+            .prepare_execution(f.app.human_owner(), &id, &ExecutionPreparation::default())
+            .unwrap(),
+    );
+    EXECUTION_ELIGIBILITY_CALLS.with(|calls| calls.set(0));
+    let preparer = ExecutionPreparation {
+        fail: true,
+        ..Default::default()
+    };
+    assert!(
+        f.app
+            .prepare_execution(f.app.human_owner(), &id, &preparer)
+            .is_err()
+    );
+    assert_eq!(preparer.calls.get(), 1);
+    EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    assert_execution_quiet();
+}
+
+#[test]
+fn execution_preparation_rejects_actual_restart_and_changed_active_policy() {
+    let f = fixture();
+    let id = approved(&f);
+    let mut changed = operation_draft();
+    changed.targets.push("production".into());
+    f.app.activate_operation(changed).unwrap();
+    let preparer = ExecutionPreparation::default();
+    assert!(
+        f.app
+            .prepare_execution(f.app.human_owner(), &id, &preparer)
+            .is_err()
+    );
+    assert_eq!(preparer.calls.get(), 0);
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    assert_execution_quiet();
+
+    let f = fixture();
+    let id = approved(&f);
+    let owner = f.app.human_owner();
+    drop(f.app);
+    let app = ProviderApplication::new(
+        Provider::start(f.dir.path().join("provider")).unwrap(),
+        Box::new(Backend),
+        Box::new(Clock {
+            monotonic: f.monotonic,
+            wall: f.wall,
+            on_wall_read: f.on_wall_read,
+        }),
+    )
+    .unwrap();
+    app.authenticate(SensitiveString::new("synthetic-password".into()))
+        .unwrap();
+    let preparer = ExecutionPreparation::default();
+    assert!(app.prepare_execution(owner, &id, &preparer).is_err());
+    assert_eq!(preparer.calls.get(), 0);
+    assert_eq!(app.direct_status(owner, &id), Ok(DirectStatus::Expired));
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    assert_execution_quiet();
+}
+
+#[test]
+fn execution_preparation_releases_owned_bytes_when_admission_closes_on_another_thread() {
+    let f = fixture();
+    let id = approved(&f);
+    let (arrived_tx, arrived_rx) = std::sync::mpsc::channel();
+    let (continue_tx, continue_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let worker = std::thread::spawn(move || {
+        let preparer = ExecutionPreparation {
+            after: std::cell::RefCell::new(Some(Box::new(move || {
+                arrived_tx.send(()).unwrap();
+                continue_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            }))),
+            ..Default::default()
+        };
+        let result = app.prepare_execution(app.human_owner(), &id, &preparer);
+        assert_eq!(preparer.calls.get(), 1);
+        assert_eq!(preparer.dropped.load(Ordering::SeqCst), 1);
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+        result
+    });
+    arrived_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    f.app.close_admission();
+    continue_tx.send(()).unwrap();
+    assert!(matches!(
+        worker.join().unwrap(),
+        Err(DirectRequestError::Locked)
+    ));
+}
+
+#[test]
+fn execution_failed_io_still_revokes_expired_or_closed_authority_before_returning() {
+    for phase in ["prepare", "probe", "eligible"] {
+        for cause in ["request", "session", "closing"] {
+            let f = if cause == "session" {
+                fixture_with_lifetime(Duration::from_secs(3600))
+            } else {
+                fixture()
+            };
+            let id = approved(&f);
+            let clock = f.monotonic.clone();
+            let app = Arc::downgrade(&f.app);
+            let invalidate = move || match cause {
+                "request" => clock.store(310, Ordering::SeqCst),
+                "session" => clock.store(910, Ordering::SeqCst),
+                "closing" => app.upgrade().unwrap().close_admission(),
+                _ => panic!("unknown cause"),
+            };
+            let mut preparer = ExecutionPreparation::default();
+            if phase == "prepare" {
+                preparer.fail = true;
+                *preparer.after.borrow_mut() = Some(Box::new(invalidate));
+            } else {
+                let callback = Box::new(move || {
+                    invalidate();
+                    Err(SessionError::BackendUnavailable)
+                });
+                if phase == "probe" {
+                    PROBE_ACTION.with(|hook| *hook.borrow_mut() = Some(callback));
+                } else {
+                    ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = Some(callback));
+                }
+            }
+            let result = f.app.prepare_execution(f.app.human_owner(), &id, &preparer);
+            PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
+            ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = None);
+            let expected = if cause == "request" {
+                DirectRequestError::AlreadyDecided
+            } else {
+                DirectRequestError::Locked
+            };
+            assert!(
+                matches!(result, Err(error) if error == expected),
+                "{phase}/{cause}"
+            );
+            // Inspect persisted bytes and backend cleanup directly: calling status
+            // here would itself revoke authority and mask the missing post-check.
+            assert_eq!(
+                records(&f)["requests"][0]["status"],
+                "invalidated",
+                "{phase}/{cause}"
+            );
+            EXECUTION_CLEAR_CALLS.with(|calls| {
+                assert_eq!(
+                    calls.get(),
+                    usize::from(cause != "request"),
+                    "{phase}/{cause}"
+                )
+            });
+            EXECUTION_PROBE_CALLS
+                .with(|calls| assert_eq!(calls.get(), usize::from(phase != "prepare")));
+            EXECUTION_ELIGIBILITY_CALLS
+                .with(|calls| assert_eq!(calls.get(), usize::from(phase == "eligible")));
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+            assert_execution_quiet();
+            assert_eq!(
+                preparer.dropped.load(Ordering::SeqCst),
+                usize::from(phase != "prepare")
+            );
+        }
+    }
+}
+
+#[test]
+fn execution_legacy_approval_has_a_stable_closed_rejection_category() {
+    for has_binding in [false, true] {
+        let f = fixture();
+        let id = approved(&f);
+        write_execution_record(&f, |record| {
+            record.review.one_time = LEGACY_ONE_TIME.into();
+            if !has_binding {
+                record.approval = None;
+            }
+        });
+        let preparer = ExecutionPreparation::default();
+        assert!(matches!(
+            f.app.prepare_execution(f.app.human_owner(), &id, &preparer),
+            Err(DirectRequestError::Unavailable)
+        ));
+        assert_eq!(preparer.calls.get(), 0);
+        EXECUTION_PROBE_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+    }
+}
+
+#[test]
+fn execution_durable_validation_work_is_independent_of_credential_count() {
+    use sha2::{Digest, Sha256};
+    const IMAGE_BYTES: usize = 2 * 1024 * 1024;
+    for credentials in [1, 8] {
+        let f = fixture();
+        let path = f.dir.path().join("approved-image");
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes.resize(IMAGE_BYTES, 0);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o500)).unwrap();
+        let image = ApprovedImage::new(
+            "deploy-image".into(),
+            f.dir.path().to_str().unwrap().into(),
+            path.to_str().unwrap().into(),
+            Sha256::digest(&bytes)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect(),
+            ExecutionProfile::ReviewedSelfContainedElf64V1,
+        )
+        .unwrap();
+        let mut state = records(&f);
+        state["approved_images"] = serde_json::json!([image]);
+        state["operations"] = serde_json::json!([]);
+        std::fs::write(
+            f.dir.path().join("provider/provider-state.json"),
+            serde_json::to_vec(&state).unwrap(),
+        )
+        .unwrap();
+        let mut draft = operation_draft();
+        draft.credentials = (1..=credentials)
+            .map(|index| {
+                let mut login = draft.credentials[0].clone();
+                login.item_id = format!("{index:08}-1111-1111-1111-111111111111");
+                login.field_mappings[0].environment = format!("PASSWORD_{index}");
+                login
+            })
+            .collect();
+        f.app.activate_operation(draft).unwrap();
+        let id = approved(&f);
+        super::provider_store::TEST_STATE_READS.with(|count| count.set(0));
+        TEST_IMAGE_HASH_BYTES.with(|count| count.set(0));
+        let preparer = ExecutionPreparation::default();
+        drop(
+            f.app
+                .prepare_execution(f.app.human_owner(), &id, &preparer)
+                .unwrap(),
+        );
+        super::provider_store::TEST_STATE_READS.with(|count| assert_eq!(count.get(), 3));
+        // Existing policy deserialization/rebuilding plus registry validation
+        // hash five image copies per read. Observe actual hash input separately
+        // from read calls: three boundaries, unchanged for eight credentials.
+        TEST_IMAGE_HASH_BYTES.with(|count| assert_eq!(count.get(), 15 * IMAGE_BYTES as u64));
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), credentials));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+        assert_eq!(preparer.dropped.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+fn execution_failed_durable_reads_still_clear_invalidated_authority() {
+    use super::provider_store::READ_TEST_HOOK;
+    for boundary in 0..=3 {
+        for cause in ["session", "closing"] {
+            let f = if boundary == 0 {
+                fixture()
+            } else {
+                fixture_with_lifetime(Duration::from_secs(3600))
+            };
+            let id = approved(&f);
+            if boundary == 0 {
+                // Fail the durable expiry read, before an approved-record read.
+                f.monotonic.store(310, Ordering::SeqCst);
+            }
+            let clock = f.monotonic.clone();
+            let app = Arc::downgrade(&f.app);
+            let mut reads = 0;
+            READ_TEST_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    reads += 1;
+                    if reads != boundary.max(1) {
+                        return false;
+                    }
+                    if cause == "session" {
+                        clock.store(910, Ordering::SeqCst);
+                    } else {
+                        app.upgrade().unwrap().close_admission();
+                    }
+                    true
+                }));
+            });
+            let preparer = ExecutionPreparation::default();
+            let result = f.app.prepare_execution(f.app.human_owner(), &id, &preparer);
+            READ_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+            assert!(
+                matches!(result, Err(DirectRequestError::Locked)),
+                "{boundary}/{cause}"
+            );
+            EXECUTION_CLEAR_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+            assert_eq!(
+                preparer.dropped.load(Ordering::SeqCst),
+                usize::from(boundary > 1)
+            );
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+            assert_execution_quiet();
+            assert_eq!(records(&f)["requests"][0]["status"], "invalidated");
+        }
+    }
+}
+
+#[test]
+fn execution_failed_request_expiry_write_still_clears_invalidated_authority() {
+    use super::provider_store::WRITE_TEST_HOOK;
+    for phase in ["initial", "prepared", "backend"] {
+        for cause in ["session", "closing"] {
+            let f = fixture();
+            let id = approved(&f);
+            let clock = f.monotonic.clone();
+            let mut preparer = ExecutionPreparation::default();
+            match phase {
+                "initial" => clock.store(310, Ordering::SeqCst),
+                "prepared" => {
+                    preparer.after = std::cell::RefCell::new(Some(Box::new(move || {
+                        clock.store(310, Ordering::SeqCst);
+                    })));
+                }
+                "backend" => PROBE_ACTION.with(|hook| {
+                    *hook.borrow_mut() = Some(Box::new(move || {
+                        clock.store(310, Ordering::SeqCst);
+                        Ok(true)
+                    }));
+                }),
+                _ => panic!("unknown expiry phase"),
+            }
+            let clock = f.monotonic.clone();
+            let app = Arc::downgrade(&f.app);
+            let mut failed = false;
+            WRITE_TEST_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move |_| {
+                    if failed {
+                        return false;
+                    }
+                    failed = true;
+                    if cause == "session" {
+                        clock.store(910, Ordering::SeqCst);
+                    } else {
+                        app.upgrade().unwrap().close_admission();
+                    }
+                    true
+                }));
+            });
+            let result = f.app.prepare_execution(f.app.human_owner(), &id, &preparer);
+            WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+            PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
+            assert!(
+                matches!(result, Err(DirectRequestError::Locked)),
+                "{phase}/{cause}"
+            );
+            EXECUTION_CLEAR_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+            assert_eq!(
+                preparer.dropped.load(Ordering::SeqCst),
+                usize::from(phase != "initial")
+            );
+            EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+            assert_execution_quiet();
+            assert_eq!(records(&f)["requests"][0]["status"], "invalidated");
+        }
+    }
+}
+
+#[test]
+fn execution_final_durable_validation_rejects_edits_during_backend_work() {
+    for edit in ["binding", "policy", "state"] {
+        let f = fixture();
+        let id = approved(&f);
+        let original = records(&f);
+        match edit {
+            "binding" => write_execution_record(&f, |record| record.created_at_unix_seconds -= 1),
+            "state" => {
+                write_execution_record(&f, |record| record.review.status = DirectStatus::Denied)
+            }
+            "policy" => {
+                let mut draft = operation_draft();
+                draft.targets.push("production".into());
+                f.app.activate_operation(draft).unwrap();
+                let updated = records(&f);
+                assert_ne!(updated["operations"][0], original["operations"][0]);
+                assert_eq!(updated["requests"], original["requests"]);
+            }
+            _ => panic!("unknown durable edit"),
+        }
+        let path = f.dir.path().join("provider/provider-state.json");
+        let edited = std::fs::read(&path).unwrap();
+        std::fs::write(&path, serde_json::to_vec(&original).unwrap()).unwrap();
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| calls.set(0));
+        ELIGIBILITY_ACTION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                std::fs::write(&path, &edited).unwrap();
+                Ok(true)
+            }));
+        });
+        let preparer = ExecutionPreparation::default();
+        let result = f.app.prepare_execution(f.app.human_owner(), &id, &preparer);
+        ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = None);
+        let expected = match edit {
+            "policy" => DirectRequestError::StaleRevision,
+            "state" => DirectRequestError::AlreadyDecided,
+            _ => DirectRequestError::InvalidRequest,
+        };
+        assert!(matches!(result, Err(error) if error == expected), "{edit}");
+        EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
+        assert_eq!(preparer.dropped.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn execution_application_integrates_real_owned_linux_preparation() {
+    struct RealPreparation {
+        dropped: Arc<AtomicUsize>,
+        after: Option<Arc<ProviderApplication>>,
+    }
+    struct RealPrepared {
+        _image: crate::adapters::execution::PreparedExecutable,
+        dropped: Arc<AtomicUsize>,
+    }
+    impl Drop for RealPrepared {
+        fn drop(&mut self) {
+            self.dropped.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    impl ProtectedExecution for RealPreparation {
+        type Prepared = RealPrepared;
+        fn prepare(
+            &self,
+            image: ExecutionImage<'_>,
+            argv: Vec<String>,
+        ) -> Result<RealPrepared, ExecutionError> {
+            let image = crate::adapters::execution::LinuxExecutablePreparer.prepare(image, argv)?;
+            if let Some(app) = &self.after {
+                app.close_admission();
+            }
+            Ok(RealPrepared {
+                _image: image,
+                dropped: self.dropped.clone(),
+            })
+        }
+    }
+    for close in [false, true] {
+        let f = fixture();
+        let id = approved(&f);
+        let preparer = RealPreparation {
+            dropped: Arc::new(AtomicUsize::new(0)),
+            after: close.then(|| f.app.clone()),
+        };
+        let result = f.app.prepare_execution(f.app.human_owner(), &id, &preparer);
+        assert_eq!(result.is_ok(), !close);
+        drop(result);
+        assert_eq!(preparer.dropped.load(Ordering::SeqCst), 1);
+        EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+        assert_execution_quiet();
     }
 }

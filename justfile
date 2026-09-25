@@ -3,24 +3,24 @@ check:
     cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery
     cargo audit
     cargo deny check all
-    cargo test
+    ./scripts/with-secure-test-tmpdir.sh cargo test
 
 test:
     #!/usr/bin/env bash
     set -euo pipefail
     if cargo nextest --version >/dev/null 2>&1; then
-      cargo nextest run --no-fail-fast
+      ./scripts/with-secure-test-tmpdir.sh cargo nextest run --no-fail-fast
     else
-      cargo test
+      ./scripts/with-secure-test-tmpdir.sh cargo test
     fi
 
 coverage:
     #!/usr/bin/env bash
     set -euo pipefail
     RUN_ROOT="${RUN_ROOT:-$(mktemp -d /tmp/vaultwarden-cli-tarpaulin.XXXXXX)}"
-    mkdir -p "$RUN_ROOT/tmp" "$RUN_ROOT/target" "$RUN_ROOT/out"
+    mkdir -p "$RUN_ROOT/target" "$RUN_ROOT/out"
     echo "coverage run root: $RUN_ROOT"
-    TMPDIR="$RUN_ROOT/tmp" cargo tarpaulin --all-targets --no-fail-fast --target-dir "$RUN_ROOT/target" --output-dir "$RUN_ROOT/out" --out Json Stdout --timeout 120
+    ./scripts/with-secure-test-tmpdir.sh cargo tarpaulin --all-targets --no-fail-fast --target-dir "$RUN_ROOT/target" --output-dir "$RUN_ROOT/out" --out Json Stdout --timeout 120
     test -s "$RUN_ROOT/out/tarpaulin-report.json"
     echo "coverage report: $RUN_ROOT/out/tarpaulin-report.json"
 
@@ -46,7 +46,7 @@ pre-commit:
     cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery
     cargo audit
     cargo deny check all
-    cargo test
+    ./scripts/with-secure-test-tmpdir.sh cargo test
     ./scripts/scan-staged-secrets.sh
 
 release *args:

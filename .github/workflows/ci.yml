@@ -53,11 +53,11 @@ jobs:
       - name: Print Cargo Version
         run: cargo -V
       - name: Default features
-        run: cargo test --workspace
+        run: ./scripts/with-secure-test-tmpdir.sh cargo test --workspace
       - name: All features
-        run: cargo test --workspace --all-features
+        run: ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-features
       - name: No-default features
-        run: cargo test --workspace --no-default-features
+        run: ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --no-default-features
 
   build:
     name: Build (${{ matrix.target }})
@@ -122,7 +122,7 @@ jobs:
         id: tarpaulin
         continue-on-error: true
         if: steps.install-tarpaulin.outcome == 'success'
-        run: cargo tarpaulin --workspace --all-features --skip-clean --out Json --output-dir tarpaulin-report
+        run: ./scripts/with-secure-test-tmpdir.sh cargo tarpaulin --workspace --all-features --skip-clean --out Json --output-dir tarpaulin-report
 
       - name: Build coverage comment body
         id: coverage

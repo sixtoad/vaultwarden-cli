@@ -1,0 +1,11 @@
+{
+  "required_environment_present": {
+    "VAULTWARDEN_LIVE_TEST_URL": false,
+    "VAULTWARDEN_LIVE_ADMIN_TOKEN": false
+  },
+  "environment_values_recorded": false,
+  "target": "tests/live_tests.rs",
+  "reported_passes": 71,
+  "executed_live_account_tests": 0,
+  "evidence": "tests/live/env.rs:118-119 returns None without the two account environment variables; all 71 tests return early. Final stable live suite elapsed 0.01s; Rust 1.88 elapsed 0.01s. No live account execution claimed."
+}

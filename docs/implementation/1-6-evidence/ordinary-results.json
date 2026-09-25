@@ -1,0 +1,106 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-exact-protected-executable",
+      "env_overrides": {
+        "TMPDIR": "/home/sixtocantolla/.vw-story16-tests.LGlAXW",
+        "CARGO_TERM_COLOR": "never",
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-refinement-target"
+      },
+      "log": "/tmp/vw-story16-review2-final-verification/stable-0.log",
+      "exit_code": 0,
+      "elapsed_seconds": 2.736
+    },
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-exact-protected-executable",
+      "env_overrides": {
+        "TMPDIR": "/home/sixtocantolla/.vw-story16-tests.LGlAXW",
+        "CARGO_TERM_COLOR": "never",
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-refinement-target"
+      },
+      "log": "/tmp/vw-story16-review2-final-verification/stable-1.log",
+      "exit_code": 0,
+      "elapsed_seconds": 197.186
+    },
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-exact-protected-executable",
+      "env_overrides": {
+        "TMPDIR": "/home/sixtocantolla/.vw-story16-tests.LGlAXW",
+        "CARGO_TERM_COLOR": "never",
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-refinement-target"
+      },
+      "log": "/tmp/vw-story16-review2-final-verification/stable-2.log",
+      "exit_code": 0,
+      "elapsed_seconds": 5.68
+    },
+    {
+      "argv": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "rustup",
+        "run",
+        "1.88.0",
+        "cargo",
+        "test",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-exact-protected-executable",
+      "env_overrides": {
+        "TMPDIR": "/home/sixtocantolla/.vw-story16-tests.LGlAXW",
+        "CARGO_TERM_COLOR": "never",
+        "RUSTUP_HOME": "/tmp/vw-story16-rustup",
+        "CARGO_TARGET_DIR": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-exact-protected-executable/target/msrv188"
+      },
+      "log": "/tmp/vw-story16-review2-final-verification/msrv-0.log",
+      "exit_code": 0,
+      "elapsed_seconds": 111.804
+    }
+  ],
+  "counts": {
+    "reported_passes_per_toolchain": 774,
+    "non_live_tests_executed_per_toolchain": 703,
+    "live_account_early_returns_per_toolchain": 71,
+    "suites_per_toolchain": 15,
+    "library_passes_per_toolchain": 518,
+    "library_ignored_entries_per_toolchain": 9,
+    "ignored_fixtures_invoked_by_passing_parents": 8,
+    "ignored_browser_not_run": 1,
+    "benchmark_smoke_checks_per_toolchain": 13
+  },
+  "source_unchanged_during_runs": true,
+  "prior_failed_attempt": {
+    "archive": "review2-msrv-first-attempt/",
+    "exit_code": 101,
+    "elapsed_seconds": 159.115,
+    "failure": "Existing fixed_system_launcher_uses_only_an_isolated_desktop_association: isolated child returned ReviewUnavailable at its two-second timeout while stable and MSRV ran concurrently. Full MSRV rerun alone passed without source changes; timeout under load is an inference, not proof of cause."
+  }
+}

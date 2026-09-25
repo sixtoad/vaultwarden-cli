@@ -1,0 +1,756 @@
+[
+  {
+    "name": "src/access/policy.rs:181:9: replace OperationPolicy::from_draft -> Result<Self, PolicyValidationError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__policy.rs_line_181_col_9.log",
+    "diff_path": "diff/src__access__policy.rs_line_181_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.144371088,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/policy.rs:223:9: replace OperationPolicy::execution_image -> super::ports::ExecutionImage<'_> with Default::default()",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__policy.rs_line_223_col_9.log",
+    "diff_path": "diff/src__access__policy.rs_line_223_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.779746952,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `ports::ExecutionImage<'_>: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/policy.rs:357:9: replace <impl TryFrom<StoredOperationPolicy> for OperationPolicy>::try_from -> Result<Self, Self::Error> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__policy.rs_line_357_col_9.log",
+    "diff_path": "diff/src__access__policy.rs_line_357_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.697613302,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/policy.rs:482:5: replace nonsymlink_regular -> Option<fs::Metadata> with Some(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__policy.rs_line_482_col_5_001.log",
+    "diff_path": "diff/src__access__policy.rs_line_482_col_5_001.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.947718304,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `Metadata: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error; 1 warning emitted"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/provider.rs:285:9: replace Provider::approved_execution -> Result<(super::direct_request::ApprovalBinding, OperationPolicy, Vec<String>,), super::direct_request::DirectRequestError, > with Ok((Default::default(), Default::default(), vec![]))",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__provider.rs_line_285_col_9.log",
+    "diff_path": "diff/src__access__provider.rs_line_285_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 13.03428297,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied",
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/provider.rs:285:9: replace Provider::approved_execution -> Result<(super::direct_request::ApprovalBinding, OperationPolicy, Vec<String>,), super::direct_request::DirectRequestError, > with Ok((Default::default(), Default::default(), vec![String::new()]))",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__provider.rs_line_285_col_9_001.log",
+    "diff_path": "diff/src__access__provider.rs_line_285_col_9_001.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 9.176847539,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied",
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/provider.rs:285:9: replace Provider::approved_execution -> Result<(super::direct_request::ApprovalBinding, OperationPolicy, Vec<String>,), super::direct_request::DirectRequestError, > with Ok((Default::default(), Default::default(), vec![\"xyzzy\".into()]))",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__access__provider.rs_line_285_col_9_002.log",
+    "diff_path": "diff/src__access__provider.rs_line_285_col_9_002.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 9.118886581,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied",
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:17:33: replace * with /",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_17_col_33_001.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_17_col_33_001.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 6.988431902,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error: this arithmetic operation will overflow",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:41:9: replace <impl ProtectedExecution for LinuxExecutablePreparer>::prepare -> Result<PreparedExecutable, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_41_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_41_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 4.896800311,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `execution::PreparedExecutable: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:87:9: replace PreparedExecutable::execute -> Result<std::convert::Infallible, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_87_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_87_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 8.151427134,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `Infallible: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:125:9: replace linux::open_at -> Result<File, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_125_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_125_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 5.347908273,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `std::fs::File: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:152:9: replace linux::components -> Result<Vec<&std::ffi::OsStr>, ExecutionError> with Ok(vec![Box::leak(Box::new(Default::default()))])",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_152_col_9_001.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_152_col_9_001.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 17.737087464,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `std::ffi::OsStr: Default` is not satisfied",
+      "error[E0277]: the size for values of type `[u8]` cannot be known at compilation time",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors; 1 warning emitted"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:176:9: replace linux::open_source -> Result<File, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_176_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_176_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.653982592,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `std::fs::File: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:214:9: replace linux::open_relative -> Result<File, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_214_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_214_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.310041377,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `std::fs::File: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:241:9: replace linux::source_metadata -> Result<Metadata, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_241_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_241_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 6.814324709,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `Metadata: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:275:9: replace linux::snapshot -> Result<PreparedExecutable, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_275_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_275_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 6.612011351,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `execution::PreparedExecutable: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/adapters/execution.rs:355:9: replace linux::execute_fd -> Result<std::convert::Infallible, ExecutionError> with Ok(Default::default())",
+    "initial_outcome": "Unviable",
+    "campaign": "initial-generated",
+    "log_path": "log/src__adapters__execution.rs_line_355_col_9.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_355_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 6.779275421,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `Infallible: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ],
+    "retained_after_review1": true
+  },
+  {
+    "name": "src/access/application.rs:286:9: replace ProviderApplication::prepare_execution -> Result<P::Prepared, DirectRequestError> with Ok(Default::default())",
+    "campaign": "review1-generated",
+    "initial_outcome": "Unviable",
+    "log_path": "log/src__access__application.rs_line_286_col_9.log",
+    "diff_path": "diff/src__access__application.rs_line_286_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 11.553370722,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `<P as ports::ProtectedExecution>::Prepared: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ]
+  },
+  {
+    "name": "src/access/application.rs:324:9: replace ProviderApplication::execution_authority -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError> with Ok((Default::default(), Default::default(), vec![]))",
+    "campaign": "review1-generated",
+    "initial_outcome": "Unviable",
+    "log_path": "log/src__access__application.rs_line_324_col_9.log",
+    "diff_path": "diff/src__access__application.rs_line_324_col_9.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 13.97968822,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied",
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors"
+    ]
+  },
+  {
+    "name": "src/access/application.rs:324:9: replace ProviderApplication::execution_authority -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError> with Ok((Default::default(), Default::default(), vec![String::new()]))",
+    "campaign": "review1-generated",
+    "initial_outcome": "Unviable",
+    "log_path": "log/src__access__application.rs_line_324_col_9_001.log",
+    "diff_path": "diff/src__access__application.rs_line_324_col_9_001.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 12.128568046,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied",
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors"
+    ]
+  },
+  {
+    "name": "src/access/application.rs:324:9: replace ProviderApplication::execution_authority -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError> with Ok((Default::default(), Default::default(), vec![\"xyzzy\".into()]))",
+    "campaign": "review1-infrastructure-rerun",
+    "initial_outcome": "Timeout",
+    "log_path": "log/src__access__application.rs_line_324_col_9_002.log",
+    "diff_path": "diff/src__access__application.rs_line_324_col_9_002.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 600.202953623,
+        "process_status": "Timeout",
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "build": {
+      "argv": [
+        "cargo",
+        "test",
+        "--lib",
+        "--no-run",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/tmp/vw-story16-review1-manual-final/workspace",
+      "exit_code": 101,
+      "elapsed_seconds": 9.037,
+      "log": "/tmp/vw-story16-review1-infrastructure-final/infrastructure_rerun_2/build.log",
+      "env_overrides": {
+        "TMPDIR": "/home/sixtocantolla/.vw-story16-tests.LGlAXW",
+        "CARGO_TARGET_DIR": "/tmp/vw-story16-review1-manual-final/target",
+        "CARGO_TERM_COLOR": "never"
+      }
+    },
+    "compiler_errors": [
+      "error[E0277]: the trait bound `direct_request::ApprovalBinding: Default` is not satisfied",
+      "error[E0277]: the trait bound `policy::OperationPolicy: Default` is not satisfied",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors"
+    ]
+  },
+  {
+    "name": "src/adapters/execution.rs:499:34: replace >= with < in linux::validate_elf_for_page_size",
+    "campaign": "review1-generated",
+    "initial_outcome": "Unviable",
+    "log_path": "log/src__adapters__execution.rs_line_499_col_34.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_499_col_34.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 4.649857257,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error: `<` is interpreted as a start of generic arguments for `u64`, not a comparison",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ]
+  },
+  {
+    "name": "src/adapters/execution.rs:516:42: replace >= with < in linux::validate_elf_for_page_size",
+    "campaign": "review1-generated",
+    "initial_outcome": "Unviable",
+    "log_path": "log/src__adapters__execution.rs_line_516_col_42.log",
+    "diff_path": "diff/src__adapters__execution.rs_line_516_col_42.diff",
+    "phase_results": [
+      {
+        "phase": "Build",
+        "duration": 7.453547773,
+        "process_status": {
+          "Failure": 101
+        },
+        "argv": [
+          "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--verbose",
+          "--package=vaultwarden-cli@0.5.4",
+          "--lib",
+          "--locked",
+          "--offline"
+        ]
+      }
+    ],
+    "classification": "compiler-rejected",
+    "compiler_errors": [
+      "error: `<` is interpreted as a start of generic arguments for `u64`, not a comparison",
+      "error: could not compile `vaultwarden-cli` (lib test) due to 1 previous error"
+    ]
+  }
+]

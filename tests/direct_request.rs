@@ -76,19 +76,18 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
     app.authenticate(SensitiveString::new("synthetic-password".into()))
         .unwrap();
     let image = dir.path().join("image");
-    let bytes = std::fs::read("/usr/bin/true").unwrap();
-    std::fs::write(&image, &bytes).unwrap();
-    std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let bytes: &[u8] = b"\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00\x01\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x01\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x78\x00\x00\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\xb8\x3c\x00\x00\x00\xbf\x00\x00\x00\x00\x0f\x05";
+    std::fs::write(&image, bytes).unwrap();
+    std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o500)).unwrap();
     use sha2::Digest;
-    let digest: String = sha2::Sha256::digest(&bytes)
+    let digest: String = sha2::Sha256::digest(bytes)
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
     let state_path = root.join("provider-state.json");
     let mut state: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&state_path).unwrap()).unwrap();
-    state["approved_images"] =
-        serde_json::json!([{"id":"test-image","path":image,"sha256":digest}]);
+    state["approved_images"] = serde_json::json!([{"id":"test-image","execution_root":dir.path(),"path":image,"sha256":digest,"profile":"reviewed_self_contained_elf64_v1"}]);
     std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
     let revision = app
         .activate_operation(OperationPolicyDraft {
