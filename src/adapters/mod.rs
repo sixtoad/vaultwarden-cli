@@ -5,6 +5,7 @@ pub(crate) mod execution;
 pub mod human_socket;
 pub mod loopback_ui;
 pub mod session;
+pub(crate) mod supervisor;
 pub mod vaultwarden;
 
 #[cfg(test)]

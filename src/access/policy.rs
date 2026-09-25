@@ -235,6 +235,7 @@ impl OperationPolicy {
                 .iter()
                 .map(|mapping| mapping.field.clone())
                 .collect(),
+            mappings: &credential.field_mappings,
         })
     }
     pub(crate) fn validates_args(&self, values: &[String]) -> bool {
@@ -337,6 +338,8 @@ impl OperationPolicy {
 pub(crate) struct LoginBindingRef<'a> {
     pub(crate) item_id: &'a str,
     pub(crate) required_fields: Vec<LoginField>,
+    #[allow(dead_code)] // Consumed by supervised dispatch in Story 1.7.
+    pub(crate) mappings: &'a [LoginFieldMapping],
 }
 
 #[derive(Deserialize)]
@@ -576,9 +579,13 @@ fn valid_environment(value: &str) -> bool {
         })
         && !value.starts_with("LD_")
         && !value.starts_with("DYLD_")
+        && !value.starts_with("VAULTWARDEN_")
+        && !value.starts_with("BITWARDEN_")
         && !matches!(
             value,
             "PATH"
+                | "LANG"
+                | "LC_ALL"
                 | "IFS"
                 | "ENV"
                 | "BASH_ENV"
@@ -1286,6 +1293,10 @@ mod tests {
             "LD_PRELOAD",
             "LD_LIBRARY_PATH",
             "LD_AUDIT",
+            "LANG",
+            "LC_ALL",
+            "VAULTWARDEN_TOKEN",
+            "BITWARDEN_SESSION",
         ] {
             assert!(!valid_environment(environment));
         }
