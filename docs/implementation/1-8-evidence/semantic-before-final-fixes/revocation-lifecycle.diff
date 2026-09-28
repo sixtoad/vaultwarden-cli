@@ -1,0 +1,11 @@
+--- src/access/provider_store.rs
++++ src/access/provider_store.rs
+@@ -342,7 +342,7 @@
+             .ok_or_else(|| error(ProviderDiagnostic::PersistenceFailure))?;
+         for request in &mut state.requests {
+             if request.status.is_unexecuted() {
+-                if !recovered
++                if false
+                     && request.direct.as_ref().is_some_and(|d| {
+                         d.execution_claimed || request.status == RequestLifecycleStatus::Running
+                     })

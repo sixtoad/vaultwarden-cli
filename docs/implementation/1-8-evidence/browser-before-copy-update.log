@@ -1,0 +1,19 @@
+COMMAND ["env", "VW_UI_DEPS=/tmp/vw-story14-browser/node_modules", "CERTUTIL=/tmp/vw-story13-nss/extracted/usr/bin/certutil", "node", "tests/ui/direct-request.mjs"]
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /execution has not started/. Input:
+
+'Request status: approved; approved once; awaiting protected execution'
+
+    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/tests/ui/direct-request.mjs:118:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'Request status: approved; approved once; awaiting protected execution',
+  expected: /execution has not started/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v26.3.1

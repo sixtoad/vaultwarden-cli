@@ -1,0 +1,3 @@
+COMMAND ["cargo", "clippy", "--all-targets", "--all-features", "--offline", "--locked", "--", "-D", "warnings"]
+    Checking vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.88s

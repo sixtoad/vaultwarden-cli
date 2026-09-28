@@ -1,0 +1,25 @@
+--- src/adapters/supervisor/manager.rs
++++ replace belongs -> bool with true
+@@ -576,21 +576,17 @@
+ }
+ fn valid_cgroup(path: &str) -> bool {
+     path.starts_with('/')
+         && path.len() < 2048
+         && !path.split('/').any(|s| matches!(s, "." | ".."))
+         && !path.chars().any(char::is_control)
+ }
+ fn belongs(observed: &str, cgroup: &str) -> bool {
+-    let observed = observed.strip_suffix(" (deleted)").unwrap_or(observed);
+-    observed == cgroup
+-        || observed
+-            .strip_prefix(cgroup)
+-            .is_some_and(|suffix| suffix.starts_with('/'))
++    true /* ~ changed by cargo-mutants ~ */
+ }
+ fn start_time(stat: &str) -> Option<&str> {
+     stat.rsplit_once(") ")?.1.split_whitespace().nth(19)
+ }
+ pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {
+     if !valid_cgroup(cgroup) {
+         return Err(ExecutionError::CleanupUncertain);
+     }

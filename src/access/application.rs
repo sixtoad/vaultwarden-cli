@@ -2,11 +2,16 @@
 use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider::Provider};
 use std::{
     sync::{
-        Mutex,
+        Arc, Condvar, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
+
+#[cfg(test)]
+type CleanupWaitHook = std::cell::RefCell<Option<Box<dyn FnOnce()>>>;
+#[cfg(test)]
+thread_local! { static CLEANUP_WAIT_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
 
 pub const MAX_SESSION: Duration = Duration::from_secs(15 * 60);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,6 +36,84 @@ pub struct ProviderApplication {
     revocation_epoch: AtomicU64,
     request_lifetime: Duration,
     owner: AuthenticatedHuman,
+    release_gate: Mutex<()>,
+    executions: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+    reaped: Condvar,
+    cleanup_uncertain: AtomicBool,
+}
+struct ApplicationExecution<'a> {
+    app: &'a ProviderApplication,
+    owner: AuthenticatedHuman,
+    binding: &'a ApprovalBinding,
+    epoch: u64,
+    deadline: Duration,
+    cancel: Arc<AtomicBool>,
+}
+impl ApplicationExecution<'_> {
+    fn live_fast(&self) -> bool {
+        !self.cancel.load(Ordering::Acquire)
+            && !self.app.closing.load(Ordering::Acquire)
+            && self.app.revocation_epoch.load(Ordering::Acquire) == self.epoch
+            && self.app.clock.now() < self.deadline
+    }
+}
+impl ExecutionControl for ApplicationExecution<'_> {
+    fn live(&self) -> bool {
+        if !self.live_fast() {
+            return false;
+        }
+        match self.app.gate.lock() {
+            Ok(authority) => authority
+                .provider
+                .execution_matches(self.binding)
+                .unwrap_or(false),
+            Err(_) => false,
+        }
+    }
+    fn remaining(&self) -> Duration {
+        self.deadline.saturating_sub(self.app.clock.now())
+    }
+    fn release(
+        &self,
+        action: &mut dyn FnMut() -> Result<(), ExecutionError>,
+    ) -> Result<(), ExecutionError> {
+        let mut authority = self
+            .app
+            .gate
+            .lock()
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        self.app
+            .execution_authority_current(
+                &mut authority,
+                self.owner,
+                &self.binding.request_id,
+                Some(self.binding),
+                self.epoch,
+            )
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        let _release = self
+            .app
+            .release_gate
+            .lock()
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        if !self.live_fast() {
+            return Err(ExecutionError::Cancelled);
+        }
+        action()
+    }
+    fn started(&self) -> Result<(), ExecutionError> {
+        let result = self
+            .app
+            .gate
+            .lock()
+            .map_err(|_error| ExecutionError::ExecutionFailed)?
+            .provider
+            .execution_started(self.binding);
+        if result.is_err() {
+            self.app.close_admission();
+        }
+        result.map_err(|_error| ExecutionError::ExecutionFailed)
+    }
 }
 impl ProviderApplication {
     pub fn new(
@@ -64,6 +147,10 @@ impl ProviderApplication {
             revocation_epoch: AtomicU64::new(0),
             request_lifetime,
             owner,
+            release_gate: Mutex::new(()),
+            executions: Mutex::new(std::collections::HashMap::new()),
+            reaped: Condvar::new(),
+            cleanup_uncertain: AtomicBool::new(false),
         };
         app.lock()?;
         Ok(app)
@@ -100,21 +187,120 @@ impl ProviderApplication {
         }
     }
     pub fn lock(&self) -> Result<(), SessionError> {
-        self.revocation_epoch.fetch_add(1, Ordering::AcqRel);
-        let mut authority = self
-            .gate
-            .lock()
-            .map_err(|_error| SessionError::CleanupFailed)?;
-        Self::revoke(&mut authority)
+        {
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| SessionError::CleanupFailed)?;
+            self.revocation_epoch.fetch_add(1, Ordering::AcqRel);
+        }
+        let result = {
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| SessionError::CleanupFailed)?;
+            Self::revoke(&mut authority)
+        };
+        self.await_cleanup(None)?;
+        result
     }
-    /// Irreversible admission closure for transport failure and process shutdown.
     pub fn shutdown(&self) -> Result<(), SessionError> {
         self.close_admission();
         self.lock()
     }
-    /// Publish irreversible closure without waiting for an in-flight backend call.
     pub fn close_admission(&self) {
+        // A release already linearized before this lock is stopped by its monitor.
+        let _release = self.release_gate.lock().unwrap_or_else(|e| e.into_inner());
         self.closing.store(true, Ordering::Release);
+    }
+    fn await_cleanup(&self, id: Option<&str>) -> Result<(), SessionError> {
+        let active = self
+            .executions
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        let (active, wait) = self
+            .reaped
+            .wait_timeout_while(active, Duration::from_secs(20), |active| {
+                id.map_or(!active.is_empty(), |id| active.contains_key(id))
+            })
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        let uncertain = wait.timed_out()
+            && id.map_or(!active.is_empty(), |id| active.contains_key(id))
+            || self.cleanup_uncertain.load(Ordering::Acquire);
+        // Cancellation acquires release_gate before executions; never invert it.
+        drop(active);
+        #[cfg(test)]
+        CLEANUP_WAIT_HOOK.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe();
+            }
+        });
+        if uncertain {
+            self.close_admission();
+            return Err(SessionError::CleanupFailed);
+        }
+        Ok(())
+    }
+    /// Lifecycle hook for an authenticated request transport, separate from UI authentication cancellation.
+    pub fn cancel_execution(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<(), DirectRequestError> {
+        self.check_owner(owner)?;
+        {
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let active = self
+                .executions
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if let Some(cancel) = active.get(id) {
+                cancel.store(true, Ordering::Release);
+                drop(active);
+                drop(_release);
+                return self.await_cleanup(Some(id)).map_err(Into::into);
+            }
+        }
+        // Claim holds authority through registration. Recheck after acquiring it:
+        // either claim won and we cancel active work, or the durable approval is
+        // invalidated before a queued worker can claim it. Match release's lock
+        // order; never wait for authority while retaining release_gate.
+        let result = {
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let active = self
+                .executions
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if let Some(cancel) = active.get(id) {
+                cancel.store(true, Ordering::Release);
+                Ok(())
+            } else {
+                authority.provider.cancel_unclaimed_execution(owner, id)
+            }
+        };
+        if result == Err(DirectRequestError::Unavailable) {
+            self.close_admission();
+        }
+        result?;
+        self.await_cleanup(Some(id)).map_err(Into::into)
+    }
+    /// Future pairing administration calls this hook before acknowledging revocation.
+    pub fn revoke_requester(&self, owner: AuthenticatedHuman) -> Result<(), DirectRequestError> {
+        self.check_owner(owner)?;
+        self.lock().map_err(Into::into)
+    }
+    pub fn admission_closed(&self) -> bool {
+        self.closing.load(Ordering::Acquire)
     }
     pub(crate) fn human_owner(&self) -> AuthenticatedHuman {
         self.owner
@@ -296,6 +482,7 @@ impl ProviderApplication {
     ) -> Result<DirectStatus, DirectRequestError> {
         self.check_owner(owner)?;
         if !supervisor.available() {
+            self.close_admission();
             return Err(DirectRequestError::Unavailable);
         }
         // Capture before waiting for the serialized gate. `lock` publishes its
@@ -319,17 +506,31 @@ impl ProviderApplication {
                 && self.clock.now() < session_deadline
         };
         let binding = authority.provider.claim_execution(owner, id, live)?;
-        let result = (|| {
-            let (_, policy, argv) = self.execution_authority_current(
-                &mut authority,
-                owner,
-                id,
-                Some(&binding),
-                revocation_epoch,
-            )?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.executions
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .insert(id.to_owned(), cancel.clone());
+        let candidate = self.execution_authority_current(
+            &mut authority,
+            owner,
+            id,
+            Some(&binding),
+            revocation_epoch,
+        );
+        drop(authority);
+        let preparation = candidate.and_then(|(_, policy, argv)| {
             let prepared = preparer
                 .prepare(policy.execution_image(), argv)
                 .map_err(|_error| DirectRequestError::Unavailable)?;
+            Ok((policy, prepared))
+        });
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let result = (|| {
+            let (policy, prepared) = preparation?;
             self.execution_authority_current(
                 &mut authority,
                 owner,
@@ -374,35 +575,84 @@ impl ProviderApplication {
                 Some(&binding),
                 revocation_epoch,
             )?;
-            let outcome = supervisor
-                .supervise(prepared, environment)
+            Ok((prepared, environment))
+        })();
+        // No provider-state or backend lock is held across manager operations.
+        drop(authority);
+        let control = ApplicationExecution {
+            app: self,
+            owner,
+            binding: &binding,
+            epoch: revocation_epoch,
+            deadline: deadline.min(session_deadline),
+            cancel,
+        };
+        let report = match result {
+            Ok((prepared, environment)) => {
+                supervisor.supervise_controlled(prepared, environment, &control)
+            }
+            Err(_error) => Supervision {
+                outcome: Err(ExecutionError::ExecutionFailed),
+                cleanup: CleanupEvidence::NotStarted,
+                helper_reaped: false,
+            },
+        };
+        let _helper_reaping_observed = report.helper_reaped;
+        if report.outcome == Err(ExecutionError::ManagerUnavailable) {
+            self.close_admission();
+        }
+        let finish = (|| {
+            let durable_live = control.live();
+            let release = self
+                .release_gate
+                .lock()
                 .map_err(|_error| DirectRequestError::Unavailable)?;
-            self.execution_live_current(&mut authority, id, revocation_epoch)?;
-            Ok(match outcome {
-                ExecutionOutcome::ExitedZero => DirectStatus::Completed { exit_code: 0 },
-                ExecutionOutcome::ExitedNonZero => DirectStatus::Failed {
+            let live = durable_live && control.live_fast();
+            if report.cleanup == CleanupEvidence::Uncertain {
+                self.cleanup_uncertain.store(true, Ordering::Release);
+                self.closing.store(true, Ordering::Release);
+                return Err(DirectRequestError::Unavailable);
+            }
+            let terminal = match (live, report.outcome) {
+                (true, Ok(ExecutionOutcome::ExitedZero)) => {
+                    DirectStatus::Completed { exit_code: 0 }
+                }
+                (true, Ok(ExecutionOutcome::ExitedNonZero)) => DirectStatus::Failed {
                     reason: DirectFailure::ExecutionNonzero,
                 },
-                ExecutionOutcome::Signaled => DirectStatus::Failed {
+                (true, Ok(ExecutionOutcome::Signaled)) => DirectStatus::Failed {
                     reason: DirectFailure::ExecutionSignaled,
                 },
-            })
+                _ => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionUnavailable,
+                },
+            };
+            drop(release);
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if authority
+                .provider
+                .finish_execution(&binding, terminal.clone(), report.cleanup)
+                .is_err()
+            {
+                self.closing.store(true, Ordering::Release);
+                let _ignored = Self::revoke(&mut authority);
+                return Err(DirectRequestError::Unavailable);
+            }
+            if matches!(terminal, DirectStatus::Completed { .. }) {
+                Ok(terminal)
+            } else {
+                Err(DirectRequestError::Unavailable)
+            }
         })();
-        let terminal = result.unwrap_or(DirectStatus::Failed {
-            reason: DirectFailure::ExecutionUnavailable,
-        });
-        let persisted = authority
-            .provider
-            .finish_execution(&binding, terminal.clone(), live);
-        if persisted.is_err() {
-            self.close_admission();
-            let _ignored = Self::revoke(&mut authority);
-            return Err(DirectRequestError::Unavailable);
-        }
-        match terminal {
-            DirectStatus::Completed { .. } => Ok(terminal),
-            _ => Err(DirectRequestError::Unavailable),
-        }
+        self.executions
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .remove(id);
+        self.reaped.notify_all();
+        finish
     }
 
     /// Compatibility helper retained for Story 1.6 test evidence.  It verifies
@@ -834,6 +1084,34 @@ mod tests {
         app.authenticate(SensitiveString::new("password-sentinel".into()))
             .unwrap();
     }
+    #[test]
+    fn uncertain_cleanup_releases_execution_registry_before_closing_admission() {
+        let (_dir, app) = fixture_with(
+            backend(Arc::new(Observed::default())),
+            Arc::new(AtomicU64::new(0)),
+        );
+        app.cleanup_uncertain.store(true, Ordering::Release);
+        let release = app.release_gate.lock().unwrap();
+        let (observed_tx, observed_rx) = mpsc::channel();
+        let waiting = app.clone();
+        let worker = std::thread::spawn(move || {
+            CLEANUP_WAIT_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || observed_tx.send(()).unwrap()))
+            });
+            waiting.await_cleanup(None)
+        });
+        observed_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        // A canceller takes release_gate then executions. The cleanup path must
+        // never retain executions while waiting for the same release_gate.
+        let registry_available = app.executions.try_lock().is_ok();
+        drop(release);
+        assert_eq!(worker.join().unwrap(), Err(SessionError::CleanupFailed));
+        assert!(
+            registry_available,
+            "cleanup would invert the cancellation lock order"
+        );
+    }
+
     #[test]
     fn slow_backend_errors_revoke_before_propagation() {
         for operation in ["consume_probe", "activate_probe", "resolve"] {

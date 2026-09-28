@@ -1,0 +1,20 @@
+COMMAND ["cargo", "clippy", "--all-targets", "--all-features", "--offline", "--locked", "--", "-D", "warnings"]
+    Checking vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+error: usage of the `unreachable!` macro
+    --> src/access/direct_request_tests.rs:3306:13
+     |
+3306 |             unreachable!()
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unreachable
+     = note: requested on the command line with `-D clippy::unreachable`
+
+error: usage of the `unreachable!` macro
+   --> src/adapters/supervisor/real_tests.rs:210:18
+    |
+210 |             _ => unreachable!(),
+    |                  ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unreachable
+
+error: could not compile `vaultwarden-cli` (lib test) due to 2 previous errors

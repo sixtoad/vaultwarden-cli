@@ -49,6 +49,7 @@ pub struct LoopbackUi {
     sessions: Vec<BrowserSession>,
     broker: Arc<RequestLaunchBroker>,
     approval_authenticator: Option<Arc<dyn ApprovalAuthenticator + Send + Sync>>,
+    execution_dispatcher: Option<Arc<dyn crate::access::ports::ExecutionDispatcher>>,
 }
 const MAX_BROWSER_SESSIONS: usize = 64;
 const MAX_REQUEST_LAUNCHES: usize = 64;
@@ -217,7 +218,15 @@ impl LoopbackUi {
             launch: Some(launch),
             sessions: Vec::new(),
             approval_authenticator: None,
+            execution_dispatcher: None,
         })
+    }
+    pub fn with_execution_dispatcher(
+        mut self,
+        dispatcher: Arc<dyn crate::access::ports::ExecutionDispatcher>,
+    ) -> Self {
+        self.execution_dispatcher = Some(dispatcher);
+        self
     }
     pub fn with_approval_authenticator(
         mut self,
@@ -266,7 +275,15 @@ impl LoopbackUi {
         }
         match authenticated.and_then(|proof| app.commit_approval(proof)) {
             Ok(DirectStatus::Approved) => {
-                Response::text("Request approved once. Execution has not started.")
+                if let Some(dispatcher) = &locked.execution_dispatcher
+                    && dispatcher.dispatch(&input.request_id).is_err()
+                {
+                    app.close_admission();
+                    return Response::denied();
+                }
+                Response::text(
+                    "Request approved once. Follow request status for execution progress.",
+                )
             }
             _ => Response::denied(),
         }
@@ -385,7 +402,7 @@ impl LoopbackUi {
             // scoped in sessionStorage (cookies themselves are not port-scoped).
             return Response::html(r#"<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Vaultwarden Access</title><style>
 body{font-family:system-ui,sans-serif;max-width:54rem;margin:2rem auto;padding:0 1rem;color:#142033;background:#fff}button,input{font:inherit;margin:.5rem;padding:.6rem}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #124ed0;outline-offset:3px}dt{font-weight:bold;margin-top:1rem}dd{margin:.25rem 0;overflow-wrap:anywhere}#result,#review-status{padding:.75rem;border:2px solid #64748b}[hidden]{display:none}
-</style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Decide this request once. Approval does not start execution at this stage.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><p id=decision-feedback role=status aria-live=polite aria-atomic=true></p><div id=decisions hidden><button id=deny type=button>Deny request</button><button id=begin-approval type=button>Authenticate and approve once</button><form id=approval hidden><label for=approval-password>Master password for this approval</label><input id=approval-password type=password autocomplete=current-password required maxlength=4096><button id=approve type=submit>Approve once</button><button id=cancel-approval type=button>Cancel authentication</button></form></div><button id=refresh type=button>Refresh request status</button></section></main><script>
+</style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Decide this request once. Approval schedules one protected execution.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><p id=decision-feedback role=status aria-live=polite aria-atomic=true></p><div id=decisions hidden><button id=deny type=button>Deny request</button><button id=begin-approval type=button>Authenticate and approve once</button><form id=approval hidden><label for=approval-password>Master password for this approval</label><input id=approval-password type=password autocomplete=current-password required maxlength=4096><button id=approve type=submit>Approve once</button><button id=cancel-approval type=button>Cancel authentication</button></form></div><button id=refresh type=button>Refresh request status</button></section></main><script>
 (async()=>{
 const result=document.getElementById('result'), input=document.getElementById('password');
 let [capability,requestId]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
@@ -409,7 +426,7 @@ async function decide(path,password){approvalPassword.value='';deciding=true;inv
 approval.onsubmit=e=>{e.preventDefault();decide('/approve',approvalPassword.value);};document.getElementById('deny').onclick=()=>decide('/deny','');
 function showStatus(text){const status=document.getElementById('review-status');if(status.textContent!==text)status.textContent=text;}
 function renderDetails(value){const details=document.getElementById('details');for(const [name,text] of [['Request ID',value.id],['Requester',value.requester],['Operation',value.operation],['Effect',value.effect],['Target',value.target],['Permitted arguments',value.arguments],['Credentials and use types',value.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Executable digest',value.executable_digest],['Policy digest',value.policy_digest],['Arguments digest',value.arguments_digest],['Expires at',new Date(value.expires_at_unix_seconds*1000).toISOString()],['One-time meaning',value.one_time]]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;if(Array.isArray(text)){const values=document.createElement('ol');values.id='arguments';for(const [index,value] of text.entries()){const item=document.createElement('li');item.setAttribute('aria-label','Argument '+(index+1));item.textContent=value;values.append(item);}dd.append(values);}else{dd.textContent=text;}details.append(dt,dd);}detailsReady=true;}
-async function review(force=false){if(force)invalidateReview();if(reviewRequest)return;const request={epoch:reviewEpoch};reviewRequest=request;clearTimeout(timer);let delay=0;const current=()=>reviewRequest===request&&request.epoch===reviewEpoch;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!current())return;if([400,401,403,404].includes(r.status)){retireSession();return;}if(!r.ok)throw Error();const value=await r.json();if(!current()||retired)return;if(!detailsReady)renderDetails(value);const state=value.status.status;decisions.hidden=false;decisionControls(deciding||state!=='pending');if(state!=='pending'){approvalPassword.value='';approval.hidden=true;}showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:state==='approved'?'; approved once; execution has not started':state==='denied'?'; no operation will run':''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{if(current()&&!retired){showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}}finally{if(current()){reviewRequest=null;if(delay&&!retired)timer=setTimeout(review,delay);}}}
+async function review(force=false){if(force)invalidateReview();if(reviewRequest)return;const request={epoch:reviewEpoch};reviewRequest=request;clearTimeout(timer);let delay=0;const current=()=>reviewRequest===request&&request.epoch===reviewEpoch;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!current())return;if([400,401,403,404].includes(r.status)){retireSession();return;}if(!r.ok)throw Error();const value=await r.json();if(!current()||retired)return;if(!detailsReady)renderDetails(value);const state=value.status.status;decisions.hidden=false;decisionControls(deciding||state!=='pending');if(state!=='pending'){approvalPassword.value='';approval.hidden=true;}showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:state==='approved'?'; approved once; awaiting protected execution':state==='denied'?'; no operation will run':''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{if(current()&&!retired){showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}}finally{if(current()){reviewRequest=null;if(delay&&!retired)timer=setTimeout(review,delay);}}}
 if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=>review();await review();}
 })();</script></html>"#.into());
         }
@@ -1772,6 +1789,43 @@ mod tests {
             } else {
                 Err(SessionError::AuthenticationFailed)
             }
+        }
+    }
+    #[test]
+    fn approval_dispatches_only_committed_ids_and_closes_on_queue_failure() {
+        struct Dispatcher {
+            seen: Mutex<Vec<String>>,
+            fail: bool,
+        }
+        impl crate::access::ports::ExecutionDispatcher for Dispatcher {
+            fn dispatch(&self, id: &str) -> Result<(), SessionError> {
+                self.seen.lock().unwrap().push(id.to_owned());
+                if self.fail {
+                    Err(SessionError::BackendUnavailable)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        for fail in [false, true] {
+            let (f, ui, id) = decision_fixture(Arc::new(ApprovalCheck(AtomicUsize::new(0))));
+            let dispatcher = Arc::new(Dispatcher {
+                seen: Mutex::new(vec![]),
+                fail,
+            });
+            ui.lock().unwrap().execution_dispatcher = Some(dispatcher.clone());
+            let body =
+                serde_json::json!({"request_id":id,"password":"approval-sentinel"}).to_string();
+            let req = request(&ui.lock().unwrap(), "/approve", &body);
+            assert_eq!(
+                LoopbackUi::dispatch(&ui, req, &f.app).status,
+                if fail { 403 } else { 200 }
+            );
+            assert_eq!(*dispatcher.seen.lock().unwrap(), vec![id]);
+            assert_eq!(f.app.admission_closed(), fail);
+            let req = request(&ui.lock().unwrap(), "/approve", &body);
+            assert_eq!(LoopbackUi::dispatch(&ui, req, &f.app).status, 403);
+            assert_eq!(dispatcher.seen.lock().unwrap().len(), 1);
         }
     }
     #[test]

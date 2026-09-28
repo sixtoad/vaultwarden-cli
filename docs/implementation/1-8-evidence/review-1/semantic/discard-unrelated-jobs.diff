@@ -1,0 +1,11 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -329,7 +329,7 @@
+ }
+ impl JobObservation {
+     fn observe(&mut self, job: String, unit: &str, result: String) {
+-        if unit == self.unit {
++        if true {
+             self.result = Some((job, result));
+         }
+     }

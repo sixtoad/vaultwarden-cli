@@ -1,0 +1,16 @@
+cleanup-lock-order: caught; baseline exit 0; mutant exit 101
+zero-packet-rights: caught; baseline exit 0; mutant exit 101
+required-dependency: caught; baseline exit 0; mutant exit 101
+release-authority: caught; baseline exit 0; mutant exit 101
+cleanup-terminal: caught; baseline exit 0; mutant exit 101
+revocation-lifecycle: caught; baseline exit 0; mutant exit 101
+recovery-before-validation: caught; baseline exit 0; mutant exit 101
+actual-helper-parent: caught; baseline exit 0; mutant exit 101
+queued-cancellation: caught; baseline exit 0; mutant exit 101
+unavailable-closes-admission: caught; baseline exit 0; mutant exit 101
+lease-no-replace: caught; baseline exit 0; mutant exit 101
+recover-abandoned-staging: caught; baseline exit 0; mutant exit 101
+discard-unrelated-jobs: caught; baseline exit 0; mutant exit 101
+helper-name-filter: caught; baseline exit 0; mutant exit 101
+worker-dispatch: caught; baseline exit 0; mutant exit 101
+15 semantic mutants caught. Initial worker fixture-reuse infrastructure failure was corrected and rerun; see worker-fixture-reuse-infrastructure.log and worker-mutation-retry.log.

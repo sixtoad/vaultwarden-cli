@@ -1,0 +1,15 @@
+Sep 27 22:18:11 pop-os systemd[15793]: Starting vw18-harness-2809184-.tmpREATdy-app-signal.service - /home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture...
+Sep 27 22:18:11 pop-os systemd[15793]: Started vw18-harness-2809184-.tmpREATdy-app-signal.service - /home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture.
+Sep 27 22:18:11 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: running 1 test
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: thread 'adapters::supervisor::real_tests::provider_harness' (2809200) panicked at src/adapters/supervisor/real_tests.rs:540:9:
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: assertion `left == right` failed
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]:   left: Completed { exit_code: 0 }
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]:  right: Failed { reason: ExecutionSignaled }
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: test adapters::supervisor::real_tests::provider_harness ... FAILED
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: failures:
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: failures:
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]:     adapters::supervisor::real_tests::provider_harness
+Sep 27 22:18:12 pop-os vaultwarden_cli-e3f6bc7a555f4483[2809196]: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 563 filtered out; finished in 0.81s
+Sep 27 22:18:12 pop-os systemd[15793]: vw18-harness-2809184-.tmpREATdy-app-signal.service: Main process exited, code=exited, status=101/n/a
+Sep 27 22:18:12 pop-os systemd[15793]: vw18-harness-2809184-.tmpREATdy-app-signal.service: Failed with result 'exit-code'.

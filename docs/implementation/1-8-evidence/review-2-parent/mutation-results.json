@@ -1,0 +1,26 @@
+[
+  {
+    "name": "entry-scan-budget",
+    "test": "adapters::supervisor::manager::tests::proc_inventory_stops_at_the_entry_that_exhausts_the_remaining_budget",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "source_sha256": "6e0caa80e421b85a13c7187d46c01403bbe280d30c9d0cb06caa3fa4a53f60ee"
+  },
+  {
+    "name": "final-scan-budget",
+    "test": "adapters::supervisor::manager::tests::proc_inventory_stops_at_the_entry_that_exhausts_the_remaining_budget",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "source_sha256": "6e0caa80e421b85a13c7187d46c01403bbe280d30c9d0cb06caa3fa4a53f60ee"
+  },
+  {
+    "name": "failed-unit-collection",
+    "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "source_sha256": "6e0caa80e421b85a13c7187d46c01403bbe280d30c9d0cb06caa3fa4a53f60ee"
+  }
+]

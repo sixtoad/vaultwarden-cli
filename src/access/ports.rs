@@ -41,6 +41,11 @@ pub(crate) struct ChildEnvironment {
     pointers: Vec<*const c_char>,
 }
 impl ChildEnvironment {
+    /// Borrow the explicit, NUL-terminated entries for the private helper channel.
+    pub(crate) fn entries(&self) -> impl ExactSizeIterator<Item = &[u8]> {
+        self.entries.iter().map(|entry| entry.as_slice())
+    }
+
     const MAX_ENTRIES: usize = 32;
     const MAX_BYTES: usize = 32 * 1024;
     pub(crate) fn from_mappings(
@@ -106,22 +111,85 @@ fn valid_environment_name(name: &str) -> bool {
         && !name.starts_with("BITWARDEN_")
 }
 
-/// Production remains closed until Story 1.8 provides a manager-bound
-/// implementation. This port prevents a direct-child fallback.
-#[allow(dead_code)]
+/// Evidence is independent of the workload result. Errors cannot imply cleanup.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CleanupEvidence {
+    NotStarted,
+    Reaped,
+    Uncertain,
+}
+pub(crate) struct Supervision {
+    pub(crate) outcome: Result<ExecutionOutcome, ExecutionError>,
+    pub(crate) cleanup: CleanupEvidence,
+    pub(crate) helper_reaped: bool,
+}
+pub(crate) trait ExecutionControl {
+    fn live(&self) -> bool;
+    fn remaining(&self) -> std::time::Duration;
+    /// Serializes only the final nonblocking release against revocation intent.
+    fn release(
+        &self,
+        action: &mut dyn FnMut() -> Result<(), ExecutionError>,
+    ) -> Result<(), ExecutionError>;
+    fn started(&self) -> Result<(), ExecutionError>;
+}
 pub(crate) trait ProcessSupervisor<P: ProtectedExecution> {
     fn available(&self) -> bool;
+    #[cfg(test)]
     fn supervise(
         &self,
         prepared: P::Prepared,
         environment: ChildEnvironment,
     ) -> Result<ExecutionOutcome, ExecutionError>;
+    fn supervise_controlled(
+        &self,
+        prepared: P::Prepared,
+        environment: ChildEnvironment,
+        control: &dyn ExecutionControl,
+    ) -> Supervision {
+        #[cfg(test)]
+        {
+            if control.release(&mut || Ok(())).is_err() {
+                return Supervision {
+                    outcome: Err(ExecutionError::Cancelled),
+                    cleanup: CleanupEvidence::NotStarted,
+                    helper_reaped: false,
+                };
+            }
+            let outcome = self.supervise(prepared, environment);
+            if outcome.is_ok() && control.started().is_err() {
+                return Supervision {
+                    outcome: Err(ExecutionError::ExecutionFailed),
+                    cleanup: CleanupEvidence::Reaped,
+                    helper_reaped: false,
+                };
+            }
+            Supervision {
+                outcome,
+                cleanup: CleanupEvidence::Reaped,
+                helper_reaped: false,
+            }
+        }
+        #[cfg(not(test))]
+        {
+            let _unused = (prepared, environment, control);
+            Supervision {
+                outcome: Err(ExecutionError::Unavailable),
+                cleanup: CleanupEvidence::NotStarted,
+                helper_reaped: false,
+            }
+        }
+    }
+}
+/// Bounded provider-owned dispatch; contains only a request identifier.
+pub trait ExecutionDispatcher: Send + Sync {
+    fn dispatch(&self, request_id: &str) -> Result<(), SessionError>;
 }
 
 /// Closed diagnostics deliberately contain no OS error, image path or argv.
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ExecutionError {
+pub enum ExecutionError {
     InvalidImage,
     UnsafePath,
     UnsafeSource,
@@ -130,6 +198,10 @@ pub(crate) enum ExecutionError {
     Unavailable,
     InvalidArguments,
     ExecutionFailed,
+    Cancelled,
+    ManagerUnavailable,
+    CleanupUncertain,
+    UnitCollision,
 }
 impl fmt::Display for ExecutionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -142,6 +214,10 @@ impl fmt::Display for ExecutionError {
             Self::Unavailable => "executable preparation unavailable",
             Self::InvalidArguments => "invalid executable arguments",
             Self::ExecutionFailed => "descriptor execution failed",
+            Self::Cancelled => "execution cancelled",
+            Self::ManagerUnavailable => "containment manager unavailable",
+            Self::CleanupUncertain => "execution cleanup unconfirmed",
+            Self::UnitCollision => "execution unit collision",
         })
     }
 }

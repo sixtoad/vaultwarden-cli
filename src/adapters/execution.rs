@@ -88,6 +88,12 @@ fn checked_arguments(argv: Vec<String>) -> Result<Vec<CString>, ExecutionError> 
 }
 
 impl PreparedExecutable {
+    #[cfg(target_os = "linux")]
+    pub(crate) fn descriptor_and_arguments(&self) -> (std::os::fd::BorrowedFd<'_>, &[CString]) {
+        use std::os::fd::AsFd;
+        (self.file.as_fd(), &self.argv)
+    }
+
     /// Replaces the current, already supervised process; never forks or uses a path.
     #[allow(dead_code)] // Story 1.7 will invoke this only after consuming authority.
     pub(crate) fn execute(self) -> Result<std::convert::Infallible, ExecutionError> {

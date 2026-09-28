@@ -1,0 +1,11 @@
+--- src/access/provider_store.rs
++++ src/access/provider_store.rs
+@@ -247,7 +247,7 @@
+         };
+         // The stable writer is held. Revoke crashed-process authority before any
+         // state decoding, permission/integrity checks or lifecycle persistence.
+-        cleanup().map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
++        drop(cleanup);
+         store.read_state().map(|_| store)
+     }
+     pub(crate) fn owner_uid(&self) -> u32 {

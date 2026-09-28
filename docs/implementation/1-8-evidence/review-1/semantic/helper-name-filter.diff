@@ -1,0 +1,11 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -98,7 +98,7 @@
+         if !environment_name(name) {
+             return Err(ExecutionError::ManagerUnavailable);
+         }
+-        names.insert(name.to_owned());
++        let _ignored_name = name;
+     }
+     Ok(names.into_iter().collect())
+ }

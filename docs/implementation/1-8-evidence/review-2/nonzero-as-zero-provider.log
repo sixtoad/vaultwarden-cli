@@ -1,0 +1,15 @@
+Sep 27 22:17:13 pop-os systemd[15793]: Starting vw18-harness-2794499-.tmpL8ZPpa-app-nonzero.service - /home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture...
+Sep 27 22:17:13 pop-os systemd[15793]: Started vw18-harness-2794499-.tmpL8ZPpa-app-nonzero.service - /home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture.
+Sep 27 22:17:13 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: running 1 test
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: thread 'adapters::supervisor::real_tests::provider_harness' (2794526) panicked at src/adapters/supervisor/real_tests.rs:540:9:
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: assertion `left == right` failed
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]:   left: Completed { exit_code: 0 }
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]:  right: Failed { reason: ExecutionNonzero }
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: test adapters::supervisor::real_tests::provider_harness ... FAILED
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: failures:
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: failures:
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]:     adapters::supervisor::real_tests::provider_harness
+Sep 27 22:17:14 pop-os vaultwarden_cli-e3f6bc7a555f4483[2794514]: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 563 filtered out; finished in 1.32s
+Sep 27 22:17:14 pop-os systemd[15793]: vw18-harness-2794499-.tmpL8ZPpa-app-nonzero.service: Main process exited, code=exited, status=101/n/a
+Sep 27 22:17:14 pop-os systemd[15793]: vw18-harness-2794499-.tmpL8ZPpa-app-nonzero.service: Failed with result 'exit-code'.

@@ -1,0 +1,74 @@
+--- src/adapters/supervisor/manager.rs
++++ replace proc_empty_with_budget -> Result<bool, ExecutionError> with Ok(false)
+@@ -792,70 +792,17 @@
+ fn proc_empty_until(root: &Path, cgroup: &str, deadline: Instant) -> Result<bool, ExecutionError> {
+     proc_empty_with_budget(root, cgroup, || Instant::now() < deadline)
+ }
+ fn proc_empty_with_budget(
+     root: &Path,
+     cgroup: &str,
+     mut has_budget: impl FnMut() -> bool,
+ ) -> Result<bool, ExecutionError> {
+-    if !valid_cgroup(cgroup) {
+-        return Err(ExecutionError::CleanupUncertain);
+-    }
+-    for entry in std::fs::read_dir(root).map_err(failure)? {
+-        // Use the caller's remaining cleanup budget, including non-process entries.
+-        // An interrupted inventory cannot prove absence.
+-        if !has_budget() {
+-            return Err(ExecutionError::CleanupUncertain);
+-        }
+-        let entry = entry.map_err(failure)?;
+-        if entry
+-            .file_name()
+-            .to_str()
+-            .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))
+-        {
+-            continue;
+-        }
+-        let path = entry.path();
+-        let read = |name: &str| -> Result<Option<String>, ExecutionError> {
+-            match std::fs::read_to_string(path.join(name)) {
+-                Ok(s) => Ok(Some(s)),
+-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+-                Err(_) => Err(ExecutionError::CleanupUncertain),
+-            }
+-        };
+-        let Some(before) = read("stat")? else {
+-            continue;
+-        };
+-        let Some(groups) = read("cgroup")? else {
+-            continue;
+-        };
+-        let Some(after) = read("stat")? else {
+-            continue;
+-        };
+-        let before = start_time(&before).ok_or(ExecutionError::CleanupUncertain)?;
+-        let after = start_time(&after).ok_or(ExecutionError::CleanupUncertain)?;
+-        if before != after {
+-            return Err(ExecutionError::CleanupUncertain);
+-        }
+-        if groups
+-            .lines()
+-            .filter_map(|line| line.strip_prefix("0::"))
+-            .any(|path| belongs(path, cgroup))
+-        {
+-            return Ok(false);
+-        }
+-        if !groups.lines().any(|line| line.starts_with("0::")) {
+-            return Err(ExecutionError::CleanupUncertain);
+-        }
+-    }
+-    if !has_budget() {
+-        return Err(ExecutionError::CleanupUncertain);
+-    }
+-    Ok(true)
++    Ok(false) /* ~ changed by cargo-mutants ~ */
+ }
+ fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {
+     let m = std::fs::symlink_metadata(path).map_err(failure)?;
+     let uid = unsafe { libc::geteuid() };
+     if !m.is_dir()
+         || m.file_type().is_symlink()
+         || (m.uid() != uid && m.uid() != 0)
+         || m.mode() & 0o7022 != 0

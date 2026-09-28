@@ -1,0 +1,15 @@
+[
+  "docs/implementation/1-8-evidence/review-2-parent/stable-all-targets.log",
+  "docs/implementation/1-8-evidence/review-2-parent/entry-scan-budget-baseline.log",
+  "docs/implementation/1-8-evidence/review-2-parent/named-contracts.log",
+  "docs/implementation/1-8-evidence/review-2-parent/rust-1.88-all-targets.log",
+  "docs/implementation/1-8-evidence/review-2-parent/failed-unit-collection-baseline.log",
+  "docs/implementation/1-8-evidence/review-2-parent/real-final.log",
+  "docs/implementation/1-8-evidence/review-2-parent/final-scan-budget-baseline.log",
+  "docs/implementation/1-8-evidence/review-1/generated/mutants.out/outcomes.json",
+  "docs/implementation/1-8-evidence/review-1/generated/mutants.out/lock.json",
+  "docs/implementation/1-8-evidence/review-1/generated/mutants.out/mutants.json",
+  "docs/implementation/1-8-evidence/review-2-parent/generated/mutants.out/outcomes.json",
+  "docs/implementation/1-8-evidence/review-2-parent/generated/mutants.out/lock.json",
+  "docs/implementation/1-8-evidence/review-2-parent/generated/mutants.out/mutants.json"
+]

@@ -1,0 +1,21 @@
+src/adapters/supervisor/manager.rs:171:9: replace Config::owns_name -> bool with true
+src/adapters/supervisor/manager.rs:171:9: replace Config::owns_name -> bool with false
+src/adapters/supervisor/manager.rs:175:21: replace && with || in Config::owns_name
+src/adapters/supervisor/manager.rs:174:25: replace == with != in Config::owns_name
+src/adapters/supervisor/manager.rs:176:53: replace || with && in Config::owns_name
+src/adapters/supervisor/manager.rs:779:5: replace belongs -> bool with true
+src/adapters/supervisor/manager.rs:779:5: replace belongs -> bool with false
+src/adapters/supervisor/manager.rs:781:9: replace || with && in belongs
+src/adapters/supervisor/manager.rs:780:14: replace == with != in belongs
+src/adapters/supervisor/manager.rs:800:5: replace proc_empty_with_budget -> Result<bool, ExecutionError> with Ok(true)
+src/adapters/supervisor/manager.rs:800:5: replace proc_empty_with_budget -> Result<bool, ExecutionError> with Ok(false)
+src/adapters/supervisor/manager.rs:800:8: delete ! in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:806:12: delete ! in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:813:42: replace || with && in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:813:45: delete ! in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:821:27: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:821:27: replace match guard e.kind() == std::io::ErrorKind::NotFound with false in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:821:36: replace == with != in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:836:19: replace != with == in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:846:12: delete ! in proc_empty_with_budget
+src/adapters/supervisor/manager.rs:850:8: delete ! in proc_empty_with_budget

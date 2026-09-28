@@ -17,6 +17,7 @@ use vaultwarden_cli::{
         human_socket::HumanSocket,
         loopback_ui::LoopbackUi,
         session::{MonotonicClock, clear_persisted_session},
+        supervisor::{ExecutionWorker, SystemdProcessSupervisor},
         vaultwarden::VaultwardenBackend,
     },
 };
@@ -62,7 +63,19 @@ fn run(args: Args) -> Result<(), ()> {
             signal(SignalKind::terminate()).map_err(|_error| ())?,
         ))
     })?;
-    let mut provider = initialize_provider(&args.state_root, clear_persisted_session)?;
+    let mut supervisor = None;
+    let mut provider = initialize_provider(&args.state_root, || {
+        let contained = Arc::new(
+            SystemdProcessSupervisor::installed()
+                .map_err(|_error| vaultwarden_cli::access::ports::SessionError::CleanupFailed)?,
+        );
+        contained
+            .recover()
+            .map_err(|_error| vaultwarden_cli::access::ports::SessionError::CleanupFailed)?;
+        supervisor = Some(contained);
+        clear_persisted_session()
+    })?;
+    let supervisor = supervisor.ok_or(())?;
     let Some(config) = args.backend_config.as_deref() else {
         // Preserve locked-only installations until human provisioning is complete.
         runtime.block_on(async {
@@ -82,6 +95,7 @@ fn run(args: Args) -> Result<(), ()> {
         )
         .map_err(|_error| ())?,
     );
+    let execution_worker = ExecutionWorker::start(app.clone(), supervisor).map_err(|_error| ())?;
     let human_socket = HumanSocket::bind(&args.state_root).map_err(|_error| ())?;
     let artifact = args.state_root.join("open-vaultwarden-access.html");
     let ui = LoopbackUi::bind(
@@ -90,7 +104,8 @@ fn run(args: Args) -> Result<(), ()> {
         args.ui_tls_key.as_deref().ok_or(())?,
     )
     .map_err(|_error| ())?
-    .with_approval_authenticator(approval_authenticator);
+    .with_approval_authenticator(approval_authenticator)
+    .with_execution_dispatcher(execution_worker.dispatcher());
     let stop = Arc::new(AtomicBool::new(false));
     let human_worker = {
         let app = app.clone();
@@ -108,7 +123,7 @@ fn run(args: Args) -> Result<(), ()> {
         async {
             tokio::select! { _ = interrupt.recv() => {}, _ = term.recv() => {} }
         },
-        || transport_finished(&worker, &human_worker),
+        || transport_finished(&worker, &human_worker) || execution_worker.is_finished(),
     ));
     stop.store(true, Ordering::Release);
     // Never short-circuit joining or final revocation on a worker error.
@@ -122,7 +137,8 @@ fn run(args: Args) -> Result<(), ()> {
         memory.and(persisted).and(human)
     });
     let artifact_cleanup = std::fs::remove_file(artifact).map_err(|_error| ());
-    cleanup.and(artifact_cleanup)
+    let execution_cleanup = execution_worker.join().map_err(|_error| ());
+    cleanup.and(artifact_cleanup).and(execution_cleanup)
 }
 
 #[cfg(target_os = "linux")]
@@ -160,7 +176,7 @@ async fn monitor_shutdown(
         tokio::select! {
             _ = &mut signal => break,
             _ = tokio::time::sleep(Duration::from_secs(1)) => {
-                if worker_finished() { break; }
+                if worker_finished() || app.admission_closed() { break; }
                 let status_app = app.clone();
                 let status = tokio::task::spawn_blocking(move || status_app.status());
                 tokio::select! {

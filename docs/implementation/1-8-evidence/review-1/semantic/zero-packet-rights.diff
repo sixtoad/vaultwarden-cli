@@ -1,0 +1,11 @@
+--- src/adapters/supervisor/bridge.rs
++++ src/adapters/supervisor/bridge.rs
+@@ -434,7 +434,7 @@
+             libc::MSG_CMSG_CLOEXEC | libc::MSG_DONTWAIT,
+         )
+     };
+-    if count < 0 {
++    if count <= 0 {
+         return Err(BridgeError);
+     }
+     // A zero-byte SEQPACKET can still carry SCM_RIGHTS. Own every installed

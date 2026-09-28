@@ -1,0 +1,11 @@
+--- a/src/adapters/supervisor/bridge.rs
++++ b/src/adapters/supervisor/bridge.rs
+@@ -865,7 +865,7 @@
+                     if libc::WEXITSTATUS(status) == 0 {
+                         ZERO
+                     } else {
+-                        NONZERO
++                        ZERO
+                     }
+                 } else {
+                     SIGNAL

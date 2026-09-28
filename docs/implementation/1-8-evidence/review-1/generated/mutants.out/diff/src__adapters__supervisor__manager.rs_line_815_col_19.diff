@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ replace != with == in proc_empty
+@@ -807,17 +807,17 @@
+         let Some(groups) = read("cgroup")? else {
+             continue;
+         };
+         let Some(after) = read("stat")? else {
+             continue;
+         };
+         let before = start_time(&before).ok_or(ExecutionError::CleanupUncertain)?;
+         let after = start_time(&after).ok_or(ExecutionError::CleanupUncertain)?;
+-        if before != after {
++        if before == /* ~ changed by cargo-mutants ~ */ after {
+             return Err(ExecutionError::CleanupUncertain);
+         }
+         if groups
+             .lines()
+             .filter_map(|line| line.strip_prefix("0::"))
+             .any(|path| belongs(path, cgroup))
+         {
+             return Ok(false);

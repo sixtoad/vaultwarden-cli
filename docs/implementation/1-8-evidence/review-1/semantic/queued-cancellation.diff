@@ -1,0 +1,11 @@
+--- src/access/application.rs
++++ src/access/application.rs
+@@ -285,7 +285,7 @@
+                 cancel.store(true, Ordering::Release);
+                 Ok(())
+             } else {
+-                authority.provider.cancel_unclaimed_execution(owner, id)
++                Ok(())
+             }
+         };
+         if result == Err(DirectRequestError::Unavailable) {

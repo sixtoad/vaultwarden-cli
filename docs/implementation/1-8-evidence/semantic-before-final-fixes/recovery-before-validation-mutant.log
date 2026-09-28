@@ -1,0 +1,22 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.42s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test access::provider::tests::startup_cleanup_precedes_registered_image_integrity_validation ... FAILED
+
+failures:
+
+---- access::provider::tests::startup_cleanup_precedes_registered_image_integrity_validation stdout ----
+
+thread 'access::provider::tests::startup_cleanup_precedes_registered_image_integrity_validation' (1260866) panicked at src/access/provider.rs:693:9:
+assertion failed: cleared.get()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    access::provider::tests::startup_cleanup_precedes_registered_image_integrity_validation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 555 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,19 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 36.65s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 12 tests
+test adapters::supervisor::bridge::tests::error_pipe_distinguishes_exec_failure_from_close_on_exec ... ok
+test adapters::supervisor::bridge::tests::parent_death_before_and_after_prctl_uses_actual_helper_identity ... ok
+test adapters::supervisor::bridge::tests::payload_rejects_wrong_seals_counts_nuls_environment_and_extra_descriptors ... ok
+test adapters::supervisor::bridge::tests::protocol_authenticates_pid_and_checks_private_endpoint ... ok
+test adapters::supervisor::bridge::tests::protocol_rejects_truncation_wrong_version_and_unexpected_rights ... ok
+test adapters::supervisor::bridge::tests::received_descriptor_is_cloexec_and_resources_close_after_parse_failure ... ok
+test adapters::supervisor::bridge::tests::release_requires_readiness_and_reports_require_observed_exec_before_outcome ... ok
+test adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties ... ok
+test adapters::supervisor::manager::tests::incompatible_manager_versions_fail_closed ... ok
+test adapters::supervisor::manager::tests::independent_reaping_observes_zombies_deleted_groups_and_subtrees ... ok
+test adapters::supervisor::manager::tests::strict_ownership_namespace_and_random_names ... ok
+test adapters::supervisor::real_tests::provider_harness ... ignored, internal real-manager harness; invoked by scripts/test-systemd-supervisor.sh
+
+test result: ok. 11 passed; 0 failed; 1 ignored; 0 measured; 542 filtered out; finished in 0.08s

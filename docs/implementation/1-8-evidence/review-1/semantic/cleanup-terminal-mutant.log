@@ -1,0 +1,24 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.07s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test access::direct_request_tests::uncertain_cleanup_closes_admission_and_never_persists_terminal ... FAILED
+
+failures:
+
+---- access::direct_request_tests::uncertain_cleanup_closes_admission_and_never_persists_terminal stdout ----
+
+thread 'access::direct_request_tests::uncertain_cleanup_closes_admission_and_never_persists_terminal' (2165903) panicked at src/access/direct_request_tests.rs:3302:5:
+assertion `left == right` failed
+  left: Ok(())
+ right: Err(CleanupFailed)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    access::direct_request_tests::uncertain_cleanup_closes_admission_and_never_persists_terminal
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 561 filtered out; finished in 0.36s
+
+error: test failed, to rerun pass `--lib`

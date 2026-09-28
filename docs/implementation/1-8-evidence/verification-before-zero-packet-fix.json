@@ -1,0 +1,58 @@
+[
+  {
+    "name": "startup-regression",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "provider_session",
+      "daemon_missing_keyring_fails_closed_even_without_backend_config",
+      "--",
+      "--exact"
+    ],
+    "exit": 0,
+    "seconds": 10.48
+  },
+  {
+    "name": "static-contracts",
+    "command": [
+      "python3",
+      "docs/implementation/1-8-evidence/static-contracts.py"
+    ],
+    "exit": 0,
+    "seconds": 0.13
+  },
+  {
+    "name": "stable-all-targets",
+    "command": [
+      "env",
+      "RUST_TEST_THREADS=4",
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 275.93
+  },
+  {
+    "name": "rust-1.88-all-targets",
+    "command": [
+      "env",
+      "RUST_TEST_THREADS=4",
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": -15,
+    "seconds": 340.0
+  }
+]

@@ -115,7 +115,7 @@ try{
     assert.equal(await tab.$eval('#approval-password',e=>e.value),'');
     assert.equal(run(['status',decided.id]).state.status,decision==='deny'?'denied':'approved');
     assert(await tab.$$eval('#decisions button',buttons=>buttons.every(b=>b.disabled)));
-    assert.match(await tab.$eval('#review-status',e=>e.textContent),decision==='deny'?/no operation will run/:/execution has not started/);
+    assert.match(await tab.$eval('#review-status',e=>e.textContent),decision==='deny'?/no operation will run/:/approved once; awaiting protected execution/);
     const replay=await tab.evaluate(async({id,decision})=>(await fetch('/'+decision,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify(decision==='approve'?{request_id:id,password:'synthetic-browser-password'}:{request_id:id})})).status,{id:decided.id,decision});assert.equal(replay,403);
     await tab.addScriptTag({content:axe});assert.deepEqual(await tab.evaluate(async()=>(await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>v.id)),[]);
     await tab.close();

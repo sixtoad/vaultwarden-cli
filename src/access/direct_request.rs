@@ -296,11 +296,15 @@ impl DirectRecord {
             && valid_sha256(&r.executable_digest)
             && valid_sha256(&r.policy_digest)
             && r.arguments_digest == arguments_digest(&r.arguments)
-            && (r.one_time == ONE_TIME || r.one_time == LEGACY_ONE_TIME)
+            && (r.one_time == ONE_TIME
+                || r.one_time == PREVIOUS_ONE_TIME
+                || r.one_time == LEGACY_ONE_TIME)
             && !matches!(r.status, DirectStatus::Completed { exit_code } if !(0..=255).contains(&exit_code))
     }
 }
 
 pub(crate) const LEGACY_ONE_TIME: &str = "Approving this request would authorize one execution only; approval is unavailable at this stage.";
-pub(crate) const ONE_TIME: &str =
+pub(crate) const PREVIOUS_ONE_TIME: &str =
     "Approval authorizes this request once only. Execution is not available yet.";
+pub(crate) const ONE_TIME: &str =
+    "Approval authorizes one protected execution. Lock or cancellation stops its descendants.";

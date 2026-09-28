@@ -1,0 +1,137 @@
+[
+  {
+    "name": "cleanup-lock-order",
+    "file": "src/access/application.rs",
+    "test": "access::application::tests::uncertain_cleanup_releases_execution_registry_before_closing_admission",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "b07dd188f67e132c2b8040b21aa0d7c321cb180f60ac7cca9c26a54dcfcc3921"
+  },
+  {
+    "name": "zero-packet-rights",
+    "file": "src/adapters/supervisor/bridge.rs",
+    "test": "adapters::supervisor::bridge::tests::zero_length_packet_closes_every_received_descriptor",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "8a5819b9e72616437aa46ad53b170fabf632357c6bb14270beed55fe95cc4097"
+  },
+  {
+    "name": "required-dependency",
+    "file": "src/adapters/supervisor/manager.rs",
+    "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "031f3dd2018ad3b5e633c7ca05c93454136c36a76aac2e303dc0b84e8be9ca46"
+  },
+  {
+    "name": "release-authority",
+    "file": "src/access/application.rs",
+    "test": "access::direct_request_tests::final_release_revalidates_authority_after_supervisor_setup",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "b07dd188f67e132c2b8040b21aa0d7c321cb180f60ac7cca9c26a54dcfcc3921"
+  },
+  {
+    "name": "cleanup-terminal",
+    "file": "src/access/application.rs",
+    "test": "access::direct_request_tests::uncertain_cleanup_closes_admission_and_never_persists_terminal",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "b07dd188f67e132c2b8040b21aa0d7c321cb180f60ac7cca9c26a54dcfcc3921"
+  },
+  {
+    "name": "revocation-lifecycle",
+    "file": "src/access/provider_store.rs",
+    "test": "access::direct_request_tests::running_is_observed_before_reaping_and_lock_waits_without_holding_authority",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "dee8ab4f2d8d4514d8b805a703213f23839a596d6fc487443e70a375c12af3a3"
+  },
+  {
+    "name": "recovery-before-validation",
+    "file": "src/access/provider_store.rs",
+    "test": "access::provider::tests::startup_cleanup_precedes_registered_image_integrity_validation",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "dee8ab4f2d8d4514d8b805a703213f23839a596d6fc487443e70a375c12af3a3"
+  },
+  {
+    "name": "actual-helper-parent",
+    "file": "src/adapters/supervisor/bridge.rs",
+    "test": "adapters::supervisor::bridge::tests::parent_death_before_and_after_prctl_uses_actual_helper_identity",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "8a5819b9e72616437aa46ad53b170fabf632357c6bb14270beed55fe95cc4097"
+  },
+  {
+    "name": "queued-cancellation",
+    "file": "src/access/application.rs",
+    "test": "access::direct_request_tests::queued_cancellation_is_owner_bound_and_prevents_later_claim",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "b07dd188f67e132c2b8040b21aa0d7c321cb180f60ac7cca9c26a54dcfcc3921"
+  },
+  {
+    "name": "unavailable-closes-admission",
+    "file": "src/access/application.rs",
+    "test": "access::direct_request_tests::unavailable_supervisor_prevents_claim_resolution_and_launch",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "b07dd188f67e132c2b8040b21aa0d7c321cb180f60ac7cca9c26a54dcfcc3921"
+  },
+  {
+    "name": "lease-no-replace",
+    "file": "src/adapters/supervisor/manager.rs",
+    "test": "adapters::supervisor::manager::tests::lease_publication_is_atomic_collision_safe_and_recovers_interrupted_staging",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "031f3dd2018ad3b5e633c7ca05c93454136c36a76aac2e303dc0b84e8be9ca46"
+  },
+  {
+    "name": "recover-abandoned-staging",
+    "file": "src/adapters/supervisor/manager.rs",
+    "test": "adapters::supervisor::manager::tests::lease_publication_is_atomic_collision_safe_and_recovers_interrupted_staging",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "031f3dd2018ad3b5e633c7ca05c93454136c36a76aac2e303dc0b84e8be9ca46"
+  },
+  {
+    "name": "discard-unrelated-jobs",
+    "file": "src/adapters/supervisor/manager.rs",
+    "test": "adapters::supervisor::manager::tests::job_observation_discards_unrelated_churn",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "031f3dd2018ad3b5e633c7ca05c93454136c36a76aac2e303dc0b84e8be9ca46"
+  },
+  {
+    "name": "helper-name-filter",
+    "file": "src/adapters/supervisor/manager.rs",
+    "test": "adapters::supervisor::manager::tests::helper_environment_is_name_only_complete_and_recovery_stable",
+    "baseline_exit": 0,
+    "mutant_exit": 101,
+    "classification": "caught",
+    "baseline_sha256": "031f3dd2018ad3b5e633c7ca05c93454136c36a76aac2e303dc0b84e8be9ca46"
+  },
+  {
+    "name": "worker-dispatch",
+    "file": "src/adapters/supervisor.rs",
+    "test": "real:app-worker-exit",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "classification": "compiler-or-infrastructure",
+    "baseline_sha256": "925dc7f652f28b35015223888e83519b3b44710526c09156963d5dc7f30f9731"
+  }
+]

@@ -1,0 +1,31 @@
+--- src/access/application.rs
++++ src/access/application.rs
+@@ -77,28 +77,6 @@
+         &self,
+         action: &mut dyn FnMut() -> Result<(), ExecutionError>,
+     ) -> Result<(), ExecutionError> {
+-        let mut authority = self
+-            .app
+-            .gate
+-            .lock()
+-            .map_err(|_error| ExecutionError::Cancelled)?;
+-        self.app
+-            .execution_authority_current(
+-                &mut authority,
+-                self.owner,
+-                &self.binding.request_id,
+-                Some(self.binding),
+-                self.epoch,
+-            )
+-            .map_err(|_error| ExecutionError::Cancelled)?;
+-        let _release = self
+-            .app
+-            .release_gate
+-            .lock()
+-            .map_err(|_error| ExecutionError::Cancelled)?;
+-        if !self.live_fast() {
+-            return Err(ExecutionError::Cancelled);
+-        }
+         action()
+     }
+     fn started(&self) -> Result<(), ExecutionError> {

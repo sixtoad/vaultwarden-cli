@@ -1,0 +1,11 @@
+{
+  "test": "adapters::supervisor::bridge::tests::pre_exec_sigkill_with_empty_error_pipe_reports_failure_and_confirmed_cleanup",
+  "mutation": "Run trace_exec but discard its result; authorize EXEC from pipe EOF alone",
+  "source_sha256_before": "26f0d4e3920f70a7a25bc2bddcf3fddf6f0d3b0b1adc659a212dceaa098593b3",
+  "baseline_exit": 0,
+  "mutant_exit": 101,
+  "source_sha256_restored": "26f0d4e3920f70a7a25bc2bddcf3fddf6f0d3b0b1adc659a212dceaa098593b3",
+  "source_restored": true,
+  "classification": "caught by regression assertion (false ExecConfirmed), not timeout",
+  "restored_exit": 0
+}

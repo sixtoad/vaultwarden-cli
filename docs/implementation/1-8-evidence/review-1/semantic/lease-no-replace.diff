@@ -1,0 +1,11 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -234,7 +234,7 @@
+             file.sync_all().map_err(failure)?;
+             // Publishing a hard link is atomic and refuses an existing final name.
+             // A crash before publication leaves only a precisely owned staging file.
+-            std::fs::hard_link(&staging, self.lease_path(&lease.name)).map_err(failure)?;
++            std::fs::copy(&staging, self.lease_path(&lease.name)).map_err(failure)?;
+             std::fs::File::open(&self.runtime)
+                 .and_then(|f| f.sync_all())
+                 .map_err(failure)

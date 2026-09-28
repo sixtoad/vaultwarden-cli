@@ -1,14 +1,18 @@
 [Unit]
-Description=Vaultwarden Access locked provider foundation
+Description=Vaultwarden Access protected execution provider
 
 [Service]
-Type=simple
+Type=exec
 ExecStart=%h/.local/bin/vaultwarden-accessd --state-root %h/.local/share/vaultwarden-access/provider
 KillMode=control-group
+SendSIGKILL=yes
+TimeoutStopSec=30s
+LimitCORE=0
+NoNewPrivileges=yes
 
-# Later protected request units are created by the systemd user manager, not
+# Protected request units are created by the systemd user manager, not
 # by agent clients or this service directly. Each must be manager-owned and
-# bind to this unit with BindsTo= and PartOf= plus KillMode=control-group.
+# bind to this unit with BindsTo=, PartOf= and After= plus KillMode=control-group.
 
 [Install]
 WantedBy=default.target

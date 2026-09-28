@@ -1614,52 +1614,58 @@ fn decision_closed_diagnostics_remain_actionable_and_redacted() {
 }
 
 #[test]
-fn decision_legacy_explanations_preserve_terminal_history_and_never_restore_approval() {
-    for (status, lifecycle) in [
-        (DirectStatus::Pending, "pending"),
-        (DirectStatus::Approved, "approved"),
-        (DirectStatus::Denied, "denied"),
-        (DirectStatus::Expired, "invalidated"),
-        (
-            DirectStatus::Failed {
-                reason: DirectFailure::ReviewUnavailable,
-            },
-            "failed",
-        ),
-    ] {
-        let f = fixture();
-        let id = pending(&f);
-        let mut state = records(&f);
-        let mut direct: DirectRecord =
-            serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
-        direct.review.one_time = LEGACY_ONE_TIME.into();
-        direct.review.status = status.clone();
-        direct.seal();
-        state["requests"][0]["status"] = lifecycle.into();
-        state["requests"][0]["direct"] = serde_json::to_value(&direct).unwrap();
-        let previous = state["requests"][0].clone();
-        let root = f.dir.path().join("provider");
-        std::fs::write(
-            root.join("provider-state.json"),
-            serde_json::to_vec(&state).unwrap(),
-        )
-        .unwrap();
-        drop(f.app);
-        let _restarted = Provider::start(&root).unwrap();
-        let state: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(root.join("provider-state.json")).unwrap())
-                .unwrap();
-        if status.is_terminal() {
-            assert_eq!(state["requests"][0], previous);
-        } else {
-            assert_eq!(state["requests"][0]["status"], "invalidated");
-            assert!(state["requests"][0]["direct"].get("approval").is_none());
+fn decision_previous_explanations_preserve_terminal_history_and_never_restore_approval() {
+    for explanation in [LEGACY_ONE_TIME, PREVIOUS_ONE_TIME] {
+        for (status, lifecycle) in [
+            (DirectStatus::Pending, "pending"),
+            (DirectStatus::Approved, "approved"),
+            (DirectStatus::Denied, "denied"),
+            (DirectStatus::Completed { exit_code: 0 }, "completed"),
+            (DirectStatus::Expired, "invalidated"),
+            (
+                DirectStatus::Failed {
+                    reason: DirectFailure::ReviewUnavailable,
+                },
+                "failed",
+            ),
+        ] {
+            let f = fixture();
+            let id = pending(&f);
+            let mut state = records(&f);
+            let mut direct: DirectRecord =
+                serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
+            direct.review.one_time = explanation.into();
+            direct.review.status = status.clone();
+            direct.seal();
+            if explanation == PREVIOUS_ONE_TIME && status == DirectStatus::Approved {
+                direct.approval = Some(direct.approval_binding());
+            }
+            state["requests"][0]["status"] = lifecycle.into();
+            state["requests"][0]["direct"] = serde_json::to_value(&direct).unwrap();
+            let previous = state["requests"][0].clone();
+            let root = f.dir.path().join("provider");
+            std::fs::write(
+                root.join("provider-state.json"),
+                serde_json::to_vec(&state).unwrap(),
+            )
+            .unwrap();
+            drop(f.app);
+            let _restarted = Provider::start(&root).unwrap();
+            let state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(root.join("provider-state.json")).unwrap())
+                    .unwrap();
+            if status.is_terminal() {
+                assert_eq!(state["requests"][0], previous);
+            } else {
+                assert_eq!(state["requests"][0]["status"], "invalidated");
+                assert!(state["requests"][0]["direct"].get("approval").is_none());
+            }
+            assert_eq!(state["requests"][0]["id"], id);
+            assert_eq!(
+                state["requests"][0]["direct"]["review"]["one_time"],
+                explanation
+            );
         }
-        assert_eq!(state["requests"][0]["id"], id);
-        assert_eq!(
-            state["requests"][0]["direct"]["review"]["one_time"],
-            LEGACY_ONE_TIME
-        );
     }
 }
 
@@ -2251,6 +2257,9 @@ fn unavailable_supervisor_prevents_claim_resolution_and_launch() {
     EXECUTION_ELIGIBILITY_CALLS.with(|calls| assert_eq!(calls.get(), 0));
     EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
     assert_eq!(records(&f), before);
+    assert!(f.app.admission_closed());
+    f.app.shutdown().unwrap();
+    assert_eq!(records(&f)["requests"][0]["status"], "invalidated");
 }
 
 #[test]
@@ -3079,4 +3088,342 @@ fn execution_application_integrates_real_owned_linux_preparation() {
         EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
         assert_execution_quiet();
     }
+}
+
+struct ContainmentBarrier {
+    started: std::sync::mpsc::Sender<()>,
+    clean: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+    evidence: CleanupEvidence,
+    revoked: Option<std::sync::mpsc::Sender<()>>,
+}
+#[test]
+fn queued_cancellation_is_owner_bound_and_prevents_later_claim() {
+    let f = fixture();
+    let first_id = approved(&f);
+    let queued_id = approved(&f);
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+    let (app, active_id, second_id) = (f.app.clone(), first_id.clone(), queued_id.clone());
+    // This worker cannot dequeue the second ID until cleanup releases the first.
+    let worker = std::thread::spawn(move || {
+        let first = app.run_execution(
+            app.human_owner(),
+            &active_id,
+            &ExecutionPreparation::default(),
+            &ContainmentBarrier {
+                started: started_tx,
+                clean: Mutex::new(clean_rx),
+                evidence: CleanupEvidence::Reaped,
+                revoked: None,
+            },
+        );
+        let preparer = ExecutionPreparation::default();
+        let supervisor = OutcomeSupervisor {
+            outcome: Ok(ExecutionOutcome::ExitedZero),
+            launches: std::cell::Cell::new(0),
+        };
+        let queued = app.run_execution(app.human_owner(), &second_id, &preparer, &supervisor);
+        (
+            first,
+            queued,
+            preparer.calls.get(),
+            supervisor.launches.get(),
+        )
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let wrong_owner = AuthenticatedHuman::from_peer_uid(f.app.human_owner().uid() + 1);
+    let before = records(&f);
+    assert_eq!(
+        f.app.cancel_execution(wrong_owner, &queued_id),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(records(&f), before);
+    f.app
+        .cancel_execution(f.app.human_owner(), &queued_id)
+        .unwrap();
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &queued_id),
+        Ok(DirectStatus::Expired)
+    );
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &first_id),
+        Ok(DirectStatus::Running)
+    );
+    let cancelled = records(&f)["requests"][1].clone();
+    assert!(cancelled["direct"].get("approval").is_none());
+    assert_ne!(cancelled["direct"]["execution_claimed"], true);
+    assert_eq!(
+        f.app.cancel_execution(f.app.human_owner(), &queued_id),
+        Err(DirectRequestError::AlreadyDecided)
+    );
+    assert_eq!(records(&f)["requests"][1], cancelled);
+    assert!(!f.app.admission_closed());
+    clean_tx.send(()).unwrap();
+    let (first, queued, preparations, launches) = worker.join().unwrap();
+    assert_eq!(first, Ok(DirectStatus::Completed { exit_code: 0 }));
+    assert_eq!(queued, Err(DirectRequestError::AlreadyDecided));
+    assert_eq!((preparations, launches), (0, 0));
+    assert_eq!(records(&f)["requests"][1], cancelled);
+}
+
+impl ProcessSupervisor<ExecutionPreparation> for ContainmentBarrier {
+    fn available(&self) -> bool {
+        true
+    }
+    fn supervise(
+        &self,
+        _: ObservedPrepared,
+        _: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        Err(ExecutionError::Unavailable)
+    }
+    fn supervise_controlled(
+        &self,
+        _: ObservedPrepared,
+        _: ChildEnvironment,
+        control: &dyn ExecutionControl,
+    ) -> Supervision {
+        control.release(&mut || Ok(())).unwrap();
+        control.started().unwrap();
+        self.started.send(()).unwrap();
+        let mut revoked = self.revoked.clone();
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            if self
+                .clean
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_millis(20))
+                .is_ok()
+            {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            if !control.live()
+                && let Some(sender) = revoked.take()
+            {
+                sender.send(()).unwrap();
+            }
+        }
+        Supervision {
+            outcome: if control.live() {
+                Ok(ExecutionOutcome::ExitedZero)
+            } else {
+                Err(ExecutionError::Cancelled)
+            },
+            cleanup: self.evidence,
+            helper_reaped: false,
+        }
+    }
+}
+#[test]
+fn running_is_observed_before_reaping_and_lock_waits_without_holding_authority() {
+    let f = fixture();
+    let id = approved(&f);
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+    let (app, running_id) = (f.app.clone(), id.clone());
+    let execution = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &running_id,
+            &ExecutionPreparation::default(),
+            &ContainmentBarrier {
+                started: started_tx,
+                clean: std::sync::Mutex::new(clean_rx),
+                evidence: CleanupEvidence::Reaped,
+                revoked: None,
+            },
+        )
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Running)
+    );
+    let (locked_tx, locked_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let epoch = app.revocation_epoch_for_test();
+    let lock = std::thread::spawn(move || locked_tx.send(app.lock()).unwrap());
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while f.app.revocation_epoch_for_test() == epoch {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Running)
+    );
+    assert!(locked_rx.recv_timeout(Duration::from_millis(30)).is_err());
+    clean_tx.send(()).unwrap();
+    assert_eq!(
+        execution.join().unwrap(),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert_eq!(
+        locked_rx.recv_timeout(Duration::from_secs(5)).unwrap(),
+        Ok(())
+    );
+    lock.join().unwrap();
+    assert!(
+        f.app
+            .direct_status(f.app.human_owner(), &id)
+            .unwrap()
+            .is_terminal()
+    );
+}
+#[test]
+fn uncertain_cleanup_closes_admission_and_never_persists_terminal() {
+    let f = fixture();
+    let id = approved(&f);
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+    let (app, running_id) = (f.app.clone(), id.clone());
+    let execution = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &running_id,
+            &ExecutionPreparation::default(),
+            &ContainmentBarrier {
+                started: started_tx,
+                clean: std::sync::Mutex::new(clean_rx),
+                evidence: CleanupEvidence::Uncertain,
+                revoked: None,
+            },
+        )
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    clean_tx.send(()).unwrap();
+    assert_eq!(
+        execution.join().unwrap(),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert!(f.app.admission_closed());
+    assert_eq!(f.app.shutdown(), Err(SessionError::CleanupFailed));
+    assert_eq!(records(&f)["requests"][0]["status"], "running");
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Running)
+    );
+}
+
+#[test]
+fn every_authority_loss_hook_withholds_terminal_until_observed_cleanup() {
+    for cause in ["cancel", "revoke", "shutdown", "request", "session"] {
+        let f = if cause == "session" {
+            fixture_with_lifetime(Duration::from_secs(3600))
+        } else {
+            fixture()
+        };
+        let id = approved(&f);
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+        let (revoked_tx, revoked_rx) = std::sync::mpsc::channel();
+        let (app, running_id) = (f.app.clone(), id.clone());
+        let execution = std::thread::spawn(move || {
+            app.run_execution(
+                app.human_owner(),
+                &running_id,
+                &ExecutionPreparation::default(),
+                &ContainmentBarrier {
+                    started: started_tx,
+                    clean: std::sync::Mutex::new(clean_rx),
+                    evidence: CleanupEvidence::Reaped,
+                    revoked: Some(revoked_tx),
+                },
+            )
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (app, running_id, clock) = (f.app.clone(), id.clone(), f.monotonic.clone());
+        let revoke = std::thread::spawn(move || match cause {
+            "cancel" => app
+                .cancel_execution(app.human_owner(), &running_id)
+                .map_err(|_error| ()),
+            "revoke" => app.revoke_requester(app.human_owner()).map_err(|_error| ()),
+            "shutdown" => app.shutdown().map_err(|_error| ()),
+            "request" => {
+                clock.store(310, Ordering::SeqCst);
+                Ok(())
+            }
+            "session" => {
+                clock.store(910, Ordering::SeqCst);
+                Ok(())
+            }
+            _ => panic!("unknown test cause"),
+        });
+        revoked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(
+            f.app.direct_status(f.app.human_owner(), &id),
+            Ok(DirectStatus::Running),
+            "{cause}"
+        );
+        clean_tx.send(()).unwrap();
+        assert_eq!(
+            execution.join().unwrap(),
+            Err(DirectRequestError::Unavailable)
+        );
+        assert_eq!(revoke.join().unwrap(), Ok(()));
+        let terminal = f.app.direct_status(f.app.human_owner(), &id).unwrap();
+        assert!(terminal.is_terminal());
+        f.app.lock().unwrap();
+        assert_eq!(f.app.direct_status(f.app.human_owner(), &id), Ok(terminal));
+    }
+}
+
+#[test]
+fn final_release_revalidates_authority_after_supervisor_setup() {
+    struct RevokeBeforeRelease(Arc<ProviderApplication>);
+    impl ProcessSupervisor<ExecutionPreparation> for RevokeBeforeRelease {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            Err(ExecutionError::Unavailable)
+        }
+        fn supervise_controlled(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            assert!(control.live());
+            self.0.close_admission();
+            let mut released = false;
+            let result = control.release(&mut || {
+                released = true;
+                Ok(())
+            });
+            assert_eq!(result, Err(ExecutionError::Cancelled));
+            assert!(
+                !released,
+                "revocation must prevent the release message itself"
+            );
+            Supervision {
+                outcome: Err(ExecutionError::Cancelled),
+                cleanup: CleanupEvidence::Reaped,
+                helper_reaped: false,
+            }
+        }
+    }
+    let f = fixture();
+    let id = approved(&f);
+    assert_eq!(
+        f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &RevokeBeforeRelease(f.app.clone())
+        ),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert!(
+        f.app
+            .direct_status(f.app.human_owner(), &id)
+            .unwrap()
+            .is_terminal()
+    );
 }

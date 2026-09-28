@@ -1,0 +1,12 @@
+--- a/src/adapters/supervisor/bridge.rs
++++ b/src/adapters/supervisor/bridge.rs
+@@ -779,7 +779,8 @@
+ ) -> Result<(), BridgeError> {
+     // A CLOEXEC error pipe is separate from the helper's successful exec/start job.
+     // HUP is expected after successful exec, so observe read directly when poll returns.
+-    let confirmed = trace_exec(child) && confirm_exec(read.as_raw_fd());
++    let _ignored_trace_result = trace_exec(child);
++    let confirmed = confirm_exec(read.as_raw_fd());
+     drop(read);
+     let _ignored = send_code(socket, if confirmed { EXEC } else { FAILED });
+     reap_all(socket, child, confirmed)

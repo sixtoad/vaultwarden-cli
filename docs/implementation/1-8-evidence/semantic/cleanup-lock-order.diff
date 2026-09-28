@@ -1,0 +1,10 @@
+--- src/access/application.rs
++++ src/access/application.rs
+@@ -228,7 +228,6 @@
+             && id.map_or(!active.is_empty(), |id| active.contains_key(id))
+             || self.cleanup_uncertain.load(Ordering::Acquire);
+         // Cancellation acquires release_gate before executions; never invert it.
+-        drop(active);
+         #[cfg(test)]
+         CLEANUP_WAIT_HOOK.with(|hook| {
+             if let Some(observe) = hook.borrow_mut().take() {
