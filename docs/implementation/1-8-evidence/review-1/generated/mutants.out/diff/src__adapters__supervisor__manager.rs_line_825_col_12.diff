@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ delete ! in proc_empty
+@@ -817,17 +817,17 @@
+         }
+         if groups
+             .lines()
+             .filter_map(|line| line.strip_prefix("0::"))
+             .any(|path| belongs(path, cgroup))
+         {
+             return Ok(false);
+         }
+-        if !groups.lines().any(|line| line.starts_with("0::")) {
++        if  /* ~ changed by cargo-mutants ~ */groups.lines().any(|line| line.starts_with("0::")) {
+             return Err(ExecutionError::CleanupUncertain);
+         }
+     }
+     Ok(true)
+ }
+ fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {
+     let m = std::fs::symlink_metadata(path).map_err(failure)?;
+     let uid = unsafe { libc::geteuid() };

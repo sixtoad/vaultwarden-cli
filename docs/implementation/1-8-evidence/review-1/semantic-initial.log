@@ -1,0 +1,35 @@
+cleanup-lock-order baseline passed
+zero-packet-rights baseline passed
+required-dependency baseline passed
+release-authority baseline passed
+cleanup-terminal baseline passed
+revocation-lifecycle baseline passed
+recovery-before-validation baseline passed
+actual-helper-parent baseline passed
+queued-cancellation baseline passed
+unavailable-closes-admission baseline passed
+lease-no-replace baseline passed
+recover-abandoned-staging baseline passed
+discard-unrelated-jobs baseline passed
+helper-name-filter baseline passed
+worker-dispatch baseline passed
+cleanup-lock-order caught
+zero-packet-rights caught
+required-dependency caught
+release-authority caught
+cleanup-terminal caught
+revocation-lifecycle caught
+recovery-before-validation caught
+actual-helper-parent caught
+queued-cancellation caught
+unavailable-closes-admission caught
+lease-no-replace caught
+recover-abandoned-staging caught
+discard-unrelated-jobs caught
+helper-name-filter caught
+worker-dispatch compiler-or-infrastructure
+Traceback (most recent call last):
+  File "/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/docs/implementation/1-8-evidence/review-1/semantic-runner.py", line 62, in <module>
+    if classification!='caught': raise RuntimeError((name,classification))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: ('worker-dispatch', 'compiler-or-infrastructure')

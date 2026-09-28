@@ -1,0 +1,24 @@
+scenario: app-nonzero
+CARGO_TARGET_DIR: /home/sixtocantolla/.vaultwarden-cli-tests.ZaJPbP/vw18-custom-target-3ff1palg/artifacts
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.75s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.83s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/systemd_supervisor.rs (/home/sixtocantolla/.vaultwarden-cli-tests.ZaJPbP/vw18-custom-target-3ff1palg/artifacts/debug/deps/systemd_supervisor-48ba7792a1e4a7c1)
+
+running 1 test
+real-manager scenario: app-nonzero
+
+thread 'independent_descendants_provider_crash_and_recovery' (2729883) panicked at tests/systemd_supervisor.rs:229:9:
+real-manager barrier deadline; stage=Ok("recovered")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test independent_descendants_provider_crash_and_recovery ... FAILED
+
+failures:
+
+failures:
+    independent_descendants_provider_crash_and_recovery
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 40.10s
+
+error: test failed, to rerun pass `--test systemd_supervisor`
+exit_code: 101

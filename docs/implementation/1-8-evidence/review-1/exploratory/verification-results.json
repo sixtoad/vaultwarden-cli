@@ -1,0 +1,94 @@
+[
+  {
+    "name": "formatting",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 2.42
+  },
+  {
+    "name": "static-contracts",
+    "command": [
+      "python3",
+      "docs/implementation/1-8-evidence/static-contracts.py"
+    ],
+    "exit": 0,
+    "seconds": 0.17
+  },
+  {
+    "name": "strict-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 15.48
+  },
+  {
+    "name": "stable-all-targets",
+    "command": [
+      "env",
+      "RUST_TEST_THREADS=4",
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 230.97
+  },
+  {
+    "name": "rust-1.88-all-targets",
+    "command": [
+      "env",
+      "RUST_TEST_THREADS=4",
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 262.53
+  },
+  {
+    "name": "named-contracts",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "contract",
+      "--",
+      "--test-threads=4"
+    ],
+    "exit": 0,
+    "seconds": 17.33
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 1,
+    "seconds": 0.32
+  }
+]

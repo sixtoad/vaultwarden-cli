@@ -1,0 +1,16 @@
+$ uname -smr
+Linux 6.18.7-76061807-generic x86_64
+exit=0
+$ rustc --version
+rustc 1.98.1 (48a229cea 2026-09-01)
+exit=0
+$ rustup run 1.88.0 rustc --version
+rustc 1.88.0 (6b00bc388 2025-06-23)
+exit=0
+$ systemctl --version
+systemd 255 (255.4-1ubuntu8.15pop0~1778766128~24.04~85b5073)
++PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified
+exit=0
+$ /usr/bin/firefox --version
+Mozilla Firefox 151.0.2
+exit=0

@@ -1,0 +1,22 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.74s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test access::application::tests::uncertain_cleanup_releases_execution_registry_before_closing_admission ... FAILED
+
+failures:
+
+---- access::application::tests::uncertain_cleanup_releases_execution_registry_before_closing_admission stdout ----
+
+thread 'access::application::tests::uncertain_cleanup_releases_execution_registry_before_closing_admission' (1452383) panicked at src/access/application.rs:1074:9:
+cleanup would invert the cancellation lock order
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    access::application::tests::uncertain_cleanup_releases_execution_registry_before_closing_admission
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 557 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `--lib`

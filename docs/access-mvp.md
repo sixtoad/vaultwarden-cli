@@ -5,9 +5,10 @@ under distinct restricted OS principals. A same-UID agent can read the human's
 memory and keyring and is not a supported secret boundary. The existing direct
 `vaultwarden-cli` remains a separate human-only vault client.
 
-Stories 1.1–1.6 provide private state, constrained operation policy, a protected
+Stories 1.1–1.8 provide private state, constrained operation policy, a protected
 provider session, authenticated one-time browser decisions and immutable executable
-preparation. Agent transport, protected dispatch and platform/WebAuthn authentication
+preparation, login-backed execution and descendant containment. Agent transport
+and platform/WebAuthn authentication
 are later stories.
 The provider has no agent-facing item lookup, secret export or password command.
 
@@ -53,9 +54,12 @@ specified below.
    non-symlink, single-link, mode `0600`, at most 64 KiB. Protect the CA signing
    key separately. Repository `tests/fixtures/provider-tls` identities are public
    synthetic test fixtures and must never be used or trusted for real accounts.
-5. Run `vaultwarden-accessd --state-root <private-directory> --backend-config
+5. Configure the supplied `vaultwarden-accessd.service` user unit to run
+   `vaultwarden-accessd --state-root <private-directory> --backend-config
    <private-setup.json> --ui-tls-cert <private-server-chain.pem> --ui-tls-key
-   <private-server-key.pem>`. Arguments contain only paths, never passwords or
+   <private-server-key.pem>`, then start that user service. Install its companion
+   helper as described below; arbitrary shell launches are rejected. Arguments
+   contain only paths, never passwords or
    tokens. Absent/invalid identity fails closed. Without `--backend-config`, the
    daemon remains locked with no UI, but it still requires a functioning keyring
    to clear any prior provider session before startup.
@@ -320,3 +324,82 @@ root/provider-owned ancestors and no group/other write or special permission bit
 the wrapper never changes shared directory permissions. Linux 6.3+ executable
 memfd support is required for the positive adapter tests; unavailable fixtures
 fail instead of being silently skipped.
+
+## Protected process containment (Story 1.8)
+
+One-time approval now queues work on a bounded provider worker. `Approved` means
+queued; `Running` is written only after the contained helper observes the kernel's
+successful protected-image exec event. Lock, request cancellation, requester
+revocation, session/request deadlines, transport failure and shutdown revoke
+launch authority independently of the worker. Terminal results require confirmed
+cleanup, even when launch authority has expired. Uncertain cleanup closes admission
+and leaves the durable record nonterminal for startup recovery.
+Cancellation also invalidates an approved request still waiting in the queue,
+under the same claim/release serialization, so its queued ID cannot execute later.
+
+Install `vaultwarden-access-exec` beside `vaultwarden-accessd`, owned by the provider
+UID, executable and without group/other write or special permission bits. Every
+installation ancestor must be root/provider-owned and not writable by other users
+or groups. Run the daemon as `vaultwarden-accessd.service` using the supplied user
+unit: an arbitrary shell process is not an authorized provider instance. The helper
+path is fixed by the daemon installation, never chosen by a request. User-manager
+connectivity, Linux 6.3+ executable memfds, unified cgroup v2, systemd 255+ and
+permitted parent/child ptrace exec-event observation are required; unsupported
+setups fail closed.
+
+Reviewed protected operations and their descendants are trusted code running as
+the provider UID. Containment manages their lifecycle; it is not a hostile same-UID
+sandbox. Deliberate user-manager or cgroup manipulation is outside this guarantee.
+Agents must still run under separate restricted OS principals without provider-UID
+or user-manager access.
+
+Each random transient service has `BindsTo`, `PartOf` and `After` dependencies on
+the provider, `KillMode=control-group`, `CollectMode=inactive-or-failed`, finite
+timeouts, `Restart=no`, null streams,
+zero core limit and no injected manager environment. The checked private runtime
+directory is `/run/user/<uid>/vw-access-<provider-namespace>`. An authenticated Unix
+SEQPACKET channel transfers the sealed executable FD and bounded, zeroizing argv
+and explicit environment. A separate guarded message releases execution. The
+single-threaded helper forks, establishes parent-death SIGKILL and verifies its
+actual helper parent, then executes the descriptor. A kernel `PTRACE_EVENT_EXEC`
+and CLOEXEC error pipe distinguish protected exec from helper start and pre-exec
+signal death. Tracing detaches before workload instructions run. Standard streams
+go directly to `/dev/null`; output is discarded by the kernel without decoded or
+retained buffers.
+
+The manager-launched helper also has an explicit environment boundary. Typed
+`UnsetEnvironment` contains only names: the manager's current inherited names,
+loader/runtime controls and systemd-generated names. Values are never copied to
+unit properties. systemd v255 applies these removals immediately before helper
+exec; an empty `Environment` or `PassEnvironment` alone does not isolate a user
+service. The same-UID manager is trusted, including its environment between the
+snapshot and start: a hostile manager can already replace unit configuration or
+executables. Failure to obtain or establish the removal policy closes execution.
+Recovery validates the stable removal contract without comparing old units to a
+new manager-environment snapshot. See the authoritative
+[systemd v255 environment semantics](https://raw.githubusercontent.com/systemd/systemd/v255/man/systemd.exec.xml).
+
+The helper adopts/reaps descendants as a subreaper. Normal completion carries
+its ECHILD report. The manager stops the entire request cgroup; a separate bounded
+`/proc` scan checks the exact cgroup/subtree, including zombies and deleted cgroup
+paths, while comparing process start times. Forced cleanup and provider crash use
+that independent observation. A retained lease preserves the exact cgroup identity
+for cleanup proof even after a failed unit is unloaded. Empty `cgroup.procs` alone
+is never completion.
+Nonsecret per-unit cleanup identities survive provider death and manager unit
+unloading. Recovery validates exact ownership and stops only owned services under
+the exclusive provider writer lock, before durable startup reconciliation or
+transport admission.
+Recovery records are fully written and synced before atomic, no-replace
+publication. Precisely owned abandoned staging files can be removed at restart;
+unrelated files and existing leases remain untouched.
+
+See `docs/implementation/1-8-test-evidence.md` for the tested platform, completed
+commands and any outstanding acceptance evidence. The real manager suite is
+`scripts/with-secure-test-tmpdir.sh scripts/test-systemd-supervisor.sh`; it uses
+only synthetic credentials and uniquely named provider/request harness units.
+Its syscall fixture requires x86-64 and rejects other test architectures early;
+AArch64 runtime support remains unverified. Journal evidence uses successful reads
+and unique markers on both provider streams to prove visibility of prior output,
+alongside null request streams. It does not claim a privileged global journal
+flush. Exact recorded test resources are stopped and cleaned even on assertions.

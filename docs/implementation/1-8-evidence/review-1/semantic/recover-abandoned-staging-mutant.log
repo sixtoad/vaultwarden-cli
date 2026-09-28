@@ -1,0 +1,34 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+warning: method `owns_staging` is never used
+   --> src/adapters/supervisor/manager.rs:206:8
+    |
+143 | impl Config {
+    | ----------- method in this implementation
+...
+206 |     fn owns_staging(&self, filename: &str) -> bool {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `vaultwarden-cli` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.41s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test adapters::supervisor::manager::tests::lease_publication_is_atomic_collision_safe_and_recovers_interrupted_staging ... FAILED
+
+failures:
+
+---- adapters::supervisor::manager::tests::lease_publication_is_atomic_collision_safe_and_recovers_interrupted_staging stdout ----
+
+thread 'adapters::supervisor::manager::tests::lease_publication_is_atomic_collision_safe_and_recovers_interrupted_staging' (2178341) panicked at src/adapters/supervisor/manager.rs:1037:9:
+assertion failed: !abandoned.exists()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::supervisor::manager::tests::lease_publication_is_atomic_collision_safe_and_recovers_interrupted_staging
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 561 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `--lib`

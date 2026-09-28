@@ -77,7 +77,7 @@ impl Provider {
         cleanup: impl FnOnce() -> Result<(), ()>,
     ) -> Result<Self, ProviderError> {
         let mut store = ProviderStore::open_with_cleanup(root, cleanup)?;
-        let state = store.invalidate_unexecuted()?;
+        let state = store.invalidate_recovered()?;
         Ok(Self {
             store,
             lock_state: ProviderLockState::Locked,
@@ -170,7 +170,10 @@ impl Provider {
         let mut state = self.store.read_state()?;
         let mut changed = false;
         for request in &mut state.requests {
-            if request.direct.is_some()
+            if request
+                .direct
+                .as_ref()
+                .is_some_and(|d| !d.execution_claimed)
                 && matches!(
                     request.status,
                     super::provider_store::RequestLifecycleStatus::Pending
@@ -328,6 +331,38 @@ impl Provider {
         Ok((binding, policy.clone(), argv))
     }
 
+    /// Called under the application claim/release gates only when no active
+    /// execution is registered. No process can exist for an unclaimed approval.
+    pub(crate) fn cancel_unclaimed_execution(
+        &mut self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+    ) -> Result<(), super::direct_request::DirectRequestError> {
+        use super::direct_request::*;
+        let mut state = self.store.read_state()?;
+        let request = state
+            .requests
+            .iter_mut()
+            .find(|request| request.id == id)
+            .ok_or(DirectRequestError::NotFound)?;
+        let direct = request
+            .direct
+            .as_ref()
+            .filter(|direct| direct.owner_uid == owner.uid())
+            .ok_or(DirectRequestError::NotFound)?;
+        if direct.review.status != DirectStatus::Approved || direct.execution_claimed {
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        request.transition(
+            DirectStatus::Expired,
+            DecisionOutcome::ExecutionUnavailable,
+            super::provider_store::provider_wall_time()?,
+        )?;
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub(crate) fn claim_execution(
         &mut self,
@@ -366,28 +401,94 @@ impl Provider {
         Ok(binding)
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn finish_execution(
+    pub(crate) fn execution_matches(
+        &self,
+        binding: &super::direct_request::ApprovalBinding,
+    ) -> Result<bool, super::direct_request::DirectRequestError> {
+        let state = self.store.read_state()?;
+        Ok(state.lifecycle_epoch == binding.lifecycle_epoch
+            && state
+                .operations
+                .iter()
+                .any(|p| p.revision() == binding.policy_digest)
+            && state
+                .requests
+                .iter()
+                .filter_map(|r| r.direct.as_ref())
+                .any(|d| {
+                    d.execution_claimed
+                        && d.approval.as_ref() == Some(binding)
+                        && matches!(
+                            d.review.status,
+                            super::direct_request::DirectStatus::Approved
+                                | super::direct_request::DirectStatus::Running
+                        )
+                }))
+    }
+    pub(crate) fn execution_started(
         &mut self,
         binding: &super::direct_request::ApprovalBinding,
-        status: super::direct_request::DirectStatus,
-        still_authorized: impl Fn() -> bool,
     ) -> Result<(), super::direct_request::DirectRequestError> {
-        use super::{direct_request::*, provider_store::RequestLifecycleStatus};
+        use super::direct_request::*;
         let mut state = self.store.read_state()?;
         let request = state
             .requests
             .iter_mut()
-            .find(|request| request.id == binding.request_id)
+            .find(|r| r.id == binding.request_id)
             .ok_or(DirectRequestError::NotFound)?;
         let direct = request
             .direct
-            .as_mut()
+            .as_ref()
             .ok_or(DirectRequestError::NotFound)?;
-        if direct.owner_uid != binding.requester_uid
-            || !direct.execution_claimed
+        if !direct.execution_claimed
             || direct.approval.as_ref() != Some(binding)
-            || request.status != RequestLifecycleStatus::Approved
+            || direct.review.status != DirectStatus::Approved
+        {
+            return Err(DirectRequestError::Unavailable);
+        }
+        request.transition(
+            DirectStatus::Running,
+            DecisionOutcome::Approved,
+            super::provider_store::provider_wall_time()?,
+        )?;
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(())
+    }
+    pub(crate) fn finish_execution(
+        &mut self,
+        binding: &super::direct_request::ApprovalBinding,
+        status: super::direct_request::DirectStatus,
+        cleanup: super::ports::CleanupEvidence,
+    ) -> Result<(), super::direct_request::DirectRequestError> {
+        use super::{direct_request::*, ports::CleanupEvidence};
+        if cleanup == CleanupEvidence::Uncertain
+            || !matches!(
+                status,
+                DirectStatus::Completed { .. } | DirectStatus::Failed { .. }
+            )
+        {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let mut state = self.store.read_state()?;
+        let request = state
+            .requests
+            .iter_mut()
+            .find(|r| r.id == binding.request_id)
+            .ok_or(DirectRequestError::NotFound)?;
+        let direct = request
+            .direct
+            .as_ref()
+            .ok_or(DirectRequestError::NotFound)?;
+        if !direct.execution_claimed
+            || direct.approval.as_ref() != Some(binding)
+            || !matches!(
+                direct.review.status,
+                DirectStatus::Approved | DirectStatus::Running
+            )
+            || (matches!(status, DirectStatus::Completed { .. })
+                && (cleanup != CleanupEvidence::Reaped
+                    || direct.review.status != DirectStatus::Running))
         {
             return Err(DirectRequestError::Unavailable);
         }
@@ -396,24 +497,13 @@ impl Provider {
         } else {
             DecisionOutcome::ExecutionUnavailable
         };
-        // A synchronous supervisor has already reaped a successful child.
-        // Only that path crosses Running; prelaunch failure closes a claimed
-        // Approved request directly without ever reporting it as launched.
-        if !matches!(
-            status,
-            DirectStatus::Failed {
-                reason: DirectFailure::ExecutionUnavailable
-            }
-        ) {
-            direct.review.status = DirectStatus::Running;
-            request.status = RequestLifecycleStatus::Running;
-        }
         request.transition(
             status,
             outcome,
             super::provider_store::provider_wall_time()?,
         )?;
-        self.store.write_state_guarded(&state, still_authorized)?;
+        // Cleanup authority survives revocation of launch authority.
+        self.store.write_state(&state)?;
         self.state = state;
         Ok(())
     }

@@ -1,0 +1,13 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -847,9 +847,7 @@
+             return Err(ExecutionError::CleanupUncertain);
+         }
+     }
+-    if !has_budget() {
+-        return Err(ExecutionError::CleanupUncertain);
+-    }
++
+     Ok(true)
+ }
+ fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {

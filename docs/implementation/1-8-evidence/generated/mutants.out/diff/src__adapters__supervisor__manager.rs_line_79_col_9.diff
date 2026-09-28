@@ -1,0 +1,27 @@
+--- src/adapters/supervisor/manager.rs
++++ replace Config::owns_name -> bool with true
+@@ -71,23 +71,17 @@
+         Ok(Self {
+             provider,
+             helper,
+             runtime,
+             prefix: format!("vw-access-{namespace}-"),
+         })
+     }
+     pub fn owns_name(&self, name: &str) -> bool {
+-        name.strip_prefix(&self.prefix)
+-            .and_then(|s| s.strip_suffix(".service"))
+-            .is_some_and(|s| {
+-                s.len() == 32
+-                    && s.bytes()
+-                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+-            })
++        true /* ~ changed by cargo-mutants ~ */
+     }
+     pub fn name(&self) -> Result<String, ExecutionError> {
+         let mut random = [0u8; 16];
+         getrandom::fill(&mut random).map_err(failure)?;
+         Ok(format!(
+             "{}{}.service",
+             self.prefix,
+             random

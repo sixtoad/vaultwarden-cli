@@ -1,0 +1,54 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+warning: variable does not need to be mutable
+   --> src/access/application.rs:272:17
+    |
+272 |             let mut authority = self
+    |                 ----^^^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `authority`
+   --> src/access/application.rs:272:17
+    |
+272 |             let mut authority = self
+    |                 ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_authority`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `cancel_unclaimed_execution` is never used
+   --> src/access/provider.rs:336:19
+    |
+ 69 | impl Provider {
+    | ------------- method in this implementation
+...
+336 |     pub(crate) fn cancel_unclaimed_execution(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `vaultwarden-cli` (lib test) generated 3 warnings (run `cargo fix --lib -p vaultwarden-cli --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.77s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test access::direct_request_tests::queued_cancellation_is_owner_bound_and_prevents_later_claim ... FAILED
+
+failures:
+
+---- access::direct_request_tests::queued_cancellation_is_owner_bound_and_prevents_later_claim stdout ----
+
+thread 'access::direct_request_tests::queued_cancellation_is_owner_bound_and_prevents_later_claim' (2172740) panicked at src/access/direct_request_tests.rs:3144:5:
+assertion `left == right` failed
+  left: Ok(Approved)
+ right: Ok(Expired)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    access::direct_request_tests::queued_cancellation_is_owner_bound_and_prevents_later_claim
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 561 filtered out; finished in 0.47s
+
+error: test failed, to rerun pass `--lib`

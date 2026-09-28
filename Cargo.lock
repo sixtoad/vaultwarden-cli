@@ -2680,6 +2680,7 @@ dependencies = [
  "cbc 0.2.1",
  "clap",
  "criterion",
+ "dbus",
  "dbus-secret-service-keyring-store",
  "directories",
  "ed25519-dalek",

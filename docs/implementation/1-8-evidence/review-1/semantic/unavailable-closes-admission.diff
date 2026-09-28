@@ -1,0 +1,10 @@
+--- src/access/application.rs
++++ src/access/application.rs
+@@ -482,7 +482,6 @@
+     ) -> Result<DirectStatus, DirectRequestError> {
+         self.check_owner(owner)?;
+         if !supervisor.available() {
+-            self.close_admission();
+             return Err(DirectRequestError::Unavailable);
+         }
+         // Capture before waiting for the serialized gate. `lock` publishes its

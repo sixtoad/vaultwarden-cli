@@ -1,0 +1,22 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.95s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties ... FAILED
+
+failures:
+
+---- adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties stdout ----
+
+thread 'adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties' (2874947) panicked at src/adapters/supervisor/manager.rs:946:26:
+no entry found for key
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 563 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`

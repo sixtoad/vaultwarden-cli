@@ -1,0 +1,11 @@
+--- src/access/application.rs
++++ src/access/application.rs
+@@ -608,7 +608,7 @@
+                 .lock()
+                 .map_err(|_error| DirectRequestError::Unavailable)?;
+             let live = durable_live && control.live_fast();
+-            if report.cleanup == CleanupEvidence::Uncertain {
++            if false {
+                 self.cleanup_uncertain.store(true, Ordering::Release);
+                 self.closing.store(true, Ordering::Release);
+                 return Err(DirectRequestError::Unavailable);

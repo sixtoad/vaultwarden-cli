@@ -1,0 +1,27 @@
+scenario: app-signal
+CARGO_TARGET_DIR: (default)
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.87s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.15s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.63s
+     Running tests/systemd_supervisor.rs (target/debug/deps/systemd_supervisor-48ba7792a1e4a7c1)
+
+running 1 test
+real-manager scenario: app-signal; provider: vw18-harness-2809184-.tmpREATdy-app-signal.service
+
+thread 'independent_descendants_provider_crash_and_recovery' (2809185) panicked at tests/systemd_supervisor.rs:229:9:
+real-manager barrier deadline; stage=Ok("recovered")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test independent_descendants_provider_crash_and_recovery ... FAILED
+
+failures:
+
+failures:
+    independent_descendants_provider_crash_and_recovery
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 40.34s
+
+error: test failed, to rerun pass `--test systemd_supervisor`
+exit_code: 101

@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ delete ! in proc_empty
+@@ -776,17 +776,17 @@
+         || observed
+             .strip_prefix(cgroup)
+             .is_some_and(|suffix| suffix.starts_with('/'))
+ }
+ fn start_time(stat: &str) -> Option<&str> {
+     stat.rsplit_once(") ")?.1.split_whitespace().nth(19)
+ }
+ pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {
+-    if !valid_cgroup(cgroup) {
++    if  /* ~ changed by cargo-mutants ~ */valid_cgroup(cgroup) {
+         return Err(ExecutionError::CleanupUncertain);
+     }
+     for entry in std::fs::read_dir(root).map_err(failure)? {
+         let entry = entry.map_err(failure)?;
+         if entry
+             .file_name()
+             .to_str()
+             .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))

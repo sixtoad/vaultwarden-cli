@@ -1,0 +1,610 @@
+[
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace Config::owns_name -> bool with true\n@@ -71,23 +71,17 @@\n         Ok(Self {\n             provider,\n             helper,\n             runtime,\n             prefix: format!(\"vw-access-{namespace}-\"),\n         })\n     }\n     pub fn owns_name(&self, name: &str) -> bool {\n-        name.strip_prefix(&self.prefix)\n-            .and_then(|s| s.strip_suffix(\".service\"))\n-            .is_some_and(|s| {\n-                s.len() == 32\n-                    && s.bytes()\n-                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))\n-            })\n+        true /* ~ changed by cargo-mutants ~ */\n     }\n     pub fn name(&self) -> Result<String, ExecutionError> {\n         let mut random = [0u8; 16];\n         getrandom::fill(&mut random).map_err(failure)?;\n         Ok(format!(\n             \"{}{}.service\",\n             self.prefix,\n             random\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "Config::owns_name",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 6,
+          "line": 86
+        },
+        "start": {
+          "column": 5,
+          "line": 78
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/adapters/supervisor/manager.rs:79:9: replace Config::owns_name -> bool with true",
+    "package": "vaultwarden-cli",
+    "replacement": "true",
+    "span": {
+      "end": {
+        "column": 15,
+        "line": 85
+      },
+      "start": {
+        "column": 9,
+        "line": 79
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace Config::owns_name -> bool with false\n@@ -71,23 +71,17 @@\n         Ok(Self {\n             provider,\n             helper,\n             runtime,\n             prefix: format!(\"vw-access-{namespace}-\"),\n         })\n     }\n     pub fn owns_name(&self, name: &str) -> bool {\n-        name.strip_prefix(&self.prefix)\n-            .and_then(|s| s.strip_suffix(\".service\"))\n-            .is_some_and(|s| {\n-                s.len() == 32\n-                    && s.bytes()\n-                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))\n-            })\n+        false /* ~ changed by cargo-mutants ~ */\n     }\n     pub fn name(&self) -> Result<String, ExecutionError> {\n         let mut random = [0u8; 16];\n         getrandom::fill(&mut random).map_err(failure)?;\n         Ok(format!(\n             \"{}{}.service\",\n             self.prefix,\n             random\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "Config::owns_name",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 6,
+          "line": 86
+        },
+        "start": {
+          "column": 5,
+          "line": 78
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/adapters/supervisor/manager.rs:79:9: replace Config::owns_name -> bool with false",
+    "package": "vaultwarden-cli",
+    "replacement": "false",
+    "span": {
+      "end": {
+        "column": 15,
+        "line": 85
+      },
+      "start": {
+        "column": 9,
+        "line": 79
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace && with || in Config::owns_name\n@@ -75,17 +75,17 @@\n             prefix: format!(\"vw-access-{namespace}-\"),\n         })\n     }\n     pub fn owns_name(&self, name: &str) -> bool {\n         name.strip_prefix(&self.prefix)\n             .and_then(|s| s.strip_suffix(\".service\"))\n             .is_some_and(|s| {\n                 s.len() == 32\n-                    && s.bytes()\n+                    || /* ~ changed by cargo-mutants ~ */ s.bytes()\n                         .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))\n             })\n     }\n     pub fn name(&self) -> Result<String, ExecutionError> {\n         let mut random = [0u8; 16];\n         getrandom::fill(&mut random).map_err(failure)?;\n         Ok(format!(\n             \"{}{}.service\",\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "Config::owns_name",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 6,
+          "line": 86
+        },
+        "start": {
+          "column": 5,
+          "line": 78
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:83:21: replace && with || in Config::owns_name",
+    "package": "vaultwarden-cli",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 23,
+        "line": 83
+      },
+      "start": {
+        "column": 21,
+        "line": 83
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace == with != in Config::owns_name\n@@ -74,17 +74,17 @@\n             runtime,\n             prefix: format!(\"vw-access-{namespace}-\"),\n         })\n     }\n     pub fn owns_name(&self, name: &str) -> bool {\n         name.strip_prefix(&self.prefix)\n             .and_then(|s| s.strip_suffix(\".service\"))\n             .is_some_and(|s| {\n-                s.len() == 32\n+                s.len() != /* ~ changed by cargo-mutants ~ */ 32\n                     && s.bytes()\n                         .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))\n             })\n     }\n     pub fn name(&self) -> Result<String, ExecutionError> {\n         let mut random = [0u8; 16];\n         getrandom::fill(&mut random).map_err(failure)?;\n         Ok(format!(\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "Config::owns_name",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 6,
+          "line": 86
+        },
+        "start": {
+          "column": 5,
+          "line": 78
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:82:25: replace == with != in Config::owns_name",
+    "package": "vaultwarden-cli",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 27,
+        "line": 82
+      },
+      "start": {
+        "column": 25,
+        "line": 82
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace || with && in Config::owns_name\n@@ -76,17 +76,17 @@\n         })\n     }\n     pub fn owns_name(&self, name: &str) -> bool {\n         name.strip_prefix(&self.prefix)\n             .and_then(|s| s.strip_suffix(\".service\"))\n             .is_some_and(|s| {\n                 s.len() == 32\n                     && s.bytes()\n-                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))\n+                        .all(|b| b.is_ascii_digit() && /* ~ changed by cargo-mutants ~ */ (b'a'..=b'f').contains(&b))\n             })\n     }\n     pub fn name(&self) -> Result<String, ExecutionError> {\n         let mut random = [0u8; 16];\n         getrandom::fill(&mut random).map_err(failure)?;\n         Ok(format!(\n             \"{}{}.service\",\n             self.prefix,\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "Config::owns_name",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 6,
+          "line": 86
+        },
+        "start": {
+          "column": 5,
+          "line": 78
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:84:53: replace || with && in Config::owns_name",
+    "package": "vaultwarden-cli",
+    "replacement": "&&",
+    "span": {
+      "end": {
+        "column": 55,
+        "line": 84
+      },
+      "start": {
+        "column": 53,
+        "line": 84
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace belongs -> bool with true\n@@ -576,21 +576,17 @@\n }\n fn valid_cgroup(path: &str) -> bool {\n     path.starts_with('/')\n         && path.len() < 2048\n         && !path.split('/').any(|s| matches!(s, \".\" | \"..\"))\n         && !path.chars().any(char::is_control)\n }\n fn belongs(observed: &str, cgroup: &str) -> bool {\n-    let observed = observed.strip_suffix(\" (deleted)\").unwrap_or(observed);\n-    observed == cgroup\n-        || observed\n-            .strip_prefix(cgroup)\n-            .is_some_and(|suffix| suffix.starts_with('/'))\n+    true /* ~ changed by cargo-mutants ~ */\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n     if !valid_cgroup(cgroup) {\n         return Err(ExecutionError::CleanupUncertain);\n     }\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "belongs",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 589
+        },
+        "start": {
+          "column": 1,
+          "line": 583
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/adapters/supervisor/manager.rs:584:5: replace belongs -> bool with true",
+    "package": "vaultwarden-cli",
+    "replacement": "true",
+    "span": {
+      "end": {
+        "column": 59,
+        "line": 588
+      },
+      "start": {
+        "column": 5,
+        "line": 584
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace belongs -> bool with false\n@@ -576,21 +576,17 @@\n }\n fn valid_cgroup(path: &str) -> bool {\n     path.starts_with('/')\n         && path.len() < 2048\n         && !path.split('/').any(|s| matches!(s, \".\" | \"..\"))\n         && !path.chars().any(char::is_control)\n }\n fn belongs(observed: &str, cgroup: &str) -> bool {\n-    let observed = observed.strip_suffix(\" (deleted)\").unwrap_or(observed);\n-    observed == cgroup\n-        || observed\n-            .strip_prefix(cgroup)\n-            .is_some_and(|suffix| suffix.starts_with('/'))\n+    false /* ~ changed by cargo-mutants ~ */\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n     if !valid_cgroup(cgroup) {\n         return Err(ExecutionError::CleanupUncertain);\n     }\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "belongs",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 589
+        },
+        "start": {
+          "column": 1,
+          "line": 583
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/adapters/supervisor/manager.rs:584:5: replace belongs -> bool with false",
+    "package": "vaultwarden-cli",
+    "replacement": "false",
+    "span": {
+      "end": {
+        "column": 59,
+        "line": 588
+      },
+      "start": {
+        "column": 5,
+        "line": 584
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace || with && in belongs\n@@ -578,17 +578,17 @@\n     path.starts_with('/')\n         && path.len() < 2048\n         && !path.split('/').any(|s| matches!(s, \".\" | \"..\"))\n         && !path.chars().any(char::is_control)\n }\n fn belongs(observed: &str, cgroup: &str) -> bool {\n     let observed = observed.strip_suffix(\" (deleted)\").unwrap_or(observed);\n     observed == cgroup\n-        || observed\n+        && /* ~ changed by cargo-mutants ~ */ observed\n             .strip_prefix(cgroup)\n             .is_some_and(|suffix| suffix.starts_with('/'))\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n     if !valid_cgroup(cgroup) {\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "belongs",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 589
+        },
+        "start": {
+          "column": 1,
+          "line": 583
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:586:9: replace || with && in belongs",
+    "package": "vaultwarden-cli",
+    "replacement": "&&",
+    "span": {
+      "end": {
+        "column": 11,
+        "line": 586
+      },
+      "start": {
+        "column": 9,
+        "line": 586
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace == with != in belongs\n@@ -577,17 +577,17 @@\n fn valid_cgroup(path: &str) -> bool {\n     path.starts_with('/')\n         && path.len() < 2048\n         && !path.split('/').any(|s| matches!(s, \".\" | \"..\"))\n         && !path.chars().any(char::is_control)\n }\n fn belongs(observed: &str, cgroup: &str) -> bool {\n     let observed = observed.strip_suffix(\" (deleted)\").unwrap_or(observed);\n-    observed == cgroup\n+    observed != /* ~ changed by cargo-mutants ~ */ cgroup\n         || observed\n             .strip_prefix(cgroup)\n             .is_some_and(|suffix| suffix.starts_with('/'))\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "belongs",
+      "return_type": "-> bool",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 589
+        },
+        "start": {
+          "column": 1,
+          "line": 583
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:585:14: replace == with != in belongs",
+    "package": "vaultwarden-cli",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 16,
+        "line": 585
+      },
+      "start": {
+        "column": 14,
+        "line": 585
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace proc_empty -> Result<bool, ExecutionError> with Ok(true)\n@@ -586,62 +586,17 @@\n         || observed\n             .strip_prefix(cgroup)\n             .is_some_and(|suffix| suffix.starts_with('/'))\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n-    if !valid_cgroup(cgroup) {\n-        return Err(ExecutionError::CleanupUncertain);\n-    }\n-    for entry in std::fs::read_dir(root).map_err(failure)? {\n-        let entry = entry.map_err(failure)?;\n-        if entry\n-            .file_name()\n-            .to_str()\n-            .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n-        {\n-            continue;\n-        }\n-        let path = entry.path();\n-        let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n-            match std::fs::read_to_string(path.join(name)) {\n-                Ok(s) => Ok(Some(s)),\n-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n-                Err(_) => Err(ExecutionError::CleanupUncertain),\n-            }\n-        };\n-        let Some(before) = read(\"stat\")? else {\n-            continue;\n-        };\n-        let Some(groups) = read(\"cgroup\")? else {\n-            continue;\n-        };\n-        let Some(after) = read(\"stat\")? else {\n-            continue;\n-        };\n-        let before = start_time(&before).ok_or(ExecutionError::CleanupUncertain)?;\n-        let after = start_time(&after).ok_or(ExecutionError::CleanupUncertain)?;\n-        if before != after {\n-            return Err(ExecutionError::CleanupUncertain);\n-        }\n-        if groups\n-            .lines()\n-            .filter_map(|line| line.strip_prefix(\"0::\"))\n-            .any(|path| belongs(path, cgroup))\n-        {\n-            return Ok(false);\n-        }\n-        if !groups.lines().any(|line| line.starts_with(\"0::\")) {\n-            return Err(ExecutionError::CleanupUncertain);\n-        }\n-    }\n-    Ok(true)\n+    Ok(true) /* ~ changed by cargo-mutants ~ */\n }\n fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {\n     let m = std::fs::symlink_metadata(path).map_err(failure)?;\n     let uid = unsafe { libc::geteuid() };\n     if !m.is_dir()\n         || m.file_type().is_symlink()\n         || (m.uid() != uid && m.uid() != 0)\n         || m.mode() & 0o7022 != 0\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/adapters/supervisor/manager.rs:594:5: replace proc_empty -> Result<bool, ExecutionError> with Ok(true)",
+    "package": "vaultwarden-cli",
+    "replacement": "Ok(true)",
+    "span": {
+      "end": {
+        "column": 13,
+        "line": 639
+      },
+      "start": {
+        "column": 5,
+        "line": 594
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace proc_empty -> Result<bool, ExecutionError> with Ok(false)\n@@ -586,62 +586,17 @@\n         || observed\n             .strip_prefix(cgroup)\n             .is_some_and(|suffix| suffix.starts_with('/'))\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n-    if !valid_cgroup(cgroup) {\n-        return Err(ExecutionError::CleanupUncertain);\n-    }\n-    for entry in std::fs::read_dir(root).map_err(failure)? {\n-        let entry = entry.map_err(failure)?;\n-        if entry\n-            .file_name()\n-            .to_str()\n-            .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n-        {\n-            continue;\n-        }\n-        let path = entry.path();\n-        let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n-            match std::fs::read_to_string(path.join(name)) {\n-                Ok(s) => Ok(Some(s)),\n-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n-                Err(_) => Err(ExecutionError::CleanupUncertain),\n-            }\n-        };\n-        let Some(before) = read(\"stat\")? else {\n-            continue;\n-        };\n-        let Some(groups) = read(\"cgroup\")? else {\n-            continue;\n-        };\n-        let Some(after) = read(\"stat\")? else {\n-            continue;\n-        };\n-        let before = start_time(&before).ok_or(ExecutionError::CleanupUncertain)?;\n-        let after = start_time(&after).ok_or(ExecutionError::CleanupUncertain)?;\n-        if before != after {\n-            return Err(ExecutionError::CleanupUncertain);\n-        }\n-        if groups\n-            .lines()\n-            .filter_map(|line| line.strip_prefix(\"0::\"))\n-            .any(|path| belongs(path, cgroup))\n-        {\n-            return Ok(false);\n-        }\n-        if !groups.lines().any(|line| line.starts_with(\"0::\")) {\n-            return Err(ExecutionError::CleanupUncertain);\n-        }\n-    }\n-    Ok(true)\n+    Ok(false) /* ~ changed by cargo-mutants ~ */\n }\n fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {\n     let m = std::fs::symlink_metadata(path).map_err(failure)?;\n     let uid = unsafe { libc::geteuid() };\n     if !m.is_dir()\n         || m.file_type().is_symlink()\n         || (m.uid() != uid && m.uid() != 0)\n         || m.mode() & 0o7022 != 0\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/adapters/supervisor/manager.rs:594:5: replace proc_empty -> Result<bool, ExecutionError> with Ok(false)",
+    "package": "vaultwarden-cli",
+    "replacement": "Ok(false)",
+    "span": {
+      "end": {
+        "column": 13,
+        "line": 639
+      },
+      "start": {
+        "column": 5,
+        "line": 594
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ delete ! in proc_empty\n@@ -586,17 +586,17 @@\n         || observed\n             .strip_prefix(cgroup)\n             .is_some_and(|suffix| suffix.starts_with('/'))\n }\n fn start_time(stat: &str) -> Option<&str> {\n     stat.rsplit_once(\") \")?.1.split_whitespace().nth(19)\n }\n pub(super) fn proc_empty(root: &Path, cgroup: &str) -> Result<bool, ExecutionError> {\n-    if !valid_cgroup(cgroup) {\n+    if  /* ~ changed by cargo-mutants ~ */valid_cgroup(cgroup) {\n         return Err(ExecutionError::CleanupUncertain);\n     }\n     for entry in std::fs::read_dir(root).map_err(failure)? {\n         let entry = entry.map_err(failure)?;\n         if entry\n             .file_name()\n             .to_str()\n             .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "UnaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:594:8: delete ! in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "",
+    "span": {
+      "end": {
+        "column": 9,
+        "line": 594
+      },
+      "start": {
+        "column": 8,
+        "line": 594
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace || with && in proc_empty\n@@ -594,17 +594,17 @@\n     if !valid_cgroup(cgroup) {\n         return Err(ExecutionError::CleanupUncertain);\n     }\n     for entry in std::fs::read_dir(root).map_err(failure)? {\n         let entry = entry.map_err(failure)?;\n         if entry\n             .file_name()\n             .to_str()\n-            .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n+            .is_none_or(|s| s.is_empty() && /* ~ changed by cargo-mutants ~ */ !s.bytes().all(|b| b.is_ascii_digit()))\n         {\n             continue;\n         }\n         let path = entry.path();\n         let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n             match std::fs::read_to_string(path.join(name)) {\n                 Ok(s) => Ok(Some(s)),\n                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:602:42: replace || with && in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "&&",
+    "span": {
+      "end": {
+        "column": 44,
+        "line": 602
+      },
+      "start": {
+        "column": 42,
+        "line": 602
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ delete ! in proc_empty\n@@ -594,17 +594,17 @@\n     if !valid_cgroup(cgroup) {\n         return Err(ExecutionError::CleanupUncertain);\n     }\n     for entry in std::fs::read_dir(root).map_err(failure)? {\n         let entry = entry.map_err(failure)?;\n         if entry\n             .file_name()\n             .to_str()\n-            .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n+            .is_none_or(|s| s.is_empty() ||  /* ~ changed by cargo-mutants ~ */s.bytes().all(|b| b.is_ascii_digit()))\n         {\n             continue;\n         }\n         let path = entry.path();\n         let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n             match std::fs::read_to_string(path.join(name)) {\n                 Ok(s) => Ok(Some(s)),\n                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "UnaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:602:45: delete ! in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "",
+    "span": {
+      "end": {
+        "column": 46,
+        "line": 602
+      },
+      "start": {
+        "column": 45,
+        "line": 602
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace match guard e.kind() == std::io::ErrorKind::NotFound with true in proc_empty\n@@ -602,17 +602,17 @@\n             .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n         {\n             continue;\n         }\n         let path = entry.path();\n         let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n             match std::fs::read_to_string(path.join(name)) {\n                 Ok(s) => Ok(Some(s)),\n-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n+                Err(e) if true /* ~ changed by cargo-mutants ~ */ => Ok(None),\n                 Err(_) => Err(ExecutionError::CleanupUncertain),\n             }\n         };\n         let Some(before) = read(\"stat\")? else {\n             continue;\n         };\n         let Some(groups) = read(\"cgroup\")? else {\n             continue;\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "MatchArmGuard",
+    "name": "src/adapters/supervisor/manager.rs:610:27: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "true",
+    "span": {
+      "end": {
+        "column": 67,
+        "line": 610
+      },
+      "start": {
+        "column": 27,
+        "line": 610
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace match guard e.kind() == std::io::ErrorKind::NotFound with false in proc_empty\n@@ -602,17 +602,17 @@\n             .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n         {\n             continue;\n         }\n         let path = entry.path();\n         let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n             match std::fs::read_to_string(path.join(name)) {\n                 Ok(s) => Ok(Some(s)),\n-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n+                Err(e) if false /* ~ changed by cargo-mutants ~ */ => Ok(None),\n                 Err(_) => Err(ExecutionError::CleanupUncertain),\n             }\n         };\n         let Some(before) = read(\"stat\")? else {\n             continue;\n         };\n         let Some(groups) = read(\"cgroup\")? else {\n             continue;\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "MatchArmGuard",
+    "name": "src/adapters/supervisor/manager.rs:610:27: replace match guard e.kind() == std::io::ErrorKind::NotFound with false in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "false",
+    "span": {
+      "end": {
+        "column": 67,
+        "line": 610
+      },
+      "start": {
+        "column": 27,
+        "line": 610
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace == with != in proc_empty\n@@ -602,17 +602,17 @@\n             .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))\n         {\n             continue;\n         }\n         let path = entry.path();\n         let read = |name: &str| -> Result<Option<String>, ExecutionError> {\n             match std::fs::read_to_string(path.join(name)) {\n                 Ok(s) => Ok(Some(s)),\n-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),\n+                Err(e) if e.kind() != /* ~ changed by cargo-mutants ~ */ std::io::ErrorKind::NotFound => Ok(None),\n                 Err(_) => Err(ExecutionError::CleanupUncertain),\n             }\n         };\n         let Some(before) = read(\"stat\")? else {\n             continue;\n         };\n         let Some(groups) = read(\"cgroup\")? else {\n             continue;\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:610:36: replace == with != in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 38,
+        "line": 610
+      },
+      "start": {
+        "column": 36,
+        "line": 610
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ replace != with == in proc_empty\n@@ -617,17 +617,17 @@\n         let Some(groups) = read(\"cgroup\")? else {\n             continue;\n         };\n         let Some(after) = read(\"stat\")? else {\n             continue;\n         };\n         let before = start_time(&before).ok_or(ExecutionError::CleanupUncertain)?;\n         let after = start_time(&after).ok_or(ExecutionError::CleanupUncertain)?;\n-        if before != after {\n+        if before == /* ~ changed by cargo-mutants ~ */ after {\n             return Err(ExecutionError::CleanupUncertain);\n         }\n         if groups\n             .lines()\n             .filter_map(|line| line.strip_prefix(\"0::\"))\n             .any(|path| belongs(path, cgroup))\n         {\n             return Ok(false);\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:625:19: replace != with == in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "==",
+    "span": {
+      "end": {
+        "column": 21,
+        "line": 625
+      },
+      "start": {
+        "column": 19,
+        "line": 625
+      }
+    }
+  },
+  {
+    "diff": "--- src/adapters/supervisor/manager.rs\n+++ delete ! in proc_empty\n@@ -627,17 +627,17 @@\n         }\n         if groups\n             .lines()\n             .filter_map(|line| line.strip_prefix(\"0::\"))\n             .any(|path| belongs(path, cgroup))\n         {\n             return Ok(false);\n         }\n-        if !groups.lines().any(|line| line.starts_with(\"0::\")) {\n+        if  /* ~ changed by cargo-mutants ~ */groups.lines().any(|line| line.starts_with(\"0::\")) {\n             return Err(ExecutionError::CleanupUncertain);\n         }\n     }\n     Ok(true)\n }\n fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {\n     let m = std::fs::symlink_metadata(path).map_err(failure)?;\n     let uid = unsafe { libc::geteuid() };\n",
+    "file": "src/adapters/supervisor/manager.rs",
+    "function": {
+      "function_name": "proc_empty",
+      "return_type": "-> Result<bool, ExecutionError>",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 640
+        },
+        "start": {
+          "column": 1,
+          "line": 593
+        }
+      }
+    },
+    "genre": "UnaryOperator",
+    "name": "src/adapters/supervisor/manager.rs:635:12: delete ! in proc_empty",
+    "package": "vaultwarden-cli",
+    "replacement": "",
+    "span": {
+      "end": {
+        "column": 13,
+        "line": 635
+      },
+      "start": {
+        "column": 12,
+        "line": 635
+      }
+    }
+  }
+]

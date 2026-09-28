@@ -1,0 +1,10 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -553,7 +553,6 @@
+     }
+     Ok(vec![
+         property("Description", "Vaultwarden protected execution".to_owned()),
+-        property("BindsTo", vec![config.provider.clone()]),
+         property("PartOf", vec![config.provider.clone()]),
+         property("After", vec![config.provider.clone()]),
+         property("ExecStart", vec![(helper, args, false)]),

@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ delete ! in proc_empty_with_budget
+@@ -792,17 +792,17 @@
+ fn proc_empty_until(root: &Path, cgroup: &str, deadline: Instant) -> Result<bool, ExecutionError> {
+     proc_empty_with_budget(root, cgroup, || Instant::now() < deadline)
+ }
+ fn proc_empty_with_budget(
+     root: &Path,
+     cgroup: &str,
+     mut has_budget: impl FnMut() -> bool,
+ ) -> Result<bool, ExecutionError> {
+-    if !valid_cgroup(cgroup) {
++    if  /* ~ changed by cargo-mutants ~ */valid_cgroup(cgroup) {
+         return Err(ExecutionError::CleanupUncertain);
+     }
+     for entry in std::fs::read_dir(root).map_err(failure)? {
+         // Use the caller's remaining cleanup budget, including non-process entries.
+         // An interrupted inventory cannot prove absence.
+         if !has_budget() {
+             return Err(ExecutionError::CleanupUncertain);
+         }

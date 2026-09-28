@@ -1,0 +1,5 @@
+COMMAND ["python3", "docs/implementation/1-8-evidence/static-contracts.py"]
+PASS: no subprocess/command-string or process-group cleanup fallback
+PASS: no credential-bearing manager property construction
+PASS: descriptor-only protected exec, kernel exec event, parent death, subreaper and CLOEXEC transfer
+PASS: provider unit, writer-locked setup, recovery-before-admission and explicit worker joining

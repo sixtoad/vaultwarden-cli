@@ -1,0 +1,1861 @@
+{
+  "harnesses": {
+    "vw18-harness-1029103-.tmpApCeC1-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:48:56 IST] ; stop_time=[Sun 2026-09-27 19:48:59 IST] ; pid=1029184 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpApCeC1-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpbTXRaD-app-deadline.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:22 IST] ; stop_time=[Sun 2026-09-27 19:49:25 IST] ; pid=1034078 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpbTXRaD-app-deadline.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpEXgsts-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:04 IST] ; stop_time=[Sun 2026-09-27 19:49:04 IST] ; pid=1030823 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpEXgsts-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpfpaUHE-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:48:59 IST] ; stop_time=[Sun 2026-09-27 19:49:01 IST] ; pid=1029732 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpfpaUHE-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpHFF3rC-phase-release.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:35 IST] ; stop_time=[Sun 2026-09-27 19:49:38 IST] ; pid=1036206 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpHFF3rC-phase-release.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpHPFsDD-phase-transfer.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:33 IST] ; stop_time=[Sun 2026-09-27 19:49:35 IST] ; pid=1035793 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpHPFsDD-phase-transfer.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpIdqUAY-app-shutdown.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:19 IST] ; stop_time=[Sun 2026-09-27 19:49:22 IST] ; pid=1033513 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpIdqUAY-app-shutdown.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpivJnn0-app-revoke.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:15 IST] ; stop_time=[Sun 2026-09-27 19:49:19 IST] ; pid=1032882 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpivJnn0-app-revoke.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpJBVZ3c-app-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:12 IST] ; stop_time=[Sun 2026-09-27 19:49:15 IST] ; pid=1032107 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpJBVZ3c-app-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpkl9jWL-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:07 IST] ; stop_time=[Sun 2026-09-27 19:49:07 IST] ; pid=1031425 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpkl9jWL-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpmooRox-app-lock.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:08 IST] ; stop_time=[Sun 2026-09-27 19:49:11 IST] ; pid=1031648 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpmooRox-app-lock.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpPQjzRN-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:04 IST] ; stop_time=[Sun 2026-09-27 19:49:06 IST] ; pid=1030900 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpPQjzRN-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpRTgVNG-phase-helper.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:31 IST] ; stop_time=[Sun 2026-09-27 19:49:33 IST] ; pid=1035454 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpRTgVNG-phase-helper.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpUcAh0F-phase-job.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:28 IST] ; stop_time=[Sun 2026-09-27 19:49:30 IST] ; pid=1035105 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpUcAh0F-phase-job.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1029103-.tmpVR3gjs-app-persistence.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:25 IST] ; stop_time=[Sun 2026-09-27 19:49:28 IST] ; pid=1034546 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1029103-.tmpVR3gjs-app-persistence.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpa4kIZh-fault-stop.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:43 IST] ; stop_time=[Sun 2026-09-27 19:58:45 IST] ; pid=1119413 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpa4kIZh-fault-stop.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpaTSbOa-app-revoke.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:19 IST] ; stop_time=[Sun 2026-09-27 19:58:22 IST] ; pid=1115148 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpaTSbOa-app-revoke.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpd8LlGs-phase-helper.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:33 IST] ; stop_time=[Sun 2026-09-27 19:58:36 IST] ; pid=1117776 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpd8LlGs-phase-helper.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpFE6jOQ-phase-transfer.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:36 IST] ; stop_time=[Sun 2026-09-27 19:58:38 IST] ; pid=1118655 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpFE6jOQ-phase-transfer.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpHXNFVZ-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:03 IST] ; stop_time=[Sun 2026-09-27 19:58:05 IST] ; pid=1111602 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpHXNFVZ-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpIbDbTu-app-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:15 IST] ; stop_time=[Sun 2026-09-27 19:58:19 IST] ; pid=1114089 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpIbDbTu-app-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpv1na7c-app-lock.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:12 IST] ; stop_time=[Sun 2026-09-27 19:58:15 IST] ; pid=1113650 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpv1na7c-app-lock.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpvmXsxU-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:11 IST] ; stop_time=[Sun 2026-09-27 19:58:11 IST] ; pid=1113496 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpvmXsxU-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpWodt7P-app-persistence.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:28 IST] ; stop_time=[Sun 2026-09-27 19:58:31 IST] ; pid=1116953 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpWodt7P-app-persistence.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpWwS5ME-phase-release.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:38 IST] ; stop_time=[Sun 2026-09-27 19:58:41 IST] ; pid=1118965 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpWwS5ME-phase-release.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpx5Lc5j-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:08 IST] ; stop_time=[Sun 2026-09-27 19:58:10 IST] ; pid=1112975 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpx5Lc5j-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpxldcYp-app-deadline.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:25 IST] ; stop_time=[Sun 2026-09-27 19:58:28 IST] ; pid=1116119 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpxldcYp-app-deadline.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpXoQ0to-phase-job.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:31 IST] ; stop_time=[Sun 2026-09-27 19:58:33 IST] ; pid=1117491 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpXoQ0to-phase-job.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpXZWr3U-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:08 IST] ; stop_time=[Sun 2026-09-27 19:58:08 IST] ; pid=1112910 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpXZWr3U-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpYfVf7Y-app-shutdown.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:22 IST] ; stop_time=[Sun 2026-09-27 19:58:25 IST] ; pid=1115635 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpYfVf7Y-app-shutdown.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1111253-.tmpyQWqYx-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:00 IST] ; stop_time=[Sun 2026-09-27 19:58:02 IST] ; pid=1111364 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1111253-.tmpyQWqYx-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmp7CoO3h-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:55 IST] ; stop_time=[Sun 2026-09-27 20:45:57 IST] ; pid=1610795 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmp7CoO3h-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmp7zziBU-app-shutdown.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:08 IST] ; stop_time=[Sun 2026-09-27 20:46:11 IST] ; pid=1612994 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmp7zziBU-app-shutdown.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmp94Af5m-app-persistence.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:15 IST] ; stop_time=[Sun 2026-09-27 20:46:17 IST] ; pid=1613969 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmp94Af5m-app-persistence.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpDRBEmr-phase-job.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:18 IST] ; stop_time=[Sun 2026-09-27 20:46:20 IST] ; pid=1614623 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpDRBEmr-phase-job.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpkMlJrj-app-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:01 IST] ; stop_time=[Sun 2026-09-27 20:46:04 IST] ; pid=1611790 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpkMlJrj-app-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpMJVLms-phase-release.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:25 IST] ; stop_time=[Sun 2026-09-27 20:46:27 IST] ; pid=1615908 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpMJVLms-phase-release.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpMNcDmT-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:50 IST] ; stop_time=[Sun 2026-09-27 20:45:52 IST] ; pid=1609817 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpMNcDmT-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpolMKWs-phase-helper.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:20 IST] ; stop_time=[Sun 2026-09-27 20:46:23 IST] ; pid=1614967 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpolMKWs-phase-helper.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpQ1SExs-app-deadline.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:11 IST] ; stop_time=[Sun 2026-09-27 20:46:15 IST] ; pid=1613471 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpQ1SExs-app-deadline.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpRVz8qo-app-lock.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:58 IST] ; stop_time=[Sun 2026-09-27 20:46:01 IST] ; pid=1611266 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpRVz8qo-app-lock.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpsxKXKZ-phase-transfer.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:23 IST] ; stop_time=[Sun 2026-09-27 20:46:25 IST] ; pid=1615329 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpsxKXKZ-phase-transfer.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpTxqAp5-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:55 IST] ; stop_time=[Sun 2026-09-27 20:45:55 IST] ; pid=1610741 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpTxqAp5-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpux8JUQ-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:57 IST] ; stop_time=[Sun 2026-09-27 20:45:57 IST] ; pid=1611111 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpux8JUQ-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpvnjdi8-fault-stop.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:30 IST] ; stop_time=[Sun 2026-09-27 20:46:32 IST] ; pid=1616591 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpvnjdi8-fault-stop.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpW45WNx-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:47 IST] ; stop_time=[Sun 2026-09-27 20:45:49 IST] ; pid=1609464 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpW45WNx-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-1609374-.tmpXYrS45-app-revoke.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:04 IST] ; stop_time=[Sun 2026-09-27 20:46:07 IST] ; pid=1612222 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-1609374-.tmpXYrS45-app-revoke.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2036520-.tmpDSjqui-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:10 IST] ; stop_time=[Sun 2026-09-27 21:18:12 IST] ; pid=2038534 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2036520-.tmpDSjqui-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2036520-.tmpevNb3p-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:12 IST] ; stop_time=[Sun 2026-09-27 21:18:12 IST] ; pid=2039275 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2036520-.tmpevNb3p-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2036520-.tmpF3b9ER-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:04 IST] ; stop_time=[Sun 2026-09-27 21:18:07 IST] ; pid=2037512 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2036520-.tmpF3b9ER-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2036520-.tmpGFBq8A-helper-environment.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:12 IST] ; stop_time=[Sun 2026-09-27 21:18:12 IST] ; pid=2039293 ; code=exited ; status=101 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2036520-.tmpGFBq8A-helper-environment.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2036520-.tmpw77qib-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:02 IST] ; stop_time=[Sun 2026-09-27 21:18:04 IST] ; pid=2036758 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2036520-.tmpw77qib-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2036520-.tmpWuXERT-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:10 IST] ; stop_time=[Sun 2026-09-27 21:18:10 IST] ; pid=2038438 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2036520-.tmpWuXERT-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmp1OEfVI-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:32 IST] ; stop_time=[Sun 2026-09-27 21:22:32 IST] ; pid=2084009 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmp1OEfVI-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmp2CC3wM-app-persistence.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:59 IST] ; stop_time=[Sun 2026-09-27 21:23:02 IST] ; pid=2088232 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmp2CC3wM-app-persistence.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpAxPmKy-app-deadline.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:55 IST] ; stop_time=[Sun 2026-09-27 21:22:59 IST] ; pid=2087817 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpAxPmKy-app-deadline.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpfV3VRh-app-lock.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:41 IST] ; stop_time=[Sun 2026-09-27 21:22:44 IST] ; pid=2085661 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpfV3VRh-app-lock.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpg2vbyH-phase-release.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:10 IST] ; stop_time=[Sun 2026-09-27 21:23:13 IST] ; pid=2089888 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpg2vbyH-phase-release.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpgGi3LB-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:19 IST] ; stop_time=[Sun 2026-09-27 21:22:21 IST] ; pid=2082895 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpgGi3LB-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpjwR5po-app-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:44 IST] ; stop_time=[Sun 2026-09-27 21:22:48 IST] ; pid=2086360 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpjwR5po-app-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpM608hc-phase-transfer.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:08 IST] ; stop_time=[Sun 2026-09-27 21:23:10 IST] ; pid=2089477 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpM608hc-phase-transfer.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpPj50Q5-app-revoke.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:48 IST] ; stop_time=[Sun 2026-09-27 21:22:51 IST] ; pid=2086792 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpPj50Q5-app-revoke.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpreDhep-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:22 IST] ; stop_time=[Sun 2026-09-27 21:22:25 IST] ; pid=2083164 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpreDhep-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpSCptRL-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:29 IST] ; stop_time=[Sun 2026-09-27 21:22:31 IST] ; pid=2083767 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpSCptRL-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpsehBTT-app-worker-shutdown.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:36 IST] ; stop_time=[Sun 2026-09-27 21:22:39 IST] ; pid=2084401 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpsehBTT-app-worker-shutdown.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpvQbrKG-app-shutdown.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:52 IST] ; stop_time=[Sun 2026-09-27 21:22:55 IST] ; pid=2087362 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpvQbrKG-app-shutdown.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpvxweYY-fault-stop.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:16 IST] ; stop_time=[Sun 2026-09-27 21:23:19 IST] ; pid=2090655 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpvxweYY-fault-stop.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpWNSRkS-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:28 IST] ; stop_time=[Sun 2026-09-27 21:22:28 IST] ; pid=2083690 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpWNSRkS-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpy9iKMq-phase-job.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:03 IST] ; stop_time=[Sun 2026-09-27 21:23:05 IST] ; pid=2088664 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpy9iKMq-phase-job.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-2082775-.tmpZMzgfh-phase-helper.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:05 IST] ; stop_time=[Sun 2026-09-27 21:23:08 IST] ; pid=2088983 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-2082775-.tmpZMzgfh-phase-helper.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-829797-.tmpJff9rb-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:24:34 IST] ; stop_time=[Sun 2026-09-27 19:24:35 IST] ; pid=831166 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-829797-.tmpJff9rb-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-829797-.tmpk1gig4-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:24:25 IST] ; stop_time=[Sun 2026-09-27 19:24:28 IST] ; pid=830305 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-829797-.tmpk1gig4-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-829797-.tmpO2y83l-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:24:29 IST] ; stop_time=[Sun 2026-09-27 19:24:33 IST] ; pid=830538 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-829797-.tmpO2y83l-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-846394-.tmpelY9ij-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:03 IST] ; stop_time=[Sun 2026-09-27 19:27:05 IST] ; pid=846505 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-846394-.tmpelY9ij-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-846394-.tmpFN8zRf-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:12 IST] ; stop_time=[Sun 2026-09-27 19:27:44 IST] ; pid=847633 ; code=exited ; status=101 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-846394-.tmpFN8zRf-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw18-harness-846394-.tmplx25Jj-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:12 IST] ; stop_time=[Sun 2026-09-27 19:27:12 IST] ; pid=847582 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-846394-.tmplx25Jj-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-846394-.tmpWl5cBI-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:06 IST] ; stop_time=[Sun 2026-09-27 19:27:08 IST] ; pid=846707 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-846394-.tmpWl5cBI-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-867675-.tmpFQumGy-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:41 IST] ; stop_time=[Sun 2026-09-27 19:30:43 IST] ; pid=867732 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-867675-.tmpFQumGy-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-867675-.tmpjerQTN-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:50 IST] ; stop_time=[Sun 2026-09-27 19:30:53 IST] ; pid=868737 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-867675-.tmpjerQTN-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-867675-.tmpLMbl7Y-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:53 IST] ; stop_time=[Sun 2026-09-27 19:30:54 IST] ; pid=869102 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-867675-.tmpLMbl7Y-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-867675-.tmpsqshna-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:43 IST] ; stop_time=[Sun 2026-09-27 19:30:46 IST] ; pid=867948 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-867675-.tmpsqshna-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-867675-.tmpvS2vYc-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:50 IST] ; stop_time=[Sun 2026-09-27 19:30:50 IST] ; pid=868616 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-867675-.tmpvS2vYc-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-927056-.tmpCPAcbM-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:19 IST] ; stop_time=[Sun 2026-09-27 19:38:19 IST] ; pid=928515 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-927056-.tmpCPAcbM-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-927056-.tmpJR5MhE-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:10 IST] ; stop_time=[Sun 2026-09-27 19:38:13 IST] ; pid=927172 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-927056-.tmpJR5MhE-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-927056-.tmpM2xfJK-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:13 IST] ; stop_time=[Sun 2026-09-27 19:38:16 IST] ; pid=927778 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-927056-.tmpM2xfJK-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-927056-.tmpqvlnlx-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:19 IST] ; stop_time=[Sun 2026-09-27 19:38:21 IST] ; pid=928571 ; code=exited ; status=101 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-927056-.tmpqvlnlx-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmp1zGjG7-phase-transfer.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:43:02 IST] ; stop_time=[Sun 2026-09-27 19:43:04 IST] ; pid=971070 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmp1zGjG7-phase-transfer.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmp34jrdw-phase-helper.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:59 IST] ; stop_time=[Sun 2026-09-27 19:43:01 IST] ; pid=970764 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmp34jrdw-phase-helper.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpaYifPr-helper-failure.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:35 IST] ; stop_time=[Sun 2026-09-27 19:42:35 IST] ; pid=967272 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpaYifPr-helper-failure.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpCn42NV-app-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:39 IST] ; stop_time=[Sun 2026-09-27 19:42:42 IST] ; pid=968050 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpCn42NV-app-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpDKhVpd-app-persistence.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:53 IST] ; stop_time=[Sun 2026-09-27 19:42:56 IST] ; pid=970018 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpDKhVpd-app-persistence.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpiY35V0-crash.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:32 IST] ; stop_time=[Sun 2026-09-27 19:42:32 IST] ; pid=966862 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpiY35V0-crash.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpLjwvri-cancel.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:26 IST] ; stop_time=[Sun 2026-09-27 19:42:29 IST] ; pid=966146 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpLjwvri-cancel.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpOQCLXQ-app-revoke.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:43 IST] ; stop_time=[Sun 2026-09-27 19:42:46 IST] ; pid=968548 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpOQCLXQ-app-revoke.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpPx8TY8-app-deadline.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:50 IST] ; stop_time=[Sun 2026-09-27 19:42:53 IST] ; pid=969412 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpPx8TY8-app-deadline.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmps2wVnU-orphan.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:24 IST] ; stop_time=[Sun 2026-09-27 19:42:26 IST] ; pid=965650 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmps2wVnU-orphan.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpSjvA5G-app-shutdown.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:46 IST] ; stop_time=[Sun 2026-09-27 19:42:50 IST] ; pid=968954 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpSjvA5G-app-shutdown.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpT1xjfJ-phase-release.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:43:04 IST] ; stop_time=[Sun 2026-09-27 19:43:06 IST] ; pid=971367 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpT1xjfJ-phase-release.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpTZ7XPi-app-lock.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:36 IST] ; stop_time=[Sun 2026-09-27 19:42:39 IST] ; pid=967466 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpTZ7XPi-app-lock.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpvaZgcO-phase-job.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:57 IST] ; stop_time=[Sun 2026-09-27 19:42:59 IST] ; pid=970451 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpvaZgcO-phase-job.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-harness-965577-.tmpx6p8gt-collision.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:32 IST] ; stop_time=[Sun 2026-09-27 19:42:34 IST] ; pid=966924 ; code=exited ; status=0 }",
+      "ControlGroup": "",
+      "Id": "vw18-harness-965577-.tmpx6p8gt-collision.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-panic-2036520-.tmpsQahw2.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:01 IST] ; stop_time=[Sun 2026-09-27 21:18:04 IST] ; pid=2036575 ; code=killed ; status=15/TERM }",
+      "ControlGroup": "",
+      "Id": "vw18-panic-2036520-.tmpsQahw2.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    },
+    "vw18-panic-2082775-.tmp864SAW.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 ; argv[]=/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483 --exact adapters::supervisor::real_tests::provider_harness --ignored --nocapture ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:19 IST] ; stop_time=[Sun 2026-09-27 21:22:21 IST] ; pid=2082810 ; code=killed ; status=15/TERM }",
+      "ControlGroup": "",
+      "Id": "vw18-panic-2082775-.tmp864SAW.service",
+      "BindsTo": "",
+      "PartOf": "",
+      "ActiveState": "inactive",
+      "Transient": "yes"
+    }
+  },
+  "requests": {
+    "vw-access-04adc801cc4299eb-b52aa66ae331a6d76d35581d94d23192.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpF3b9ER/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpF3b9ER/helper /run/user/1000/vw-access-04adc801cc4299eb/b52aa66ae331a6d76d35581d94d23192.sock 2037512 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:05 IST] ; stop_time=[Sun 2026-09-27 21:18:07 IST] ; pid=2037525 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-04adc801cc4299eb-b52aa66ae331a6d76d35581d94d23192.service",
+      "BindsTo": "vw18-harness-2036520-.tmpF3b9ER-cancel.service",
+      "PartOf": "vw18-harness-2036520-.tmpF3b9ER-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-04b08dfbd1d00bff-b71ed1df8aee54c57d37a7930967a086.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpVR3gjs/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpVR3gjs/helper /run/user/1000/vw-access-04b08dfbd1d00bff/b71ed1df8aee54c57d37a7930967a086.sock 1034546 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:26 IST] ; stop_time=[Sun 2026-09-27 19:49:28 IST] ; pid=1034619 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-04b08dfbd1d00bff-b71ed1df8aee54c57d37a7930967a086.service",
+      "BindsTo": "vw18-harness-1029103-.tmpVR3gjs-app-persistence.service",
+      "PartOf": "vw18-harness-1029103-.tmpVR3gjs-app-persistence.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-050454d77d90bd55-33a2f41114916274ca6d8907d5b04984.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpsqshna/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpsqshna/helper /run/user/1000/vw-access-050454d77d90bd55/33a2f41114916274ca6d8907d5b04984.sock 867948 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:44 IST] ; stop_time=[Sun 2026-09-27 19:30:46 IST] ; pid=867961 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-050454d77d90bd55-33a2f41114916274ca6d8907d5b04984.service",
+      "BindsTo": "vw18-harness-867675-.tmpsqshna-cancel.service",
+      "PartOf": "vw18-harness-867675-.tmpsqshna-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-07daaabd54eacb6e-ae225f2f06c77f0a57861a39d2fda7e5.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpHFF3rC/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpHFF3rC/helper /run/user/1000/vw-access-07daaabd54eacb6e/ae225f2f06c77f0a57861a39d2fda7e5.sock 1036206 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:35 IST] ; stop_time=[Sun 2026-09-27 19:49:38 IST] ; pid=1036211 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-07daaabd54eacb6e-ae225f2f06c77f0a57861a39d2fda7e5.service",
+      "BindsTo": "vw18-harness-1029103-.tmpHFF3rC-phase-release.service",
+      "PartOf": "vw18-harness-1029103-.tmpHFF3rC-phase-release.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-08936fcf2fba5f21-f708429536063deadba0b05d04c005d5.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpRTgVNG/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpRTgVNG/helper /run/user/1000/vw-access-08936fcf2fba5f21/f708429536063deadba0b05d04c005d5.sock 1035454 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:31 IST] ; stop_time=[Sun 2026-09-27 19:49:33 IST] ; pid=1035469 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-08936fcf2fba5f21-f708429536063deadba0b05d04c005d5.service",
+      "BindsTo": "vw18-harness-1029103-.tmpRTgVNG-phase-helper.service",
+      "PartOf": "vw18-harness-1029103-.tmpRTgVNG-phase-helper.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-0abce7c9cab0bed2-ec20e48bb8cb43e13b47f549ff91eb13.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpsxKXKZ/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpsxKXKZ/helper /run/user/1000/vw-access-0abce7c9cab0bed2/ec20e48bb8cb43e13b47f549ff91eb13.sock 1615329 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:23 IST] ; stop_time=[Sun 2026-09-27 20:46:25 IST] ; pid=1615333 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-0abce7c9cab0bed2-ec20e48bb8cb43e13b47f549ff91eb13.service",
+      "BindsTo": "vw18-harness-1609374-.tmpsxKXKZ-phase-transfer.service",
+      "PartOf": "vw18-harness-1609374-.tmpsxKXKZ-phase-transfer.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-0c16fafd7810f38d-bb94ed50764123a5513b4489e73c745d.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpMJVLms/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpMJVLms/helper /run/user/1000/vw-access-0c16fafd7810f38d/bb94ed50764123a5513b4489e73c745d.sock 1615908 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:25 IST] ; stop_time=[Sun 2026-09-27 20:46:27 IST] ; pid=1615932 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-0c16fafd7810f38d-bb94ed50764123a5513b4489e73c745d.service",
+      "BindsTo": "vw18-harness-1609374-.tmpMJVLms-phase-release.service",
+      "PartOf": "vw18-harness-1609374-.tmpMJVLms-phase-release.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-12ad788bbbec0efd-30cf9420219f8ba8660119b6f32d092e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmps2wVnU/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmps2wVnU/helper /run/user/1000/vw-access-12ad788bbbec0efd/30cf9420219f8ba8660119b6f32d092e.sock 965650 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:24 IST] ; stop_time=[Sun 2026-09-27 19:42:26 IST] ; pid=965663 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-12ad788bbbec0efd-30cf9420219f8ba8660119b6f32d092e.service",
+      "BindsTo": "vw18-harness-965577-.tmps2wVnU-orphan.service",
+      "PartOf": "vw18-harness-965577-.tmps2wVnU-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-1873784036c6f79a-b9e9308d9481621ec89404a7fb989897.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.eZQcXi/.tmpJff9rb/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.eZQcXi/.tmpJff9rb/helper /run/user/1000/vw-access-1873784036c6f79a/b9e9308d9481621ec89404a7fb989897.sock 831166 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:24:34 IST] ; stop_time=[Sun 2026-09-27 19:24:37 IST] ; pid=831174 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-1873784036c6f79a-b9e9308d9481621ec89404a7fb989897.service",
+      "BindsTo": "vw18-harness-829797-.tmpJff9rb-crash.service",
+      "PartOf": "vw18-harness-829797-.tmpJff9rb-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2010b7f2c63c8c73-193bfdb5f08ab92ac7b2dbf43c2d5d45.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpfpaUHE/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpfpaUHE/helper /run/user/1000/vw-access-2010b7f2c63c8c73/193bfdb5f08ab92ac7b2dbf43c2d5d45.sock 1029732 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:48:59 IST] ; stop_time=[Sun 2026-09-27 19:49:01 IST] ; pid=1029744 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2010b7f2c63c8c73-193bfdb5f08ab92ac7b2dbf43c2d5d45.service",
+      "BindsTo": "vw18-harness-1029103-.tmpfpaUHE-cancel.service",
+      "PartOf": "vw18-harness-1029103-.tmpfpaUHE-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2055ad527d7e8fcf-03a701f5d510374c9d7f9eff775cd82e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmplx25Jj/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmplx25Jj/helper /run/user/1000/vw-access-2055ad527d7e8fcf/03a701f5d510374c9d7f9eff775cd82e.sock 847349 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:09 IST] ; stop_time=[Sun 2026-09-27 19:27:11 IST] ; pid=847356 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2055ad527d7e8fcf-03a701f5d510374c9d7f9eff775cd82e.service",
+      "BindsTo": "vw18-harness-846394-.tmplx25Jj-crash.service",
+      "PartOf": "vw18-harness-846394-.tmplx25Jj-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2135d73709c32044-5f20ffe66c7ff3c9800aa215d67f3bd0.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmp864SAW/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmp864SAW/helper /run/user/1000/vw-access-2135d73709c32044/5f20ffe66c7ff3c9800aa215d67f3bd0.sock 2082810 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:19 IST] ; stop_time=[Sun 2026-09-27 21:22:21 IST] ; pid=2082824 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2135d73709c32044-5f20ffe66c7ff3c9800aa215d67f3bd0.service",
+      "BindsTo": "vw18-panic-2082775-.tmp864SAW.service",
+      "PartOf": "vw18-panic-2082775-.tmp864SAW.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-25fdc5f66e5553e9-d821c23a5cd440778344b35ee6770829.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpWwS5ME/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpWwS5ME/helper /run/user/1000/vw-access-25fdc5f66e5553e9/d821c23a5cd440778344b35ee6770829.sock 1118965 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:38 IST] ; stop_time=[Sun 2026-09-27 19:58:41 IST] ; pid=1118979 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-25fdc5f66e5553e9-d821c23a5cd440778344b35ee6770829.service",
+      "BindsTo": "vw18-harness-1111253-.tmpWwS5ME-phase-release.service",
+      "PartOf": "vw18-harness-1111253-.tmpWwS5ME-phase-release.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-28204ee29c72a8a8-5b5e5ec6314f234d17a97b604984503e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpsehBTT/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpsehBTT/helper /run/user/1000/vw-access-28204ee29c72a8a8/5b5e5ec6314f234d17a97b604984503e.sock 2084401 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:36 IST] ; stop_time=[Sun 2026-09-27 21:22:38 IST] ; pid=2084582 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-28204ee29c72a8a8-5b5e5ec6314f234d17a97b604984503e.service",
+      "BindsTo": "vw18-harness-2082775-.tmpsehBTT-app-worker-shutdown.service",
+      "PartOf": "vw18-harness-2082775-.tmpsehBTT-app-worker-shutdown.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2b2f119d8f364979-cedd9151e9e9a50c7ad070e9a57bb93a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpjwR5po/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpjwR5po/helper /run/user/1000/vw-access-2b2f119d8f364979/cedd9151e9e9a50c7ad070e9a57bb93a.sock 2086360 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:45 IST] ; stop_time=[Sun 2026-09-27 21:22:48 IST] ; pid=2086440 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2b2f119d8f364979-cedd9151e9e9a50c7ad070e9a57bb93a.service",
+      "BindsTo": "vw18-harness-2082775-.tmpjwR5po-app-cancel.service",
+      "PartOf": "vw18-harness-2082775-.tmpjwR5po-app-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2c0d2b3e6081be2d-7ad459dad72deed868f27e612d7b50a1.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmp34jrdw/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmp34jrdw/helper /run/user/1000/vw-access-2c0d2b3e6081be2d/7ad459dad72deed868f27e612d7b50a1.sock 970764 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:59 IST] ; stop_time=[Sun 2026-09-27 19:43:01 IST] ; pid=970766 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2c0d2b3e6081be2d-7ad459dad72deed868f27e612d7b50a1.service",
+      "BindsTo": "vw18-harness-965577-.tmp34jrdw-phase-helper.service",
+      "PartOf": "vw18-harness-965577-.tmp34jrdw-phase-helper.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2c1d026efe3112ee-c279c76e56d8366d1ba0cd3c86b9e83a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpJBVZ3c/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpJBVZ3c/helper /run/user/1000/vw-access-2c1d026efe3112ee/c279c76e56d8366d1ba0cd3c86b9e83a.sock 1032107 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:12 IST] ; stop_time=[Sun 2026-09-27 19:49:15 IST] ; pid=1032184 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2c1d026efe3112ee-c279c76e56d8366d1ba0cd3c86b9e83a.service",
+      "BindsTo": "vw18-harness-1029103-.tmpJBVZ3c-app-cancel.service",
+      "PartOf": "vw18-harness-1029103-.tmpJBVZ3c-app-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2d1cfdb009abf85c-12f8ef225153088740bf39ec19c62715.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpd8LlGs/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpd8LlGs/helper /run/user/1000/vw-access-2d1cfdb009abf85c/12f8ef225153088740bf39ec19c62715.sock 1117776 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:33 IST] ; stop_time=[Sun 2026-09-27 19:58:36 IST] ; pid=1117780 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2d1cfdb009abf85c-12f8ef225153088740bf39ec19c62715.service",
+      "BindsTo": "vw18-harness-1111253-.tmpd8LlGs-phase-helper.service",
+      "PartOf": "vw18-harness-1111253-.tmpd8LlGs-phase-helper.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-2ffd79f48136fcd1-0328a7e4f3f10d75ac78493b2dc1c60f.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpSCptRL/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpSCptRL/helper /run/user/1000/vw-access-2ffd79f48136fcd1/0328a7e4f3f10d75ac78493b2dc1c60f.sock 2083767 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:29 IST] ; stop_time=[Sun 2026-09-27 21:22:31 IST] ; pid=2083781 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-2ffd79f48136fcd1-0328a7e4f3f10d75ac78493b2dc1c60f.service",
+      "BindsTo": "vw18-harness-2082775-.tmpSCptRL-collision.service",
+      "PartOf": "vw18-harness-2082775-.tmpSCptRL-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-306405221cb47392-fb7a6e66471aba5cc0a6f86fe228f9fc.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpg2vbyH/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpg2vbyH/helper /run/user/1000/vw-access-306405221cb47392/fb7a6e66471aba5cc0a6f86fe228f9fc.sock 2089888 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:10 IST] ; stop_time=[Sun 2026-09-27 21:23:13 IST] ; pid=2089890 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-306405221cb47392-fb7a6e66471aba5cc0a6f86fe228f9fc.service",
+      "BindsTo": "vw18-harness-2082775-.tmpg2vbyH-phase-release.service",
+      "PartOf": "vw18-harness-2082775-.tmpg2vbyH-phase-release.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-3346e58e2f79f51f-e9298fab62045bcdcccc5ec5b0ffa335.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.eZQcXi/.tmpk1gig4/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.eZQcXi/.tmpk1gig4/helper /run/user/1000/vw-access-3346e58e2f79f51f/e9298fab62045bcdcccc5ec5b0ffa335.sock 830305 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:24:25 IST] ; stop_time=[Sun 2026-09-27 19:24:28 IST] ; pid=830326 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-3346e58e2f79f51f-e9298fab62045bcdcccc5ec5b0ffa335.service",
+      "BindsTo": "vw18-harness-829797-.tmpk1gig4-orphan.service",
+      "PartOf": "vw18-harness-829797-.tmpk1gig4-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-353c1170d58d9514-de4b1805332d239b537fb6cf3ccae0b7.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpW45WNx/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpW45WNx/helper /run/user/1000/vw-access-353c1170d58d9514/de4b1805332d239b537fb6cf3ccae0b7.sock 1609464 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:47 IST] ; stop_time=[Sun 2026-09-27 20:45:49 IST] ; pid=1609479 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-353c1170d58d9514-de4b1805332d239b537fb6cf3ccae0b7.service",
+      "BindsTo": "vw18-harness-1609374-.tmpW45WNx-orphan.service",
+      "PartOf": "vw18-harness-1609374-.tmpW45WNx-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-361d02ca59bedfc5-4fc45bd669b08a2519179d89ba1b6521.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmp7CoO3h/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmp7CoO3h/helper /run/user/1000/vw-access-361d02ca59bedfc5/4fc45bd669b08a2519179d89ba1b6521.sock 1610795 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:55 IST] ; stop_time=[Sun 2026-09-27 20:45:57 IST] ; pid=1610798 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-361d02ca59bedfc5-4fc45bd669b08a2519179d89ba1b6521.service",
+      "BindsTo": "vw18-harness-1609374-.tmp7CoO3h-collision.service",
+      "PartOf": "vw18-harness-1609374-.tmp7CoO3h-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-368836a5dfcbc36d-a11a82ebaca85be26e426e65f188dad3.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpTZ7XPi/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpTZ7XPi/helper /run/user/1000/vw-access-368836a5dfcbc36d/a11a82ebaca85be26e426e65f188dad3.sock 967466 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:37 IST] ; stop_time=[Sun 2026-09-27 19:42:39 IST] ; pid=967547 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-368836a5dfcbc36d-a11a82ebaca85be26e426e65f188dad3.service",
+      "BindsTo": "vw18-harness-965577-.tmpTZ7XPi-app-lock.service",
+      "PartOf": "vw18-harness-965577-.tmpTZ7XPi-app-lock.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-3794b3a1199b177c-8c71b04636abc205e7db0f2e3a293429.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpMNcDmT/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpMNcDmT/helper /run/user/1000/vw-access-3794b3a1199b177c/8c71b04636abc205e7db0f2e3a293429.sock 1609817 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:50 IST] ; stop_time=[Sun 2026-09-27 20:45:52 IST] ; pid=1609832 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-3794b3a1199b177c-8c71b04636abc205e7db0f2e3a293429.service",
+      "BindsTo": "vw18-harness-1609374-.tmpMNcDmT-cancel.service",
+      "PartOf": "vw18-harness-1609374-.tmpMNcDmT-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-3cdc6e0fed74bbe2-bebbd3dde5938738048e291bd95ebc10.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpaTSbOa/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpaTSbOa/helper /run/user/1000/vw-access-3cdc6e0fed74bbe2/bebbd3dde5938738048e291bd95ebc10.sock 1115148 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:19 IST] ; stop_time=[Sun 2026-09-27 19:58:22 IST] ; pid=1115288 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-3cdc6e0fed74bbe2-bebbd3dde5938738048e291bd95ebc10.service",
+      "BindsTo": "vw18-harness-1111253-.tmpaTSbOa-app-revoke.service",
+      "PartOf": "vw18-harness-1111253-.tmpaTSbOa-app-revoke.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-3eb909356232df02-09853836cb7e37de22a96dcb1fe7fcf6.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpEXgsts/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpEXgsts/helper /run/user/1000/vw-access-3eb909356232df02/09853836cb7e37de22a96dcb1fe7fcf6.sock 1030109 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:01 IST] ; stop_time=[Sun 2026-09-27 19:49:04 IST] ; pid=1030112 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-3eb909356232df02-09853836cb7e37de22a96dcb1fe7fcf6.service",
+      "BindsTo": "vw18-harness-1029103-.tmpEXgsts-crash.service",
+      "PartOf": "vw18-harness-1029103-.tmpEXgsts-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-40590b2a2070a1c2-994f7f8ae7fa2164578dc872776084e3.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpivJnn0/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpivJnn0/helper /run/user/1000/vw-access-40590b2a2070a1c2/994f7f8ae7fa2164578dc872776084e3.sock 1032882 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:16 IST] ; stop_time=[Sun 2026-09-27 19:49:18 IST] ; pid=1032946 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-40590b2a2070a1c2-994f7f8ae7fa2164578dc872776084e3.service",
+      "BindsTo": "vw18-harness-1029103-.tmpivJnn0-app-revoke.service",
+      "PartOf": "vw18-harness-1029103-.tmpivJnn0-app-revoke.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-4113d1a889567dc8-ddd5859f35ef66a5404e3ef43c276c16.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpTxqAp5/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpTxqAp5/helper /run/user/1000/vw-access-4113d1a889567dc8/ddd5859f35ef66a5404e3ef43c276c16.sock 1610420 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:52 IST] ; stop_time=[Sun 2026-09-27 20:45:55 IST] ; pid=1610433 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-4113d1a889567dc8-ddd5859f35ef66a5404e3ef43c276c16.service",
+      "BindsTo": "vw18-harness-1609374-.tmpTxqAp5-crash.service",
+      "PartOf": "vw18-harness-1609374-.tmpTxqAp5-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-439f69eaf2ca883b-5650636c93bcf04f478b82b73f8e4c5f.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpSjvA5G/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpSjvA5G/helper /run/user/1000/vw-access-439f69eaf2ca883b/5650636c93bcf04f478b82b73f8e4c5f.sock 968954 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:47 IST] ; stop_time=[Sun 2026-09-27 19:42:49 IST] ; pid=969024 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-439f69eaf2ca883b-5650636c93bcf04f478b82b73f8e4c5f.service",
+      "BindsTo": "vw18-harness-965577-.tmpSjvA5G-app-shutdown.service",
+      "PartOf": "vw18-harness-965577-.tmpSjvA5G-app-shutdown.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-48012ce6d0090158-9377473adcf9913b68906fba9c331f6a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpvQbrKG/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpvQbrKG/helper /run/user/1000/vw-access-48012ce6d0090158/9377473adcf9913b68906fba9c331f6a.sock 2087362 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:52 IST] ; stop_time=[Sun 2026-09-27 21:22:55 IST] ; pid=2087436 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-48012ce6d0090158-9377473adcf9913b68906fba9c331f6a.service",
+      "BindsTo": "vw18-harness-2082775-.tmpvQbrKG-app-shutdown.service",
+      "PartOf": "vw18-harness-2082775-.tmpvQbrKG-app-shutdown.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-4bd759faefa1c14b-ec1af1da406466fde28ebf8d1a5cc84c.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpvmXsxU/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpvmXsxU/helper /run/user/1000/vw-access-4bd759faefa1c14b/ec1af1da406466fde28ebf8d1a5cc84c.sock 1113496 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:11 IST] ; stop_time=[Sun 2026-09-27 19:58:11 IST] ; pid=1113498 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-4bd759faefa1c14b-ec1af1da406466fde28ebf8d1a5cc84c.service",
+      "BindsTo": "vw18-harness-1111253-.tmpvmXsxU-helper-failure.service",
+      "PartOf": "vw18-harness-1111253-.tmpvmXsxU-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-4bd9060b82df303f-1653f9b71c567fa75a27282d23821df0.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmp1zGjG7/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmp1zGjG7/helper /run/user/1000/vw-access-4bd9060b82df303f/1653f9b71c567fa75a27282d23821df0.sock 971070 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:43:02 IST] ; stop_time=[Sun 2026-09-27 19:43:04 IST] ; pid=971083 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-4bd9060b82df303f-1653f9b71c567fa75a27282d23821df0.service",
+      "BindsTo": "vw18-harness-965577-.tmp1zGjG7-phase-transfer.service",
+      "PartOf": "vw18-harness-965577-.tmp1zGjG7-phase-transfer.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-4fde9eabd4d5a220-0a2c39ec51eca45a8c870d24cc2cf44a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpPj50Q5/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpPj50Q5/helper /run/user/1000/vw-access-4fde9eabd4d5a220/0a2c39ec51eca45a8c870d24cc2cf44a.sock 2086792 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:49 IST] ; stop_time=[Sun 2026-09-27 21:22:51 IST] ; pid=2086866 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-4fde9eabd4d5a220-0a2c39ec51eca45a8c870d24cc2cf44a.service",
+      "BindsTo": "vw18-harness-2082775-.tmpPj50Q5-app-revoke.service",
+      "PartOf": "vw18-harness-2082775-.tmpPj50Q5-app-revoke.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-52bd583fbd3d89b5-e849030deb41455272ed5c6f3f489843.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpgGi3LB/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpgGi3LB/helper /run/user/1000/vw-access-52bd583fbd3d89b5/e849030deb41455272ed5c6f3f489843.sock 2082895 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:19 IST] ; stop_time=[Sun 2026-09-27 21:22:21 IST] ; pid=2082897 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-52bd583fbd3d89b5-e849030deb41455272ed5c6f3f489843.service",
+      "BindsTo": "vw18-harness-2082775-.tmpgGi3LB-orphan.service",
+      "PartOf": "vw18-harness-2082775-.tmpgGi3LB-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-53b01f5c719b13b3-77223061345e0ce1658282dd9f0cd9e8.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpOQCLXQ/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpOQCLXQ/helper /run/user/1000/vw-access-53b01f5c719b13b3/77223061345e0ce1658282dd9f0cd9e8.sock 968548 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:43 IST] ; stop_time=[Sun 2026-09-27 19:42:46 IST] ; pid=968602 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-53b01f5c719b13b3-77223061345e0ce1658282dd9f0cd9e8.service",
+      "BindsTo": "vw18-harness-965577-.tmpOQCLXQ-app-revoke.service",
+      "PartOf": "vw18-harness-965577-.tmpOQCLXQ-app-revoke.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-5a457852d87d2b49-91a597c5791eb720857a904a9048dc40.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmp7zziBU/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmp7zziBU/helper /run/user/1000/vw-access-5a457852d87d2b49/91a597c5791eb720857a904a9048dc40.sock 1612994 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:08 IST] ; stop_time=[Sun 2026-09-27 20:46:11 IST] ; pid=1613079 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-5a457852d87d2b49-91a597c5791eb720857a904a9048dc40.service",
+      "BindsTo": "vw18-harness-1609374-.tmp7zziBU-app-shutdown.service",
+      "PartOf": "vw18-harness-1609374-.tmp7zziBU-app-shutdown.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-5e168e959bca2dce-fd1a90905704623ab31ea95b38063b2d.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpevNb3p/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpevNb3p/helper /run/user/1000/vw-access-5e168e959bca2dce/fd1a90905704623ab31ea95b38063b2d.sock 2039275 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:12 IST] ; stop_time=[Sun 2026-09-27 21:18:12 IST] ; pid=2039277 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-5e168e959bca2dce-fd1a90905704623ab31ea95b38063b2d.service",
+      "BindsTo": "vw18-harness-2036520-.tmpevNb3p-helper-failure.service",
+      "PartOf": "vw18-harness-2036520-.tmpevNb3p-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-5fd4c0b2148655ec-ac9596a9c42577d0e8110097f601182e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmp94Af5m/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmp94Af5m/helper /run/user/1000/vw-access-5fd4c0b2148655ec/ac9596a9c42577d0e8110097f601182e.sock 1613969 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:15 IST] ; stop_time=[Sun 2026-09-27 20:46:17 IST] ; pid=1614103 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-5fd4c0b2148655ec-ac9596a9c42577d0e8110097f601182e.service",
+      "BindsTo": "vw18-harness-1609374-.tmp94Af5m-app-persistence.service",
+      "PartOf": "vw18-harness-1609374-.tmp94Af5m-app-persistence.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-5fddbbed301e837a-f0222c424e0e8269a98e6a2488160723.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpw77qib/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpw77qib/helper /run/user/1000/vw-access-5fddbbed301e837a/f0222c424e0e8269a98e6a2488160723.sock 2036758 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:02 IST] ; stop_time=[Sun 2026-09-27 21:18:04 IST] ; pid=2036772 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-5fddbbed301e837a-f0222c424e0e8269a98e6a2488160723.service",
+      "BindsTo": "vw18-harness-2036520-.tmpw77qib-orphan.service",
+      "PartOf": "vw18-harness-2036520-.tmpw77qib-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-5ffebca4dbeed91f-2a6b986b12c71e8a51c62aad5d2fd10e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpHXNFVZ/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpHXNFVZ/helper /run/user/1000/vw-access-5ffebca4dbeed91f/2a6b986b12c71e8a51c62aad5d2fd10e.sock 1111602 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:03 IST] ; stop_time=[Sun 2026-09-27 19:58:05 IST] ; pid=1111633 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-5ffebca4dbeed91f-2a6b986b12c71e8a51c62aad5d2fd10e.service",
+      "BindsTo": "vw18-harness-1111253-.tmpHXNFVZ-cancel.service",
+      "PartOf": "vw18-harness-1111253-.tmpHXNFVZ-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-63978727e85b378d-6c969b0d124eedcbba3d571a83ff1829.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpjerQTN/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpjerQTN/helper /run/user/1000/vw-access-63978727e85b378d/6c969b0d124eedcbba3d571a83ff1829.sock 868737 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:51 IST] ; stop_time=[Sun 2026-09-27 19:30:53 IST] ; pid=868749 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-63978727e85b378d-6c969b0d124eedcbba3d571a83ff1829.service",
+      "BindsTo": "vw18-harness-867675-.tmpjerQTN-collision.service",
+      "PartOf": "vw18-harness-867675-.tmpjerQTN-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-645a2efb94240ecb-4229fbbedcea8a5f1bf47baef9e99065.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpux8JUQ/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpux8JUQ/helper /run/user/1000/vw-access-645a2efb94240ecb/4229fbbedcea8a5f1bf47baef9e99065.sock 1611111 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:57 IST] ; stop_time=[Sun 2026-09-27 20:45:57 IST] ; pid=1611124 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-645a2efb94240ecb-4229fbbedcea8a5f1bf47baef9e99065.service",
+      "BindsTo": "vw18-harness-1609374-.tmpux8JUQ-helper-failure.service",
+      "PartOf": "vw18-harness-1609374-.tmpux8JUQ-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-666a258d0f0d80d3-777fb8ea0eab72860b2b3e63033a0485.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpPQjzRN/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpPQjzRN/helper /run/user/1000/vw-access-666a258d0f0d80d3/777fb8ea0eab72860b2b3e63033a0485.sock 1030900 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:04 IST] ; stop_time=[Sun 2026-09-27 19:49:06 IST] ; pid=1030931 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-666a258d0f0d80d3-777fb8ea0eab72860b2b3e63033a0485.service",
+      "BindsTo": "vw18-harness-1029103-.tmpPQjzRN-collision.service",
+      "PartOf": "vw18-harness-1029103-.tmpPQjzRN-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-66747426953f00d2-d8c1a5c17fc6bac05d1f69407041834f.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpGFBq8A/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpGFBq8A/helper /run/user/1000/vw-access-66747426953f00d2/d8c1a5c17fc6bac05d1f69407041834f.sock 2039293 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:12 IST] ; stop_time=[Sun 2026-09-27 21:18:12 IST] ; pid=2039295 ; code=exited ; status=1 }",
+      "ControlGroup": "",
+      "Id": "vw-access-66747426953f00d2-d8c1a5c17fc6bac05d1f69407041834f.service",
+      "BindsTo": "vw18-harness-2036520-.tmpGFBq8A-helper-environment.service",
+      "PartOf": "vw18-harness-2036520-.tmpGFBq8A-helper-environment.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-684eadaa58c75680-e1d787adf1a0510c2464095999caaf6a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmp2CC3wM/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmp2CC3wM/helper /run/user/1000/vw-access-684eadaa58c75680/e1d787adf1a0510c2464095999caaf6a.sock 2088232 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:00 IST] ; stop_time=[Sun 2026-09-27 21:23:02 IST] ; pid=2088307 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-684eadaa58c75680-e1d787adf1a0510c2464095999caaf6a.service",
+      "BindsTo": "vw18-harness-2082775-.tmp2CC3wM-app-persistence.service",
+      "PartOf": "vw18-harness-2082775-.tmp2CC3wM-app-persistence.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-7156235d3b0a32cc-20537db9c2d0a19362983964571ffc48.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpLjwvri/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpLjwvri/helper /run/user/1000/vw-access-7156235d3b0a32cc/20537db9c2d0a19362983964571ffc48.sock 966146 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:26 IST] ; stop_time=[Sun 2026-09-27 19:42:29 IST] ; pid=966149 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-7156235d3b0a32cc-20537db9c2d0a19362983964571ffc48.service",
+      "BindsTo": "vw18-harness-965577-.tmpLjwvri-cancel.service",
+      "PartOf": "vw18-harness-965577-.tmpLjwvri-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-72d21f43e9406fc4-eafec2c34869681fc9829ae4dae1a21a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpa4kIZh/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpa4kIZh/helper /run/user/1000/vw-access-72d21f43e9406fc4/eafec2c34869681fc9829ae4dae1a21a.sock 1119413 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:43 IST] ; stop_time=[Sun 2026-09-27 19:58:45 IST] ; pid=1119427 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-72d21f43e9406fc4-eafec2c34869681fc9829ae4dae1a21a.service",
+      "BindsTo": "vw18-harness-1111253-.tmpa4kIZh-fault-stop.service",
+      "PartOf": "vw18-harness-1111253-.tmpa4kIZh-fault-stop.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-7328c28c7bc70f1a-8a7503ca315b8f5b4a98f70c2abe60b4.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpWuXERT/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpWuXERT/helper /run/user/1000/vw-access-7328c28c7bc70f1a/8a7503ca315b8f5b4a98f70c2abe60b4.sock 2037853 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:07 IST] ; stop_time=[Sun 2026-09-27 21:18:10 IST] ; pid=2037866 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-7328c28c7bc70f1a-8a7503ca315b8f5b4a98f70c2abe60b4.service",
+      "BindsTo": "vw18-harness-2036520-.tmpWuXERT-crash.service",
+      "PartOf": "vw18-harness-2036520-.tmpWuXERT-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-74071ea5d735cce2-1638dbc6ba577198f305130d429b6a03.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpFE6jOQ/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpFE6jOQ/helper /run/user/1000/vw-access-74071ea5d735cce2/1638dbc6ba577198f305130d429b6a03.sock 1118655 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:36 IST] ; stop_time=[Sun 2026-09-27 19:58:38 IST] ; pid=1118670 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-74071ea5d735cce2-1638dbc6ba577198f305130d429b6a03.service",
+      "BindsTo": "vw18-harness-1111253-.tmpFE6jOQ-phase-transfer.service",
+      "PartOf": "vw18-harness-1111253-.tmpFE6jOQ-phase-transfer.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-78884136a31f36aa-1a224b2fdeeed7bb55a8357a85ec8806.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpiY35V0/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpiY35V0/helper /run/user/1000/vw-access-78884136a31f36aa/1a224b2fdeeed7bb55a8357a85ec8806.sock 966470 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:29 IST] ; stop_time=[Sun 2026-09-27 19:42:32 IST] ; pid=966483 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-78884136a31f36aa-1a224b2fdeeed7bb55a8357a85ec8806.service",
+      "BindsTo": "vw18-harness-965577-.tmpiY35V0-crash.service",
+      "PartOf": "vw18-harness-965577-.tmpiY35V0-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-79581d2d0526b9a5-f5da735f49195e22ef59ce9a2f0f9c31.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpDRBEmr/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpDRBEmr/helper /run/user/1000/vw-access-79581d2d0526b9a5/f5da735f49195e22ef59ce9a2f0f9c31.sock 1614623 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:18 IST] ; stop_time=[Sun 2026-09-27 20:46:20 IST] ; pid=1614627 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-79581d2d0526b9a5-f5da735f49195e22ef59ce9a2f0f9c31.service",
+      "BindsTo": "vw18-harness-1609374-.tmpDRBEmr-phase-job.service",
+      "PartOf": "vw18-harness-1609374-.tmpDRBEmr-phase-job.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-795dffbf132a9df2-70e4c62ac723fc8a720acfeb9084f252.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpfV3VRh/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpfV3VRh/helper /run/user/1000/vw-access-795dffbf132a9df2/70e4c62ac723fc8a720acfeb9084f252.sock 2085661 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:41 IST] ; stop_time=[Sun 2026-09-27 21:22:44 IST] ; pid=2085868 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-795dffbf132a9df2-70e4c62ac723fc8a720acfeb9084f252.service",
+      "BindsTo": "vw18-harness-2082775-.tmpfV3VRh-app-lock.service",
+      "PartOf": "vw18-harness-2082775-.tmpfV3VRh-app-lock.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-79620cf83f39844e-783e9b46a487c155109a3a61f16d3b4d.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpUcAh0F/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpUcAh0F/helper /run/user/1000/vw-access-79620cf83f39844e/783e9b46a487c155109a3a61f16d3b4d.sock 1035105 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:28 IST] ; stop_time=[Sun 2026-09-27 19:49:30 IST] ; pid=1035119 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-79620cf83f39844e-783e9b46a487c155109a3a61f16d3b4d.service",
+      "BindsTo": "vw18-harness-1029103-.tmpUcAh0F-phase-job.service",
+      "PartOf": "vw18-harness-1029103-.tmpUcAh0F-phase-job.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-7b8052ded27c71d2-c348e59145ed279beeea8ac2daa91420.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmpelY9ij/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmpelY9ij/helper /run/user/1000/vw-access-7b8052ded27c71d2/c348e59145ed279beeea8ac2daa91420.sock 846505 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:03 IST] ; stop_time=[Sun 2026-09-27 19:27:05 IST] ; pid=846507 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-7b8052ded27c71d2-c348e59145ed279beeea8ac2daa91420.service",
+      "BindsTo": "vw18-harness-846394-.tmpelY9ij-orphan.service",
+      "PartOf": "vw18-harness-846394-.tmpelY9ij-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-8020d718e07f399d-f4d94f2b8299600c3238bd4c98e6fcd1.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmpFN8zRf/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmpFN8zRf/helper /run/user/1000/vw-access-8020d718e07f399d/f4d94f2b8299600c3238bd4c98e6fcd1.sock 847633 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:12 IST] ; stop_time=[Sun 2026-09-27 19:27:44 IST] ; pid=847661 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-8020d718e07f399d-f4d94f2b8299600c3238bd4c98e6fcd1.service",
+      "BindsTo": "vw18-harness-846394-.tmpFN8zRf-collision.service",
+      "PartOf": "vw18-harness-846394-.tmpFN8zRf-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-8497eb9921bb699b-f00fee6c583d7ee9d38c4c2305acade8.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpkl9jWL/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpkl9jWL/helper /run/user/1000/vw-access-8497eb9921bb699b/f00fee6c583d7ee9d38c4c2305acade8.sock 1031425 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:07 IST] ; stop_time=[Sun 2026-09-27 19:49:07 IST] ; pid=1031447 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-8497eb9921bb699b-f00fee6c583d7ee9d38c4c2305acade8.service",
+      "BindsTo": "vw18-harness-1029103-.tmpkl9jWL-helper-failure.service",
+      "PartOf": "vw18-harness-1029103-.tmpkl9jWL-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-855fc92e269862f4-dde49eded685d7be942ff6876166af62.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmp1OEfVI/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmp1OEfVI/helper /run/user/1000/vw-access-855fc92e269862f4/dde49eded685d7be942ff6876166af62.sock 2084009 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:32 IST] ; stop_time=[Sun 2026-09-27 21:22:32 IST] ; pid=2084026 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-855fc92e269862f4-dde49eded685d7be942ff6876166af62.service",
+      "BindsTo": "vw18-harness-2082775-.tmp1OEfVI-helper-failure.service",
+      "PartOf": "vw18-harness-2082775-.tmp1OEfVI-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-8a4dd21216e9b889-2e7433b281c57c6bd2ec2a50058e2a6d.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpbTXRaD/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpbTXRaD/helper /run/user/1000/vw-access-8a4dd21216e9b889/2e7433b281c57c6bd2ec2a50058e2a6d.sock 1034078 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:23 IST] ; stop_time=[Sun 2026-09-27 19:49:25 IST] ; pid=1034142 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-8a4dd21216e9b889-2e7433b281c57c6bd2ec2a50058e2a6d.service",
+      "BindsTo": "vw18-harness-1029103-.tmpbTXRaD-app-deadline.service",
+      "PartOf": "vw18-harness-1029103-.tmpbTXRaD-app-deadline.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-8d08d02447780711-b903cdae6b857714b71239f7803b03c4.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpvxweYY/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpvxweYY/helper /run/user/1000/vw-access-8d08d02447780711/b903cdae6b857714b71239f7803b03c4.sock 2090655 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:16 IST] ; stop_time=[Sun 2026-09-27 21:23:19 IST] ; pid=2090669 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-8d08d02447780711-b903cdae6b857714b71239f7803b03c4.service",
+      "BindsTo": "vw18-harness-2082775-.tmpvxweYY-fault-stop.service",
+      "PartOf": "vw18-harness-2082775-.tmpvxweYY-fault-stop.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-8f95c4087a7c6a36-a54c2cb6051ce14fe4b1d21177028f1a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpvaZgcO/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpvaZgcO/helper /run/user/1000/vw-access-8f95c4087a7c6a36/a54c2cb6051ce14fe4b1d21177028f1a.sock 970451 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:57 IST] ; stop_time=[Sun 2026-09-27 19:42:59 IST] ; pid=970464 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-8f95c4087a7c6a36-a54c2cb6051ce14fe4b1d21177028f1a.service",
+      "BindsTo": "vw18-harness-965577-.tmpvaZgcO-phase-job.service",
+      "PartOf": "vw18-harness-965577-.tmpvaZgcO-phase-job.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-9305f836c457a35f-8a54325ce6763e3de273220ee4eaf7fa.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpsQahw2/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpsQahw2/helper /run/user/1000/vw-access-9305f836c457a35f/8a54325ce6763e3de273220ee4eaf7fa.sock 2036575 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:02 IST] ; stop_time=[Sun 2026-09-27 21:18:04 IST] ; pid=2036620 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-9305f836c457a35f-8a54325ce6763e3de273220ee4eaf7fa.service",
+      "BindsTo": "vw18-panic-2036520-.tmpsQahw2.service",
+      "PartOf": "vw18-panic-2036520-.tmpsQahw2.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-933a4ab9b5cacaf6-a64c994192a787519ccab0b6748f4536.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpkMlJrj/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpkMlJrj/helper /run/user/1000/vw-access-933a4ab9b5cacaf6/a64c994192a787519ccab0b6748f4536.sock 1611790 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:02 IST] ; stop_time=[Sun 2026-09-27 20:46:04 IST] ; pid=1611866 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-933a4ab9b5cacaf6-a64c994192a787519ccab0b6748f4536.service",
+      "BindsTo": "vw18-harness-1609374-.tmpkMlJrj-app-cancel.service",
+      "PartOf": "vw18-harness-1609374-.tmpkMlJrj-app-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-953e279ba02329c4-8f3593a5fee42f880eac308177dfbc90.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpaYifPr/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpaYifPr/helper /run/user/1000/vw-access-953e279ba02329c4/8f3593a5fee42f880eac308177dfbc90.sock 967272 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:35 IST] ; stop_time=[Sun 2026-09-27 19:42:35 IST] ; pid=967274 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-953e279ba02329c4-8f3593a5fee42f880eac308177dfbc90.service",
+      "BindsTo": "vw18-harness-965577-.tmpaYifPr-helper-failure.service",
+      "PartOf": "vw18-harness-965577-.tmpaYifPr-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-9a6e938da9658f24-183cb5ac8d363ddf26a8ae7fab1f8d0e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpAxPmKy/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpAxPmKy/helper /run/user/1000/vw-access-9a6e938da9658f24/183cb5ac8d363ddf26a8ae7fab1f8d0e.sock 2087817 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:56 IST] ; stop_time=[Sun 2026-09-27 21:22:59 IST] ; pid=2087899 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-9a6e938da9658f24-183cb5ac8d363ddf26a8ae7fab1f8d0e.service",
+      "BindsTo": "vw18-harness-2082775-.tmpAxPmKy-app-deadline.service",
+      "PartOf": "vw18-harness-2082775-.tmpAxPmKy-app-deadline.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-9bfefa8a88bd9967-c03806a4db5ab8eb54469198e1361814.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpHPFsDD/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpHPFsDD/helper /run/user/1000/vw-access-9bfefa8a88bd9967/c03806a4db5ab8eb54469198e1361814.sock 1035793 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:33 IST] ; stop_time=[Sun 2026-09-27 19:49:35 IST] ; pid=1035807 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-9bfefa8a88bd9967-c03806a4db5ab8eb54469198e1361814.service",
+      "BindsTo": "vw18-harness-1029103-.tmpHPFsDD-phase-transfer.service",
+      "PartOf": "vw18-harness-1029103-.tmpHPFsDD-phase-transfer.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-a686e1b13bbcba49-eebca9adf2ac5cc47f133a6387c9482b.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpT1xjfJ/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpT1xjfJ/helper /run/user/1000/vw-access-a686e1b13bbcba49/eebca9adf2ac5cc47f133a6387c9482b.sock 971367 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:43:04 IST] ; stop_time=[Sun 2026-09-27 19:43:06 IST] ; pid=971380 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-a686e1b13bbcba49-eebca9adf2ac5cc47f133a6387c9482b.service",
+      "BindsTo": "vw18-harness-965577-.tmpT1xjfJ-phase-release.service",
+      "PartOf": "vw18-harness-965577-.tmpT1xjfJ-phase-release.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-a7a18c3e7ec4d3e2-781046b4759aac075d54f7fa41094f99.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpv1na7c/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpv1na7c/helper /run/user/1000/vw-access-a7a18c3e7ec4d3e2/781046b4759aac075d54f7fa41094f99.sock 1113650 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:13 IST] ; stop_time=[Sun 2026-09-27 19:58:15 IST] ; pid=1113733 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-a7a18c3e7ec4d3e2-781046b4759aac075d54f7fa41094f99.service",
+      "BindsTo": "vw18-harness-1111253-.tmpv1na7c-app-lock.service",
+      "PartOf": "vw18-harness-1111253-.tmpv1na7c-app-lock.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-a9be0e086a4513bf-0a31912144bcd543a192ef52ed8a3ced.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpDKhVpd/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpDKhVpd/helper /run/user/1000/vw-access-a9be0e086a4513bf/0a31912144bcd543a192ef52ed8a3ced.sock 970018 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:54 IST] ; stop_time=[Sun 2026-09-27 19:42:56 IST] ; pid=970095 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-a9be0e086a4513bf-0a31912144bcd543a192ef52ed8a3ced.service",
+      "BindsTo": "vw18-harness-965577-.tmpDKhVpd-app-persistence.service",
+      "PartOf": "vw18-harness-965577-.tmpDKhVpd-app-persistence.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-aa11c0b2963a570e-f0f9cb38523a4972e78b0463b0ba3a84.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpXoQ0to/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpXoQ0to/helper /run/user/1000/vw-access-aa11c0b2963a570e/f0f9cb38523a4972e78b0463b0ba3a84.sock 1117491 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:31 IST] ; stop_time=[Sun 2026-09-27 19:58:33 IST] ; pid=1117494 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-aa11c0b2963a570e-f0f9cb38523a4972e78b0463b0ba3a84.service",
+      "BindsTo": "vw18-harness-1111253-.tmpXoQ0to-phase-job.service",
+      "PartOf": "vw18-harness-1111253-.tmpXoQ0to-phase-job.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-aa998337adfc9870-cf2fc13633ad8f5494d8d3633596caff.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.eZQcXi/.tmpO2y83l/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.eZQcXi/.tmpO2y83l/helper /run/user/1000/vw-access-aa998337adfc9870/cf2fc13633ad8f5494d8d3633596caff.sock 830538 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:24:29 IST] ; stop_time=[Sun 2026-09-27 19:24:32 IST] ; pid=830541 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-aa998337adfc9870-cf2fc13633ad8f5494d8d3633596caff.service",
+      "BindsTo": "vw18-harness-829797-.tmpO2y83l-cancel.service",
+      "PartOf": "vw18-harness-829797-.tmpO2y83l-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b0da88abd44932ee-e8b0b925b13d0e0dfd612ead52f7b6df.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpPx8TY8/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpPx8TY8/helper /run/user/1000/vw-access-b0da88abd44932ee/e8b0b925b13d0e0dfd612ead52f7b6df.sock 969412 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:50 IST] ; stop_time=[Sun 2026-09-27 19:42:53 IST] ; pid=969450 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b0da88abd44932ee-e8b0b925b13d0e0dfd612ead52f7b6df.service",
+      "BindsTo": "vw18-harness-965577-.tmpPx8TY8-app-deadline.service",
+      "PartOf": "vw18-harness-965577-.tmpPx8TY8-app-deadline.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b2c4133f61a5e5f5-a84a7d9204d1e5191c0558f696efc15a.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpx5Lc5j/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpx5Lc5j/helper /run/user/1000/vw-access-b2c4133f61a5e5f5/a84a7d9204d1e5191c0558f696efc15a.sock 1112975 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:08 IST] ; stop_time=[Sun 2026-09-27 19:58:10 IST] ; pid=1112988 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b2c4133f61a5e5f5-a84a7d9204d1e5191c0558f696efc15a.service",
+      "BindsTo": "vw18-harness-1111253-.tmpx5Lc5j-collision.service",
+      "PartOf": "vw18-harness-1111253-.tmpx5Lc5j-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b5086220b47014d0-50d3a3cc388ca8ca8eee58b40abb62d0.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpApCeC1/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpApCeC1/helper /run/user/1000/vw-access-b5086220b47014d0/50d3a3cc388ca8ca8eee58b40abb62d0.sock 1029184 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:48:56 IST] ; stop_time=[Sun 2026-09-27 19:48:59 IST] ; pid=1029186 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b5086220b47014d0-50d3a3cc388ca8ca8eee58b40abb62d0.service",
+      "BindsTo": "vw18-harness-1029103-.tmpApCeC1-orphan.service",
+      "PartOf": "vw18-harness-1029103-.tmpApCeC1-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b5532fd7a7c1b414-c9683beef1882c1ee68dcd05bc4402aa.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpCPAcbM/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpCPAcbM/helper /run/user/1000/vw-access-b5532fd7a7c1b414/c9683beef1882c1ee68dcd05bc4402aa.sock 928178 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:16 IST] ; stop_time=[Sun 2026-09-27 19:38:19 IST] ; pid=928193 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b5532fd7a7c1b414-c9683beef1882c1ee68dcd05bc4402aa.service",
+      "BindsTo": "vw18-harness-927056-.tmpCPAcbM-crash.service",
+      "PartOf": "vw18-harness-927056-.tmpCPAcbM-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b69cf3470c79218d-81416f9b14b9c519b5fa8d65030498f2.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpWodt7P/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpWodt7P/helper /run/user/1000/vw-access-b69cf3470c79218d/81416f9b14b9c519b5fa8d65030498f2.sock 1116953 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:28 IST] ; stop_time=[Sun 2026-09-27 19:58:31 IST] ; pid=1117086 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b69cf3470c79218d-81416f9b14b9c519b5fa8d65030498f2.service",
+      "BindsTo": "vw18-harness-1111253-.tmpWodt7P-app-persistence.service",
+      "PartOf": "vw18-harness-1111253-.tmpWodt7P-app-persistence.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b92be9eaa93b550b-7f552f32b186fe68926e8f2bb9911cde.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpYfVf7Y/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpYfVf7Y/helper /run/user/1000/vw-access-b92be9eaa93b550b/7f552f32b186fe68926e8f2bb9911cde.sock 1115635 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:22 IST] ; stop_time=[Sun 2026-09-27 19:58:25 IST] ; pid=1115639 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b92be9eaa93b550b-7f552f32b186fe68926e8f2bb9911cde.service",
+      "BindsTo": "vw18-harness-1111253-.tmpYfVf7Y-app-shutdown.service",
+      "PartOf": "vw18-harness-1111253-.tmpYfVf7Y-app-shutdown.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-b93b5f48183daef5-f0589b348dd41418e8d82875afe0d6de.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpRVz8qo/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpRVz8qo/helper /run/user/1000/vw-access-b93b5f48183daef5/f0589b348dd41418e8d82875afe0d6de.sock 1611266 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:45:58 IST] ; stop_time=[Sun 2026-09-27 20:46:01 IST] ; pid=1611444 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-b93b5f48183daef5-f0589b348dd41418e8d82875afe0d6de.service",
+      "BindsTo": "vw18-harness-1609374-.tmpRVz8qo-app-lock.service",
+      "PartOf": "vw18-harness-1609374-.tmpRVz8qo-app-lock.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-be14e0ff1c2c132c-d163758efd5eae5c30886a44d38b1915.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpWNSRkS/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpWNSRkS/helper /run/user/1000/vw-access-be14e0ff1c2c132c/d163758efd5eae5c30886a44d38b1915.sock 2083451 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:25 IST] ; stop_time=[Sun 2026-09-27 21:22:28 IST] ; pid=2083476 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-be14e0ff1c2c132c-d163758efd5eae5c30886a44d38b1915.service",
+      "BindsTo": "vw18-harness-2082775-.tmpWNSRkS-crash.service",
+      "PartOf": "vw18-harness-2082775-.tmpWNSRkS-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-c24d231ca76ee673-59f0cabc7cc9338de78b2b2b32d9010e.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpFQumGy/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpFQumGy/helper /run/user/1000/vw-access-c24d231ca76ee673/59f0cabc7cc9338de78b2b2b32d9010e.sock 867732 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:41 IST] ; stop_time=[Sun 2026-09-27 19:30:43 IST] ; pid=867746 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-c24d231ca76ee673-59f0cabc7cc9338de78b2b2b32d9010e.service",
+      "BindsTo": "vw18-harness-867675-.tmpFQumGy-orphan.service",
+      "PartOf": "vw18-harness-867675-.tmpFQumGy-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-c909a7b51cabbae4-56ca3fd41ee674271d02b90746355bc1.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpXZWr3U/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpXZWr3U/helper /run/user/1000/vw-access-c909a7b51cabbae4/56ca3fd41ee674271d02b90746355bc1.sock 1112269 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:06 IST] ; stop_time=[Sun 2026-09-27 19:58:08 IST] ; pid=1112346 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-c909a7b51cabbae4-56ca3fd41ee674271d02b90746355bc1.service",
+      "BindsTo": "vw18-harness-1111253-.tmpXZWr3U-crash.service",
+      "PartOf": "vw18-harness-1111253-.tmpXZWr3U-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-caa29a4961a3c337-ef63348cc57ac2003335b98b1ec2c16c.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpreDhep/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpreDhep/helper /run/user/1000/vw-access-caa29a4961a3c337/ef63348cc57ac2003335b98b1ec2c16c.sock 2083164 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:22:22 IST] ; stop_time=[Sun 2026-09-27 21:22:25 IST] ; pid=2083178 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-caa29a4961a3c337-ef63348cc57ac2003335b98b1ec2c16c.service",
+      "BindsTo": "vw18-harness-2082775-.tmpreDhep-cancel.service",
+      "PartOf": "vw18-harness-2082775-.tmpreDhep-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-cc227c558274c6c5-df76007b833805bf71ec50b2f65c6a07.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpy9iKMq/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpy9iKMq/helper /run/user/1000/vw-access-cc227c558274c6c5/df76007b833805bf71ec50b2f65c6a07.sock 2088664 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:03 IST] ; stop_time=[Sun 2026-09-27 21:23:05 IST] ; pid=2088677 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-cc227c558274c6c5-df76007b833805bf71ec50b2f65c6a07.service",
+      "BindsTo": "vw18-harness-2082775-.tmpy9iKMq-phase-job.service",
+      "PartOf": "vw18-harness-2082775-.tmpy9iKMq-phase-job.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-cf116e0917e85306-93d4e0fd97d5831ca25f70aad5519e2c.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpmooRox/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpmooRox/helper /run/user/1000/vw-access-cf116e0917e85306/93d4e0fd97d5831ca25f70aad5519e2c.sock 1031648 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:09 IST] ; stop_time=[Sun 2026-09-27 19:49:11 IST] ; pid=1031734 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-cf116e0917e85306-93d4e0fd97d5831ca25f70aad5519e2c.service",
+      "BindsTo": "vw18-harness-1029103-.tmpmooRox-app-lock.service",
+      "PartOf": "vw18-harness-1029103-.tmpmooRox-app-lock.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-d0be83d055831ec2-abd0ae3db651763a1fdc2798b162dbf8.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpxldcYp/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpxldcYp/helper /run/user/1000/vw-access-d0be83d055831ec2/abd0ae3db651763a1fdc2798b162dbf8.sock 1116119 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:26 IST] ; stop_time=[Sun 2026-09-27 19:58:28 IST] ; pid=1116206 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-d0be83d055831ec2-abd0ae3db651763a1fdc2798b162dbf8.service",
+      "BindsTo": "vw18-harness-1111253-.tmpxldcYp-app-deadline.service",
+      "PartOf": "vw18-harness-1111253-.tmpxldcYp-app-deadline.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-d89a747971bb8b67-72b4a35fb0d119a3e3be460a09c11eb3.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpM608hc/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpM608hc/helper /run/user/1000/vw-access-d89a747971bb8b67/72b4a35fb0d119a3e3be460a09c11eb3.sock 2089477 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:08 IST] ; stop_time=[Sun 2026-09-27 21:23:10 IST] ; pid=2089501 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-d89a747971bb8b67-72b4a35fb0d119a3e3be460a09c11eb3.service",
+      "BindsTo": "vw18-harness-2082775-.tmpM608hc-phase-transfer.service",
+      "PartOf": "vw18-harness-2082775-.tmpM608hc-phase-transfer.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-d8eaff7a74d876d7-ee0d322132615b6a9ff16d707fa9984c.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpM2xfJK/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpM2xfJK/helper /run/user/1000/vw-access-d8eaff7a74d876d7/ee0d322132615b6a9ff16d707fa9984c.sock 927778 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:13 IST] ; stop_time=[Sun 2026-09-27 19:38:16 IST] ; pid=927791 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-d8eaff7a74d876d7-ee0d322132615b6a9ff16d707fa9984c.service",
+      "BindsTo": "vw18-harness-927056-.tmpM2xfJK-cancel.service",
+      "PartOf": "vw18-harness-927056-.tmpM2xfJK-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-dabd896c4e5b6256-b86f3c33a53acc05c6ac132e5054f7c1.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpIbDbTu/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpIbDbTu/helper /run/user/1000/vw-access-dabd896c4e5b6256/b86f3c33a53acc05c6ac132e5054f7c1.sock 1114089 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:16 IST] ; stop_time=[Sun 2026-09-27 19:58:19 IST] ; pid=1114177 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-dabd896c4e5b6256-b86f3c33a53acc05c6ac132e5054f7c1.service",
+      "BindsTo": "vw18-harness-1111253-.tmpIbDbTu-app-cancel.service",
+      "PartOf": "vw18-harness-1111253-.tmpIbDbTu-app-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-dc1ec4f2dea313fb-107b8d175cbfe676382642ddac34b7a8.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpolMKWs/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpolMKWs/helper /run/user/1000/vw-access-dc1ec4f2dea313fb/107b8d175cbfe676382642ddac34b7a8.sock 1614967 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:20 IST] ; stop_time=[Sun 2026-09-27 20:46:23 IST] ; pid=1614970 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-dc1ec4f2dea313fb-107b8d175cbfe676382642ddac34b7a8.service",
+      "BindsTo": "vw18-harness-1609374-.tmpolMKWs-phase-helper.service",
+      "PartOf": "vw18-harness-1609374-.tmpolMKWs-phase-helper.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-e0864e8939b1a40e-84086aef9fe72aa40df07763f1ead268.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpx6p8gt/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpx6p8gt/helper /run/user/1000/vw-access-e0864e8939b1a40e/84086aef9fe72aa40df07763f1ead268.sock 966924 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:32 IST] ; stop_time=[Sun 2026-09-27 19:42:34 IST] ; pid=966930 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-e0864e8939b1a40e-84086aef9fe72aa40df07763f1ead268.service",
+      "BindsTo": "vw18-harness-965577-.tmpx6p8gt-collision.service",
+      "PartOf": "vw18-harness-965577-.tmpx6p8gt-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-e0b427e7dde3a3c5-8f8b55f83c5963e4fc92eb78b99abe4d.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpqvlnlx/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpqvlnlx/helper /run/user/1000/vw-access-e0b427e7dde3a3c5/8f8b55f83c5963e4fc92eb78b99abe4d.sock 928571 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:19 IST] ; stop_time=[Sun 2026-09-27 19:38:21 IST] ; pid=928586 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-e0b427e7dde3a3c5-8f8b55f83c5963e4fc92eb78b99abe4d.service",
+      "BindsTo": "vw18-harness-927056-.tmpqvlnlx-collision.service",
+      "PartOf": "vw18-harness-927056-.tmpqvlnlx-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-ec06787128bcc23b-dd2f5efb20b249716dadea6332d7a25f.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpvnjdi8/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpvnjdi8/helper /run/user/1000/vw-access-ec06787128bcc23b/dd2f5efb20b249716dadea6332d7a25f.sock 1616591 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:30 IST] ; stop_time=[Sun 2026-09-27 20:46:32 IST] ; pid=1616607 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-ec06787128bcc23b-dd2f5efb20b249716dadea6332d7a25f.service",
+      "BindsTo": "vw18-harness-1609374-.tmpvnjdi8-fault-stop.service",
+      "PartOf": "vw18-harness-1609374-.tmpvnjdi8-fault-stop.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-ece59b7129366ead-eb2c4829c69ab4e7432f849e14d47dc9.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpCn42NV/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WY6NcS/.tmpCn42NV/helper /run/user/1000/vw-access-ece59b7129366ead/eb2c4829c69ab4e7432f849e14d47dc9.sock 968050 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:42:40 IST] ; stop_time=[Sun 2026-09-27 19:42:42 IST] ; pid=968133 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-ece59b7129366ead-eb2c4829c69ab4e7432f849e14d47dc9.service",
+      "BindsTo": "vw18-harness-965577-.tmpCn42NV-app-cancel.service",
+      "PartOf": "vw18-harness-965577-.tmpCn42NV-app-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-ed1e4a696eea7b63-54ebb929349ee2db001c2f7db1ea1c7f.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpvS2vYc/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpvS2vYc/helper /run/user/1000/vw-access-ed1e4a696eea7b63/54ebb929349ee2db001c2f7db1ea1c7f.sock 868382 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:47 IST] ; stop_time=[Sun 2026-09-27 19:30:50 IST] ; pid=868395 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-ed1e4a696eea7b63-54ebb929349ee2db001c2f7db1ea1c7f.service",
+      "BindsTo": "vw18-harness-867675-.tmpvS2vYc-crash.service",
+      "PartOf": "vw18-harness-867675-.tmpvS2vYc-crash.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-f06ab31701f98a6c-c45457a7acc9783c253a471256117467.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpZMzgfh/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.yCgUkJ/.tmpZMzgfh/helper /run/user/1000/vw-access-f06ab31701f98a6c/c45457a7acc9783c253a471256117467.sock 2088983 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:23:05 IST] ; stop_time=[Sun 2026-09-27 21:23:08 IST] ; pid=2089002 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-f06ab31701f98a6c-c45457a7acc9783c253a471256117467.service",
+      "BindsTo": "vw18-harness-2082775-.tmpZMzgfh-phase-helper.service",
+      "PartOf": "vw18-harness-2082775-.tmpZMzgfh-phase-helper.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-f0b3ee93a06e8dd1-617e798050e951d7df364edf91a61401.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpJR5MhE/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.CAgASV/.tmpJR5MhE/helper /run/user/1000/vw-access-f0b3ee93a06e8dd1/617e798050e951d7df364edf91a61401.sock 927172 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:38:11 IST] ; stop_time=[Sun 2026-09-27 19:38:13 IST] ; pid=927190 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-f0b3ee93a06e8dd1-617e798050e951d7df364edf91a61401.service",
+      "BindsTo": "vw18-harness-927056-.tmpJR5MhE-orphan.service",
+      "PartOf": "vw18-harness-927056-.tmpJR5MhE-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-f562b1ac433240b3-53ece408d22d87acfed46719d7f33a27.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmpWl5cBI/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.4s44Bp/.tmpWl5cBI/helper /run/user/1000/vw-access-f562b1ac433240b3/53ece408d22d87acfed46719d7f33a27.sock 846707 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:27:06 IST] ; stop_time=[Sun 2026-09-27 19:27:08 IST] ; pid=846737 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-f562b1ac433240b3-53ece408d22d87acfed46719d7f33a27.service",
+      "BindsTo": "vw18-harness-846394-.tmpWl5cBI-cancel.service",
+      "PartOf": "vw18-harness-846394-.tmpWl5cBI-cancel.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-f71ad27e56d9b642-c79e562c6ecafaced5cbe55cecabbe22.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpyQWqYx/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.WyW72u/.tmpyQWqYx/helper /run/user/1000/vw-access-f71ad27e56d9b642/c79e562c6ecafaced5cbe55cecabbe22.sock 1111364 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:58:00 IST] ; stop_time=[Sun 2026-09-27 19:58:02 IST] ; pid=1111386 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-f71ad27e56d9b642-c79e562c6ecafaced5cbe55cecabbe22.service",
+      "BindsTo": "vw18-harness-1111253-.tmpyQWqYx-orphan.service",
+      "PartOf": "vw18-harness-1111253-.tmpyQWqYx-orphan.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-f966870394c68515-56af0aa6d7f898a9c62af761c7bffbd9.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpQ1SExs/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpQ1SExs/helper /run/user/1000/vw-access-f966870394c68515/56af0aa6d7f898a9c62af761c7bffbd9.sock 1613471 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:12 IST] ; stop_time=[Sun 2026-09-27 20:46:15 IST] ; pid=1613563 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-f966870394c68515-56af0aa6d7f898a9c62af761c7bffbd9.service",
+      "BindsTo": "vw18-harness-1609374-.tmpQ1SExs-app-deadline.service",
+      "PartOf": "vw18-harness-1609374-.tmpQ1SExs-app-deadline.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-fd55b428a4346c44-1c25df07f87362bee3cf55a060d9d4b3.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpIdqUAY/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.cgVBo0/.tmpIdqUAY/helper /run/user/1000/vw-access-fd55b428a4346c44/1c25df07f87362bee3cf55a060d9d4b3.sock 1033513 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:49:19 IST] ; stop_time=[Sun 2026-09-27 19:49:22 IST] ; pid=1033660 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-fd55b428a4346c44-1c25df07f87362bee3cf55a060d9d4b3.service",
+      "BindsTo": "vw18-harness-1029103-.tmpIdqUAY-app-shutdown.service",
+      "PartOf": "vw18-harness-1029103-.tmpIdqUAY-app-shutdown.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-fd84a18941f67972-f0a6fef2188887103dc58691e085ba98.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpLMbl7Y/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.2bksPz/.tmpLMbl7Y/helper /run/user/1000/vw-access-fd84a18941f67972/f0a6fef2188887103dc58691e085ba98.sock 869102 ; ignore_errors=no ; start_time=[Sun 2026-09-27 19:30:54 IST] ; stop_time=[Sun 2026-09-27 19:30:54 IST] ; pid=869106 ; code=exited ; status=203 }",
+      "ControlGroup": "",
+      "Id": "vw-access-fd84a18941f67972-f0a6fef2188887103dc58691e085ba98.service",
+      "BindsTo": "vw18-harness-867675-.tmpLMbl7Y-helper-failure.service",
+      "PartOf": "vw18-harness-867675-.tmpLMbl7Y-helper-failure.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-fdc1ba3d217bff71-8684fde97a55c494b1148d95157589d3.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpDSjqui/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.l7nMr1/.tmpDSjqui/helper /run/user/1000/vw-access-fdc1ba3d217bff71/8684fde97a55c494b1148d95157589d3.sock 2038534 ; ignore_errors=no ; start_time=[Sun 2026-09-27 21:18:10 IST] ; stop_time=[Sun 2026-09-27 21:18:12 IST] ; pid=2038559 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-fdc1ba3d217bff71-8684fde97a55c494b1148d95157589d3.service",
+      "BindsTo": "vw18-harness-2036520-.tmpDSjqui-collision.service",
+      "PartOf": "vw18-harness-2036520-.tmpDSjqui-collision.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    },
+    "vw-access-fdc3ad0c5f1a734f-eda07c46d79ee04e98b20570f554f9cd.service": {
+      "ExecStart": "{ path=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpXYrS45/helper ; argv[]=/home/sixtocantolla/.vaultwarden-cli-tests.xu4lIW/.tmpXYrS45/helper /run/user/1000/vw-access-fdc3ad0c5f1a734f/eda07c46d79ee04e98b20570f554f9cd.sock 1612222 ; ignore_errors=no ; start_time=[Sun 2026-09-27 20:46:05 IST] ; stop_time=[Sun 2026-09-27 20:46:07 IST] ; pid=1612303 ; code=killed ; status=9/KILL }",
+      "ControlGroup": "",
+      "Id": "vw-access-fdc3ad0c5f1a734f-eda07c46d79ee04e98b20570f554f9cd.service",
+      "BindsTo": "vw18-harness-1609374-.tmpXYrS45-app-revoke.service",
+      "PartOf": "vw18-harness-1609374-.tmpXYrS45-app-revoke.service",
+      "ActiveState": "failed",
+      "Transient": "yes"
+    }
+  },
+  "preserved": []
+}

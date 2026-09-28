@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 6 tests
+test access::direct_request_tests::identifiers_digest_and_closed_contracts_have_independent_vectors ... ok
+test adapters::execution::linux::tests::snapshot_contract_rejects_same_byte_rewrite_with_changed_timestamp ... ok
+test adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties ... ok
+test access::policy::tests::preliminary_open_flags_are_required_by_the_syscall_contract ... ok
+test access::direct_request_tests::redacted_output_contracts_reject_unknown_secret_session_and_output_fields ... ok
+test adapters::execution::linux::tests::snapshot_contract_accepts_literal_64_mib_pinned_image ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 558 filtered out; finished in 15.86s

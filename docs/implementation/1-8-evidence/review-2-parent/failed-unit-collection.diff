@@ -1,0 +1,10 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -755,7 +755,6 @@
+         property("Type", "exec".to_owned()),
+         property("ExitType", "main".to_owned()),
+         property("KillMode", "control-group".to_owned()),
+-        property("CollectMode", "inactive-or-failed".to_owned()),
+         property("SendSIGKILL", true),
+         property("Restart", "no".to_owned()),
+         property("TimeoutStartUSec", 5_000_000u64),

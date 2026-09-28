@@ -1,0 +1,44 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 23s
+    Blocking waiting for file lock on build directory
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.34s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s
+     Running tests/systemd_supervisor.rs (target/debug/deps/systemd_supervisor-48ba7792a1e4a7c1)
+
+running 2 tests
+real-manager scenario: exit
+
+thread 'assertion_unwind_reaps_exact_resources_and_preserves_unrelated' (2107661) panicked at tests/systemd_supervisor.rs:547:9:
+injected scenario assertion failure
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+real-manager scenario: orphan
+test assertion_unwind_reaps_exact_resources_and_preserves_unrelated ... ok
+real-manager scenario: cancel
+real-manager scenario: crash
+real-manager scenario: collision
+real-manager scenario: helper-failure
+real-manager scenario: helper-environment
+real-manager scenario: app-worker-exit
+real-manager scenario: app-worker-shutdown
+real-manager scenario: app-exit
+real-manager scenario: app-lock
+real-manager scenario: app-cancel
+real-manager scenario: app-revoke
+real-manager scenario: app-shutdown
+real-manager scenario: app-deadline
+real-manager scenario: app-persistence
+real-manager scenario: phase-job
+real-manager scenario: phase-helper
+real-manager scenario: phase-transfer
+real-manager scenario: phase-release
+test independent_descendants_provider_crash_and_recovery has been running for over 60 seconds
+real-manager scenario: phase-exit
+real-manager scenario: fault-missing
+real-manager scenario: fault-job
+real-manager scenario: fault-exec
+real-manager scenario: fault-monitor
+real-manager scenario: fault-stop
+test independent_descendants_provider_crash_and_recovery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 67.94s

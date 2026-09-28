@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ replace && with || in Config::owns_name
+@@ -167,17 +167,17 @@
+             test_environment: Vec::new(),
+         })
+     }
+     pub fn owns_name(&self, name: &str) -> bool {
+         name.strip_prefix(&self.prefix)
+             .and_then(|s| s.strip_suffix(".service"))
+             .is_some_and(|s| {
+                 s.len() == 32
+-                    && s.bytes()
++                    || /* ~ changed by cargo-mutants ~ */ s.bytes()
+                         .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+             })
+     }
+     pub fn name(&self) -> Result<String, ExecutionError> {
+         let mut random = [0u8; 16];
+         getrandom::fill(&mut random).map_err(failure)?;
+         Ok(format!(
+             "{}{}.service",

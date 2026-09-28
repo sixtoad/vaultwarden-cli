@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ replace match guard e.kind() == std::io::ErrorKind::NotFound with true in proc_empty
+@@ -792,17 +792,17 @@
+             .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))
+         {
+             continue;
+         }
+         let path = entry.path();
+         let read = |name: &str| -> Result<Option<String>, ExecutionError> {
+             match std::fs::read_to_string(path.join(name)) {
+                 Ok(s) => Ok(Some(s)),
+-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
++                Err(e) if true /* ~ changed by cargo-mutants ~ */ => Ok(None),
+                 Err(_) => Err(ExecutionError::CleanupUncertain),
+             }
+         };
+         let Some(before) = read("stat")? else {
+             continue;
+         };
+         let Some(groups) = read("cgroup")? else {
+             continue;

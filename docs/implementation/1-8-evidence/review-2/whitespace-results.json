@@ -1,0 +1,16 @@
+{
+  "baseline": "ffd8ed4c434f585b2bcb37b0ca9a8517538be662",
+  "tracked_baseline_diff_exit": 0,
+  "tracked_output": "",
+  "new_files_checked": 293,
+  "normalized_evidence_files": [
+    "docs/implementation/1-8-evidence/review-2/proc-budget-regression.log"
+  ],
+  "violations": [
+    {
+      "path": "docs/implementation/1-8-evidence/review-2-parent/entry-scan-budget-baseline.log",
+      "exit": 3,
+      "output": "docs/implementation/1-8-evidence/review-2-parent/entry-scan-budget-baseline.log:8: new blank line at EOF.\n"
+    }
+  ]
+}

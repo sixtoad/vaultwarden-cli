@@ -1,0 +1,11 @@
+--- a/src/adapters/supervisor/bridge.rs
++++ b/src/adapters/supervisor/bridge.rs
+@@ -868,7 +868,7 @@
+                         NONZERO
+                     }
+                 } else {
+-                    SIGNAL
++                    ZERO
+                 };
+                 let _ignored = send_code(socket, code);
+             }

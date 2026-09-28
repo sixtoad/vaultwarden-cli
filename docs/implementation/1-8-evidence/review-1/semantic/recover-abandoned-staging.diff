@@ -1,0 +1,11 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -263,7 +263,7 @@
+             let filename = filename
+                 .to_str()
+                 .ok_or(ExecutionError::ManagerUnavailable)?;
+-            if self.owns_staging(filename) {
++            if false {
+                 let metadata = std::fs::symlink_metadata(entry.path()).map_err(failure)?;
+                 if !metadata.is_file()
+                     || metadata.uid() != unsafe { libc::geteuid() }

@@ -122,6 +122,8 @@ impl ProviderState {
                 if !consistent
                     || !direct.validate(&request.id, self.lifecycle_epoch)
                     || (request.status.is_unexecuted()
+                        && !direct.execution_claimed
+                        && request.status != RequestLifecycleStatus::Running
                         && direct.lifecycle_epoch != self.lifecycle_epoch)
                 {
                     return Err(error(ProviderDiagnostic::InvalidState));
@@ -327,6 +329,12 @@ impl ProviderStore {
         Ok(())
     }
     pub(crate) fn invalidate_unexecuted(&mut self) -> Result<ProviderState, ProviderError> {
+        self.invalidate(false)
+    }
+    pub(crate) fn invalidate_recovered(&mut self) -> Result<ProviderState, ProviderError> {
+        self.invalidate(true)
+    }
+    fn invalidate(&mut self, recovered: bool) -> Result<ProviderState, ProviderError> {
         let mut state = self.read_state()?;
         state.lifecycle_epoch = state
             .lifecycle_epoch
@@ -334,6 +342,13 @@ impl ProviderStore {
             .ok_or_else(|| error(ProviderDiagnostic::PersistenceFailure))?;
         for request in &mut state.requests {
             if request.status.is_unexecuted() {
+                if !recovered
+                    && request.direct.as_ref().is_some_and(|d| {
+                        d.execution_claimed || request.status == RequestLifecycleStatus::Running
+                    })
+                {
+                    continue;
+                }
                 use super::direct_request::{DecisionOutcome, DirectFailure, DirectStatus};
                 if request.direct.is_some() {
                     let (next, outcome) = if request.status == RequestLifecycleStatus::Running {

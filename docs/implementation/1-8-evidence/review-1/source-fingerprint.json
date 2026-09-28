@@ -1,0 +1,7 @@
+{
+  "baseline_commit": "ffd8ed4c434f585b2bcb37b0ca9a8517538be662",
+  "branch": "feature/contain-protected-child-processes",
+  "source_manifest_sha256": "cf0f9761ec449e98a945206665c8ffc5f8b5da0e9f35bc989418c7bfc6a6643c",
+  "files": 77,
+  "source_mutations_restored": true
+}

@@ -1,0 +1,11 @@
+--- src/adapters/supervisor/bridge.rs
++++ src/adapters/supervisor/bridge.rs
+@@ -777,7 +777,7 @@
+ }
+ // Must compare against the actual creating helper, including death before prctl.
+ unsafe fn arm_parent_death(parent: libc::pid_t) -> bool {
+-    unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == 0 && libc::getppid() == parent }
++    unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == 0 }
+ }
+ unsafe fn child_fail(fd: RawFd) -> ! {
+     unsafe {

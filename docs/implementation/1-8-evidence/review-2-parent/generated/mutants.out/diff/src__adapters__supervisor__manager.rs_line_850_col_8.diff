@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ delete ! in proc_empty_with_budget
+@@ -842,17 +842,17 @@
+             .any(|path| belongs(path, cgroup))
+         {
+             return Ok(false);
+         }
+         if !groups.lines().any(|line| line.starts_with("0::")) {
+             return Err(ExecutionError::CleanupUncertain);
+         }
+     }
+-    if !has_budget() {
++    if  /* ~ changed by cargo-mutants ~ */has_budget() {
+         return Err(ExecutionError::CleanupUncertain);
+     }
+     Ok(true)
+ }
+ fn checked_directory(path: &Path, private: bool) -> Result<(), ExecutionError> {
+     let m = std::fs::symlink_metadata(path).map_err(failure)?;
+     let uid = unsafe { libc::geteuid() };
+     if !m.is_dir()

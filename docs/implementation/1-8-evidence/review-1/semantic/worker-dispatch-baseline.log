@@ -1,0 +1,18 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.12s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.68s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.29s
+     Running tests/systemd_supervisor.rs (target/debug/deps/systemd_supervisor-48ba7792a1e4a7c1)
+
+running 2 tests
+real-manager scenario: app-worker-exit
+
+thread 'assertion_unwind_reaps_exact_resources_and_preserves_unrelated' (2207299) panicked at tests/systemd_supervisor.rs:549:9:
+injected scenario assertion failure
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test independent_descendants_provider_crash_and_recovery ... ok
+test assertion_unwind_reaps_exact_resources_and_preserves_unrelated ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.88s

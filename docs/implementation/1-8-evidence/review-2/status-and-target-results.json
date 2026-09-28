@@ -1,0 +1,18 @@
+{
+  "default_target_absent_before": true,
+  "custom-target-app-nonzero": 0,
+  "default_target_absent_after": true,
+  "build_cache_restored": true,
+  "app-signal-baseline": 0,
+  "source_sha256_before": "26f0d4e3920f70a7a25bc2bddcf3fddf6f0d3b0b1adc659a212dceaa098593b3",
+  "nonzero-as-zero": 101,
+  "nonzero-as-zero-classification": "caught by exact application status assertion in provider journal; outer harness fails its completion barrier after that panic; incorrect Completed versus required ExecutionNonzero",
+  "signal-as-zero": 101,
+  "signal-as-zero-classification": "caught by exact application status assertion in provider journal; outer harness fails its completion barrier after that panic; incorrect Completed versus required ExecutionSignaled",
+  "source_sha256_restored": "26f0d4e3920f70a7a25bc2bddcf3fddf6f0d3b0b1adc659a212dceaa098593b3",
+  "source_restored": true,
+  "app-nonzero-restored": 0,
+  "app-signal-restored": 0,
+  "helper-failure-restored": 0,
+  "failed-launch-recovery-restored": 0
+}

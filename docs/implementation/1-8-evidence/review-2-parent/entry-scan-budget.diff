@@ -1,0 +1,13 @@
+--- src/adapters/supervisor/manager.rs
++++ src/adapters/supervisor/manager.rs
+@@ -803,9 +803,7 @@
+     for entry in std::fs::read_dir(root).map_err(failure)? {
+         // Use the caller's remaining cleanup budget, including non-process entries.
+         // An interrupted inventory cannot prove absence.
+-        if !has_budget() {
+-            return Err(ExecutionError::CleanupUncertain);
+-        }
++
+         let entry = entry.map_err(failure)?;
+         if entry
+             .file_name()

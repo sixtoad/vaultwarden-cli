@@ -1,0 +1,18 @@
+{
+  "baseline_commit": "ffd8ed4c434f585b2bcb37b0ca9a8517538be662",
+  "branch": "feature/contain-protected-child-processes",
+  "source_manifest_sha256": "ab7b613562b0a8bbbf67e93bba7006a3b854dba164435402f9dfc20dd5d1655d",
+  "files": 76,
+  "external_test_updates_after_rust_snapshot": [
+    {
+      "path": "tests/fixtures/protected-tree.c",
+      "old": "c282f386fc455d44241810bed607152306976a3fb9897f31db80367abcff83e4",
+      "new": "5d84b293a6eeca6e584de2b8b880cea9ebf47614457e0648fff532bbebf32e7d"
+    },
+    {
+      "path": "tests/ui/direct-request.mjs",
+      "old": "71801e40a06b23fff1772cc0c21e5a2a6db0f5fdae2ec2b02149c936674563fb",
+      "new": "9be8203ad0f86a95b01df6047e3b9dacc2a37c3b11071184fdd8c8f1c1df0bad"
+    }
+  ]
+}

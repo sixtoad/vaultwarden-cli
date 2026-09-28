@@ -1,0 +1,1399 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 9.975253696,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.007111975,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:79:9: replace Config::owns_name -> bool with true",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "Config::owns_name",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 78,
+                "column": 5
+              },
+              "end": {
+                "line": 86,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 79,
+              "column": 9
+            },
+            "end": {
+              "line": 85,
+              "column": 15
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_79_col_9.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_79_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 32.738552588,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.956735485,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:79:9: replace Config::owns_name -> bool with false",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "Config::owns_name",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 78,
+                "column": 5
+              },
+              "end": {
+                "line": 86,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 79,
+              "column": 9
+            },
+            "end": {
+              "line": 85,
+              "column": 15
+            }
+          },
+          "replacement": "false",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_79_col_9_001.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_79_col_9_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 21.901193767,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.057654699,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:83:21: replace && with || in Config::owns_name",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "Config::owns_name",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 78,
+                "column": 5
+              },
+              "end": {
+                "line": 86,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 83,
+              "column": 21
+            },
+            "end": {
+              "line": 83,
+              "column": 23
+            }
+          },
+          "replacement": "||",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_83_col_21.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_83_col_21.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 33.130365744,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.00713172,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:82:25: replace == with != in Config::owns_name",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "Config::owns_name",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 78,
+                "column": 5
+              },
+              "end": {
+                "line": 86,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 82,
+              "column": 25
+            },
+            "end": {
+              "line": 82,
+              "column": 27
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_82_col_25.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_82_col_25.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 20.188529902,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.006304676,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:84:53: replace || with && in Config::owns_name",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "Config::owns_name",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 78,
+                "column": 5
+              },
+              "end": {
+                "line": 86,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 84,
+              "column": 53
+            },
+            "end": {
+              "line": 84,
+              "column": 55
+            }
+          },
+          "replacement": "&&",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_84_col_53.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_84_col_53.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 25.698489892,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.006445974,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:584:5: replace belongs -> bool with true",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "belongs",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 583,
+                "column": 1
+              },
+              "end": {
+                "line": 589,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 584,
+              "column": 5
+            },
+            "end": {
+              "line": 588,
+              "column": 59
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_584_col_5.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_584_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 21.972332316,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.009211318,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:584:5: replace belongs -> bool with false",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "belongs",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 583,
+                "column": 1
+              },
+              "end": {
+                "line": 589,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 584,
+              "column": 5
+            },
+            "end": {
+              "line": 588,
+              "column": 59
+            }
+          },
+          "replacement": "false",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_584_col_5_001.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_584_col_5_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 21.939501656,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.108021617,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:586:9: replace || with && in belongs",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "belongs",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 583,
+                "column": 1
+              },
+              "end": {
+                "line": 589,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 586,
+              "column": 9
+            },
+            "end": {
+              "line": 586,
+              "column": 11
+            }
+          },
+          "replacement": "&&",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_586_col_9.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_586_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 21.984094550000002,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.956692021,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:585:14: replace == with != in belongs",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "belongs",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 583,
+                "column": 1
+              },
+              "end": {
+                "line": 589,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 585,
+              "column": 14
+            },
+            "end": {
+              "line": 585,
+              "column": 16
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_585_col_14.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_585_col_14.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 21.780927158,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.007461017,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:594:5: replace proc_empty -> Result<bool, ExecutionError> with Ok(true)",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 594,
+              "column": 5
+            },
+            "end": {
+              "line": 639,
+              "column": 13
+            }
+          },
+          "replacement": "Ok(true)",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_594_col_5.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_594_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 34.953513304,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.007689047,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:594:5: replace proc_empty -> Result<bool, ExecutionError> with Ok(false)",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 594,
+              "column": 5
+            },
+            "end": {
+              "line": 639,
+              "column": 13
+            }
+          },
+          "replacement": "Ok(false)",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_594_col_5_001.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_594_col_5_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 23.5315282,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.110574255,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:594:8: delete ! in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 594,
+              "column": 8
+            },
+            "end": {
+              "line": 594,
+              "column": 9
+            }
+          },
+          "replacement": "",
+          "genre": "UnaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_594_col_8.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_594_col_8.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 44.281946354,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.057632834,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:602:42: replace || with && in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 602,
+              "column": 42
+            },
+            "end": {
+              "line": 602,
+              "column": 44
+            }
+          },
+          "replacement": "&&",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_602_col_42.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_602_col_42.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 22.753995931,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.95769434,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:602:45: delete ! in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 602,
+              "column": 45
+            },
+            "end": {
+              "line": 602,
+              "column": 46
+            }
+          },
+          "replacement": "",
+          "genre": "UnaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_602_col_45.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_602_col_45.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 24.805681012,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.957650464,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:610:27: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 610,
+              "column": 27
+            },
+            "end": {
+              "line": 610,
+              "column": 67
+            }
+          },
+          "replacement": "true",
+          "genre": "MatchArmGuard"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_610_col_27.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_610_col_27.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 20.76551698,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.057893434,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:610:27: replace match guard e.kind() == std::io::ErrorKind::NotFound with false in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 610,
+              "column": 27
+            },
+            "end": {
+              "line": 610,
+              "column": 67
+            }
+          },
+          "replacement": "false",
+          "genre": "MatchArmGuard"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_610_col_27_001.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_610_col_27_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 21.705441844,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.057541039,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:610:36: replace == with != in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 610,
+              "column": 36
+            },
+            "end": {
+              "line": 610,
+              "column": 38
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_610_col_36.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_610_col_36.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 20.62760157,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.007015124,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:625:19: replace != with == in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 625,
+              "column": 19
+            },
+            "end": {
+              "line": 625,
+              "column": 21
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_625_col_19.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_625_col_19.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 20.365122071,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.009150629,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "src/adapters/supervisor/manager.rs:635:12: delete ! in proc_empty",
+          "package": "vaultwarden-cli",
+          "file": "src/adapters/supervisor/manager.rs",
+          "function": {
+            "function_name": "proc_empty",
+            "return_type": "-> Result<bool, ExecutionError>",
+            "span": {
+              "start": {
+                "line": 593,
+                "column": 1
+              },
+              "end": {
+                "line": 640,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 635,
+              "column": 12
+            },
+            "end": {
+              "line": 635,
+              "column": 13
+            }
+          },
+          "replacement": "",
+          "genre": "UnaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/src__adapters__supervisor__manager.rs_line_635_col_12.log",
+      "diff_path": "diff/src__adapters__supervisor__manager.rs_line_635_col_12.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 22.502250205,
+          "process_status": "Success",
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.158694276,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/sixtocantolla/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=vaultwarden-cli@0.5.4",
+            "--offline",
+            "--locked",
+            "--lib",
+            "adapters::supervisor::manager::tests"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 19,
+  "missed": 0,
+  "caught": 19,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0,
+  "start_time": "2026-09-27T18:59:20.563506413Z",
+  "end_time": "2026-09-27T19:07:48.791530839Z",
+  "cargo_mutants_version": "27.1.0"
+}

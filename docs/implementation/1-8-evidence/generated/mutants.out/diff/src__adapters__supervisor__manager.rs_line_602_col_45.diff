@@ -1,0 +1,21 @@
+--- src/adapters/supervisor/manager.rs
++++ delete ! in proc_empty
+@@ -594,17 +594,17 @@
+     if !valid_cgroup(cgroup) {
+         return Err(ExecutionError::CleanupUncertain);
+     }
+     for entry in std::fs::read_dir(root).map_err(failure)? {
+         let entry = entry.map_err(failure)?;
+         if entry
+             .file_name()
+             .to_str()
+-            .is_none_or(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))
++            .is_none_or(|s| s.is_empty() ||  /* ~ changed by cargo-mutants ~ */s.bytes().all(|b| b.is_ascii_digit()))
+         {
+             continue;
+         }
+         let path = entry.path();
+         let read = |name: &str| -> Result<Option<String>, ExecutionError> {
+             match std::fs::read_to_string(path.join(name)) {
+                 Ok(s) => Ok(Some(s)),
+                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),

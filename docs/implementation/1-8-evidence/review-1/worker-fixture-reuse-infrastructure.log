@@ -1,0 +1,7 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.04s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-contain-protected-child-processes)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.91s
+error: output file /home/sixtocantolla/.vaultwarden-cli-tests.ee7MSK/helper-environment is not writeable -- check its permissions
+
+error: aborting due to 1 previous error
