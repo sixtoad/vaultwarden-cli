@@ -1,0 +1,11 @@
+--- src/access/history.rs
++++ src/access/history.rs
+@@ -207,7 +207,7 @@
+ }
+ pub(crate) fn limit(value: Option<u32>) -> Result<usize, DirectRequestError> {
+     let limit = value.unwrap_or(DEFAULT_HISTORY_LIMIT);
+-    if (1..=MAX_HISTORY_LIMIT).contains(&limit) {
++    if (0..=MAX_HISTORY_LIMIT).contains(&limit) {
+         Ok(limit as usize)
+     } else {
+         Err(DirectRequestError::InvalidRequest)

@@ -1,0 +1,37 @@
+--- src/access/history.rs
++++ replace HistoryEvent::valid -> bool with false
+@@ -111,33 +111,17 @@
+             expires_at_unix_seconds: record.review.expires_at_unix_seconds,
+             at_unix_seconds: Some(now),
+             ordinal,
+             outcome,
+             status,
+         }
+     }
+     pub(crate) fn valid(&self) -> bool {
+-        let text = |s: &str| !s.is_empty() && s.len() <= 256;
+-        self.version == HISTORY_VERSION
+-            && super::direct_request::valid_request_id(&self.request_id)
+-            && super::valid_operation_id(&self.operation)
+-            && super::valid_sha256(&self.policy_revision)
+-            && self.created_at_unix_seconds < self.expires_at_unix_seconds
+-            && match &self.requester {
+-                RequesterSnapshot::Human { uid, label } => *uid != u32::MAX && text(label),
+-                RequesterSnapshot::Agent { label, fingerprint } => {
+-                    text(label) && super::valid_sha256(fingerprint)
+-                }
+-            }
+-            && !self.credentials.is_empty()
+-            && self.credentials.len() <= 16
+-            && self.credentials.iter().all(|c| text(&c.label))
+-            && (self.at_unix_seconds.is_some() || self.outcome == HistoryOutcome::LegacyUnknown)
+-            && self.consistent_outcome()
++        false /* ~ changed by cargo-mutants ~ */
+     }
+     fn consistent_outcome(&self) -> bool {
+         use DirectStatus as S;
+         use HistoryOutcome as O;
+         matches!(
+             (&self.outcome, &self.status),
+             (O::Submitted, Some(S::Pending))
+                 | (O::Approved, Some(S::Approved))

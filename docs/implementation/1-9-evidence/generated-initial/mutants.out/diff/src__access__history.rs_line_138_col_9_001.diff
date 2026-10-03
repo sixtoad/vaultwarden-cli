@@ -1,0 +1,77 @@
+--- src/access/history.rs
++++ replace HistoryEvent::consistent_outcome -> bool with false
+@@ -130,73 +130,17 @@
+             }
+             && !self.credentials.is_empty()
+             && self.credentials.len() <= 16
+             && self.credentials.iter().all(|c| text(&c.label))
+             && (self.at_unix_seconds.is_some() || self.outcome == HistoryOutcome::LegacyUnknown)
+             && self.consistent_outcome()
+     }
+     fn consistent_outcome(&self) -> bool {
+-        use DirectStatus as S;
+-        use HistoryOutcome as O;
+-        matches!(
+-            (&self.outcome, &self.status),
+-            (O::Submitted, Some(S::Pending))
+-                | (O::Approved, Some(S::Approved))
+-                | (O::Denied, Some(S::Denied))
+-                | (
+-                    O::Expired | O::ReviewUnavailable | O::Invalidated,
+-                    Some(S::Expired)
+-                )
+-                | (O::ExecutionStarted, Some(S::Running))
+-                | (O::Succeeded, Some(S::Completed { exit_code: 0 }))
+-                | (
+-                    O::ExecutionNonzero,
+-                    Some(S::Failed {
+-                        reason: DirectFailure::ExecutionNonzero
+-                    })
+-                )
+-                | (
+-                    O::ExecutionSignaled,
+-                    Some(S::Failed {
+-                        reason: DirectFailure::ExecutionSignaled
+-                    })
+-                )
+-                | (
+-                    O::ExecutionRejected,
+-                    Some(S::Failed {
+-                        reason: DirectFailure::ExecutionRejected
+-                    })
+-                )
+-                | (
+-                    O::ExecutionUnavailable,
+-                    Some(
+-                        S::Expired
+-                            | S::Failed {
+-                                reason: DirectFailure::ExecutionUnavailable
+-                            }
+-                    )
+-                )
+-                | (
+-                    O::ReviewUnavailable,
+-                    Some(S::Failed {
+-                        reason: DirectFailure::ReviewUnavailable
+-                    })
+-                )
+-                | (
+-                    O::Recovered,
+-                    Some(
+-                        S::Expired
+-                            | S::Failed {
+-                                reason: DirectFailure::ExecutionUnavailable
+-                            }
+-                    )
+-                )
+-                | (O::LegacyUnknown, _)
+-        ) || matches!((&self.outcome, &self.status), (O::ExecutionNonzero, Some(S::Completed { exit_code })) if (1..=255).contains(exit_code))
++        false /* ~ changed by cargo-mutants ~ */
+     }
+     pub(crate) fn matches_record(&self, record: &DirectRecord) -> bool {
+         let mut expected = Self::snapshot(
+             record,
+             self.ordinal,
+             self.at_unix_seconds.unwrap_or(0),
+             self.outcome,
+             self.status.clone(),

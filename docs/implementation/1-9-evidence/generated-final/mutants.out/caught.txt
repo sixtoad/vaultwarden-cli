@@ -1,0 +1,2 @@
+src/access/history.rs:119:9: replace HistoryEvent::valid -> bool with true
+src/access/history.rs:138:9: replace HistoryEvent::consistent_outcome -> bool with true

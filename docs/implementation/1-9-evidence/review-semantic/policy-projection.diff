@@ -1,0 +1,11 @@
+--- src/access/history.rs
++++ src/access/history.rs
+@@ -105,7 +105,7 @@
+                 uid: record.owner_uid,
+                 label: record.review.requester.clone(),
+             },
+-            policy_revision: record.review.policy_digest.clone(),
++            policy_revision: record.review.arguments_digest.clone(),
+             credentials: record.review.credentials.clone(),
+             created_at_unix_seconds: record.created_at_unix_seconds,
+             expires_at_unix_seconds: record.review.expires_at_unix_seconds,

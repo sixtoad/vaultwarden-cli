@@ -1,0 +1,401 @@
+[
+  {
+    "name": "requester-attribution",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_submission_and_decision_have_exact_allowlisted_snapshots",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 0.46,
+    "mutant_exit": 101,
+    "mutant_seconds": 3.67,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "policy-projection",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_submission_and_decision_have_exact_allowlisted_snapshots",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 3.57,
+    "mutant_exit": 101,
+    "mutant_seconds": 3.07,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "credential-projection",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_submission_and_decision_have_exact_allowlisted_snapshots",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 3.07,
+    "mutant_exit": 101,
+    "mutant_seconds": 3.12,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "application-human-check",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_owner_and_browser_generation_guards_work_while_locked",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.68,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.48,
+    "classification": "caught",
+    "source_sha256": "6f9f7cd3f1217aa2888cae2606bb4ea3719795ff7c31e284aa4294c512aac38f"
+  },
+  {
+    "name": "provider-human-check",
+    "path": "src/access/provider.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_provider_owner_guard_is_independent_of_application_authentication",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.83,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.98,
+    "classification": "caught",
+    "source_sha256": "c5ef3be6257cde919f0741e2cecb6b33e8a4817f047b76db5faf35d36f4f07d3"
+  },
+  {
+    "name": "browser-generation",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_owner_and_browser_generation_guards_work_while_locked",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 5.08,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.78,
+    "classification": "caught",
+    "source_sha256": "6f9f7cd3f1217aa2888cae2606bb4ea3719795ff7c31e284aa4294c512aac38f"
+  },
+  {
+    "name": "minimum-limit",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_limits_empty_equal_timestamps_and_all_tiebreakers_are_deterministic",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.58,
+    "mutant_exit": 101,
+    "mutant_seconds": 6.39,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "maximum-limit",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_limits_empty_equal_timestamps_and_all_tiebreakers_are_deterministic",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.43,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.83,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "default-limit",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_default_and_maximum_limits_count_events",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 6.24,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.58,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "timestamp-precedence",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_time_precedes_identity_and_ordinal_and_unknown_time_sorts_last",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.78,
+    "mutant_exit": 101,
+    "mutant_seconds": 6.29,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "identity-tiebreak",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_time_precedes_identity_and_ordinal_and_unknown_time_sorts_last",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.63,
+    "mutant_exit": 101,
+    "mutant_seconds": 6.29,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "ordinal-tiebreak",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_time_precedes_identity_and_ordinal_and_unknown_time_sorts_last",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.98,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.58,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "bounded-query",
+    "path": "src/access/history.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_default_and_maximum_limits_count_events",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 5.59,
+    "mutant_exit": 101,
+    "mutant_seconds": 6.09,
+    "classification": "caught",
+    "source_sha256": "3eef04dc78be700a71518b788849df498e87cb738a5cb37c66e5094c38b1d5d8"
+  },
+  {
+    "name": "legacy-binding",
+    "path": "src/access/direct_request.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_malformed_storage_unknown_versions_duplicates_and_state_mismatch_fail_closed",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 7.34,
+    "mutant_exit": 0,
+    "mutant_seconds": 5.58,
+    "classification": "survived",
+    "source_sha256": "ad6ca7ef5c56bc804ea1014616983d11e4bc7c8024da3502026100970678f648"
+  },
+  {
+    "name": "final-lifecycle-consistency",
+    "path": "src/access/direct_request.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_malformed_storage_unknown_versions_duplicates_and_state_mismatch_fail_closed",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 5.78,
+    "mutant_exit": 0,
+    "mutant_seconds": 6.19,
+    "classification": "survived",
+    "source_sha256": "ad6ca7ef5c56bc804ea1014616983d11e4bc7c8024da3502026100970678f648"
+  },
+  {
+    "name": "execution-claim-consistency",
+    "path": "src/access/direct_request.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_recorded_execution_requires_a_claim_independently_of_other_guards",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 5.33,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.73,
+    "classification": "caught",
+    "source_sha256": "ad6ca7ef5c56bc804ea1014616983d11e4bc7c8024da3502026100970678f648"
+  },
+  {
+    "name": "recovery-invalidation",
+    "path": "src/access/provider_store.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_terminal_restart_is_idempotent_and_pending_never_regains_authority",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 5.33,
+    "mutant_exit": 101,
+    "mutant_seconds": 5.59,
+    "classification": "caught",
+    "source_sha256": "4b16e3abfbbc31748756bf606f20d2f08b22769f29c0c6e5904aeb082038aab7"
+  },
+  {
+    "name": "durable-submission",
+    "path": "src/access/provider.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_submission_and_decision_have_exact_allowlisted_snapshots",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.58,
+    "mutant_exit": 101,
+    "mutant_seconds": 6.34,
+    "classification": "caught",
+    "source_sha256": "c5ef3be6257cde919f0741e2cecb6b33e8a4817f047b76db5faf35d36f4f07d3"
+  },
+  {
+    "name": "transition-event",
+    "path": "src/access/provider_store.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_every_lifecycle_projection_has_exact_fields_and_distinct_outcomes",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 6.74,
+    "mutant_exit": 101,
+    "mutant_seconds": 5.14,
+    "classification": "caught",
+    "source_sha256": "4b16e3abfbbc31748756bf606f20d2f08b22769f29c0c6e5904aeb082038aab7"
+  }
+]

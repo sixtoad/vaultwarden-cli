@@ -5,9 +5,9 @@ under distinct restricted OS principals. A same-UID agent can read the human's
 memory and keyring and is not a supported secret boundary. The existing direct
 `vaultwarden-cli` remains a separate human-only vault client.
 
-Stories 1.1–1.8 provide private state, constrained operation policy, a protected
+Stories 1.1–1.9 provide private state, constrained operation policy, a protected
 provider session, authenticated one-time browser decisions and immutable executable
-preparation, login-backed execution and descendant containment. Agent transport
+preparation, login-backed execution, descendant containment and redacted history. Agent transport
 and platform/WebAuthn authentication
 are later stories.
 The provider has no agent-facing item lookup, secret export or password command.
@@ -228,11 +228,53 @@ announce execution in a later story. Pending and unexecuted Approved requests ex
 at their monotonic deadline (five minutes by default), on lock or restart. Denied
 and Expired never regain authority. Failed desktop handoffs now become Expired,
 with a redacted review-unavailable audit outcome; historical Failed records remain
-readable and unchanged. Audit contains exact request/UID/digest/expiry bindings,
-provider timestamps and closed outcomes, without password, browser proof, backend
-values, argument values or raw errors. The public status remains tokenless.
+readable and unchanged. Audit contains allowlisted request/operation identifiers, requester snapshots, policy
+revision, credential labels/use types, timestamps and closed outcomes. Reusable
+approval bindings stay outside audit. History never includes passwords, browser
+proof, backend values, argument values or raw errors. The public status remains tokenless.
 Legacy schema-v1 `{id,status}` records remain readable by the store but carry no
 human ownership and cannot be queried or reviewed as direct requests.
+
+## Redacted operation history (Story 1.9)
+
+Run `vw-access history` or `vw-access history --limit 200` from the human desktop
+account. The JSON response contains `result: "history"` and an `events` array.
+In the authenticated desktop page, use **Operation history**, choose **Number of
+events**, then **Refresh history**. Both views default to 50 events and accept
+1–200; the limit counts lifecycle events, not requests. Empty storage returns an
+empty list. Invalid limits and malformed requests fail with fixed redacted errors.
+Responses and terminal output are bounded to 2 MiB; oversized results fail without
+partial output. Use a smaller limit if needed.
+
+Each event exposes only its format version, request ID, operation ID, event-time
+requester kind/identity/label, original policy revision, original credential
+labels/use types, creation/expiry/event times, per-request ordinal, lifecycle
+status and stable outcome. Submission, approval, denial, expiry, execution start,
+success, nonzero exit, signal, rejected/unavailable execution, invalidation and
+recovery have distinct outcomes. Confirmed cleanup and reaping still precede
+terminal execution records. Historical labels never join the current policy.
+No argument values, targets, environment mappings, backend item IDs, secrets,
+process streams, sessions, browser/launch capabilities or reusable approval
+material enter history. Agent attribution is reserved for future agent support;
+no agent history or discovery endpoint is provided.
+
+Events sort newest first by event timestamp, then request ID, then per-request
+ordinal, all descending. Supported legacy records migrate atomically into the
+versioned format at startup. Where old storage cannot prove an event time or
+phase, `legacy_unknown` and null fields preserve that uncertainty; the UI shows
+**Unknown (legacy record)**. Unknown-time events sort after known-time events.
+Terminal history survives restart. Unexecuted work expires during recovery and
+cannot gain authority from a read. No retention, export or pruning is introduced.
+
+CLI reads require kernel-authenticated provider-owner UID. Browser reads require
+the cookie, independent session proof and current provider generation, checked
+inside the serialized query. Reads work while the vault is locked when the proof
+is current. Lock/unlock retires the earlier generation for history; use a fresh
+provider/request launch to authenticate, or use the CLI while locked. The existing
+request review may still show a terminal status with older proof. The public page
+contains no historical data. History text uses DOM text nodes; invisible controls
+and directional formatting are visibly escaped. Terminal JSON additionally
+escapes DEL/C1 and directional controls while preserving its parsed values.
 
 ## Exact executable preparation (Story 1.6)
 

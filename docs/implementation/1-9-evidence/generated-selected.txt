@@ -1,0 +1,16 @@
+src/access/history.rs:119:9: replace HistoryEvent::valid -> bool with true
+src/access/history.rs:119:9: replace HistoryEvent::valid -> bool with false
+src/access/history.rs:138:9: replace HistoryEvent::consistent_outcome -> bool with true
+src/access/history.rs:138:9: replace HistoryEvent::consistent_outcome -> bool with false
+src/access/history.rs:197:9: replace HistoryEvent::matches_record -> bool with true
+src/access/history.rs:197:9: replace HistoryEvent::matches_record -> bool with false
+src/access/history.rs:209:5: replace limit -> Result<usize, DirectRequestError> with Ok(0)
+src/access/history.rs:209:5: replace limit -> Result<usize, DirectRequestError> with Ok(1)
+src/access/history.rs:217:5: replace newest -> Vec<HistoryEvent> with vec![]
+src/access/history.rs:243:52: replace match guard decision == D::Recovered with true in outcome
+src/access/history.rs:243:52: replace match guard decision == D::Recovered with false in outcome
+src/access/history.rs:243:61: replace == with != in outcome
+src/access/history.rs:250:13: delete match arm D::ReviewUnavailable in outcome
+src/access/history.rs:251:13: delete match arm D::ExecutionUnavailable in outcome
+src/access/history.rs:252:13: delete match arm D::Invalidated in outcome
+src/access/history.rs:253:13: delete match arm D::Recovered in outcome

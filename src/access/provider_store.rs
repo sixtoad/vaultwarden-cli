@@ -150,7 +150,7 @@ impl RequestRecord {
         outcome: super::direct_request::DecisionOutcome,
         now: u64,
     ) -> Result<(), ProviderError> {
-        use super::direct_request::{DecisionAudit, DirectStatus as S};
+        use super::direct_request::DirectStatus as S;
         let direct = self
             .direct
             .as_mut()
@@ -181,11 +181,13 @@ impl RequestRecord {
         if next.is_terminal() {
             direct.approval = None;
         }
-        direct.audit.push(DecisionAudit {
-            binding: direct.approval_binding(),
-            at_unix_seconds: now,
-            outcome,
-        });
+        direct.audit.push(super::history::HistoryEvent::snapshot(
+            direct,
+            direct.audit.len() as u32,
+            now,
+            super::history::outcome(&next, outcome),
+            Some(next.clone()),
+        ));
         direct.review.status = next;
         Ok(())
     }
@@ -351,7 +353,7 @@ impl ProviderStore {
                 }
                 use super::direct_request::{DecisionOutcome, DirectFailure, DirectStatus};
                 if request.direct.is_some() {
-                    let (next, outcome) = if request.status == RequestLifecycleStatus::Running {
+                    let (next, _outcome) = if request.status == RequestLifecycleStatus::Running {
                         (
                             DirectStatus::Failed {
                                 reason: DirectFailure::ExecutionUnavailable,
@@ -361,7 +363,15 @@ impl ProviderStore {
                     } else {
                         (DirectStatus::Expired, DecisionOutcome::Expired)
                     };
-                    request.transition(next, outcome, provider_wall_time()?)?;
+                    request.transition(
+                        next,
+                        if recovered {
+                            DecisionOutcome::Recovered
+                        } else {
+                            DecisionOutcome::Invalidated
+                        },
+                        provider_wall_time()?,
+                    )?;
                 } else {
                     // Historical non-direct records retain their startup semantics.
                     request.status = RequestLifecycleStatus::Invalidated;

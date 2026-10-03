@@ -404,6 +404,42 @@ impl ProviderApplication {
             status: review.status,
         })
     }
+    pub fn history(
+        &self,
+        owner: AuthenticatedHuman,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        self.check_owner(owner)?;
+        self.history_current(None, limit)
+    }
+    /// Only the browser adapter supplies a generation from a verified cookie/proof session.
+    pub(crate) fn browser_history(
+        &self,
+        generation: u64,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        self.history_current(Some(generation), limit)
+    }
+    fn history_current(
+        &self,
+        generation: Option<u64>,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        if generation.is_some_and(|g| g != authority.generation) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        super::history::limit(limit)?;
+        self.expire_requests(&mut authority)?;
+        authority.provider.history(self.owner, limit)
+    }
     pub fn direct_status(
         &self,
         owner: AuthenticatedHuman,

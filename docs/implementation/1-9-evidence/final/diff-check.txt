@@ -1,0 +1,2 @@
+git diff --check: exit 0
+New authored text files: no trailing whitespace

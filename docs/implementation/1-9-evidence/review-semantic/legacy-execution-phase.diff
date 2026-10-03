@@ -1,0 +1,11 @@
+--- src/access/direct_request.rs
++++ src/access/direct_request.rs
+@@ -273,7 +273,7 @@
+                     let next = match event.outcome {
+                         DecisionOutcome::Approved => match previous {
+                             DirectStatus::Pending => DirectStatus::Approved,
+-                            DirectStatus::Approved => DirectStatus::Running,
++                            DirectStatus::Approved => return Err("invalid legacy history"),
+                             DirectStatus::Running
+                                 if last
+                                     && matches!(

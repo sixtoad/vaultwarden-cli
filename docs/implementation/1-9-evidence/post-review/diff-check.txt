@@ -1,0 +1,2 @@
+git diff --check: exit 0
+Source manifest checked after all jobs: unchanged

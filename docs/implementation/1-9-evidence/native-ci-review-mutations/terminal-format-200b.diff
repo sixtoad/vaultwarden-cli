@@ -1,0 +1,11 @@
+--- src/bin/vw-access.rs
++++ src/bin/vw-access.rs
+@@ -167,7 +167,7 @@
+     let mut safe = String::new();
+     for character in json.chars() {
+         if character.is_control()
+-            || matches!(character, '\u{061c}' | '\u{200b}' | '\u{2060}' | '\u{feff}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
++            || matches!(character, '\u{061c}' | '\u{2060}' | '\u{feff}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+         {
+             write!(safe, "\\u{:04x}", character as u32)
+                 .map_err(|_error| "provider response unavailable")?;

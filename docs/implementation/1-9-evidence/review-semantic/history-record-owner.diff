@@ -1,0 +1,10 @@
+--- src/access/provider.rs
++++ src/access/provider.rs
+@@ -114,7 +114,6 @@
+                 .requests
+                 .into_iter()
+                 .filter_map(|r| r.direct)
+-                .filter(|d| d.owner_uid == owner.uid())
+                 .flat_map(|d| d.audit)
+                 .collect(),
+             limit,

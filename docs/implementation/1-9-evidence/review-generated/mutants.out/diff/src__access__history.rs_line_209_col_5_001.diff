@@ -1,0 +1,26 @@
+--- src/access/history.rs
++++ replace limit -> Result<usize, DirectRequestError> with Ok(1)
+@@ -201,22 +201,17 @@
+             self.outcome,
+             self.status.clone(),
+         );
+         expected.at_unix_seconds = self.at_unix_seconds;
+         self.valid() && *self == expected
+     }
+ }
+ pub(crate) fn limit(value: Option<u32>) -> Result<usize, DirectRequestError> {
+-    let limit = value.unwrap_or(DEFAULT_HISTORY_LIMIT);
+-    if (1..=MAX_HISTORY_LIMIT).contains(&limit) {
+-        Ok(limit as usize)
+-    } else {
+-        Err(DirectRequestError::InvalidRequest)
+-    }
++    Ok(1) /* ~ changed by cargo-mutants ~ */
+ }
+ pub(crate) fn newest(mut events: Vec<HistoryEvent>, limit: usize) -> Vec<HistoryEvent> {
+     events.sort_by(|a, b| {
+         (b.at_unix_seconds, &b.request_id, b.ordinal).cmp(&(
+             a.at_unix_seconds,
+             &a.request_id,
+             a.ordinal,
+         ))

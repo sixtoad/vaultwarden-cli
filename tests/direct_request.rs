@@ -79,6 +79,18 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         .unwrap();
     let image = dir.path().join("image");
     let bytes: &[u8] = b"\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00\x01\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x01\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x78\x00\x00\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\xb8\x3c\x00\x00\x00\xbf\x00\x00\x00\x00\x0f\x05";
+    #[cfg(target_arch = "aarch64")]
+    let native_bytes = {
+        let mut native = bytes.to_vec();
+        native[18..20].copy_from_slice(&183u16.to_le_bytes());
+        // mov x0, #0; mov x8, #93; svc #0 (native Linux exit(0)).
+        native[120..132].copy_from_slice(&[
+            0x00, 0x00, 0x80, 0xd2, 0xa8, 0x0b, 0x80, 0xd2, 0x01, 0x00, 0x00, 0xd4,
+        ]);
+        native
+    };
+    #[cfg(target_arch = "aarch64")]
+    let bytes = native_bytes.as_slice();
     std::fs::write(&image, bytes).unwrap();
     std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o500)).unwrap();
     use sha2::Digest;

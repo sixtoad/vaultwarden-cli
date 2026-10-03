@@ -1,0 +1,35 @@
+[
+  {
+    "name": "workflow-lint",
+    "command": [
+      "/tmp/story19-ci-tools/actionlint",
+      "-shellcheck=/tmp/story19-ci-tools/shellcheck-dist/usr/bin/shellcheck",
+      ".github/workflows/ci.yml"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "runner-guards",
+    "command": [
+      "python3",
+      "docs/implementation/1-9-evidence/review-fix/runner-guards.py"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "fixture-shellcheck",
+    "command": [
+      "/tmp/story19-ci-tools/shellcheck-dist/usr/bin/shellcheck",
+      "scripts/check-native-fixtures.sh",
+      "scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "assembly",
+    "command": [
+      "./scripts/check-native-fixtures.sh"
+    ],
+    "exit": 0
+  }
+]

@@ -3,33 +3,21 @@ use std::io::Write;
 use std::os::unix::fs::{PermissionsExt, symlink};
 
 fn image_bytes() -> Vec<u8> {
-    // Machine code assembled from tests/fixtures/protected-exit.S; no toolchain at test time.
-    let code: &[u8] = &[
-        0x48, 0x83, 0x3c, 0x24, 0x02, 0x75, 0x2a, 0x48, 0x8b, 0x44, 0x24, 0x10, 0x81, 0x38, 0x6d,
-        0x61, 0x72, 0x6b, 0x75, 0x1d, 0x80, 0x78, 0x04, 0x00, 0x75, 0x17, 0x48, 0x83, 0x7c, 0x24,
-        0x18, 0x00, 0x75, 0x0f, 0x48, 0x83, 0x7c, 0x24, 0x20, 0x00, 0x75, 0x07, 0xbf, 0x2a, 0x00,
-        0x00, 0x00, 0xeb, 0x05, 0xbf, 0x63, 0x00, 0x00, 0x00, 0xb8, 0x3c, 0x00, 0x00, 0x00, 0x0f,
-        0x05,
-    ];
+    // Auditable source: tests/fixtures/protected-exit.S; no assembler at test time.
+    #[cfg(target_arch = "x86_64")]
+    let code = include_bytes!("../../../../tests/fixtures/protected-exit-x86_64.bin");
+    #[cfg(target_arch = "aarch64")]
+    let code = include_bytes!("../../../../tests/fixtures/protected-exit-aarch64.bin");
     image_with_code(code)
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn output_image_bytes() -> Vec<u8> {
-    // This fixture forks two writers: one emits 128 KiB to stdout while the
-    // other emits 128 KiB to stderr. It is preassembled so the test needs no
-    // toolchain and exercises concurrent pipe draining.
-    let code: &[u8] = &[
-        0xb8, 0x39, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x48, 0x85, 0xc0, 0x74, 0x2c, 0x41, 0xbc, 0x00,
-        0x20, 0x00, 0x00, 0xb8, 0x01, 0x00, 0x00, 0x00, 0xbf, 0x01, 0x00, 0x00, 0x00, 0x48, 0x8d,
-        0x35, 0x41, 0x00, 0x00, 0x00, 0xba, 0x10, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x41, 0xff, 0xcc,
-        0x75, 0xe3, 0xb8, 0x3c, 0x00, 0x00, 0x00, 0x31, 0xff, 0x0f, 0x05, 0x41, 0xbc, 0x00, 0x20,
-        0x00, 0x00, 0xb8, 0x01, 0x00, 0x00, 0x00, 0xbf, 0x02, 0x00, 0x00, 0x00, 0x48, 0x8d, 0x35,
-        0x25, 0x00, 0x00, 0x00, 0xba, 0x10, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x41, 0xff, 0xcc, 0x75,
-        0xe3, 0xb8, 0x3c, 0x00, 0x00, 0x00, 0x31, 0xff, 0x0f, 0x05, b's', b't', b'd', b'o', b'u',
-        b't', b'-', b's', b'e', b'n', b't', b'i', b'n', b'e', b'l', b'\n', b's', b't', b'd', b'e',
-        b'r', b'r', b'-', b's', b'e', b'n', b't', b'i', b'n', b'e', b'l', b'\n',
-    ];
+    // Preassembled concurrent stream writers from tests/fixtures/protected-output.S.
+    #[cfg(target_arch = "x86_64")]
+    let code = include_bytes!("../../../../tests/fixtures/protected-output-x86_64.bin");
+    #[cfg(target_arch = "aarch64")]
+    let code = include_bytes!("../../../../tests/fixtures/protected-output-aarch64.bin");
     image_with_code(code)
 }
 
@@ -56,12 +44,6 @@ fn image_with_code(code: &[u8]) -> Vec<u8> {
     b[104..112].copy_from_slice(&4096u64.to_le_bytes());
     b[112..120].copy_from_slice(&4096u64.to_le_bytes());
     b[120..120 + code.len()].copy_from_slice(code);
-    if cfg!(target_arch = "aarch64") {
-        // Native exit(42); real argv/environment execution oracle is x86_64-only.
-        b[120..132].copy_from_slice(&[
-            0x40, 0x05, 0x80, 0xd2, 0xa8, 0x0b, 0x80, 0xd2, 0x01, 0x00, 0x00, 0xd4,
-        ]);
-    }
     b
 }
 struct Fixture {
@@ -73,7 +55,7 @@ impl Fixture {
     fn new() -> Self {
         Self::from_bytes(image_bytes())
     }
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
     fn output() -> Self {
         Self::from_bytes(output_image_bytes())
     }
@@ -166,7 +148,7 @@ fn fixture_supervision_uses_explicit_environment_and_reaps_the_child() {
     );
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 #[test]
 fn fixture_supervision_discards_large_secret_output_from_both_streams() {
     crate::adapters::execution::TEST_DISCARDED_BYTES.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -523,7 +505,7 @@ fn invalid_and_unsealable_descriptors_fail_closed() {
     assert_eq!(seal_fd(file.as_raw_fd()), Err(ExecutionError::Unavailable));
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 #[test]
 fn descriptor_execution_subprocess() {
     let child = std::process::Command::new(std::env::current_exe().unwrap())
@@ -544,7 +526,7 @@ fn descriptor_execution_subprocess() {
         String::from_utf8_lossy(&child.stderr)
     );
 }
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 #[test]
 #[ignore = "only invoked by descriptor_execution_subprocess; replaces process"]
 fn execution_child() {
@@ -1623,4 +1605,71 @@ fn elf_boundaries_entry_and_independent_second_load() {
             Err(ExecutionError::UnsupportedImage)
         );
     }
+}
+
+#[test]
+fn native_argument_environment_oracle_has_independent_positive_and_negative_controls() {
+    for (case, expected) in [
+        ("valid", 42),
+        ("wrong_argument", 99),
+        ("wrong_terminator", 99),
+        ("missing_argument", 99),
+        ("nonempty_environment", 99),
+    ] {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "adapters::execution::linux::tests::native_oracle_child",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("VW_NATIVE_ORACLE_CASE", case)
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(expected),
+            "{case}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+#[test]
+#[ignore = "native_argument_environment_oracle subprocess; replaces process"]
+fn native_oracle_child() {
+    let case = std::env::var("VW_NATIVE_ORACLE_CASE").unwrap();
+    let fixture = Fixture::new();
+    let mut prepared = fixture.prepare().unwrap();
+    if case == "wrong_argument" {
+        prepared.argv[1] = CString::new("bark").unwrap();
+    } else if case == "wrong_terminator" {
+        prepared.argv[1] = CString::new("marks").unwrap();
+    } else if case == "missing_argument" {
+        prepared.argv.pop();
+    }
+    let mut arguments = prepared
+        .argv
+        .iter()
+        .map(|arg| arg.as_ptr())
+        .collect::<Vec<_>>();
+    arguments.push(std::ptr::null());
+    let sentinel = CString::new("ORACLE_ENVIRONMENT=nonempty").unwrap();
+    let environment = if case == "nonempty_environment" {
+        vec![sentinel.as_ptr(), std::ptr::null()]
+    } else {
+        vec![std::ptr::null()]
+    };
+    // Test-only direct syscall independently validates the machine-code oracle.
+    // Production execute_fd's empty-environment boundary remains unchanged.
+    let result = unsafe {
+        libc::syscall(
+            libc::SYS_execveat,
+            prepared.file.as_raw_fd(),
+            c"".as_ptr(),
+            arguments.as_ptr(),
+            environment.as_ptr(),
+            libc::AT_EMPTY_PATH,
+        )
+    };
+    panic!("oracle execveat unexpectedly returned {result}");
 }

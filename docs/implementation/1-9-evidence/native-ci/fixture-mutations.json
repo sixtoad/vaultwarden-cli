@@ -1,0 +1,34 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--lib",
+    "adapters::execution::linux::tests::native_argument_environment_oracle_has_independent_positive_and_negative_controls",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "restored_sha256": "ac812e497a8a9a6927736d5ddb51b362c9ee08e988983e024b3e68d82a663dc3",
+  "results": [
+    {
+      "mutation": "omit-argument-content-guard",
+      "returncode": 101,
+      "classification": "caught",
+      "seconds": 8.6
+    },
+    {
+      "mutation": "omit-argument-terminator-guard",
+      "returncode": 101,
+      "classification": "caught",
+      "seconds": 7.8
+    },
+    {
+      "mutation": "omit-environment-guard",
+      "returncode": 101,
+      "classification": "caught",
+      "seconds": 6.69
+    }
+  ]
+}
