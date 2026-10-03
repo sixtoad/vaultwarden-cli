@@ -1,0 +1,15 @@
+[
+  "test access::policy::tests::preliminary_open_flags_child ... ignored, isolated preliminary open-flag contract; parent harness only",
+  "test adapters::desktop_launch::tests::isolated_system_launcher_child ... ignored, invoked only by the isolated desktop test subprocess",
+  "test adapters::execution::linux::tests::cleanup_child ... ignored, isolated FD-count and raw closed descriptor checks",
+  "test adapters::execution::linux::tests::descriptor_zero_child ... ignored, isolated descriptor-zero contract; parent harness only",
+  "test adapters::execution::linux::tests::execution_child ... ignored, only invoked by descriptor_execution_subprocess; replaces process",
+  "test adapters::execution::linux::tests::native_oracle_child ... ignored, native_argument_environment_oracle subprocess; replaces process",
+  "test adapters::execution::linux::tests::required_syscall_flag_child ... ignored, isolated syscall-flag contract; parent harness only",
+  "test adapters::execution::linux::tests::syscall_failure_child ... ignored, installs process-local seccomp fault injection; parent harness only",
+  "test adapters::human_socket::tests::isolated_descriptor_fixture ... ignored, isolated process fixture invoked by descriptor regression wrapper",
+  "test adapters::loopback_ui::tests::direct_request_browser_fixture ... ignored, run with tests/ui/direct-request.mjs and a disposable trusted browser profile",
+  "test adapters::supervisor::real_tests::provider_harness ... ignored, internal real-manager harness; invoked by scripts/test-systemd-supervisor.sh",
+  "test assertion_unwind_reaps_exact_resources_and_preserves_unrelated ... ignored, requires real user systemd; run scripts/test-systemd-supervisor.sh",
+  "test independent_descendants_provider_crash_and_recovery ... ignored, requires real user systemd; run scripts/test-systemd-supervisor.sh"
+]

@@ -137,6 +137,11 @@ impl RequestLaunchBroker {
 }
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+struct HistoryInput {
+    limit: Option<u32>,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ReviewInput {
     request_id: String,
 }
@@ -402,7 +407,7 @@ impl LoopbackUi {
             // scoped in sessionStorage (cookies themselves are not port-scoped).
             return Response::html(r#"<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Vaultwarden Access</title><style>
 body{font-family:system-ui,sans-serif;max-width:54rem;margin:2rem auto;padding:0 1rem;color:#142033;background:#fff}button,input{font:inherit;margin:.5rem;padding:.6rem}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #124ed0;outline-offset:3px}dt{font-weight:bold;margin-top:1rem}dd{margin:.25rem 0;overflow-wrap:anywhere}#result,#review-status{padding:.75rem;border:2px solid #64748b}[hidden]{display:none}
-</style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Decide this request once. Approval schedules one protected execution.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><p id=decision-feedback role=status aria-live=polite aria-atomic=true></p><div id=decisions hidden><button id=deny type=button>Deny request</button><button id=begin-approval type=button>Authenticate and approve once</button><form id=approval hidden><label for=approval-password>Master password for this approval</label><input id=approval-password type=password autocomplete=current-password required maxlength=4096><button id=approve type=submit>Approve once</button><button id=cancel-approval type=button>Cancel authentication</button></form></div><button id=refresh type=button>Refresh request status</button></section></main><script>
+</style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Decide this request once. Approval schedules one protected execution.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><p id=decision-feedback role=status aria-live=polite aria-atomic=true></p><div id=decisions hidden><button id=deny type=button>Deny request</button><button id=begin-approval type=button>Authenticate and approve once</button><form id=approval hidden><label for=approval-password>Master password for this approval</label><input id=approval-password type=password autocomplete=current-password required maxlength=4096><button id=approve type=submit>Approve once</button><button id=cancel-approval type=button>Cancel authentication</button></form></div><button id=refresh type=button>Refresh request status</button></section><section id=operation-history hidden aria-labelledby=history-title><h2 id=history-title>Operation history</h2><p>Recent redacted lifecycle events, newest first.</p><form id=history-form><label for=history-limit>Number of events</label><input id=history-limit type=number min=1 max=200 value=50 required><button id=history-refresh type=submit>Refresh history</button></form><p id=history-status role=status aria-live=polite aria-atomic=true></p><ol id=history-events></ol></section></main><script>
 (async()=>{
 const result=document.getElementById('result'), input=document.getElementById('password');
 let [capability,requestId]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
@@ -410,16 +415,17 @@ if(location.protocol!=='https:')return;
 if(capability){try{await navigator.locks.request('vw-launch',async()=>{const r=await fetch('/launch',{method:'POST',headers:{'Content-Type':'text/plain'},body:capability});capability='';if(!r.ok)throw Error();sessionStorage.setItem('vw_proof',await r.text());if(requestId)sessionStorage.setItem('vw_request',requestId);});}catch{result.textContent='Launch unavailable';return;}}
 const csrf=sessionStorage.getItem('vw_proof');if(!csrf)return;
 requestId=sessionStorage.getItem('vw_request');
+document.getElementById('operation-history').hidden=false;
 document.getElementById('unlock').hidden=false;document.getElementById('lock').hidden=false;result.textContent='Ready for an action';
-let mutations=Promise.resolve();
-function act(path,password){input.value='';const run=async()=>{try{const body=JSON.stringify({password});password='';let r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});result.textContent='Last action result: '+await r.text();if(requestId)await review();}catch{password='';result.textContent='Last action result: Provider unavailable';}};mutations=mutations.then(run,run);}
+let mutations=Promise.resolve(),pendingMutations=0;
+function act(path,password){input.value='';pendingMutations++;resetHistory();const run=async()=>{try{const body=JSON.stringify({password});password='';let r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});result.textContent='Last action result: '+await r.text();if(requestId)await review();}catch{password='';result.textContent='Last action result: Provider unavailable';}finally{pendingMutations--;resetHistory();}};mutations=mutations.then(run,run);}
 document.getElementById('unlock').onsubmit=e=>{e.preventDefault();act('/unlock',input.value)};document.getElementById('lock').onclick=()=>act('/lock','');
 let reviewRequest=null,reviewEpoch=0,timer,detailsReady=false,retryDelay=1000,deciding=false,retired=false;
 const decisions=document.getElementById('decisions'),approval=document.getElementById('approval'),approvalPassword=document.getElementById('approval-password'),beginApproval=document.getElementById('begin-approval'),refresh=document.getElementById('refresh'),feedback=document.getElementById('decision-feedback');
 function showFeedback(text){if(!retired)feedback.textContent=text;}
 function decisionControls(unavailable){if(unavailable&&decisions.contains(document.activeElement))refresh.focus();decisions.querySelectorAll('button,input').forEach(control=>control.disabled=unavailable);}
 function invalidateReview(){reviewEpoch++;reviewRequest=null;clearTimeout(timer);}
-function retireSession(){retired=true;approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired. Reopen this request from a fresh launch to continue.';showStatus('Request status unavailable for this browser session.');}
+function retireSession(){retired=true;resetHistory();approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired. Reopen this request from a fresh launch to continue.';showStatus('Request status unavailable for this browser session.');}
 beginApproval.onclick=()=>{approval.hidden=false;approvalPassword.focus();};
 document.getElementById('cancel-approval').onclick=()=>{approvalPassword.value='';approval.hidden=true;showFeedback('Authentication form cancelled.');beginApproval.focus();review(true);};
 async function decide(path,password){approvalPassword.value='';deciding=true;invalidateReview();decisionControls(true);showFeedback('Submitting decision.');try{const body=JSON.stringify(path==='/approve'?{request_id:requestId,password}:{request_id:requestId});password='';const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});showFeedback(response.ok?'Decision submitted. See the current request status below.':'Decision rejected. Check the request status below.');}catch{password='';showFeedback('Decision response unavailable. Request status below is authoritative; do not resubmit.');}finally{approval.hidden=true;deciding=false;await review(true);refresh.focus();}}
@@ -427,7 +433,15 @@ approval.onsubmit=e=>{e.preventDefault();decide('/approve',approvalPassword.valu
 function showStatus(text){const status=document.getElementById('review-status');if(status.textContent!==text)status.textContent=text;}
 function renderDetails(value){const details=document.getElementById('details');for(const [name,text] of [['Request ID',value.id],['Requester',value.requester],['Operation',value.operation],['Effect',value.effect],['Target',value.target],['Permitted arguments',value.arguments],['Credentials and use types',value.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Executable digest',value.executable_digest],['Policy digest',value.policy_digest],['Arguments digest',value.arguments_digest],['Expires at',new Date(value.expires_at_unix_seconds*1000).toISOString()],['One-time meaning',value.one_time]]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;if(Array.isArray(text)){const values=document.createElement('ol');values.id='arguments';for(const [index,value] of text.entries()){const item=document.createElement('li');item.setAttribute('aria-label','Argument '+(index+1));item.textContent=value;values.append(item);}dd.append(values);}else{dd.textContent=text;}details.append(dt,dd);}detailsReady=true;}
 async function review(force=false){if(force)invalidateReview();if(reviewRequest)return;const request={epoch:reviewEpoch};reviewRequest=request;clearTimeout(timer);let delay=0;const current=()=>reviewRequest===request&&request.epoch===reviewEpoch;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!current())return;if([400,401,403,404].includes(r.status)){retireSession();return;}if(!r.ok)throw Error();const value=await r.json();if(!current()||retired)return;if(!detailsReady)renderDetails(value);const state=value.status.status;decisions.hidden=false;decisionControls(deciding||state!=='pending');if(state!=='pending'){approvalPassword.value='';approval.hidden=true;}showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:state==='approved'?'; approved once; awaiting protected execution':state==='denied'?'; no operation will run':''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{if(current()&&!retired){showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}}finally{if(current()){reviewRequest=null;if(delay&&!retired)timer=setTimeout(review,delay);}}}
-if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=>review();await review();}
+function visibleText(value){return String(value).replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b\u2060\ufeff\u200e\u200f\u2028-\u202e\u2066-\u2069]/gu,c=>'\\u'+c.codePointAt(0).toString(16).padStart(4,'0'));}
+function historyTime(value){if(value===null)return 'Unknown (legacy record)';const date=new Date(value*1000);return Number.isNaN(date.getTime())?String(value)+' Unix seconds':date.toISOString();}
+let historyLoading=false,historyEpoch=0;
+const historyFailure='History unavailable. Try fewer events, reopen a fresh provider launch to authenticate, or check provider availability.';
+function resetHistory(){historyEpoch++;historyLoading=false;document.getElementById('history-events').replaceChildren();document.querySelectorAll('#history-form button,#history-form input').forEach(control=>control.disabled=retired||pendingMutations>0);document.getElementById('history-status').textContent=retired?'History unavailable for this retired browser session.':pendingMutations?'History unavailable while a provider action is pending.':'Refresh history to read current events.';}
+async function loadHistory(){if(historyLoading||retired||pendingMutations)return;historyLoading=true;const epoch=historyEpoch,rows=document.getElementById('history-events'),status=document.getElementById('history-status'),button=document.getElementById('history-refresh');rows.replaceChildren();button.disabled=true;status.textContent='Loading history';const controller=new AbortController();let deadlineTimer;const deadline=new Promise((_,reject)=>{deadlineTimer=setTimeout(()=>{controller.abort();reject(Error());},15000);});try{const limit=Number(document.getElementById('history-limit').value);if(!Number.isInteger(limit)||limit<1||limit>200)throw Error();const events=await Promise.race([(async()=>{const response=await fetch('/history',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({limit}),signal:controller.signal});if(!response.ok)throw Error();return response.json();})(),deadline]);if(epoch!==historyEpoch)return;for(const event of events){const item=document.createElement('li'),details=document.createElement('dl');const requester=event.requester;for(const [name,value] of [['Request ID',event.request_id],['Operation',event.operation],['Requester',requester.label],['Requester kind',requester.kind],['Requester identity',requester.kind==='human'?requester.uid:requester.fingerprint],['Policy revision',event.policy_revision],['Credentials and use types',event.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Created at',historyTime(event.created_at_unix_seconds)],['Expires at',historyTime(event.expires_at_unix_seconds)],['Event time',historyTime(event.at_unix_seconds)],['Event ordinal',event.ordinal],['Outcome',event.outcome],['Status',event.status===null?'Unknown (legacy record)':JSON.stringify(event.status)]]){const term=document.createElement('dt'),description=document.createElement('dd');term.textContent=name;description.textContent=visibleText(value);details.append(term,description);}item.append(details);rows.append(item);}status.textContent=events.length?events.length+' history events shown.':'No operation history.';}catch{if(epoch===historyEpoch){rows.replaceChildren();status.textContent=historyFailure;}}finally{clearTimeout(deadlineTimer);if(epoch===historyEpoch){button.disabled=false;historyLoading=false;}}}
+document.getElementById('history-form').onsubmit=event=>{event.preventDefault();loadHistory();};
+void loadHistory();
+if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=>review();void review();}
 })();</script></html>"#.into());
         }
         if request.method != "POST" || request.header("origin") != Some(self.origin.as_str()) {
@@ -498,6 +512,18 @@ if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=
             || request.header("content-type") != Some("application/json")
         {
             return Response::denied();
+        }
+        if request.path == "/history" {
+            let Ok(input) = serde_json::from_slice::<HistoryInput>(&request.body) else {
+                return Response::denied();
+            };
+            let Some(session) = self.browser_session(&request) else {
+                return Response::denied();
+            };
+            return match app.browser_history(session.decision_generation, input.limit) {
+                Ok(events) => Response::history_json(&events),
+                Err(_) => Response::denied(),
+            };
         }
         if request.path == "/review" {
             let Ok(input) = serde_json::from_slice::<ReviewInput>(&request.body) else {
@@ -795,6 +821,12 @@ impl Response {
             body: "Invalid human request".into(),
             cookie: None,
             html: false,
+        }
+    }
+    fn history_json(value: &impl serde::Serialize) -> Self {
+        match serde_json::to_string(value) {
+            Ok(body) if body.len() <= 2 * 1024 * 1024 => Self::text(&body),
+            _ => Self::denied(),
         }
     }
     fn text(body: &str) -> Self {
@@ -1746,6 +1778,127 @@ mod tests {
                 .status,
             DirectStatus::Expired
         );
+    }
+
+    #[test]
+    fn history_browser_guards_are_independent_and_current_locked_sessions_work() {
+        for case in [
+            "cookie_missing",
+            "csrf_missing",
+            "cookie_wrong",
+            "csrf_wrong",
+            "host",
+            "origin",
+            "content-type",
+            "method",
+            "generation",
+            "cross_session",
+        ] {
+            let (f, ui, _) = decision_fixture(Arc::new(ApprovalCheck(AtomicUsize::new(0))));
+            let mut ui = ui.lock().unwrap();
+            let valid = request(&ui, "/history", "{}");
+            assert_eq!(ui.handle(valid, &f.app).status, 200, "prerequisite {case}");
+            let mut invalid = request(&ui, "/history", "{}");
+            match case {
+                "cookie_missing" => invalid.headers.retain(|(name, _)| name != "cookie"),
+                "csrf_missing" => invalid.headers.retain(|(name, _)| name != "x-csrf-token"),
+                "method" => invalid.method = "GET".into(),
+                "generation" => {
+                    f.app.lock().unwrap();
+                }
+                "cross_session" => {
+                    let wrong = random().unwrap();
+                    ui.sessions.push(BrowserSession {
+                        cookie: random().unwrap(),
+                        csrf: wrong,
+                        decision_generation: f.app.decision_generation().unwrap(),
+                    });
+                    invalid
+                        .headers
+                        .iter_mut()
+                        .find(|(name, _)| name == "x-csrf-token")
+                        .unwrap()
+                        .1 = ui.sessions.last().unwrap().csrf.expose().to_owned();
+                }
+                name => {
+                    let header = match name {
+                        "cookie_wrong" => "cookie",
+                        "csrf_wrong" => "x-csrf-token",
+                        _ => name,
+                    };
+                    invalid
+                        .headers
+                        .iter_mut()
+                        .find(|(name, _)| name == header)
+                        .unwrap()
+                        .1 = "private-sentinel".into();
+                }
+            }
+            let response = ui.handle(invalid, &f.app);
+            assert_eq!(response.status, 403, "{case}");
+            assert_eq!(response.body, "Invalid human request", "{case}");
+        }
+        let (f, ui, _) = decision_fixture(Arc::new(ApprovalCheck(AtomicUsize::new(0))));
+        let mut ui = ui.lock().unwrap();
+        for body in ["{}", r#"{"limit":1}"#, r#"{"limit":200}"#] {
+            let request = request(&ui, "/history", body);
+            let response = ui.handle(request, &f.app);
+            assert_eq!(response.status, 200);
+            let events: Vec<crate::access::history::HistoryEvent> =
+                serde_json::from_str(&response.body).unwrap();
+            assert_eq!(events.len(), 1);
+            assert_eq!(
+                events[0].outcome,
+                crate::access::history::HistoryOutcome::Submitted
+            );
+        }
+        for body in [
+            r#"{"limit":0}"#,
+            r#"{"limit":201}"#,
+            r#"{"limit":4294967296}"#,
+            r#"{"limit":-1}"#,
+            r#"{"limit":"private-sentinel"}"#,
+            r#"{"uid":0}"#,
+            "private-sentinel",
+        ] {
+            let request = request(&ui, "/history", body);
+            let response = ui.handle(request, &f.app);
+            assert_eq!(response.status, 403, "{body}");
+            assert_eq!(response.body, "Invalid human request");
+        }
+        f.app.lock().unwrap();
+        let stale = request(&ui, "/history", "{}");
+        assert_eq!(ui.handle(stale, &f.app).status, 403);
+        // A fresh launch supplies current-generation proof even while locked.
+        ui.launch = Some(random().unwrap());
+        let mut launch = request(&ui, "/launch", ui.launch.as_ref().unwrap().expose());
+        launch
+            .headers
+            .iter_mut()
+            .find(|(name, _)| name == "content-type")
+            .unwrap()
+            .1 = "text/plain".into();
+        assert_eq!(ui.handle(launch, &f.app).status, 200);
+        let current = request(&ui, "/history", "{}");
+        let response = ui.handle(current, &f.app);
+        assert_eq!(response.status, 200);
+        let events: Vec<crate::access::history::HistoryEvent> =
+            serde_json::from_str(&response.body).unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0].outcome,
+            crate::access::history::HistoryOutcome::Invalidated
+        );
+    }
+    #[test]
+    fn history_http_output_bound_has_stable_redacted_failure() {
+        assert_eq!(
+            Response::history_json(&"x".repeat(2_097_150)).body.len(),
+            2_097_152
+        );
+        let response = Response::history_json(&"x".repeat(2_097_151));
+        assert_eq!(response.status, 403);
+        assert_eq!(response.body, "Invalid human request");
     }
 
     fn decision_fixture(

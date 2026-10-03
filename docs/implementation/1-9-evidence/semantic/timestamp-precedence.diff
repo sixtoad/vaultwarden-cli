@@ -1,0 +1,13 @@
+--- src/access/history.rs
++++ src/access/history.rs
+@@ -215,8 +215,8 @@
+ }
+ pub(crate) fn newest(mut events: Vec<HistoryEvent>, limit: usize) -> Vec<HistoryEvent> {
+     events.sort_by(|a, b| {
+-        (b.at_unix_seconds, &b.request_id, b.ordinal).cmp(&(
+-            a.at_unix_seconds,
++        (None::<u64>, &b.request_id, b.ordinal).cmp(&(
++            None::<u64>,
+             &a.request_id,
+             a.ordinal,
+         ))

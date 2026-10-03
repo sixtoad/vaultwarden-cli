@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "$(uname -m)" != x86_64 ]]; then
-    echo "unsupported test architecture: this synthetic syscall fixture requires x86_64; run on x86_64. AArch64 runtime support remains unverified." >&2
-    exit 2
-fi
+case "$(uname -m)" in
+    x86_64|aarch64) ;;
+    *) echo "unsupported synthetic test architecture: expected x86_64 or aarch64" >&2; exit 2 ;;
+esac
 # Run through with-secure-test-tmpdir.sh; helper and fixture require safe ancestry.
 : "${TMPDIR:?run with scripts/with-secure-test-tmpdir.sh}"
 VW18_RUN_DIR="$(mktemp -d "$TMPDIR/vw18-run.XXXXXX")"

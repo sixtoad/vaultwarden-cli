@@ -1,0 +1,29 @@
+--- src/access/history.rs
++++ replace HistoryEvent::matches_record -> bool with false
+@@ -189,25 +189,17 @@
+                                 reason: DirectFailure::ExecutionUnavailable
+                             }
+                     )
+                 )
+                 | (O::LegacyUnknown, _)
+         ) || matches!((&self.outcome, &self.status), (O::ExecutionNonzero, Some(S::Completed { exit_code })) if (1..=255).contains(exit_code))
+     }
+     pub(crate) fn matches_record(&self, record: &DirectRecord) -> bool {
+-        let mut expected = Self::snapshot(
+-            record,
+-            self.ordinal,
+-            self.at_unix_seconds.unwrap_or(0),
+-            self.outcome,
+-            self.status.clone(),
+-        );
+-        expected.at_unix_seconds = self.at_unix_seconds;
+-        self.valid() && *self == expected
++        false /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ pub(crate) fn limit(value: Option<u32>) -> Result<usize, DirectRequestError> {
+     let limit = value.unwrap_or(DEFAULT_HISTORY_LIMIT);
+     if (1..=MAX_HISTORY_LIMIT).contains(&limit) {
+         Ok(limit as usize)
+     } else {
+         Err(DirectRequestError::InvalidRequest)

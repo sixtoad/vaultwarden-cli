@@ -1,0 +1,8 @@
+[
+  "scripts/test-systemd-supervisor.sh",
+  "src/adapters/execution/linux/tests.rs",
+  "src/bin/vaultwarden-accessd.rs",
+  "tests/direct_request.rs",
+  "tests/fixtures/protected-exit.S",
+  "tests/fixtures/protected-tree.c"
+]

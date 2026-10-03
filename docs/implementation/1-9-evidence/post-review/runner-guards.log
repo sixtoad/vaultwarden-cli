@@ -1,0 +1,10 @@
+{"selection": "", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": " ", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": "unknown", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": "formatting,unknown", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": ",formatting", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": "formatting,", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": "formatting", "passed": true, "commands": 1, "caller_paths_honored": false}
+{"selection": "browser", "passed": true, "commands": 0, "caller_paths_honored": false}
+{"selection": "browser", "passed": true, "commands": 1, "caller_paths_honored": true}
+9 isolated runner guard cases passed; verification subprocesses were mocked.

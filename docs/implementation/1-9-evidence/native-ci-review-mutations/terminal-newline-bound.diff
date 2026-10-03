@@ -1,0 +1,11 @@
+--- src/bin/vw-access.rs
++++ src/bin/vw-access.rs
+@@ -174,7 +174,7 @@
+         } else {
+             safe.push(character);
+         }
+-        if safe.len() >= MAX_OUTPUT {
++        if safe.len() > MAX_OUTPUT {
+             return Err("provider response unavailable".into());
+         }
+     }

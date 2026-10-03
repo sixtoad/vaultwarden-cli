@@ -5,7 +5,7 @@ unsafe extern "C" {
     fn raise(signal: i32) -> i32;
 }
 fn main() {
-    // Linux SIGSTOP; this runner explicitly supports only x86_64 Linux fixtures.
+    // Linux SIGSTOP is 19 on both supported fixture architectures: x86_64 and AArch64.
     assert_eq!(unsafe { raise(19) }, 0);
     std::process::exit(vaultwarden_cli::adapters::protected_execution_helper());
 }

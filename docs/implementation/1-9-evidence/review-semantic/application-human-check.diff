@@ -1,0 +1,11 @@
+--- src/access/application.rs
++++ src/access/application.rs
+@@ -409,7 +409,7 @@
+         owner: AuthenticatedHuman,
+         limit: Option<u32>,
+     ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+-        self.check_owner(owner)?;
++        let _ = owner;
+         self.history_current(None, limit)
+     }
+     /// Only the browser adapter supplies a generation from a verified cookie/proof session.

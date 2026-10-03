@@ -17,6 +17,9 @@ pub mod application;
 pub mod direct_request;
 #[cfg(test)]
 pub(crate) mod direct_request_tests;
+pub mod history;
+#[cfg(test)]
+mod history_tests;
 pub mod policy;
 pub mod ports;
 pub mod provider;

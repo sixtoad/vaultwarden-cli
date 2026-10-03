@@ -1,0 +1,11 @@
+--- src/adapters/loopback_ui.rs
++++ src/adapters/loopback_ui.rs
+@@ -425,7 +425,7 @@
+ function showFeedback(text){if(!retired)feedback.textContent=text;}
+ function decisionControls(unavailable){if(unavailable&&decisions.contains(document.activeElement))refresh.focus();decisions.querySelectorAll('button,input').forEach(control=>control.disabled=unavailable);}
+ function invalidateReview(){reviewEpoch++;reviewRequest=null;clearTimeout(timer);}
+-function retireSession(){retired=true;resetHistory();approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired. Reopen this request from a fresh launch to continue.';showStatus('Request status unavailable for this browser session.');}
++function retireSession(){retired=true;approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired. Reopen this request from a fresh launch to continue.';showStatus('Request status unavailable for this browser session.');}
+ beginApproval.onclick=()=>{approval.hidden=false;approvalPassword.focus();};
+ document.getElementById('cancel-approval').onclick=()=>{approvalPassword.value='';approval.hidden=true;showFeedback('Authentication form cancelled.');beginApproval.focus();review(true);};
+ async function decide(path,password){approvalPassword.value='';deciding=true;invalidateReview();decisionControls(true);showFeedback('Submitting decision.');try{const body=JSON.stringify(path==='/approve'?{request_id:requestId,password}:{request_id:requestId});password='';const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});showFeedback(response.ok?'Decision submitted. See the current request status below.':'Decision rejected. Check the request status below.');}catch{password='';showFeedback('Decision response unavailable. Request status below is authoritative; do not resubmit.');}finally{approval.hidden=true;deciding=false;await review(true);refresh.focus();}}

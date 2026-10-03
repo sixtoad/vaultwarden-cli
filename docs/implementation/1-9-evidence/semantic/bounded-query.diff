@@ -1,0 +1,11 @@
+--- src/access/history.rs
++++ src/access/history.rs
+@@ -221,7 +221,7 @@
+             a.ordinal,
+         ))
+     });
+-    events.truncate(limit);
++    let _ = limit;
+     events
+ }
+ pub(crate) fn outcome(

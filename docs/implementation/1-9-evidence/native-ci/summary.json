@@ -1,0 +1,27 @@
+{
+  "stable-all-targets": {
+    "passed": 839,
+    "failed": 0,
+    "ignored": 13,
+    "benchmark_smokes": 13
+  },
+  "rust-1.88-all-targets": {
+    "passed": 839,
+    "failed": 0,
+    "ignored": 13,
+    "benchmark_smokes": 13
+  },
+  "human-integrations": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "benchmark_smokes": 0
+  },
+  "real-systemd": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "benchmark_smokes": 0,
+    "scenarios": 29
+  }
+}

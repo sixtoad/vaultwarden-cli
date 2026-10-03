@@ -1,0 +1,17 @@
+--- src/access/provider_store.rs
++++ src/access/provider_store.rs
+@@ -181,13 +181,7 @@
+         if next.is_terminal() {
+             direct.approval = None;
+         }
+-        direct.audit.push(super::history::HistoryEvent::snapshot(
+-            direct,
+-            direct.audit.len() as u32,
+-            now,
+-            super::history::outcome(&next, outcome),
+-            Some(next.clone()),
+-        ));
++        let _ = (now, outcome);
+         direct.review.status = next;
+         Ok(())
+     }
