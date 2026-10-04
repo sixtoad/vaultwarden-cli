@@ -2,8 +2,9 @@
 
 The native CI extension and all confirmed review fixes are implemented. All local
 required checks completed. The user approved publication on 2026-10-03. Hosted
-Actions results, including native ARM runtime validation, remain pending and
-will be tracked in the pull request checks.
+Actions completed on 2026-10-03: native x86/ARM tests, Firefox and systemd
+passed; the musl build exposed an ABI type mismatch in the supervisor bridge.
+The repair and follow-up evidence are recorded below.
 
 ## What changed
 
@@ -100,11 +101,11 @@ carried without creating a duplicate deferral. See [review triage](1-9-review.md
 A temporarily unavailable third reviewer started successfully on retry; no
 required review remains missing.
 
-At the local verification snapshot, hosted x86/ARM stable/MSRV, hosted Firefox/systemd,
-macOS/beta, Windows and other existing Actions jobs **had not run**. Publication
-was approved on 2026-10-03; consult the pull request checks for hosted results. Local execution was x86_64
-Linux (Node 26.3.1); ARM has assembly/link evidence only. Manual screen-reader
-verification and large-history latency measurements were not performed. Agent
+At the pre-publication verification snapshot above, hosted x86/ARM, macOS and
+Windows jobs had not run. The completed hosted results below supersede those
+platform limitations. Local browser execution used x86_64 Linux and Node 26.3.1.
+Manual screen-reader verification and large-history latency measurements were
+not performed. Agent
 attribution uses synthetic fixtures; pairing, retention selection and export
 remain outside this story.
 
@@ -114,3 +115,66 @@ provenance, including one browser test attempt that exposed a premature wait;
 [acceptance-criteria mapping](1-9-test-evidence.md) remains applicable, with the
 latest CI/rendering evidence in this report. No production inspection API was
 added for tests. This report records local verification before publication.
+
+## Hosted results and musl repair (2026-10-04)
+
+[Initial Actions run](https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620)
+for `73d9f64fb9996380a558eb34eec418e2f53f88e7` completed with 21 successful
+jobs and one failed job: `Build (x86_64-unknown-linux-musl)`. The merge gate
+was skipped because of that failure. Native Ubuntu x86/ARM stable/MSRV tests,
+Linux beta and macOS stable/beta tests, Firefox and real systemd on both Linux
+architectures, other build targets, lint and security checks passed. This
+supersedes the pre-publication ARM runtime limitation above.
+
+The failed target reported ten compile errors from one cause: musl declares
+ancillary socket lengths as `u32`, while glibc uses `usize`. The bridge now
+uses the destination ABI types for fixed, bounded send/buffer lengths and
+normalizes received lengths to `usize` before the existing validation and
+descriptor iteration. No authorization, redaction, lifecycle or cleanup
+conditions were changed.
+The [ten original compiler diagnostics](1-9-evidence/musl-repair/original-compiler-diagnostics.txt)
+are archived with terminal escapes and Actions timestamps removed.
+
+Repair verification completed before review:
+
+- `cargo build --offline --locked --target x86_64-unknown-linux-musl`: passed.
+- Musl `cargo test --offline --locked --target x86_64-unknown-linux-musl --lib adapters::supervisor::bridge::tests`: 9 passed, 0 failed.
+- Native `cargo test --offline --locked --all-targets`: 839 passed, 0 failed, 13 previously accounted fixture ignores; 13 benchmark smoke checks.
+- Native focused bridge tests: 9 passed, 0 failed.
+- Real-systemd integration: 2 passed, 29 scenarios plus panic cleanup, 0 failed.
+- `cargo fmt --all -- --check`, strict all-target/all-feature Clippy and `git diff --check`: passed.
+
+Tests used the existing secure temporary-directory wrapper. The musl build used
+Rust 1.98.1 and isolated Ubuntu musl 1.2.4 compiler packages under `/tmp` with
+`CC_x86_64_unknown_linux_musl` and
+`CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER` pointing to that compiler.
+[Exact compiler setup and reproduction commands](1-9-evidence/musl-repair/reproduction.md)
+include package versions, specs rewriting, wrapper creation and the secure
+test invocation. [Tested source provenance](1-9-evidence/musl-repair/provenance.md)
+identifies the baseline plus the sole production delta, preserves its patch,
+and records the lockfile hash separately from the existing source manifest.
+[Build](1-9-evidence/musl-repair/musl-build.log.gz),
+[musl runtime tests](1-9-evidence/musl-repair/musl-bridge-tests.log.gz),
+[native suite](1-9-evidence/musl-repair/native-all-targets.log.gz),
+[Clippy](1-9-evidence/musl-repair/clippy.log.gz),
+[systemd](1-9-evidence/musl-repair/real-systemd.log.gz), and
+[source hash](1-9-evidence/musl-repair/source.sha256) are retained.
+The initial sandboxed native bridge attempt passed 7 of 9 tests; the socket and
+ptrace fixtures both passed on the authorized unsandboxed rerun. No failures
+remain in completed local checks. The musl test build took 24 minutes under
+shared-host contention; all nine runtime tests completed in 0.02 seconds.
+
+No new mutation campaign was run for these ABI-only conversions. The scoped
+history mutation evidence above applies to unchanged projections, authorization,
+ordering, persistence and recovery code. The original hosted compile failure is
+the regression evidence for the invalid glibc-only assignments. Hosted musl
+verification of the repair remains pending publication; local success is not
+reported as a hosted pass.
+
+All three repair review layers completed: edge and verification-gap reviewers
+found no issues. Blind review produced four documentation findings: three
+reproducibility/provenance additions were made, and the Windows-runtime claim
+was rejected because the report describes Windows build jobs, not general
+provider runtime support. No production patch or new deferral resulted.
+Source hashes remained unchanged after review; formatting, manifests, document
+links, reproduction syntax and whitespace checks passed.

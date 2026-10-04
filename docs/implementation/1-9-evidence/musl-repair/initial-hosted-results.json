@@ -1,0 +1,132 @@
+{
+  "head": "73d9f64fb9996380a558eb34eec418e2f53f88e7",
+  "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620",
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "name": "Real systemd (ubuntu-24.04-arm)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542794"
+    },
+    {
+      "name": "Browser (ubuntu-24.04)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542929"
+    },
+    {
+      "name": "Coverage (Tarpaulin)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542939"
+    },
+    {
+      "name": "Rustfmt",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542947"
+    },
+    {
+      "name": "Check",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542948"
+    },
+    {
+      "name": "Browser (ubuntu-24.04-arm)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542951"
+    },
+    {
+      "name": "Security Audit",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542954"
+    },
+    {
+      "name": "Test (ubuntu-24.04, beta)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198542969"
+    },
+    {
+      "name": "Test (macos-latest, stable)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543027"
+    },
+    {
+      "name": "Real systemd (ubuntu-24.04)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543030"
+    },
+    {
+      "name": "Build (x86_64-apple-darwin)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543059"
+    },
+    {
+      "name": "Test (ubuntu-24.04-arm, stable)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543076"
+    },
+    {
+      "name": "Test (ubuntu-24.04, stable)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543079"
+    },
+    {
+      "name": "Build (x86_64-unknown-linux-musl)",
+      "conclusion": "failure",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543089"
+    },
+    {
+      "name": "Build (x86_64-unknown-linux-gnu)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543095"
+    },
+    {
+      "name": "Build (aarch64-pc-windows-msvc)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543098"
+    },
+    {
+      "name": "Build (x86_64-pc-windows-msvc)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543100"
+    },
+    {
+      "name": "Test (ubuntu-24.04, 1.88.0)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543106"
+    },
+    {
+      "name": "Test (ubuntu-24.04-arm, 1.88.0)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543149"
+    },
+    {
+      "name": "Build (aarch64-unknown-linux-gnu)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543162"
+    },
+    {
+      "name": "Test (macos-latest, beta)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543402"
+    },
+    {
+      "name": "Build (aarch64-apple-darwin)",
+      "conclusion": "success",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111198543505"
+    },
+    {
+      "name": "Merge Ready",
+      "conclusion": "skipped",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111199242162"
+    },
+    {
+      "name": "Release",
+      "conclusion": "skipped",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111199242239"
+    },
+    {
+      "name": "Detect Release Tag",
+      "conclusion": "skipped",
+      "url": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37121572620/job/111199242403"
+    }
+  ]
+}
