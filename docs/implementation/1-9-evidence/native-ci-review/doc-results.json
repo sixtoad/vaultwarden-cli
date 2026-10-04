@@ -1,0 +1,93 @@
+[
+  {
+    "name": "stable-docs-default",
+    "command": [
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 0.72
+  },
+  {
+    "name": "stable-docs-all",
+    "command": [
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked",
+      "--all-features"
+    ],
+    "exit": 0,
+    "seconds": 0.72
+  },
+  {
+    "name": "stable-docs-none",
+    "command": [
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked",
+      "--no-default-features"
+    ],
+    "exit": 0,
+    "seconds": 0.67
+  },
+  {
+    "name": "rust-1.88-docs-default",
+    "command": [
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 0.82
+  },
+  {
+    "name": "rust-1.88-docs-all",
+    "command": [
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked",
+      "--all-features"
+    ],
+    "exit": 0,
+    "seconds": 0.72
+  },
+  {
+    "name": "rust-1.88-docs-none",
+    "command": [
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked",
+      "--no-default-features"
+    ],
+    "exit": 0,
+    "seconds": 1.22
+  }
+]

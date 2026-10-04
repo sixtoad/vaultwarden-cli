@@ -16,7 +16,7 @@ const profile=path.join(control,'profile');fs.mkdirSync(profile,{mode:0o700});
 const certutil=process.env.CERTUTIL || '/tmp/vw-story13-nss/extracted/usr/bin/certutil';
 execFileSync(certutil,['-N','--empty-password','-d',`sql:${profile}`]);
 execFileSync(certutil,['-A','-n','Story 1.5 synthetic CA','-t','C,,','-i',path.join(repo,'tests/fixtures/provider-tls/ca.pem'),'-d',`sql:${profile}`]);
-const child=spawn('cargo',['test','--lib','adapters::loopback_ui::tests::direct_request_browser_fixture','--','--ignored','--exact'],{cwd:repo,env:{...process.env,VW_UI_TEST_CONTROL:control},stdio:['ignore','pipe','pipe']});
+const child=spawn('cargo',['test','--offline','--locked','--lib','adapters::loopback_ui::tests::direct_request_browser_fixture','--','--ignored','--exact'],{cwd:repo,env:{...process.env,VW_UI_TEST_CONTROL:control},stdio:['ignore','pipe','pipe']});
 let childOutput='';child.stdout.on('data',b=>childOutput+=b);child.stderr.on('data',b=>childOutput+=b);
 const closed=new Promise(resolve=>child.on('close',resolve));let browser;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -29,6 +29,8 @@ try{
   await page.goto(pathToFileURL(ready.artifact).href);await page.click('a');
   await page.waitForFunction(()=>location.protocol==='https:'&&sessionStorage.getItem('vw_proof'));
   const origin=await page.evaluate(()=>location.origin);
+  await page.waitForFunction(()=>document.querySelector('#history-status').textContent==='No operation history.');
+  assert.equal(await page.$$eval('#history-events > li',events=>events.length),0);
   // Keyboard-only unlock, with an explicit nonvisual confirmation.
   await page.focus('#password');await page.keyboard.type('synthetic-browser-password');await page.keyboard.press('Tab');
   const focus=await page.evaluate(()=>({name:document.activeElement.textContent,style:getComputedStyle(document.activeElement).outlineStyle,width:getComputedStyle(document.activeElement).outlineWidth}));assert.match(focus.name,/Unlock/);assert.equal(focus.style,'solid');assert.equal(focus.width,'3px');
@@ -49,13 +51,90 @@ try{
   const receipt=await submit(['staging','safe|\"quoted\"','+0003']);assert.equal(receipt.status.status,'pending');
   const artifact=path.join(ready.root,`review-${receipt.id}.html`);assert.equal(fs.statSync(artifact).mode&0o777,0o600);
   const launchHtml=fs.readFileSync(artifact,'utf8');const link=launchHtml.match(/href="([^"]+)"/)[1];const capability=new URL(link).hash.slice(1).split(':')[0];
-  const review=await browser.newPage();let dialogs=0;review.on('dialog',async dialog=>{dialogs++;await dialog.dismiss();});review.on('pageerror',e=>errors.push(String(e)));await review.goto(pathToFileURL(artifact).href); // automatic artifact navigation
+  const review=await browser.newPage();
+  await review.evaluateOnNewDocument(()=>{const actual=window.fetch.bind(window);window.fetch=async(url,options)=>{const response=await actual(url,options);if(url==='/history'&&!window.initialHistoryHeld){window.initialHistoryHeld=true;await new Promise(resolve=>window.releaseInitialHistory=resolve);}return response;};});
+  let dialogs=0;review.on('dialog',async dialog=>{dialogs++;await dialog.dismiss();});review.on('pageerror',e=>errors.push(String(e)));await review.goto(pathToFileURL(artifact).href); // automatic artifact navigation
   await review.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+  await review.waitForFunction(()=>window.initialHistoryHeld);
+  assert.equal(await review.$eval('#history-status',e=>e.textContent),'Loading history');
+  assert(await review.$$eval('#deny,#begin-approval',controls=>controls.every(control=>!control.disabled)),'held initial history must not block decisions');
+  await review.evaluate(()=>window.releaseInitialHistory());
   assert.equal(await review.evaluate(()=>location.hash),'');assert.equal(await review.$eval('#details',e=>e.querySelectorAll('img,script').length),0);assert.equal(dialogs,0);
   const detail=await review.$eval('#details',e=>e.textContent);for(const expected of ['local human terminal','Deploy <img src=x onerror=alert(1)>','staging','safe','Deployment <login>','Request ID','Policy digest','Executable digest','Arguments digest','One-time meaning'])assert(detail.includes(expected),expected);
   for(const forbidden of ['11111111-1111-1111-1111-111111111111','DEPLOY_PASSWORD','synthetic-browser-password'])assert(!detail.includes(forbidden));
   assert.equal(await review.$eval('#review-status',e=>e.getAttribute('aria-atomic')),'true');
   assert.deepEqual(await review.$$eval('#arguments > li',items=>items.map(item=>({text:item.textContent,name:item.getAttribute('aria-label')}))),[{text:'staging',name:'Argument 1'},{text:'safe|"quoted"',name:'Argument 2'},{text:'3',name:'Argument 3'}]);
+  // Real provider history is readable through both authenticated human transports.
+  await review.waitForFunction(()=>document.querySelector('#history-status').textContent==='1 history events shown.');
+  const cliHistory=run(['history','--limit','1']);assert.equal(cliHistory.result,'history');assert.equal(cliHistory.events.length,1);assert.equal(cliHistory.events[0].request_id,receipt.id);assert.equal(cliHistory.events[0].outcome,'submitted');
+  const historyText=await review.$eval('#history-events',e=>e.textContent);
+  assert(historyText.includes('Deployment <login>')&&historyText.includes(receipt.id),'successful history capture must contain known record fields');
+  assert.equal(await review.$eval('#history-events',e=>e.querySelectorAll('img,script').length),0);
+  for(const forbidden of ['11111111-1111-1111-1111-111111111111','DEPLOY_PASSWORD','synthetic-browser-password','safe|"quoted"',capability,'binding','record_seal'])assert(!JSON.stringify(cliHistory).includes(forbidden)&&!historyText.includes(forbidden));
+  await submit(['staging','safe','3']);
+  await submit(['staging','safe','3']);
+  const newestHistory=run(['history','--limit','1']).events[0];
+  const refreshHistory=async limit=>{
+    await review.$eval('#history-limit',(element,value)=>{element.value=String(value);},limit);
+    await review.evaluate(()=>{window.historyRefreshFinished=false;const actual=window.fetch.bind(window);window.fetch=async(url,options)=>{if(url!=='/history')return actual(url,options);window.fetch=actual;const response=await actual(url,options);const json=response.json.bind(response);response.json=async()=>{const value=await json();window.historyRefreshFinished=true;return value;};return response;};document.querySelector('#history-refresh').click();});
+    await review.waitForFunction(()=>window.historyRefreshFinished&&!document.querySelector('#history-refresh').disabled);
+  };
+  await refreshHistory(1);
+  assert.equal(await review.$$eval('#history-events > li',events=>events.length),1);
+  assert((await review.$eval('#history-events',element=>element.textContent)).includes(newestHistory.request_id));
+  await refreshHistory(3);
+  assert.equal(await review.$$eval('#history-events > li',events=>events.length),3);
+  await refreshHistory(1);
+  const historyGuards=await review.evaluate(async()=>{
+    const post=(headers,body)=>fetch('/history',{method:'POST',headers,body}).then(r=>r.status),headers={'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')};
+    return {noProof:await post({'Content-Type':'application/json'},'{}'),wrongProof:await post({...headers,'X-CSRF-Token':'wrong'},'{}'),zero:await post(headers,'{"limit":0}'),oversized:await post(headers,'{"limit":201}'),overflow:await post(headers,'{"limit":4294967296}'),unknown:await post(headers,'{"agent":"private-sentinel"}')};
+  });assert.deepEqual(historyGuards,{noProof:403,wrongProof:403,zero:403,oversized:403,overflow:403,unknown:403});
+  // An internal rendering fixture covers agent attribution and invisible controls;
+  // the provider receives no agent insertion API or authority-bearing fields.
+  await review.evaluate(event=>{
+    const fetchActual=window.fetch.bind(window);window.fetch=async(url,options)=>{if(url==='/history'){window.fetch=fetchActual;return new Response(JSON.stringify([event]),{status:200});}return fetchActual(url,options);};
+    document.querySelector('#history-refresh').click();
+  },{...cliHistory.events[0],requester:{kind:'agent',label:'Agent <img src=x>\n\x1b]2;title\x07\x7f\u0085\u009b\u061c\u200e\u200f\u202e\u2066\u2069',fingerprint:'b'.repeat(64)},at_unix_seconds:null,outcome:'legacy_unknown',status:null});
+  await review.waitForFunction(()=>document.querySelector('#history-events').textContent.includes('Unknown (legacy record)'));
+  const syntheticHistory=await review.$eval('#history-events',e=>e.textContent);
+  for(const escaped of String.raw`\u000a \u001b \u0007 \u007f \u0085 \u009b \u061c \u200e \u200f \u202e \u2066 \u2069`.split(' '))assert(syntheticHistory.includes(escaped),escaped);
+  assert(syntheticHistory.includes('b'.repeat(64)));assert.equal(await review.$eval('#history-events',e=>e.querySelectorAll('img,script').length),0);
+  await review.focus('#history-refresh');await review.keyboard.press('Enter');
+  await review.waitForFunction(()=>!document.querySelector('#history-refresh').disabled&&!document.querySelector('#history-events').textContent.includes('Unknown (legacy record)'));
+  // A static 403 cannot distinguish authentication, storage and output failures.
+  await review.evaluate(()=>{const actual=window.fetch.bind(window);window.fetch=async(url,options)=>{if(url==='/history'){window.fetch=actual;return new Response('private-history-error-sentinel',{status:403});}return actual(url,options);};document.querySelector('#history-refresh').click();});
+  await review.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('Try fewer events'));
+  const historyGuidance=await review.$eval('#history-status',e=>e.textContent);
+  for(const guidance of ['fewer events','fresh provider launch','provider availability'])assert(historyGuidance.includes(guidance));
+  assert(!historyGuidance.includes('private-history-error-sentinel'));
+  await review.evaluate(()=>document.querySelector('#history-refresh').click());
+  await review.waitForFunction(()=>document.querySelector('#history-status').textContent==='1 history events shown.');
+  // Each additional invisible separator must be escaped independently.
+  for(const character of ['\u200b','\u2060','\ufeff']){
+    await review.evaluate(({event,character})=>{const actual=window.fetch.bind(window);window.fetch=async(url,options)=>{if(url!=='/history')return actual(url,options);window.fetch=actual;return new Response(JSON.stringify([{...event,requester:{...event.requester,label:'label'+character+'end'}}]),{status:200});};document.querySelector('#history-refresh').click();},{event:cliHistory.events[0],character});
+    const escaped='\\u'+character.codePointAt(0).toString(16).padStart(4,'0');
+    await review.waitForFunction(escaped=>document.querySelector('#history-events').textContent.includes(escaped),{},escaped);
+    assert(!(await review.$eval('#history-events',element=>element.textContent)).includes(character));
+  }
+  // Trigger the real deadline deterministically for both an unresolved fetch and body.
+  for(const phase of ['fetch','body']){
+    await review.evaluate(phase=>{
+      const actual=window.fetch.bind(window),schedule=window.setTimeout.bind(window),cancel=window.clearTimeout.bind(window);
+      window.historyDeadlineCleared=false;window.historyDeadlineHeld=false;
+      window.setTimeout=(callback,delay,...args)=>{const timer=schedule(callback,delay,...args);if(delay===15000){window.historyDeadlineTimer=timer;window.triggerHistoryDeadline=()=>callback(...args);}return timer;};
+      window.clearTimeout=timer=>{if(timer===window.historyDeadlineTimer)window.historyDeadlineCleared=true;return cancel(timer);};
+      window.fetch=async(url,options)=>{if(url!=='/history')return actual(url,options);window.fetch=actual;window.historyAbortSignal=options.signal;const response=await actual(url,options);const hold=()=>new Promise(resolve=>{window.releaseTimedHistory=resolve;window.historyDeadlineHeld=true;});if(phase==='fetch'){await hold();return response;}return {ok:true,json:async()=>{await hold();return response.json();}};};
+      window.restoreDeadlineHooks=()=>{window.setTimeout=schedule;window.clearTimeout=cancel;};document.querySelector('#history-refresh').click();
+    },phase);
+    await review.waitForFunction(()=>window.historyDeadlineHeld);
+    await review.evaluate(()=>window.triggerHistoryDeadline());
+    await review.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('Try fewer events')&&!document.querySelector('#history-refresh').disabled);
+    assert.equal(await review.$$eval('#history-events > li',events=>events.length),0);
+    assert(await review.evaluate(()=>window.historyAbortSignal.aborted&&window.historyDeadlineCleared));
+    await review.evaluate(()=>{window.releaseTimedHistory();window.restoreDeadlineHooks();});
+    await refreshHistory(1);
+    assert.equal(await review.$$eval('#history-events > li',events=>events.length),1);
+  }
   // Ordinary polls must preserve immutable nodes and avoid repeated live announcements.
   await review.evaluate(()=>{
     window.detailNodes=Array.from(document.querySelector('#details').childNodes);window.detailMutations=0;window.statusMutations=0;window.reviewPolls=0;window.transientFailures=0;
@@ -214,18 +293,47 @@ try{
     await tab.close();
   }
   fs.writeFileSync(path.join(control,'clock'),'310');await review.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: expired');
-  await review.focus('#lock');await review.keyboard.press('Enter');await review.waitForFunction(()=>document.querySelector('#result').textContent.includes('Provider locked'));assert.equal(run(['status',receipt.id]).state.status,'expired');assert.equal(await review.$eval('#review-status',e=>e.textContent),'Request status: expired');
+  await review.evaluate(()=>{const actual=window.fetch.bind(window);window.historyFetches=0;window.heldLocks=[];window.fetch=async(url,options)=>{if(url==='/lock')await new Promise(resolve=>window.heldLocks.push(resolve));if(url==='/history')window.historyFetches++;const response=await actual(url,options);if(url==='/history'&&!window.historyResponseHeld){window.historyResponseHeld=true;await new Promise(resolve=>window.releaseHistory=resolve);}return response;};document.querySelector('#history-refresh').click();});
+  await review.waitForFunction(()=>window.historyResponseHeld);
+  await review.focus('#lock');await review.keyboard.press('Enter');
+  await review.waitForFunction(()=>window.heldLocks.length===1);
+  await review.evaluate(()=>{document.querySelector('#lock').click();document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true}));});
+  assert(await review.$$eval('#history-form button,#history-form input',controls=>controls.every(control=>control.disabled)));
+  assert.equal(await review.evaluate(()=>window.historyFetches),1,'refresh cannot start after lock was queued');
+  await review.evaluate(()=>window.heldLocks[0]());
+  await review.waitForFunction(()=>window.heldLocks.length===2);
+  await review.evaluate(()=>document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true})));
+  assert(await review.$$eval('#history-form button,#history-form input',controls=>controls.every(control=>control.disabled)));
+  assert.equal(await review.evaluate(()=>window.historyFetches),1,'refresh stays blocked across queued mutations');
+  await review.evaluate(()=>window.heldLocks[1]());
+  await review.waitForFunction(()=>!document.querySelector('#history-refresh').disabled&&document.querySelector('#result').textContent.includes('Provider locked'));assert.equal(run(['status',receipt.id]).state.status,'expired');assert.equal(await review.$eval('#review-status',e=>e.textContent),'Request status: expired');
+  await review.evaluate(()=>window.releaseHistory());
+  await review.waitForFunction(()=>document.querySelector('#history-status').textContent==='Refresh history to read current events.');
+  assert.equal(await review.$$eval('#history-events > li',events=>events.length),0);
+  await review.focus('#history-refresh');await review.keyboard.press('Enter');
+  await review.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('reopen a fresh provider launch'));
+  const lockedHistory=run(['history']);assert(lockedHistory.events.length>0);assert.equal(lockedHistory.events.find(event=>event.request_id===receipt.id).outcome,'expired');
   // A real lock/unlock and new launch rotates the shared cookie. Old tab proof
   // must remain retired, with persistent guidance and no cookie-based recovery.
   {
     assert.equal(await review.evaluate(async()=>(await fetch('/unlock',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({password:'synthetic-browser-password'})})).status),200);
     const {tab}=await openDecision();await typeApproval(tab,'retired-password-sentinel');
     const oldProof=await tab.evaluate(()=>sessionStorage.getItem('vw_proof'));
+    await tab.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('history events shown.'));
+    await tab.evaluate(()=>{const actual=window.fetch.bind(window);window.retiringHistoryFetches=0;window.fetch=async(url,options)=>{if(url==='/history')window.retiringHistoryFetches++;const response=await actual(url,options);if(url==='/history'){window.retiringHistoryHeld=true;await new Promise(resolve=>window.releaseRetiringHistory=resolve);window.retiringHistoryReleased=true;}return response;};document.querySelector('#history-refresh').click();});
+    await tab.waitForFunction(()=>window.retiringHistoryHeld);
     for(const action of ['lock','unlock'])assert.equal(await tab.evaluate(async action=>(await window.sendDirect('/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({password:action==='unlock'?'synthetic-browser-password':''})})).status,action),200);
     const fresh=await openDecision();assert.notEqual(await fresh.tab.evaluate(()=>sessionStorage.getItem('vw_proof')),oldProof);
     await tab.evaluate(()=>document.querySelector('#refresh').click());
     await tab.waitForFunction(()=>document.querySelector('#decision-feedback').textContent.includes('Browser session retired'));
     await assertUnavailable(tab);assert(await tab.$$eval('#unlock input,#unlock button,#lock',controls=>controls.every(c=>c.disabled)));
+    await tab.evaluate(()=>window.releaseRetiringHistory());
+    await tab.waitForFunction(()=>window.retiringHistoryReleased);
+    assert.equal(await tab.$$eval('#history-events > li',events=>events.length),0);
+    assert(await tab.$$eval('#history-form input,#history-form button',controls=>controls.every(control=>control.disabled)));
+    assert.match(await tab.$eval('#history-status',e=>e.textContent),/retired browser session/);
+    await tab.evaluate(()=>document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true})));
+    assert.equal(await tab.evaluate(()=>window.retiringHistoryFetches),1,'retired history cannot refresh or repaint');
     assert.equal(await tab.evaluate(()=>sessionStorage.getItem('vw_proof')),oldProof);
     const message=await tab.$eval('#decision-feedback',e=>e.textContent);assert.match(message,/fresh launch/);
     const polls=await tab.evaluate(()=>{const n=window.reviewDelivered;document.querySelector('#refresh').click();return n;});
@@ -236,6 +344,6 @@ try{
   assert.deepEqual(errors.filter(e=>!knownDiagnostics.includes(e)),[]);
   for(const error of errors)for(const secret of ['synthetic-browser-password','cancelled-password-sentinel','wrong-password-sentinel','retired-password-sentinel',capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
   const diagnosticCategories=[...new Set(knownDiagnostics.map(e=>e.replace(/https:\/\/127\.0\.0\.1:\d+/g,'https://127.0.0.1:<port>')))];
-  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
+  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
   fs.writeFileSync(path.join(control,'stop'),'stop');assert.equal(await closed,0,childOutput);
 }finally{fs.writeFileSync(path.join(control,'stop'),'stop');await browser?.close();if(child.exitCode===null)child.kill('SIGTERM');}

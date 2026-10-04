@@ -1,0 +1,30 @@
+[
+  {
+    "name": "browser-control-escaping",
+    "path": "src/adapters/loopback_ui.rs",
+    "command": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 33.4,
+    "mutant_exit": 1,
+    "mutant_seconds": 16.27,
+    "classification": "caught",
+    "source_sha256": "a6b402fc9cf4a9fc2ba1e2fd2c75266c82a124972df623f5fd7910318e6ad8cb"
+  },
+  {
+    "name": "browser-html-escaping",
+    "path": "src/adapters/loopback_ui.rs",
+    "command": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 49.45,
+    "mutant_exit": 1,
+    "mutant_seconds": 14.57,
+    "classification": "caught",
+    "source_sha256": "a6b402fc9cf4a9fc2ba1e2fd2c75266c82a124972df623f5fd7910318e6ad8cb"
+  }
+]

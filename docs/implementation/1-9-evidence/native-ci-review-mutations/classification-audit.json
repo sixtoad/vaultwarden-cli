@@ -1,0 +1,105 @@
+[
+  {
+    "name": "terminal-controls",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "thread 'tests::history_arguments_and_terminal_json_preserve_data_without_controls' (458639) panicked at src/bin/vw-access.rs:217:13:"
+    ]
+  },
+  {
+    "name": "terminal-format-200b",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "thread 'tests::history_arguments_and_terminal_json_preserve_data_without_controls' (459003) panicked at src/bin/vw-access.rs:234:13:"
+    ]
+  },
+  {
+    "name": "terminal-format-2060",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "thread 'tests::history_arguments_and_terminal_json_preserve_data_without_controls' (459481) panicked at src/bin/vw-access.rs:234:13:"
+    ]
+  },
+  {
+    "name": "terminal-format-feff",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "thread 'tests::history_arguments_and_terminal_json_preserve_data_without_controls' (460090) panicked at src/bin/vw-access.rs:234:13:"
+    ]
+  },
+  {
+    "name": "terminal-newline-bound",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "thread 'tests::history_arguments_and_terminal_json_preserve_data_without_controls' (460497) panicked at src/bin/vw-access.rs:227:9:"
+    ]
+  },
+  {
+    "name": "browser-control-escaping",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "AssertionError [ERR_ASSERTION]: \\u000a",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:100:131 {"
+    ]
+  },
+  {
+    "name": "browser-html-escaping",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "AssertionError [ERR_ASSERTION]: successful history capture must contain known record fields",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:71:3 {"
+    ]
+  },
+  {
+    "name": "browser-format-200b",
+    "classification": "caught",
+    "evidence": "bounded browser assertion deadline",
+    "diagnostic_locations": [
+      "TimeoutError: Waiting failed: 30000ms exceeded",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:116:18"
+    ]
+  },
+  {
+    "name": "browser-format-2060",
+    "classification": "caught",
+    "evidence": "bounded browser assertion deadline",
+    "diagnostic_locations": [
+      "TimeoutError: Waiting failed: 30000ms exceeded",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:116:18"
+    ]
+  },
+  {
+    "name": "browser-format-feff",
+    "classification": "caught",
+    "evidence": "bounded browser assertion deadline",
+    "diagnostic_locations": [
+      "TimeoutError: Waiting failed: 30000ms exceeded",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:116:18"
+    ]
+  },
+  {
+    "name": "browser-selected-limit",
+    "classification": "caught",
+    "evidence": "assertion",
+    "diagnostic_locations": [
+      "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:83:10 {"
+    ]
+  },
+  {
+    "name": "browser-deadline",
+    "classification": "caught",
+    "evidence": "bounded browser assertion deadline",
+    "diagnostic_locations": [
+      "TimeoutError: Waiting failed: 30000ms exceeded",
+      "    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-inspect-redacted-operation-history/tests/ui/direct-request.mjs:131:18"
+    ]
+  }
+]

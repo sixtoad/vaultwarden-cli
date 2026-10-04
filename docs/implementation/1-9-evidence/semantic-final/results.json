@@ -1,0 +1,66 @@
+[
+  {
+    "name": "legacy-binding",
+    "path": "src/access/direct_request.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_malformed_storage_unknown_versions_duplicates_and_state_mismatch_fail_closed",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.52,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.02,
+    "classification": "caught",
+    "source_sha256": "ad6ca7ef5c56bc804ea1014616983d11e4bc7c8024da3502026100970678f648"
+  },
+  {
+    "name": "final-lifecycle-consistency",
+    "path": "src/access/direct_request.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::history_tests::history_malformed_storage_unknown_versions_duplicates_and_state_mismatch_fail_closed",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 4.22,
+    "mutant_exit": 101,
+    "mutant_seconds": 4.12,
+    "classification": "caught",
+    "source_sha256": "ad6ca7ef5c56bc804ea1014616983d11e4bc7c8024da3502026100970678f648"
+  },
+  {
+    "name": "terminal-controls",
+    "path": "src/bin/vw-access.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--bin",
+      "vw-access",
+      "tests::history_arguments_and_terminal_json_preserve_data_without_controls",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 2.37,
+    "mutant_exit": 101,
+    "mutant_seconds": 0.67,
+    "classification": "caught",
+    "source_sha256": "eb65e2a7787ebfb26f65df215c91137dd9822975ee0cf029b6787bd62dd5dcf3"
+  }
+]

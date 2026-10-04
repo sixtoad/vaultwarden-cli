@@ -156,7 +156,7 @@ pub struct DirectReview {
     pub status: DirectStatus,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "DirectRecordWire")]
 pub(crate) struct DirectRecord {
     pub owner_uid: u32,
     pub created_at_unix_seconds: u64,
@@ -168,7 +168,8 @@ pub(crate) struct DirectRecord {
     #[serde(default)]
     pub execution_claimed: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub audit: Vec<DecisionAudit>,
+    pub audit: Vec<super::history::HistoryEvent>,
+    pub history_version: u8,
 }
 /// Internal durable authority; never projected into requester responses.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -185,18 +186,156 @@ pub(crate) struct ApprovalBinding {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum DecisionOutcome {
+    Invalidated,
+    Recovered,
     Approved,
     Denied,
     Expired,
     ReviewUnavailable,
     ExecutionUnavailable,
 }
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct DecisionAudit {
+struct LegacyDecisionAudit {
     pub binding: ApprovalBinding,
     pub at_unix_seconds: u64,
     pub outcome: DecisionOutcome,
+}
+// Legacy authority-bearing audit is accepted only through this narrow migration.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StoredAudit {
+    Current(super::history::HistoryEvent),
+    Legacy(LegacyDecisionAudit),
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DirectRecordWire {
+    owner_uid: u32,
+    created_at_unix_seconds: u64,
+    lifecycle_epoch: u64,
+    review: DirectReview,
+    binding_digest: String,
+    #[serde(default)]
+    approval: Option<ApprovalBinding>,
+    #[serde(default)]
+    execution_claimed: bool,
+    #[serde(default)]
+    audit: Vec<StoredAudit>,
+    history_version: Option<u8>,
+}
+impl TryFrom<DirectRecordWire> for DirectRecord {
+    type Error = &'static str;
+    fn try_from(w: DirectRecordWire) -> Result<Self, Self::Error> {
+        use super::history::{HISTORY_VERSION, HistoryEvent, HistoryOutcome};
+        let mut record = Self {
+            owner_uid: w.owner_uid,
+            created_at_unix_seconds: w.created_at_unix_seconds,
+            lifecycle_epoch: w.lifecycle_epoch,
+            review: w.review,
+            binding_digest: w.binding_digest,
+            approval: w.approval,
+            execution_claimed: w.execution_claimed,
+            audit: Vec::new(),
+            history_version: HISTORY_VERSION,
+        };
+        match w.history_version {
+            Some(HISTORY_VERSION) => {
+                for event in w.audit {
+                    let StoredAudit::Current(event) = event else {
+                        return Err("invalid history format");
+                    };
+                    record.audit.push(event);
+                }
+            }
+            None => {
+                // A submission time and attribution are proven by the sealed record.
+                record.audit.push(HistoryEvent::snapshot(
+                    &record,
+                    0,
+                    record.created_at_unix_seconds,
+                    HistoryOutcome::Submitted,
+                    Some(DirectStatus::Pending),
+                ));
+                let count = w.audit.len();
+                if count > 3 {
+                    return Err("invalid legacy history");
+                }
+                let mut previous = DirectStatus::Pending;
+                for (index, event) in w.audit.into_iter().enumerate() {
+                    let StoredAudit::Legacy(event) = event else {
+                        return Err("invalid legacy history");
+                    };
+                    if event.binding != record.approval_binding() {
+                        return Err("invalid legacy history");
+                    }
+                    let last = index + 1 == count;
+                    let next = match event.outcome {
+                        DecisionOutcome::Approved => match previous {
+                            DirectStatus::Pending => DirectStatus::Approved,
+                            DirectStatus::Approved => DirectStatus::Running,
+                            DirectStatus::Running
+                                if last
+                                    && matches!(
+                                        record.review.status,
+                                        DirectStatus::Completed { .. }
+                                    ) =>
+                            {
+                                record.review.status.clone()
+                            }
+                            _ => return Err("invalid legacy history"),
+                        },
+                        DecisionOutcome::Denied if previous == DirectStatus::Pending => {
+                            DirectStatus::Denied
+                        }
+                        DecisionOutcome::Expired | DecisionOutcome::ReviewUnavailable
+                            if matches!(
+                                previous,
+                                DirectStatus::Pending | DirectStatus::Approved
+                            ) =>
+                        {
+                            DirectStatus::Expired
+                        }
+                        DecisionOutcome::ExecutionUnavailable
+                            if last
+                                && matches!(
+                                    record.review.status,
+                                    DirectStatus::Expired | DirectStatus::Failed { .. }
+                                ) =>
+                        {
+                            record.review.status.clone()
+                        }
+                        _ => return Err("invalid legacy history"),
+                    };
+                    // Preserve the legacy ambiguity instead of claiming a precise historical cause.
+                    record.audit.push(HistoryEvent::snapshot(
+                        &record,
+                        (index + 1) as u32,
+                        event.at_unix_seconds,
+                        HistoryOutcome::LegacyUnknown,
+                        Some(next.clone()),
+                    ));
+                    previous = next;
+                }
+                // Earliest supported records had no audit. Only their final status is known;
+                // do not invent a timestamp for it. An empty terminal audit is retained as
+                // a legacy snapshot with no event timestamp, rather than inventing one.
+                if count == 0 && record.review.status != DirectStatus::Pending {
+                    // No event time was recorded: there is no truthful terminal event to add.
+                    record.audit[0].outcome = HistoryOutcome::LegacyUnknown;
+                    record.audit[0].at_unix_seconds = None;
+                    record.audit[0].status = Some(record.review.status.clone());
+                } else if previous != record.review.status {
+                    return Err("inconsistent legacy history");
+                }
+            }
+            _ => return Err("unsupported history version"),
+        }
+        if !record.validate_history() {
+            return Err("invalid history");
+        }
+        Ok(record)
+    }
 }
 /// Prepared under provider serialization and consumed exactly once in this process.
 pub(crate) struct PreparedApproval {
@@ -236,6 +375,60 @@ pub(crate) fn valid_request_id(id: &str) -> bool {
         })
 }
 impl DirectRecord {
+    fn validate_history(&self) -> bool {
+        use super::history::{HISTORY_VERSION, HistoryOutcome as O};
+        if self.history_version != HISTORY_VERSION || self.audit.is_empty() || self.audit.len() > 4
+        {
+            return false;
+        }
+        let mut previous = None;
+        for (ordinal, event) in self.audit.iter().enumerate() {
+            if event.ordinal as usize != ordinal || !event.matches_record(self) {
+                return false;
+            }
+            // A recorded start/completion cannot precede the one-time execution claim.
+            // Legacy snapshots and recovery retain only facts the old format proves.
+            if !self.execution_claimed
+                && matches!(
+                    event.status,
+                    Some(
+                        DirectStatus::Running
+                            | DirectStatus::Completed { .. }
+                            | DirectStatus::Failed { .. }
+                    )
+                )
+                && !matches!(event.outcome, O::LegacyUnknown | O::Recovered)
+            {
+                return false;
+            }
+            if ordinal == 0 {
+                if !((event.outcome == O::Submitted
+                    && event.at_unix_seconds == Some(self.created_at_unix_seconds))
+                    || (event.outcome == O::LegacyUnknown && event.at_unix_seconds.is_none()))
+                {
+                    return false;
+                }
+            } else if !matches!(
+                (&previous, &event.status),
+                (
+                    Some(DirectStatus::Pending),
+                    Some(DirectStatus::Approved | DirectStatus::Denied | DirectStatus::Expired)
+                ) | (
+                    Some(DirectStatus::Approved),
+                    Some(
+                        DirectStatus::Running | DirectStatus::Expired | DirectStatus::Failed { .. }
+                    )
+                ) | (
+                    Some(DirectStatus::Running),
+                    Some(DirectStatus::Completed { .. } | DirectStatus::Failed { .. })
+                )
+            ) {
+                return false;
+            }
+            previous = event.status.clone();
+        }
+        previous.as_ref() == Some(&self.review.status)
+    }
     pub(crate) fn approval_binding(&self) -> ApprovalBinding {
         ApprovalBinding {
             request_id: self.review.id.clone(),
@@ -275,10 +468,7 @@ impl DirectRecord {
             && (!matches!(r.status, DirectStatus::Approved | DirectStatus::Running)
                 || self.approval.is_some()
                 || r.one_time == LEGACY_ONE_TIME)
-            && self
-                .audit
-                .iter()
-                .all(|event| event.binding == self.approval_binding())
+            && self.validate_history()
             && valid_request_id(id)
             && r.id == id
             && self.owner_uid != u32::MAX

@@ -1,0 +1,90 @@
+{
+  "stable-all-targets": {
+    "passed": 839,
+    "failed": 0,
+    "ignored": 13,
+    "benchmark_smokes": 13
+  },
+  "rust-1.88-all-targets": {
+    "passed": 839,
+    "failed": 0,
+    "ignored": 13,
+    "benchmark_smokes": 13
+  },
+  "human-integrations": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "benchmark_smokes": 0
+  },
+  "real-systemd": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "benchmark_smokes": 0,
+    "scenarios": 29
+  },
+  "documentation": {
+    "configurations_passed": 6,
+    "defined_doctests_per_configuration": 0
+  },
+  "browser": {
+    "browser": "firefox/151.0.2",
+    "trustedTLS": true,
+    "historyEmptyAndRows": true,
+    "historyCliAndBrowser": true,
+    "historyLimitsAndAuth": true,
+    "historyAgentControlEscaping": true,
+    "historyStaleSessionRejected": true,
+    "historyLateResponseDiscarded": true,
+    "historyQueuedMutationBlocked": true,
+    "historyRetirementClearsAndDisables": true,
+    "historyInitialReadIndependent": true,
+    "historyAmbiguousFailureGuidance": true,
+    "historyBoundedFetchAndBody": true,
+    "historyInvisibleSeparators": true,
+    "historyLimitChangesObserved": true,
+    "automaticArtifactNavigation": true,
+    "keyboardFocus": {
+      "name": "Unlock for up to 15 minutes",
+      "style": "solid",
+      "width": "3px"
+    },
+    "axe": {
+      "violations": [],
+      "passes": 24
+    },
+    "requestReview": "pending -> expired -> expired while locked",
+    "launchReplay": "403",
+    "cookieOnly": "403",
+    "invalidProof": "403",
+    "stalePreUnlockProofRejected": true,
+    "terminalInspectionAfterLock": true,
+    "keyboardApproveDenyCancel": true,
+    "passwordCleared": true,
+    "immediateInFlightClearingAndDisabling": true,
+    "staleReviewDiscarded": true,
+    "activeAndInFlightAxe": true,
+    "persistentDecisionFeedback": true,
+    "retiredSessionGuidance": true,
+    "externalCompletionFocus": true,
+    "deliveredApprovalResponseDiscarded": true,
+    "exactlyOneApprovalSubmission": true,
+    "decisionReplayRejected": true,
+    "concurrentFreshCookieTabs": true,
+    "transientPollingRecovery": true,
+    "immutableDetailsStable": true,
+    "unchangedLiveStatusStable": true,
+    "argumentBoundariesPreserved": true,
+    "screenReaderManual": false,
+    "automationDiagnostics": {
+      "knownCrossOriginOrBlockedFavicon": 15,
+      "categories": [
+        "Error: SecurityError: Permission denied to access property \"__bidi_args\" on cross-origin object",
+        "Error: Error: Permission denied to access property \"length\"",
+        "Error: Content-Security-Policy: The page\u2019s settings blocked the loading of a resource (img-src) at https://127.0.0.1:<port>/favicon.ico because it violates the following directive: \u201cdefault-src 'none'\u201d"
+      ],
+      "unexpected": 0
+    }
+  }
+}

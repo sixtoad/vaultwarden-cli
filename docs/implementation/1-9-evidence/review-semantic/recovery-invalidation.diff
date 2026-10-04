@@ -1,0 +1,11 @@
+--- src/access/provider_store.rs
++++ src/access/provider_store.rs
+@@ -334,7 +334,7 @@
+         self.invalidate(false)
+     }
+     pub(crate) fn invalidate_recovered(&mut self) -> Result<ProviderState, ProviderError> {
+-        self.invalidate(true)
++        self.invalidate(false)
+     }
+     fn invalidate(&mut self, recovered: bool) -> Result<ProviderState, ProviderError> {
+         let mut state = self.read_state()?;

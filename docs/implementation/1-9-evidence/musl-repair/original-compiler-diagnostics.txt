@@ -1,0 +1,136 @@
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:382:34
+    |
+382 |         message.msg_controllen = unsafe { libc::CMSG_SPACE(size_of::<RawFd>() as u32) } as usize;
+    |         ----------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
+    |         |
+    |         expected due to the type of this binding
+
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:387:34
+    |
+387 |             (*header).cmsg_len = libc::CMSG_LEN(size_of::<RawFd>() as u32) as usize;
+    |             ------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
+    |             |
+    |             expected due to the type of this binding
+
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:429:30
+    |
+429 |     message.msg_controllen = size_of_val(&control);
+    |     ----------------------   ^^^^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
+    |     |
+    |     expected due to the type of this binding
+
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:447:25
+    |
+447 |         if h.cmsg_len < minimum {
+    |            ----------   ^^^^^^^ expected `u32`, found `usize`
+    |            |
+    |            expected because this is `u32`
+    |
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+    |
+447 |         if h.cmsg_len < minimum.try_into().unwrap() {
+    |                                ++++++++++++++++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:451:33
+    |
+451 |         let size = h.cmsg_len - minimum;
+    |                                 ^^^^^^^ expected `u32`, found `usize`
+
+error[E0277]: cannot subtract `usize` from `u32`
+   --> src/adapters/supervisor/bridge.rs:451:31
+    |
+451 |         let size = h.cmsg_len - minimum;
+    |                               ^ no implementation for `u32 - usize`
+    |
+    = help: the trait `Sub<usize>` is not implemented for `u32`
+    = help: the following other types implement trait `Sub<Rhs>`:
+              `&u32` implements `Sub<&num_bigint::bigint::BigInt>`
+              `&u32` implements `Sub<&num_bigint::biguint::BigUint>`
+              `&u32` implements `Sub<&num_complex::Complex<u32>>`
+              `&u32` implements `Sub<num_bigint::bigint::BigInt>`
+              `&u32` implements `Sub<num_bigint::biguint::BigUint>`
+              `&u32` implements `Sub<num_complex::Complex<u32>>`
+              `&u32` implements `Sub<u32>`
+              `&u32` implements `Sub`
+            and 8 others
+
+error[E0308]: mismatched types
+    --> src/adapters/supervisor/bridge.rs:454:37
+     |
+ 454 |             || !size.is_multiple_of(size_of::<RawFd>())
+     |                      -------------- ^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
+     |                      |
+     |                      arguments to this method are incorrect
+     |
+note: method defined here
+    --> /home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:3872:22
+     |
+3872 |           pub const fn is_multiple_of(self, rhs: Self) -> bool {
+     |                        ^^^^^^^^^^^^^^
+     |
+    ::: /home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/mod.rs:1290:5
+     |
+1290 | /     uint_impl! {
+1291 | |         Self = u32,
+1292 | |         ActualT = u32,
+1293 | |         SignedT = i32,
+...    |
+1313 | |         bound_condition = "",
+1314 | |     }
+     | |_____- in this macro invocation
+     = note: this error originates in the macro `uint_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: you can convert a `usize` to a `u32` and panic if the converted value doesn't fit
+     |
+ 454 |             || !size.is_multiple_of(size_of::<RawFd>().try_into().unwrap())
+     |                                                       ++++++++++++++++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:458:36
+    |
+458 |             for index in 0..size / size_of::<RawFd>() {
+    |                                    ^^^^^^^^^^^^^^^^^^ expected `u32`, found `usize`
+
+error[E0277]: cannot divide `u32` by `usize`
+   --> src/adapters/supervisor/bridge.rs:458:34
+    |
+458 |             for index in 0..size / size_of::<RawFd>() {
+    |                                  ^ no implementation for `u32 / usize`
+    |
+    = help: the trait `Div<usize>` is not implemented for `u32`
+    = help: the following other types implement trait `Div<Rhs>`:
+              `&u32` implements `Div<&num_bigint::bigint::BigInt>`
+              `&u32` implements `Div<&num_bigint::biguint::BigUint>`
+              `&u32` implements `Div<&num_complex::Complex<u32>>`
+              `&u32` implements `Div<num_bigint::bigint::BigInt>`
+              `&u32` implements `Div<num_bigint::biguint::BigUint>`
+              `&u32` implements `Div<num_complex::Complex<u32>>`
+              `&u32` implements `Div<u32>`
+              `&u32` implements `Div`
+            and 9 others
+
+error[E0308]: mismatched types
+   --> src/adapters/supervisor/bridge.rs:460:90
+    |
+460 |                     std::ptr::read_unaligned(libc::CMSG_DATA(header).cast::<RawFd>().add(index))
+    |                                                                                      --- ^^^^^ expected `usize`, found `u32`
+    |                                                                                      |
+    |                                                                                      arguments to this method are incorrect
+    |
+note: method defined here
+   --> /home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mut_ptr.rs:936:25
+    |
+936 |     pub const unsafe fn add(self, count: usize) -> Self
+    |                         ^^^
+help: you can convert a `u32` to a `usize` and panic if the converted value doesn't fit
+    |
+460 |                     std::ptr::read_unaligned(libc::CMSG_DATA(header).cast::<RawFd>().add(index.try_into().unwrap()))
+    |                                                                                               ++++++++++++++++++++
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `vaultwarden-cli` (lib) due to 10 previous errors

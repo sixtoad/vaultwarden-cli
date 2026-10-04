@@ -1,3 +1,4 @@
+use super::history::{HistoryEvent, HistoryOutcome};
 use super::{
     application::ProviderApplication, direct_request::*, policy::*, ports::*, provider::Provider,
 };
@@ -131,7 +132,7 @@ fn fixture_with_lifetime(lifetime: Duration) -> Fixture {
         on_wall_read,
     }
 }
-fn operation_draft() -> OperationPolicyDraft {
+pub(crate) fn operation_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
         id: "deploy".into(),
         description: "Deploy <img src=x onerror=alert(1)>".into(),
@@ -180,7 +181,7 @@ impl DirectReviewLauncher for Launcher {
         }
     }
 }
-fn records(f: &Fixture) -> serde_json::Value {
+pub(crate) fn records(f: &Fixture) -> serde_json::Value {
     serde_json::from_slice(
         &std::fs::read(f.dir.path().join("provider/provider-state.json")).unwrap(),
     )
@@ -511,13 +512,14 @@ fn supported_closed_outcomes_project_without_new_decision_handlers() {
             .unwrap();
         let mut state = records(&f);
         state["requests"][0]["status"] = lifecycle.into();
-        state["requests"][0]["direct"]["review"]["status"] = serde_json::to_value(&status).unwrap();
+        let mut record: DirectRecord =
+            serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
+        record.review.status = status.clone();
+        refresh_fixture_history(&mut record);
         if matches!(status, DirectStatus::Approved | DirectStatus::Running) {
-            let record: DirectRecord =
-                serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
-            state["requests"][0]["direct"]["approval"] =
-                serde_json::to_value(record.approval_binding()).unwrap();
+            record.approval = Some(record.approval_binding());
         }
+        state["requests"][0]["direct"] = serde_json::to_value(record).unwrap();
         std::fs::write(
             f.dir.path().join("provider/provider-state.json"),
             serde_json::to_vec(&state).unwrap(),
@@ -642,6 +644,7 @@ fn semantic_record_guards_are_independent_of_the_integrity_seal() {
     ] {
         let mut record = original.clone();
         record.review.status = status;
+        refresh_fixture_history(&mut record);
         assert!(record.validate(&receipt.id, epoch));
     }
 }
@@ -810,11 +813,13 @@ fn correctly_sealed_other_owner_record_is_not_disclosed_to_current_human() {
         .app
         .submit_direct(owner, input(), &Launcher::default())
         .unwrap();
+    let visible = pending(&f);
     let mut state = records(&f);
     let mut direct: DirectRecord =
         serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
     direct.owner_uid = owner.uid() + 1;
     direct.seal();
+    refresh_fixture_history(&mut direct);
     state["requests"][0]["direct"] = serde_json::to_value(direct).unwrap();
     std::fs::write(
         f.dir.path().join("provider/provider-state.json"),
@@ -829,6 +834,11 @@ fn correctly_sealed_other_owner_record_is_not_disclosed_to_current_human() {
         f.app.review_direct(owner, &receipt.id),
         Err(DirectRequestError::NotFound)
     );
+    let expected = f.app.history(owner, None).unwrap();
+    assert!(!expected.is_empty());
+    assert!(expected.iter().all(|event| event.request_id == visible));
+    let generation = f.app.decision_generation().unwrap();
+    assert_eq!(f.app.browser_history(generation, None).unwrap(), expected);
 }
 
 #[test]
@@ -970,6 +980,7 @@ fn exact_metadata_and_input_size_limits_remain_usable() {
         16
     ];
     record.seal();
+    refresh_fixture_history(&mut record);
     assert!(record.validate(&receipt.id, state["lifecycle_epoch"].as_u64().unwrap()));
 }
 
@@ -983,7 +994,7 @@ impl ApprovalAuthenticator for PasswordCheck {
         }
     }
 }
-fn approval(f: &Fixture, id: &str) -> AuthenticatedApproval {
+pub(crate) fn approval(f: &Fixture, id: &str) -> AuthenticatedApproval {
     f.app
         .prepare_approval(f.app.human_owner(), id)
         .unwrap()
@@ -993,7 +1004,7 @@ fn approval(f: &Fixture, id: &str) -> AuthenticatedApproval {
         )
         .unwrap()
 }
-fn pending(f: &Fixture) -> String {
+pub(crate) fn pending(f: &Fixture) -> String {
     f.app
         .submit_direct(f.app.human_owner(), input(), &Launcher::default())
         .unwrap()
@@ -1026,13 +1037,26 @@ fn decision_approval_binds_exactly_and_audits_once_without_client_authority() {
             .to_owned(),
     };
     assert_eq!(d.approval.as_ref(), Some(&expected_binding));
+    assert_eq!(d.audit.len(), 2);
     assert_eq!(
-        d.audit,
-        vec![DecisionAudit {
-            binding: expected_binding,
-            at_unix_seconds: 1700000000,
-            outcome: DecisionOutcome::Approved
-        }]
+        d.audit[0],
+        HistoryEvent::snapshot(
+            &d,
+            0,
+            1700000000,
+            HistoryOutcome::Submitted,
+            Some(DirectStatus::Pending)
+        )
+    );
+    assert_eq!(
+        d.audit[1],
+        HistoryEvent::snapshot(
+            &d,
+            1,
+            1700000000,
+            HistoryOutcome::Approved,
+            Some(DirectStatus::Approved)
+        )
     );
     assert!(f.app.prepare_approval(f.app.human_owner(), &id).is_err());
     assert!(f.app.deny_direct(f.app.human_owner(), &id).is_err());
@@ -1258,7 +1282,7 @@ fn decision_authentication_releases_authority_and_rechecks_each_intervention() {
             .map_or(0, Vec::len);
         assert_eq!(
             events,
-            usize::from(!action.starts_with("policy")),
+            1 + usize::from(!action.starts_with("policy")),
             "{action}"
         );
     }
@@ -1304,6 +1328,7 @@ fn decision_deadline_equality_wall_changes_and_prepared_binding_changes_are_isol
             _ => panic!("unknown test case"),
         }
         direct.seal(); // Recompute unrelated integrity so it cannot mask semantic checks.
+        refresh_fixture_history(&mut direct);
         assert!(direct.validate(&id, state["lifecycle_epoch"].as_u64().unwrap()));
         state["requests"][0]["direct"] = serde_json::to_value(direct).unwrap();
         std::fs::write(
@@ -1372,8 +1397,8 @@ fn decision_restart_invalidates_pending_and_approved_with_single_expiry_event() 
                 .unwrap();
         assert_eq!(state["requests"][0]["status"], "invalidated");
         let audit = state["requests"][0]["direct"]["audit"].as_array().unwrap();
-        assert_eq!(audit.len(), if approve { 2 } else { 1 });
-        assert_eq!(audit.last().unwrap()["outcome"], "expired");
+        assert_eq!(audit.len(), if approve { 3 } else { 2 });
+        assert_eq!(audit.last().unwrap()["outcome"], "recovered");
     }
 }
 
@@ -1637,6 +1662,7 @@ fn decision_previous_explanations_preserve_terminal_history_and_never_restore_ap
             direct.review.one_time = explanation.into();
             direct.review.status = status.clone();
             direct.seal();
+            refresh_fixture_history(&mut direct);
             if explanation == PREVIOUS_ONE_TIME && status == DirectStatus::Approved {
                 direct.approval = Some(direct.approval_binding());
             }
@@ -1678,6 +1704,7 @@ fn decision_current_approved_records_require_an_exact_binding() {
     let mut direct: DirectRecord =
         serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
     direct.review.status = DirectStatus::Approved;
+    refresh_fixture_history(&mut direct);
     assert!(!direct.validate(&id, epoch));
     direct.approval = Some(direct.approval_binding());
     assert!(direct.validate(&id, epoch));
@@ -1749,8 +1776,8 @@ fn decision_system_audit_timestamps_record_the_actual_lifecycle_event() {
             serde_json::from_slice(&std::fs::read(root.join("provider-state.json")).unwrap())
                 .unwrap();
         let audit = state["requests"][0]["direct"]["audit"].as_array().unwrap();
-        assert_eq!(audit.len(), 1, "{action}");
-        let recorded = audit[0]["at_unix_seconds"].as_u64().unwrap();
+        assert_eq!(audit.len(), 2, "{action}");
+        let recorded = audit[1]["at_unix_seconds"].as_u64().unwrap();
         assert!(
             (before..=after).contains(&recorded),
             "{action}: event {recorded} outside {before}..={after}"
@@ -1800,13 +1827,20 @@ fn decision_denied_and_clock_expired_audits_bind_exact_redacted_metadata() {
         let direct: DirectRecord =
             serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
         assert_eq!(direct.approval, None);
+        assert_eq!(direct.audit.len(), 2);
         assert_eq!(
-            direct.audit,
-            vec![DecisionAudit {
-                binding: expected_binding,
-                at_unix_seconds: 1700000123,
-                outcome,
-            }]
+            direct.audit[1],
+            HistoryEvent::snapshot(
+                &direct,
+                1,
+                1700000123,
+                super::history::outcome(&direct.review.status, outcome),
+                Some(direct.review.status.clone())
+            )
+        );
+        assert_eq!(
+            direct.audit[1].policy_revision,
+            expected_binding.policy_digest
         );
         for sentinel in [
             "approval-password-sentinel",
@@ -1960,6 +1994,40 @@ fn approved(f: &Fixture) -> String {
     crate::adapters::execution::TEST_LAUNCH_ATTEMPTS.with(|calls| calls.set(0));
     id
 }
+fn refresh_fixture_history(record: &mut DirectRecord) {
+    if matches!(
+        record.review.status,
+        DirectStatus::Running | DirectStatus::Completed { .. } | DirectStatus::Failed { .. }
+    ) {
+        record.execution_claimed = true;
+    }
+    let mut statuses = vec![DirectStatus::Pending];
+    match &record.review.status {
+        DirectStatus::Pending => {}
+        DirectStatus::Approved | DirectStatus::Denied | DirectStatus::Expired => {
+            statuses.push(record.review.status.clone())
+        }
+        DirectStatus::Running => statuses.extend([DirectStatus::Approved, DirectStatus::Running]),
+        _ => statuses.extend([
+            DirectStatus::Approved,
+            DirectStatus::Running,
+            record.review.status.clone(),
+        ]),
+    }
+    record.audit = statuses
+        .into_iter()
+        .enumerate()
+        .map(|(ordinal, status)| {
+            HistoryEvent::snapshot(
+                record,
+                ordinal as u32,
+                record.created_at_unix_seconds,
+                super::history::outcome(&status, DecisionOutcome::Expired),
+                Some(status),
+            )
+        })
+        .collect();
+}
 fn write_execution_record(f: &Fixture, change: impl FnOnce(&mut DirectRecord)) {
     let mut state = records(f);
     let mut direct: DirectRecord =
@@ -1970,9 +2038,7 @@ fn write_execution_record(f: &Fixture, change: impl FnOnce(&mut DirectRecord)) {
     if direct.approval.is_some() {
         direct.approval = Some(binding.clone());
     }
-    for event in &mut direct.audit {
-        event.binding = binding.clone();
-    }
+    refresh_fixture_history(&mut direct);
     assert!(direct.validate(
         &direct.review.id,
         state["lifecycle_epoch"].as_u64().unwrap()
@@ -2513,9 +2579,7 @@ fn execution_revalidates_authority_and_exact_binding_after_slow_preparation() {
                     record.seal();
                     let binding = record.approval_binding();
                     record.approval = Some(binding.clone());
-                    for event in &mut record.audit {
-                        event.binding = binding.clone();
-                    }
+                    refresh_fixture_history(&mut record);
                     assert!(record.validate(
                         &record.review.id,
                         state["lifecycle_epoch"].as_u64().unwrap()
@@ -3426,4 +3490,111 @@ fn final_release_revalidates_authority_after_supervisor_setup() {
             .unwrap()
             .is_terminal()
     );
+}
+
+#[test]
+fn history_execution_corpus_is_absent_from_storage_responses_and_diagnostics() {
+    const CORPUS: [&str; 10] = [
+        "VAULT-VALUE-SENTINEL",
+        "RAW-ENVIRONMENT-SENTINEL",
+        "MASTER-PASSWORD-SENTINEL",
+        "SSH-PRIVATE-KEY-SENTINEL",
+        "CHILD-STDOUT-SENTINEL",
+        "CHILD-STDERR-SENTINEL",
+        "BACKEND-SESSION-SENTINEL",
+        "BROWSER-SESSION-SENTINEL",
+        "DESKTOP-LAUNCH-SENTINEL",
+        "REUSABLE-APPROVAL-SENTINEL",
+    ];
+    struct CorpusSupervisor {
+        fail: bool,
+        captured: std::cell::RefCell<Vec<Vec<u8>>>,
+        diagnostic: std::cell::RefCell<String>,
+    }
+    impl ProcessSupervisor<ExecutionPreparation> for CorpusSupervisor {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            prepared: ObservedPrepared,
+            environment: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            *self.diagnostic.borrow_mut() = format!("{prepared:?} {environment:?}");
+            *self.captured.borrow_mut() = environment.entries().map(|e| e.to_vec()).collect();
+            if self.fail {
+                Err(ExecutionError::ExecutionFailed)
+            } else {
+                Ok(ExecutionOutcome::ExitedZero)
+            }
+        }
+    }
+    for fail in [false, true] {
+        let f = fixture();
+        let id = approved(&f);
+        RESOLUTION_ACTION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(|| {
+                Ok(vec![SensitiveString::new(CORPUS.join("|"))])
+            }))
+        });
+        let supervisor = CorpusSupervisor {
+            fail,
+            captured: Default::default(),
+            diagnostic: Default::default(),
+        };
+        let result = f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &supervisor,
+        );
+        RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+        assert_eq!(result.is_err(), fail);
+        let capture = supervisor
+            .captured
+            .borrow()
+            .iter()
+            .flat_map(|s| s.iter().copied())
+            .collect::<Vec<_>>();
+        let captured = String::from_utf8(capture).unwrap();
+        for sentinel in CORPUS {
+            assert!(
+                captured.contains(sentinel),
+                "capture must contain {sentinel}"
+            );
+        }
+        assert!(!supervisor.diagnostic.borrow().is_empty());
+        let history = f.app.history(f.app.human_owner(), None).unwrap();
+        let expected = if fail {
+            HistoryOutcome::ExecutionUnavailable
+        } else {
+            HistoryOutcome::Succeeded
+        };
+        assert_eq!(
+            history
+                .iter()
+                .find(|e| e.ordinal == if fail { 2 } else { 3 })
+                .unwrap()
+                .outcome,
+            expected
+        );
+        assert_eq!(
+            history
+                .iter()
+                .filter(|e| e.outcome == HistoryOutcome::ExecutionStarted)
+                .count(),
+            usize::from(!fail)
+        );
+        let outputs = [
+            serde_json::to_string(&records(&f)).unwrap(),
+            serde_json::to_string(&history).unwrap(),
+            format!("{result:?}"),
+            supervisor.diagnostic.borrow().clone(),
+        ];
+        for output in outputs {
+            for sentinel in CORPUS {
+                assert!(!output.contains(sentinel), "{sentinel}");
+            }
+        }
+    }
 }

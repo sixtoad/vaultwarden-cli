@@ -1,0 +1,104 @@
+[
+  {
+    "name": "formatting",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.67
+  },
+  {
+    "name": "stable-all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 171.21
+  },
+  {
+    "name": "rust-1.88-all-targets",
+    "command": [
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 157.39
+  },
+  {
+    "name": "strict-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 6.89
+  },
+  {
+    "name": "human-integrations",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "human_cli",
+      "--test",
+      "direct_request",
+      "--test",
+      "provider_session"
+    ],
+    "exit": 0,
+    "seconds": 8.04
+  },
+  {
+    "name": "build-human-cli",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--bin",
+      "vw-access"
+    ],
+    "exit": 0,
+    "seconds": 0.26
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 0,
+    "seconds": 51.97
+  },
+  {
+    "name": "real-systemd",
+    "command": [
+      "scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 0,
+    "seconds": 55.99
+  }
+]

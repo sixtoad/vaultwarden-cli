@@ -1,0 +1,20 @@
+--- src/access/history.rs
++++ delete match arm D::ReviewUnavailable in outcome
+@@ -242,16 +242,16 @@
+             DirectFailure::ReviewUnavailable => O::ReviewUnavailable,
+             DirectFailure::ExecutionUnavailable if decision == D::Recovered => O::Recovered,
+             DirectFailure::ExecutionUnavailable => O::ExecutionUnavailable,
+             DirectFailure::ExecutionRejected => O::ExecutionRejected,
+             DirectFailure::ExecutionNonzero => O::ExecutionNonzero,
+             DirectFailure::ExecutionSignaled => O::ExecutionSignaled,
+         },
+         S::Expired => match decision {
+-            D::ReviewUnavailable => O::ReviewUnavailable,
++             /* ~ changed by cargo-mutants ~ */
+             D::ExecutionUnavailable => O::ExecutionUnavailable,
+             D::Invalidated => O::Invalidated,
+             D::Recovered => O::Recovered,
+             _ => O::Expired,
+         },
+     }
+ }

@@ -1,0 +1,29 @@
+--- src/access/history.rs
++++ replace newest -> Vec<HistoryEvent> with vec![]
+@@ -209,25 +209,17 @@
+     let limit = value.unwrap_or(DEFAULT_HISTORY_LIMIT);
+     if (1..=MAX_HISTORY_LIMIT).contains(&limit) {
+         Ok(limit as usize)
+     } else {
+         Err(DirectRequestError::InvalidRequest)
+     }
+ }
+ pub(crate) fn newest(mut events: Vec<HistoryEvent>, limit: usize) -> Vec<HistoryEvent> {
+-    events.sort_by(|a, b| {
+-        (b.at_unix_seconds, &b.request_id, b.ordinal).cmp(&(
+-            a.at_unix_seconds,
+-            &a.request_id,
+-            a.ordinal,
+-        ))
+-    });
+-    events.truncate(limit);
+-    events
++    vec![] /* ~ changed by cargo-mutants ~ */
+ }
+ pub(crate) fn outcome(
+     status: &DirectStatus,
+     decision: super::direct_request::DecisionOutcome,
+ ) -> HistoryOutcome {
+     use super::direct_request::DecisionOutcome as D;
+     use DirectStatus as S;
+     use HistoryOutcome as O;

@@ -1,0 +1,57 @@
+[
+  {
+    "name": "formatting",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.62
+  },
+  {
+    "name": "stable-all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 145.85
+  },
+  {
+    "name": "rust-1.88-all-targets",
+    "command": [
+      "rustup",
+      "run",
+      "1.88.0",
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 300.31
+  },
+  {
+    "name": "strict-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 101,
+    "seconds": 53.63
+  }
+]

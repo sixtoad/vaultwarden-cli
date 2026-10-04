@@ -4,6 +4,7 @@ use crate::access::{
     direct_request::{
         AuthenticatedHuman, DirectRequestError, DirectStatus, DirectSubmission, SubmissionReceipt,
     },
+    history::HistoryEvent,
     ports::DirectReviewLauncher,
 };
 use serde::{Deserialize, Serialize};
@@ -43,12 +44,14 @@ pub struct HumanMessage {
 pub enum HumanCommand {
     Request { submission: DirectSubmission },
     Status { id: String },
+    History { limit: Option<u32> },
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HumanResponse {
     Submitted { receipt: SubmissionReceipt },
     Status { state: DirectStatus },
+    History { events: Vec<HistoryEvent> },
     Rejected { reason: DirectRequestError },
     InvalidRequest,
     Unauthorized,
@@ -371,6 +374,10 @@ fn serve_one(
                     Err(reason) => HumanResponse::Rejected { reason },
                 }
             }
+            HumanCommand::History { limit } => match app.history(owner, limit) {
+                Ok(events) => HumanResponse::History { events },
+                Err(reason) => HumanResponse::Rejected { reason },
+            },
             HumanCommand::Status { id } => match app.direct_status(owner, &id) {
                 Ok(state) => HumanResponse::Status { state },
                 Err(reason) => HumanResponse::Rejected { reason },
@@ -378,9 +385,16 @@ fn serve_one(
         },
         _ => HumanResponse::InvalidRequest,
     };
-    if let Ok(bytes) = serde_json::to_vec(&response) {
-        let _ignored = write_frame(&mut stream, &bytes);
-    }
+    let bytes = response_frame(&response);
+    let _ignored = write_frame(&mut stream, &bytes);
+}
+
+// Never start a partial frame: oversized results become a fixed, bounded failure.
+fn response_frame(response: &HumanResponse) -> Vec<u8> {
+    serde_json::to_vec(response)
+        .ok()
+        .filter(|bytes| bytes.len() <= MAX_FRAME)
+        .unwrap_or_else(|| br#"{"result":"unavailable"}"#.to_vec())
 }
 
 /// Validate filesystem ownership and server kernel credentials before sending input.
@@ -489,7 +503,25 @@ mod tests {
                 reason: DirectRequestError::Locked
             }
         ));
+        for limit in [None, Some(1), Some(200)] {
+            assert!(matches!(
+                exchange(&root, HumanCommand::History { limit }).unwrap(),
+                HumanResponse::History { events } if events.is_empty()
+            ));
+        }
+        for limit in [0, 201, u32::MAX] {
+            assert!(matches!(
+                exchange(&root, HumanCommand::History { limit: Some(limit) }).unwrap(),
+                HumanResponse::Rejected {
+                    reason: DirectRequestError::InvalidRequest
+                }
+            ));
+        }
         for input in [
+            r#"{"version":1,"command":{"kind":"history","limit":4294967296}}"#,
+            r#"{"version":1,"command":{"kind":"history","limit":-1}}"#,
+            r#"{"version":1,"command":{"kind":"history","limit":"private-input-sentinel"}}"#,
+            r#"{"version":1,"command":{"kind":"history","uid":0}}"#,
             r#"{"version":2,"command":{"kind":"status","id":"sentinel"}}"#,
             r#"{"version":1,"uid":0,"command":{"kind":"status","id":"sentinel"}}"#,
             r#"{"version":1,"command":{"kind":"status","id":"sentinel","time":0}}"#,
@@ -510,6 +542,37 @@ mod tests {
         stop.store(true, Ordering::Release);
         worker.join().unwrap().unwrap();
         assert!(!root.join(SOCKET_NAME).exists());
+    }
+    #[test]
+    fn history_frames_fail_closed_before_writing_oversized_output() {
+        use crate::access::history::{HistoryEvent, HistoryOutcome, RequesterSnapshot};
+        let event = HistoryEvent {
+            version: 1,
+            request_id: "a".repeat(64),
+            operation: "deploy".into(),
+            requester: RequesterSnapshot::Human {
+                uid: 1000,
+                label: "x".repeat(2_097_152),
+            },
+            policy_revision: "b".repeat(64),
+            credentials: vec![],
+            created_at_unix_seconds: 1,
+            expires_at_unix_seconds: 2,
+            at_unix_seconds: Some(1),
+            ordinal: 0,
+            outcome: HistoryOutcome::Submitted,
+            status: Some(DirectStatus::Pending),
+        };
+        assert_eq!(
+            response_frame(&HumanResponse::History {
+                events: vec![event]
+            }),
+            br#"{"result":"unavailable"}"#
+        );
+        assert_eq!(
+            response_frame(&HumanResponse::History { events: vec![] }),
+            br#"{"result":"history","events":[]}"#
+        );
     }
     #[test]
     fn private_boundary_rejects_unsafe_root_socket_symlink_and_active_listener() {

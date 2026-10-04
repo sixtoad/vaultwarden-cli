@@ -1,0 +1,21 @@
+--- src/access/history.rs
++++ replace == with != in outcome
+@@ -235,17 +235,17 @@
+         S::Pending => O::Submitted,
+         S::Approved => O::Approved,
+         S::Denied => O::Denied,
+         S::Running => O::ExecutionStarted,
+         S::Completed { exit_code: 0 } => O::Succeeded,
+         S::Completed { .. } => O::ExecutionNonzero,
+         S::Failed { reason } => match reason {
+             DirectFailure::ReviewUnavailable => O::ReviewUnavailable,
+-            DirectFailure::ExecutionUnavailable if decision == D::Recovered => O::Recovered,
++            DirectFailure::ExecutionUnavailable if decision != /* ~ changed by cargo-mutants ~ */ D::Recovered => O::Recovered,
+             DirectFailure::ExecutionUnavailable => O::ExecutionUnavailable,
+             DirectFailure::ExecutionRejected => O::ExecutionRejected,
+             DirectFailure::ExecutionNonzero => O::ExecutionNonzero,
+             DirectFailure::ExecutionSignaled => O::ExecutionSignaled,
+         },
+         S::Expired => match decision {
+             D::ReviewUnavailable => O::ReviewUnavailable,
+             D::ExecutionUnavailable => O::ExecutionUnavailable,

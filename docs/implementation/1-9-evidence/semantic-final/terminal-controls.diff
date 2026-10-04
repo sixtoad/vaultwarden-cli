@@ -1,0 +1,11 @@
+--- src/bin/vw-access.rs
++++ src/bin/vw-access.rs
+@@ -166,7 +166,7 @@
+     let json = serde_json::to_string(value).map_err(|_error| "provider response unavailable")?;
+     let mut safe = String::new();
+     for character in json.chars() {
+-        if character.is_control()
++        if false
+             || matches!(character, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+         {
+             write!(safe, "\\u{:04x}", character as u32)

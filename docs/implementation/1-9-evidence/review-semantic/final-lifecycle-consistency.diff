@@ -1,0 +1,11 @@
+--- src/access/direct_request.rs
++++ src/access/direct_request.rs
+@@ -427,7 +427,7 @@
+             }
+             previous = event.status.clone();
+         }
+-        previous.as_ref() == Some(&self.review.status)
++        true
+     }
+     pub(crate) fn approval_binding(&self) -> ApprovalBinding {
+         ApprovalBinding {

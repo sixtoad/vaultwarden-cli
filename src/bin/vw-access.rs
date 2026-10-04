@@ -46,6 +46,12 @@ enum Command {
     },
     /// Read a request's redacted status, including while the provider is locked.
     Status { id: String },
+    /// Read recent redacted lifecycle events, including while the provider is locked.
+    History {
+        /// Number of events (default 50; range 1–200).
+        #[arg(long)]
+        limit: Option<u32>,
+    },
 }
 #[cfg(target_os = "linux")]
 fn main() -> ExitCode {
@@ -98,6 +104,7 @@ fn run(args: Args) -> Result<(), String> {
             !no_wait,
         ),
         Command::Status { id } => (HumanCommand::Status { id }, false),
+        Command::History { limit } => (HumanCommand::History { limit }, false),
     };
     let response = exchange(&args.state_root, command).map_err(|error| error.to_string())?;
     reject_error(&response)?;
@@ -143,17 +150,100 @@ fn reject_error(response: &HumanResponse) -> Result<(), String> {
 }
 #[cfg(target_os = "linux")]
 fn output(response: &HumanResponse) -> Result<(), String> {
-    let encoded = serde_json::to_vec(response).map_err(|_error| "provider response unavailable")?;
+    let encoded = terminal_json(response)?;
     let mut stdout = io::stdout().lock();
     stdout
-        .write_all(&encoded)
+        .write_all(encoded.as_bytes())
         .and_then(|()| stdout.write_all(b"\n"))
         .and_then(|()| stdout.flush())
         .map_err(|_error| "output unavailable".into())
 }
+/// Preserve JSON semantics while making invisible terminal controls visible.
+#[cfg(target_os = "linux")]
+fn terminal_json(value: &impl serde::Serialize) -> Result<String, String> {
+    use std::fmt::Write as _;
+    const MAX_OUTPUT: usize = 2 * 1024 * 1024;
+    let json = serde_json::to_string(value).map_err(|_error| "provider response unavailable")?;
+    let mut safe = String::new();
+    for character in json.chars() {
+        if character.is_control()
+            || matches!(character, '\u{061c}' | '\u{200b}' | '\u{2060}' | '\u{feff}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        {
+            write!(safe, "\\u{:04x}", character as u32)
+                .map_err(|_error| "provider response unavailable")?;
+        } else {
+            safe.push(character);
+        }
+        if safe.len() >= MAX_OUTPUT {
+            return Err("provider response unavailable".into());
+        }
+    }
+    Ok(safe)
+}
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
+    #[test]
+    fn history_arguments_and_terminal_json_preserve_data_without_controls() {
+        for (arguments, limit) in [
+            (vec!["history"], None),
+            (vec!["history", "--limit", "200"], Some(200)),
+        ] {
+            let args = Args::try_parse_from(
+                ["vw-access", "--state-root", "/private"]
+                    .into_iter()
+                    .chain(arguments),
+            )
+            .unwrap();
+            assert!(matches!(args.command, Command::History { limit: actual } if actual == limit));
+        }
+        for value in ["4294967296", "-1", "private-sentinel"] {
+            assert!(
+                Args::try_parse_from([
+                    "vw-access",
+                    "--state-root",
+                    "/private",
+                    "history",
+                    "--limit",
+                    value
+                ])
+                .is_err()
+            );
+        }
+        let value = "<img>\"\\n\r\t\x1b]2;title\x07\x7f\u{0085}\u{009b}\u{061c}\u{200e}\u{200f}\u{2028}\u{2029}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}\u{2066}\u{2067}\u{2068}\u{2069}";
+        let encoded = terminal_json(&value).unwrap();
+        assert_eq!(serde_json::from_str::<String>(&encoded).unwrap(), value);
+        for character in value.chars().filter(|c| c.is_control() || matches!(c, '\u{061c}' | '\u{200b}' | '\u{2060}' | '\u{feff}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')) {
+            assert!(!encoded.contains(character));
+        }
+        assert!(
+            encoded.contains(r"\u007f")
+                && encoded.contains(r"\u0085")
+                && encoded.contains(r"\u202e")
+        );
+        // The complete output includes JSON's two quotes and the final newline.
+        let at_limit = terminal_json(&"x".repeat(2_097_149)).unwrap();
+        assert_eq!(at_limit.len() + 1, 2_097_152);
+        assert_eq!(
+            terminal_json(&"x".repeat(2_097_150)),
+            Err("provider response unavailable".into())
+        );
+        for character in ['\u{200b}', '\u{2060}', '\u{feff}'] {
+            let label = format!("label{character}end");
+            let encoded = terminal_json(&label).unwrap();
+            assert!(!encoded.contains(character));
+            assert!(encoded.contains(&format!("\\u{:04x}", character as u32)));
+            assert_eq!(serde_json::from_str::<String>(&encoded).unwrap(), label);
+        }
+        assert_eq!(
+            terminal_json(&"x".repeat(2_097_151)),
+            Err("provider response unavailable".into())
+        );
+        assert_eq!(
+            terminal_json(&"\u{0085}".repeat(400_000)),
+            Err("provider response unavailable".into())
+        );
+    }
     #[test]
     fn request_defaults_to_wait_and_requires_separator_for_ordered_values() {
         let args = Args::try_parse_from([

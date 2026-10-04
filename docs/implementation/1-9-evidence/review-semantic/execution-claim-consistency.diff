@@ -1,0 +1,11 @@
+--- src/access/direct_request.rs
++++ src/access/direct_request.rs
+@@ -388,7 +388,7 @@
+             }
+             // A recorded start/completion cannot precede the one-time execution claim.
+             // Legacy snapshots and recovery retain only facts the old format proves.
+-            if !self.execution_claimed
++            if false && !self.execution_claimed
+                 && matches!(
+                     event.status,
+                     Some(

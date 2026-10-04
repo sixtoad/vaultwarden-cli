@@ -1,0 +1,10 @@
+--- src/access/provider.rs
++++ src/access/provider.rs
+@@ -186,7 +186,6 @@
+             status: super::provider_store::RequestLifecycleStatus::Pending,
+             direct: Some(direct),
+         });
+-        self.store.write_state(&state)?;
+         self.state = state;
+         Ok(review)
+     }

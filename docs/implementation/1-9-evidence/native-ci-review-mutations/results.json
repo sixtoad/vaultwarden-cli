@@ -1,0 +1,192 @@
+{
+  "baselines": [
+    {
+      "group": "cli",
+      "exit": 0,
+      "seconds": 0.92
+    },
+    {
+      "group": "browser",
+      "exit": 0,
+      "seconds": 44.42
+    }
+  ],
+  "mutations": [
+    {
+      "name": "terminal-controls",
+      "path": "src/bin/vw-access.rs",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--bin",
+        "vw-access"
+      ],
+      "exit": 101,
+      "seconds": 1.22,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "0f960cf9576700aaf24557996e6236a05f4cedebda654a6a6b6792cfa2e1572f"
+    },
+    {
+      "name": "terminal-format-200b",
+      "path": "src/bin/vw-access.rs",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--bin",
+        "vw-access"
+      ],
+      "exit": 101,
+      "seconds": 1.97,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "0f960cf9576700aaf24557996e6236a05f4cedebda654a6a6b6792cfa2e1572f"
+    },
+    {
+      "name": "terminal-format-2060",
+      "path": "src/bin/vw-access.rs",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--bin",
+        "vw-access"
+      ],
+      "exit": 101,
+      "seconds": 1.62,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "0f960cf9576700aaf24557996e6236a05f4cedebda654a6a6b6792cfa2e1572f"
+    },
+    {
+      "name": "terminal-format-feff",
+      "path": "src/bin/vw-access.rs",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--bin",
+        "vw-access"
+      ],
+      "exit": 101,
+      "seconds": 1.87,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "0f960cf9576700aaf24557996e6236a05f4cedebda654a6a6b6792cfa2e1572f"
+    },
+    {
+      "name": "terminal-newline-bound",
+      "path": "src/bin/vw-access.rs",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--bin",
+        "vw-access"
+      ],
+      "exit": 101,
+      "seconds": 2.07,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "0f960cf9576700aaf24557996e6236a05f4cedebda654a6a6b6792cfa2e1572f"
+    },
+    {
+      "name": "browser-control-escaping",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 16.84,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    },
+    {
+      "name": "browser-html-escaping",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 14.52,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    },
+    {
+      "name": "browser-format-200b",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 47.6,
+      "classification": "caught",
+      "evidence": "bounded browser assertion deadline",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    },
+    {
+      "name": "browser-format-2060",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 47.96,
+      "classification": "caught",
+      "evidence": "bounded browser assertion deadline",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    },
+    {
+      "name": "browser-format-feff",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 46.7,
+      "classification": "caught",
+      "evidence": "bounded browser assertion deadline",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    },
+    {
+      "name": "browser-selected-limit",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 15.94,
+      "classification": "caught",
+      "evidence": "assertion",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    },
+    {
+      "name": "browser-deadline",
+      "path": "src/adapters/loopback_ui.rs",
+      "command": [
+        "node",
+        "tests/ui/direct-request.mjs"
+      ],
+      "exit": 1,
+      "seconds": 48.32,
+      "classification": "caught",
+      "evidence": "bounded browser assertion deadline",
+      "restored_sha256": "b23fe881f20514d559be0876d5e6c5284c7191cfa0aea6dcb623ddaddf79fc05"
+    }
+  ]
+}

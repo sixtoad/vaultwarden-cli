@@ -1,0 +1,48 @@
+diff --git a/src/adapters/supervisor/bridge.rs b/src/adapters/supervisor/bridge.rs
+index 87b7f46..42158b9 100644
+--- a/src/adapters/supervisor/bridge.rs
++++ b/src/adapters/supervisor/bridge.rs
+@@ -379,12 +379,14 @@ fn send_packet(fd: RawFd, bytes: &[u8], descriptor: Option<RawFd>) -> Result<(),
+     message.msg_iovlen = 1;
+     if let Some(descriptor) = descriptor {
+         message.msg_control = control.as_mut_ptr().cast();
+-        message.msg_controllen = unsafe { libc::CMSG_SPACE(size_of::<RawFd>() as u32) } as usize;
++        // Ancillary lengths are u32 on musl and usize on glibc; these fixed
++        // single-descriptor lengths fit either ABI's destination fields.
++        message.msg_controllen = unsafe { libc::CMSG_SPACE(size_of::<RawFd>() as u32) } as _;
+         unsafe {
+             let header = libc::CMSG_FIRSTHDR(&message);
+             (*header).cmsg_level = libc::SOL_SOCKET;
+             (*header).cmsg_type = libc::SCM_RIGHTS;
+-            (*header).cmsg_len = libc::CMSG_LEN(size_of::<RawFd>() as u32) as usize;
++            (*header).cmsg_len = libc::CMSG_LEN(size_of::<RawFd>() as u32) as _;
+             std::ptr::write_unaligned(libc::CMSG_DATA(header).cast::<RawFd>(), descriptor);
+         }
+     }
+@@ -426,7 +428,8 @@ fn receive_packet(fd: RawFd, timeout: Duration) -> Result<Option<Packet>, Bridge
+     message.msg_iov = &mut vector;
+     message.msg_iovlen = 1;
+     message.msg_control = control.as_mut_ptr().cast();
+-    message.msg_controllen = size_of_val(&control);
++    // This fixed buffer fits both musl's u32 and glibc's usize length field.
++    message.msg_controllen = size_of_val(&control) as _;
+     let count = unsafe {
+         libc::recvmsg(
+             fd,
+@@ -443,12 +446,14 @@ fn receive_packet(fd: RawFd, timeout: Duration) -> Result<Option<Packet>, Bridge
+     let mut header = unsafe { libc::CMSG_FIRSTHDR(&message) };
+     while !header.is_null() {
+         let h = unsafe { &*header };
++        // Widen musl's u32 length to usize before buffer arithmetic.
++        let length: usize = h.cmsg_len as _;
+         let minimum = unsafe { libc::CMSG_LEN(0) } as usize;
+-        if h.cmsg_len < minimum {
++        if length < minimum {
+             invalid = true;
+             break;
+         }
+-        let size = h.cmsg_len - minimum;
++        let size = length - minimum;
+         if h.cmsg_level != libc::SOL_SOCKET
+             || h.cmsg_type != libc::SCM_RIGHTS
+             || !size.is_multiple_of(size_of::<RawFd>())

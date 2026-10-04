@@ -1,0 +1,11 @@
+--- src/access/history.rs
++++ src/access/history.rs
+@@ -102,7 +102,7 @@
+             request_id: record.review.id.clone(),
+             operation: record.review.operation.clone(),
+             requester: RequesterSnapshot::Human {
+-                uid: record.owner_uid,
++                uid: record.owner_uid + 1,
+                 label: record.review.requester.clone(),
+             },
+             policy_revision: record.review.policy_digest.clone(),

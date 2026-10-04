@@ -99,6 +99,27 @@ impl Provider {
     pub(crate) fn owner_uid(&self) -> u32 {
         self.store.owner_uid()
     }
+    pub(crate) fn history(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, super::direct_request::DirectRequestError> {
+        if owner.uid() != self.owner_uid() {
+            return Err(super::direct_request::DirectRequestError::Unauthorized);
+        }
+        let limit = super::history::limit(limit)?;
+        let state = self.store.read_state()?;
+        Ok(super::history::newest(
+            state
+                .requests
+                .into_iter()
+                .filter_map(|r| r.direct)
+                .filter(|d| d.owner_uid == owner.uid())
+                .flat_map(|d| d.audit)
+                .collect(),
+            limit,
+        ))
+    }
     pub(crate) fn create_direct(
         &mut self,
         owner: super::direct_request::AuthenticatedHuman,
@@ -150,8 +171,16 @@ impl Provider {
             approval: None,
             execution_claimed: false,
             audit: Vec::new(),
+            history_version: super::history::HISTORY_VERSION,
         };
         direct.seal();
+        direct.audit.push(super::history::HistoryEvent::snapshot(
+            &direct,
+            0,
+            now,
+            super::history::HistoryOutcome::Submitted,
+            Some(DirectStatus::Pending),
+        ));
         state.requests.push(super::provider_store::RequestRecord {
             id,
             status: super::provider_store::RequestLifecycleStatus::Pending,
