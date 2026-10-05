@@ -409,7 +409,14 @@ fn application_scenario(
             arguments: vec![
                 ArgumentSpec::Target,
                 ArgumentSpec::Choice {
-                    choices: vec![marker.clone()],
+                    choices: if mode == "app-agent-revoke" {
+                        vec![
+                            marker.clone(),
+                            root.join("other-tree-ready").to_str().unwrap().into(),
+                        ]
+                    } else {
+                        vec![marker.clone()]
+                    },
                 },
             ],
             credentials: vec![LoginCredentialDraft {
@@ -424,6 +431,10 @@ fn application_scenario(
         })
         .unwrap();
     let owner = f.app.human_owner();
+    if mode == "app-agent-revoke" {
+        scoped_agent_revocation(root, &f, supervisor);
+        return;
+    }
     let id = f
         .app
         .submit_direct(
@@ -568,6 +579,155 @@ fn application_scenario(
         assert!(!review.contains("synthetic-password-sentinel"));
     }
     finish(root, b"application-verified");
+}
+
+fn scoped_agent_revocation(
+    root: &std::path::Path,
+    f: &crate::access::direct_request_tests::Fixture,
+    supervisor: Arc<SystemdProcessSupervisor>,
+) {
+    use crate::access::{
+        agent_binding::{AgentBindingStatus, AgentPairing},
+        direct_request::*,
+        direct_request_tests::Launcher,
+        ports::*,
+    };
+    struct Permit;
+    impl ApprovalAuthenticator for Permit {
+        fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+            Ok(())
+        }
+    }
+    let human = f.app.human_owner();
+    let mut prepared = Vec::new();
+    let mut work = Vec::new();
+    let mut leases = Vec::new();
+    for (seed, label, marker) in [
+        (91, "revoked-agent", "app-tree-ready"),
+        (92, "surviving-agent", "other-tree-ready"),
+    ] {
+        let binding = f
+            .app
+            .pair_agent(
+                human,
+                AgentPairing {
+                    label: label.into(),
+                    public_key: crate::access::encode_public_key(
+                        &ed25519_dalek::SigningKey::from_bytes(&[seed; 32]).verifying_key(),
+                    ),
+                    uid: 41000 + u32::from(seed),
+                    gid: 42000 + u32::from(seed),
+                },
+            )
+            .unwrap();
+        let id = f
+            .app
+            .submit_agent_for_test(
+                &binding.id,
+                binding.uid,
+                &[binding.gid],
+                DirectSubmission {
+                    operation: "deploy".into(),
+                    revision: None,
+                    values: vec!["tree".into(), root.join(marker).to_str().unwrap().into()],
+                },
+                &Launcher::default(),
+            )
+            .unwrap()
+            .id;
+        let approval = f
+            .app
+            .prepare_approval(human, &id)
+            .unwrap()
+            .authenticate(SensitiveString::new("synthetic".into()), &Permit)
+            .unwrap();
+        f.app.commit_approval(approval).unwrap();
+        prepared.push((binding, id, marker));
+    }
+    // Prepare both requests before the first supervisor starts polling authority.
+    // Admission deliberately uses try_lock and rejects incidental busy state.
+    for (binding, id, marker) in prepared {
+        let app = f.app.clone();
+        let request = id.clone();
+        let runner = supervisor.clone();
+        let worker = std::thread::spawn(move || {
+            app.run_execution(human, &request, &LinuxExecutablePreparer, runner.as_ref())
+        });
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while !root.join(marker).exists()
+            || f.app.direct_status(human, &id).unwrap() != DirectStatus::Running
+        {
+            assert!(
+                Instant::now() < deadline,
+                "agent workload did not become running"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let current = supervisor.config.leases().unwrap();
+        assert_eq!(current.len(), work.len() + 1);
+        let lease = current
+            .into_iter()
+            .find(|candidate| {
+                !leases
+                    .iter()
+                    .any(|prior: &manager::Lease| prior.name == candidate.name)
+            })
+            .unwrap();
+        leases.push(lease);
+        work.push((binding, id, worker));
+    }
+    let (a, a_id, a_worker) = work.remove(0);
+    let (b, b_id, b_worker) = work.remove(0);
+    assert_eq!(
+        f.app.revoke_agent(human, &a.id).unwrap().status,
+        AgentBindingStatus::Revoked
+    );
+    assert_eq!(
+        a_worker.join().unwrap(),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert_eq!(
+        f.app.direct_status(human, &a_id).unwrap(),
+        DirectStatus::Failed {
+            reason: DirectFailure::ExecutionUnavailable,
+        }
+    );
+    assert_eq!(
+        f.app.direct_status(human, &b_id).unwrap(),
+        DirectStatus::Running
+    );
+    assert!(!f.app.admission_closed());
+    std::fs::write(
+        root.join("scoped-identities.json"),
+        serde_json::to_vec(&leases).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(root.join("agent-revoked"), b"revoked-after-cleanup").unwrap();
+    // The independent integration process must observe A empty and B populated
+    // before we permit B cleanup or provider exit to change that observation.
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while !root.join("scoped-observation-complete").exists() {
+        assert!(
+            Instant::now() < deadline,
+            "independent scoped observation missing"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        f.app.revoke_agent(human, &a.id).unwrap().status,
+        AgentBindingStatus::Revoked
+    );
+    assert_eq!(
+        f.app.direct_status(human, &b_id).unwrap(),
+        DirectStatus::Running
+    );
+    f.app.revoke_agent(human, &b.id).unwrap();
+    assert_eq!(
+        b_worker.join().unwrap(),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert!(!f.app.admission_closed());
+    finish(root, b"scoped-agent-revocation-independently-observed");
 }
 struct FaultSupervisor {
     supervisor: Arc<SystemdProcessSupervisor>,

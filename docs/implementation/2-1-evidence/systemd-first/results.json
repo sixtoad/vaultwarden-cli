@@ -1,0 +1,10 @@
+[
+  {
+    "name": "real-systemd",
+    "command": [
+      "scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 101,
+    "seconds": 775.14
+  }
+]

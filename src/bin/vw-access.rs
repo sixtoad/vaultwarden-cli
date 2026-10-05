@@ -10,7 +10,7 @@ use std::{
 };
 #[cfg(target_os = "linux")]
 use vaultwarden_cli::{
-    access::direct_request::DirectSubmission,
+    access::{agent_binding::AgentPairing, direct_request::DirectSubmission},
     adapters::human_socket::{HumanCommand, HumanResponse, exchange},
 };
 
@@ -45,12 +45,45 @@ enum Command {
         values: Vec<String>,
     },
     /// Read a request's redacted status, including while the provider is locked.
-    Status { id: String },
+    Status {
+        #[arg(allow_hyphen_values = true)]
+        id: String,
+    },
     /// Read recent redacted lifecycle events, including while the provider is locked.
     History {
         /// Number of events (default 50; range 1–200).
         #[arg(long)]
         limit: Option<u32>,
+    },
+    /// Manage restricted agent identities, including while the vault is locked.
+    Agent {
+        #[command(subcommand)]
+        command: AgentCommand,
+    },
+}
+#[cfg(target_os = "linux")]
+#[derive(Subcommand)]
+enum AgentCommand {
+    /// Pair a fresh Ed25519 public key with a restricted numeric OS identity.
+    Pair {
+        #[arg(allow_hyphen_values = true)]
+        label: String,
+        /// Canonical unpadded base64url Ed25519 public key (never a private key).
+        #[arg(long, allow_hyphen_values = true)]
+        public_key: String,
+        /// Restricted UID, distinct from the provider UID.
+        #[arg(long)]
+        uid: u32,
+        /// Required primary or supplementary group membership.
+        #[arg(long)]
+        gid: u32,
+    },
+    /// List immutable IDs, fingerprints, OS identities and enabled/revoked status.
+    List,
+    /// Revoke an immutable binding ID and wait for affected execution cleanup.
+    Revoke {
+        #[arg(allow_hyphen_values = true)]
+        id: String,
     },
 }
 #[cfg(target_os = "linux")]
@@ -105,6 +138,26 @@ fn run(args: Args) -> Result<(), String> {
         ),
         Command::Status { id } => (HumanCommand::Status { id }, false),
         Command::History { limit } => (HumanCommand::History { limit }, false),
+        Command::Agent { command } => (
+            match command {
+                AgentCommand::Pair {
+                    label,
+                    public_key,
+                    uid,
+                    gid,
+                } => HumanCommand::AgentPair {
+                    pairing: AgentPairing {
+                        label,
+                        public_key,
+                        uid,
+                        gid,
+                    },
+                },
+                AgentCommand::List => HumanCommand::AgentList {},
+                AgentCommand::Revoke { id } => HumanCommand::AgentRevoke { id },
+            },
+            false,
+        ),
     };
     let response = exchange(&args.state_root, command).map_err(|error| error.to_string())?;
     reject_error(&response)?;

@@ -3,6 +3,156 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+
+#[test]
+fn agent_commands_send_exact_identity_fields_and_print_only_safe_views() {
+    use std::{
+        fs,
+        io::{Read, Write},
+        net::Shutdown,
+        os::unix::{fs::PermissionsExt, net::UnixListener},
+    };
+    let key = "-public-verification-bytes-sentinel";
+    let id = "-binding-id-sentinel";
+    let label = "-builder";
+    let view = serde_json::json!({"id":id,"label":label,"fingerprint":"a".repeat(64),"uid":42001,"gid":42003,"status":"enabled"});
+    let mut revoked = view.clone();
+    revoked["status"] = "revoked".into();
+    for (arguments, expected, response) in [
+        (
+            vec![
+                "agent",
+                "pair",
+                label,
+                "--public-key",
+                key,
+                "--uid",
+                "42001",
+                "--gid",
+                "42003",
+            ],
+            serde_json::json!({"kind":"agent_pair","pairing":{"label":label,"public_key":key,"uid":42001,"gid":42003}}),
+            serde_json::json!({"result":"agent_paired","agent":view}),
+        ),
+        (
+            vec!["agent", "list"],
+            serde_json::json!({"kind":"agent_list"}),
+            serde_json::json!({"result":"agents","agents":[view]}),
+        ),
+        (
+            vec!["agent", "revoke", id],
+            serde_json::json!({"kind":"agent_revoke","id":id}),
+            serde_json::json!({"result":"agent_revoked","agent":revoked}),
+        ),
+        (
+            vec!["status", id],
+            serde_json::json!({"kind":"status","id":id}),
+            serde_json::json!({"result":"status","state":{"status":"pending"}}),
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let path = directory.path().join("human.sock");
+        let listener = UnixListener::bind(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let encoded = serde_json::to_vec(&response).unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            let mut bytes = Vec::new();
+            stream.read_to_end(&mut bytes).unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),
+                serde_json::json!({"version":1,"command":expected})
+            );
+            stream.write_all(&encoded).unwrap();
+            stream.shutdown(Shutdown::Write).unwrap();
+        });
+        let result = Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+            .arg("--state-root")
+            .arg(directory.path())
+            .args(arguments)
+            .assert()
+            .success()
+            .stderr("");
+        let output = String::from_utf8(result.get_output().stdout.clone()).unwrap();
+        server.join().unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&output).unwrap(),
+            response
+        );
+        assert!(!output.contains(key));
+        assert!(!output.contains("public_key"));
+    }
+}
+
+#[test]
+fn agent_parser_failures_are_redacted_and_help_describes_identity_not_authority() {
+    for arguments in [
+        vec![
+            "agent",
+            "pair",
+            "private-sentinel",
+            "--public-key",
+            "private-sentinel",
+            "--uid",
+            "4294967296",
+            "--gid",
+            "42003",
+        ],
+        vec![
+            "agent",
+            "pair",
+            "private-sentinel",
+            "--public-key",
+            "private-sentinel",
+            "--uid",
+            "42001",
+        ],
+        vec![
+            "agent",
+            "pair",
+            "private-sentinel",
+            "--public-key",
+            "private-sentinel",
+            "--uid",
+            "42001",
+            "--gid",
+            "-1",
+        ],
+        vec!["agent", "list", "--uid", "private-sentinel"],
+        vec![
+            "agent",
+            "revoke",
+            "private-sentinel",
+            "--label",
+            "private-sentinel",
+        ],
+    ] {
+        Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+            .args(["--state-root", "/private"])
+            .args(arguments)
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr("vw-access: invalid command; use --help\n");
+    }
+    Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+        .args(["agent", "pair", "private-sentinel", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--public-key"))
+        .stdout(predicate::str::contains("--uid"))
+        .stdout(predicate::str::contains("--gid"))
+        .stdout(predicate::str::contains("private-sentinel").not());
+    Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+        .args(["agent", "revoke", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("<ID>"));
+}
 #[test]
 fn parser_failure_and_help_do_not_echo_rejected_values() {
     for args in [

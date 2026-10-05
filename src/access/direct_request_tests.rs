@@ -1023,6 +1023,7 @@ fn decision_approval_binds_exactly_and_audits_once_without_client_authority() {
     let expected_binding = ApprovalBinding {
         request_id: id.clone(),
         requester_uid: unsafe { libc::geteuid() },
+        agent_owner: None,
         policy_digest: f
             .app
             .review_direct(f.app.human_owner(), &id)
@@ -1794,6 +1795,7 @@ fn decision_denied_and_clock_expired_audits_bind_exact_redacted_metadata() {
         let expected_binding = ApprovalBinding {
             request_id: id.clone(),
             requester_uid: unsafe { libc::geteuid() },
+            agent_owner: None,
             policy_digest: f
                 .app
                 .review_direct(f.app.human_owner(), &id)
@@ -3597,4 +3599,1298 @@ fn history_execution_corpus_is_absent_from_storage_responses_and_diagnostics() {
             }
         }
     }
+}
+
+fn agent_pair(f: &Fixture, label: &str, seed: u8) -> super::agent_binding::AgentBindingView {
+    f.app
+        .pair_agent(
+            f.app.human_owner(),
+            super::agent_binding::AgentPairing {
+                label: label.into(),
+                public_key: super::encode_public_key(
+                    &ed25519_dalek::SigningKey::from_bytes(&[seed; 32]).verifying_key(),
+                ),
+                // Different bindings deliberately share their OS account so a
+                // UID-based ownership/cancellation shortcut cannot satisfy tests.
+                uid: if f.app.human_owner().uid() == 41001 {
+                    41002
+                } else {
+                    41001
+                },
+                gid: 42001,
+            },
+        )
+        .unwrap()
+}
+fn agent_snapshot(binding: &super::agent_binding::AgentBindingView) -> AgentOwner {
+    AgentOwner {
+        binding_id: binding.id.clone(),
+        label: binding.label.clone(),
+        fingerprint: binding.fingerprint.clone(),
+        uid: binding.uid,
+        gid: binding.gid,
+    }
+}
+fn agent_pending(f: &Fixture, binding: &super::agent_binding::AgentBindingView) -> String {
+    f.app
+        .submit_agent_for_test(
+            &binding.id,
+            binding.uid,
+            &[binding.gid],
+            input(),
+            &Launcher::default(),
+        )
+        .unwrap()
+        .id
+}
+fn agent_approved(f: &Fixture, binding: &super::agent_binding::AgentBindingView) -> String {
+    let id = agent_pending(f, binding);
+    assert_eq!(
+        f.app.commit_approval(approval(f, &id)),
+        Ok(DirectStatus::Approved)
+    );
+    id
+}
+#[test]
+fn agent_administration_checks_human_authority_even_while_locked_and_retains_tombstones() {
+    use super::agent_binding::*;
+    let f = fixture();
+    f.app.lock().unwrap();
+    let wrong = AuthenticatedHuman::from_peer_uid(f.app.human_owner().uid() + 1);
+    let input = AgentPairing {
+        label: "build".into(),
+        public_key: super::encode_public_key(
+            &ed25519_dalek::SigningKey::from_bytes(&[31; 32]).verifying_key(),
+        ),
+        uid: 41031,
+        gid: 42031,
+    };
+    let before = records(&f);
+    assert_eq!(
+        f.app.pair_agent(wrong, input.clone()),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        f.app.list_agents(wrong),
+        Err(DirectRequestError::Unauthorized)
+    );
+    let binding = f
+        .app
+        .pair_agent(f.app.human_owner(), input.clone())
+        .unwrap();
+    assert_eq!(
+        f.app.revoke_agent(wrong, &binding.id),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        f.app.list_agents(f.app.human_owner()).unwrap(),
+        vec![binding.clone()]
+    );
+    assert_eq!(
+        f.app.pair_agent(f.app.human_owner(), input.clone()),
+        Err(DirectRequestError::InvalidRequest)
+    );
+    let mut same_label = input.clone();
+    same_label.public_key =
+        super::encode_public_key(&ed25519_dalek::SigningKey::from_bytes(&[30; 32]).verifying_key());
+    let paired_state = records(&f);
+    assert_eq!(
+        f.app.pair_agent(f.app.human_owner(), same_label),
+        Err(DirectRequestError::InvalidRequest)
+    );
+    assert_eq!(records(&f), paired_state);
+    assert!(!f.app.admission_closed());
+    let mut other = input.clone();
+    other.label = "other".into();
+    assert_eq!(
+        f.app.pair_agent(f.app.human_owner(), other),
+        Err(DirectRequestError::InvalidRequest)
+    );
+    let revoked = f
+        .app
+        .revoke_agent(f.app.human_owner(), &binding.id)
+        .unwrap();
+    assert_eq!(revoked.status, AgentBindingStatus::Revoked);
+    assert_eq!(
+        f.app.pair_agent(f.app.human_owner(), input),
+        Err(DirectRequestError::InvalidRequest)
+    );
+    let replacement = agent_pair(&f, "build", 32);
+    let epoch = records(&f)["lifecycle_epoch"].clone();
+    assert_eq!(
+        f.app
+            .revoke_agent(f.app.human_owner(), &binding.id)
+            .unwrap(),
+        revoked
+    );
+    assert_eq!(
+        f.app.list_agents(f.app.human_owner()).unwrap()[1],
+        replacement
+    );
+    assert_eq!(records(&f)["agent_audit"].as_array().unwrap().len(), 3);
+    assert_eq!(records(&f)["lifecycle_epoch"], epoch);
+    assert_eq!(before["pairings"], serde_json::json!([]));
+}
+#[test]
+fn agent_os_lookup_and_exact_poll_ownership_reject_each_independent_mismatch() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 41);
+    let b = agent_pair(&f, "b", 42);
+    let id = agent_pending(&f, &a);
+    let human_id = pending(&f);
+    let other_id = agent_pending(&f, &b);
+    let owner = agent_snapshot(&a);
+    assert_eq!(
+        f.app.agent_status(&owner, a.uid, &[a.gid], &id),
+        Ok(DirectStatus::Pending)
+    );
+    for (uid, groups) in [(a.uid + 1, vec![a.gid]), (a.uid, vec![a.gid + 1])] {
+        assert_eq!(
+            f.app
+                .submit_agent_for_test(&a.id, uid, &groups, input(), &Launcher::default()),
+            Err(DirectRequestError::Unauthorized)
+        );
+        assert_eq!(
+            f.app.agent_status(&owner, uid, &groups, &id),
+            Err(DirectRequestError::Unauthorized)
+        );
+    }
+    assert_eq!(
+        f.app.submit_agent_for_test(
+            super::RequestId::new_random().unwrap().as_str(),
+            a.uid,
+            &[a.gid],
+            input(),
+            &Launcher::default()
+        ),
+        Err(DirectRequestError::Unauthorized)
+    );
+    for id in [&human_id, &other_id] {
+        assert_eq!(
+            f.app.agent_status(&owner, a.uid, &[a.gid], id),
+            Err(DirectRequestError::NotFound)
+        );
+    }
+    let mut wrong = owner.clone();
+    wrong.fingerprint = "a".repeat(64);
+    assert_eq!(
+        f.app.agent_status(&wrong, a.uid, &[a.gid], &id),
+        Err(DirectRequestError::Unauthorized)
+    );
+    f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+    assert_eq!(
+        f.app.agent_status(&owner, a.uid, &[a.gid], &id),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        f.app
+            .submit_agent_for_test(&a.id, a.uid, &[a.gid], input(), &Launcher::default()),
+        Err(DirectRequestError::Unauthorized)
+    );
+    let replacement = agent_pair(&f, "a", 43);
+    assert_eq!(
+        f.app.agent_status(
+            &agent_snapshot(&replacement),
+            replacement.uid,
+            &[replacement.gid],
+            &id
+        ),
+        Err(DirectRequestError::NotFound)
+    );
+    // Otherwise-valid independent guard: global fail-closed denies enabled B too.
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&b), b.uid, &[b.gid], &other_id),
+        Ok(DirectStatus::Pending)
+    );
+    f.app.close_admission();
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&b), b.uid, &[b.gid], &other_id),
+        Err(DirectRequestError::Unavailable)
+    );
+}
+#[test]
+fn agent_revoke_invalidates_only_unclaimed_owned_work_and_preserves_attribution() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 51);
+    let b = agent_pair(&f, "b", 52);
+    let a_pending = agent_pending(&f, &a);
+    let a_approved = agent_approved(&f, &a);
+    let b_approved = agent_approved(&f, &b);
+    let human = approved(&f);
+    let old_approval = approval(&f, &a_pending);
+    let epoch = records(&f)["lifecycle_epoch"].clone();
+    f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+    for id in [&a_pending, &a_approved] {
+        assert_eq!(
+            f.app.direct_status(f.app.human_owner(), id),
+            Ok(DirectStatus::Expired)
+        );
+    }
+    for id in [&b_approved, &human] {
+        assert_eq!(
+            f.app.direct_status(f.app.human_owner(), id),
+            Ok(DirectStatus::Approved)
+        );
+    }
+    assert_eq!(
+        f.app.commit_approval(old_approval),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(records(&f)["lifecycle_epoch"], epoch);
+    assert!(!f.app.admission_closed());
+    let replacement = agent_pair(&f, "a", 53);
+    let history = f.app.history(f.app.human_owner(), None).unwrap();
+    for event in history
+        .iter()
+        .filter(|e| e.request_id == a_pending || e.request_id == a_approved)
+    {
+        assert_eq!(
+            event.requester,
+            super::history::RequesterSnapshot::Agent {
+                label: a.label.clone(),
+                fingerprint: a.fingerprint.clone()
+            }
+        );
+        assert_ne!(
+            event.requester,
+            super::history::RequesterSnapshot::Agent {
+                label: replacement.label.clone(),
+                fingerprint: replacement.fingerprint.clone()
+            }
+        );
+    }
+    let serialized = serde_json::to_string(&history).unwrap();
+    assert!(!serialized.contains("public_key"));
+    assert!(!serialized.contains("synthetic-password"));
+    // Existing human and unaffected agent execute normally after selective revoke.
+    for id in [&b_approved, &human] {
+        assert_eq!(
+            f.app.run_execution(
+                f.app.human_owner(),
+                id,
+                &ExecutionPreparation::default(),
+                &RecordingSupervisor::default()
+            ),
+            Ok(DirectStatus::Completed { exit_code: 0 })
+        );
+    }
+}
+#[test]
+fn agent_revocation_persists_across_restart_without_rewriting_old_owners() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 54);
+    let id = agent_pending(&f, &a);
+    f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+    let replacement = agent_pair(&f, "a", 55);
+    let new_id = agent_pending(&f, &replacement);
+    let before = f.app.history(f.app.human_owner(), None).unwrap();
+    let Fixture {
+        dir,
+        app,
+        monotonic,
+        wall,
+        on_wall_read,
+    } = f;
+    drop(app);
+    let app = ProviderApplication::new(
+        Provider::start(dir.path().join("provider")).unwrap(),
+        Box::new(Backend),
+        Box::new(Clock {
+            monotonic,
+            wall,
+            on_wall_read,
+        }),
+    )
+    .unwrap();
+    assert_eq!(
+        app.list_agents(app.human_owner()).unwrap(),
+        vec![
+            super::agent_binding::AgentBindingView {
+                status: super::agent_binding::AgentBindingStatus::Revoked,
+                ..a.clone()
+            },
+            replacement.clone()
+        ]
+    );
+    assert_eq!(
+        app.agent_status(&agent_snapshot(&a), a.uid, &[a.gid], &id),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        app.agent_status(
+            &agent_snapshot(&replacement),
+            replacement.uid,
+            &[replacement.gid],
+            &id
+        ),
+        Err(DirectRequestError::NotFound)
+    );
+    assert_eq!(
+        app.agent_status(
+            &agent_snapshot(&replacement),
+            replacement.uid,
+            &[replacement.gid],
+            &new_id
+        ),
+        Ok(DirectStatus::Expired)
+    );
+    for event in before {
+        assert!(
+            app.history(app.human_owner(), None)
+                .unwrap()
+                .contains(&event)
+        );
+    }
+}
+#[test]
+fn agent_pair_and_revoke_persistence_failures_close_admission_and_preserve_denial() {
+    use super::provider_store::WRITE_TEST_HOOK;
+    for operation in ["pair", "revoke"] {
+        for fail_stage in [0, 1] {
+            let f = fixture();
+            let a = agent_pair(&f, "a", 61);
+            let b = agent_pair(&f, "b", 62);
+            let b_id = agent_pending(&f, &b);
+            WRITE_TEST_HOOK
+                .with(|hook| *hook.borrow_mut() = Some(Box::new(move |stage| stage == fail_stage)));
+            let result = if operation == "revoke" {
+                f.app.revoke_agent(f.app.human_owner(), &a.id)
+            } else {
+                f.app.pair_agent(
+                    f.app.human_owner(),
+                    super::agent_binding::AgentPairing {
+                        label: "new".into(),
+                        public_key: super::encode_public_key(
+                            &ed25519_dalek::SigningKey::from_bytes(&[63; 32]).verifying_key(),
+                        ),
+                        uid: 41063,
+                        gid: 42063,
+                    },
+                )
+            };
+            WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+            assert_eq!(
+                result,
+                Err(DirectRequestError::Unavailable),
+                "{operation}/{fail_stage}"
+            );
+            assert!(f.app.admission_closed());
+            assert_eq!(
+                f.app
+                    .agent_status(&agent_snapshot(&b), b.uid, &[b.gid], &b_id),
+                Err(DirectRequestError::Unavailable)
+            );
+            let durable = records(&f);
+            assert_eq!(
+                durable["pairings"][0]["status"],
+                if operation == "revoke" && fail_stage == 1 {
+                    "revoked"
+                } else {
+                    "enabled"
+                }
+            );
+        }
+    }
+}
+#[test]
+fn agent_durable_read_failure_closes_otherwise_valid_poll_authority() {
+    use super::provider_store::READ_TEST_HOOK;
+    let f = fixture();
+    let a = agent_pair(&f, "a", 64);
+    let id = agent_pending(&f, &a);
+    READ_TEST_HOOK.with(|hook| *hook.borrow_mut() = Some(Box::new(|| true)));
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&a), a.uid, &[a.gid], &id),
+        Err(DirectRequestError::Unavailable)
+    );
+    READ_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+    assert!(f.app.admission_closed());
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&a), a.uid, &[a.gid], &id),
+        Err(DirectRequestError::Unavailable)
+    );
+}
+#[test]
+fn agent_running_revoke_and_retry_wait_for_confirmed_scoped_cleanup() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 71);
+    let b = agent_pair(&f, "b", 72);
+    let a_id = agent_approved(&f, &a);
+    let b_id = agent_approved(&f, &b);
+    let (a_started_tx, a_started_rx) = std::sync::mpsc::channel();
+    let (a_clean_tx, a_clean_rx) = std::sync::mpsc::channel();
+    let (a_revoked_tx, a_revoked_rx) = std::sync::mpsc::channel();
+    let (b_started_tx, b_started_rx) = std::sync::mpsc::channel();
+    let (b_clean_tx, b_clean_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a_id.clone();
+    let a_worker = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &ContainmentBarrier {
+                started: a_started_tx,
+                clean: Mutex::new(a_clean_rx),
+                evidence: CleanupEvidence::Reaped,
+                revoked: Some(a_revoked_tx),
+            },
+        )
+    });
+    a_started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let app = f.app.clone();
+    let id = b_id.clone();
+    let b_worker = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &ContainmentBarrier {
+                started: b_started_tx,
+                clean: Mutex::new(b_clean_rx),
+                evidence: CleanupEvidence::Reaped,
+                revoked: None,
+            },
+        )
+    });
+    b_started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        done_tx
+            .send(app.revoke_agent(app.human_owner(), &id))
+            .unwrap()
+    });
+    a_revoked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (retry_tx, retry_rx) = std::sync::mpsc::channel();
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a.id.clone();
+    let retry = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK
+            .with(|hook| *hook.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+        retry_tx
+            .send(app.revoke_agent(app.human_owner(), &id))
+            .unwrap();
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(done_rx.try_recv().is_err());
+    assert!(retry_rx.try_recv().is_err());
+    for id in [&a_id, &b_id] {
+        assert_eq!(
+            f.app.direct_status(f.app.human_owner(), id),
+            Ok(DirectStatus::Running)
+        );
+    }
+    a_clean_tx.send(()).unwrap();
+    assert_eq!(
+        a_worker.join().unwrap(),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert!(
+        done_rx
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            .is_ok()
+    );
+    assert!(
+        retry_rx
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            .is_ok()
+    );
+    revoke.join().unwrap();
+    retry.join().unwrap();
+    assert!(!f.app.admission_closed());
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &b_id),
+        Ok(DirectStatus::Running)
+    );
+    b_clean_tx.send(()).unwrap();
+    assert_eq!(
+        b_worker.join().unwrap(),
+        Ok(DirectStatus::Completed { exit_code: 0 })
+    );
+}
+#[test]
+fn agent_revocation_intent_fences_backend_continuation_before_gate_is_available() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 73);
+    let id = agent_approved(&f, &a);
+    let (resolving_tx, resolving_rx) = std::sync::mpsc::channel();
+    let (continue_tx, continue_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let execution_id = id.clone();
+    let worker = std::thread::spawn(move || {
+        RESOLUTION_ACTION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                resolving_tx.send(()).unwrap();
+                continue_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                Ok(vec![SensitiveString::new(
+                    "synthetic-agent-resolution".into(),
+                )])
+            }))
+        });
+        let supervisor = RecordingSupervisor::default();
+        let result = app.run_execution(
+            app.human_owner(),
+            &execution_id,
+            &ExecutionPreparation::default(),
+            &supervisor,
+        );
+        RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+        (result, supervisor.launches.get())
+    });
+    resolving_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let binding_id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK
+            .with(|hook| *hook.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+        app.revoke_agent(app.human_owner(), &binding_id)
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    continue_tx.send(()).unwrap();
+    assert_eq!(
+        worker.join().unwrap(),
+        (Err(DirectRequestError::Unavailable), 0)
+    );
+    assert!(revoke.join().unwrap().is_ok());
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Failed {
+            reason: DirectFailure::ExecutionUnavailable
+        })
+    );
+    assert!(!f.app.admission_closed());
+}
+
+#[test]
+fn agent_running_revoke_rejects_uncertain_and_impossible_not_started_cleanup() {
+    for evidence in [CleanupEvidence::Uncertain, CleanupEvidence::NotStarted] {
+        let f = fixture();
+        let a = agent_pair(&f, "a", 81);
+        let id = agent_approved(&f, &a);
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+        let (revoked_tx, revoked_rx) = std::sync::mpsc::channel();
+        let app = f.app.clone();
+        let execution_id = id.clone();
+        let worker = std::thread::spawn(move || {
+            app.run_execution(
+                app.human_owner(),
+                &execution_id,
+                &ExecutionPreparation::default(),
+                &ContainmentBarrier {
+                    started: started_tx,
+                    clean: Mutex::new(clean_rx),
+                    evidence,
+                    revoked: Some(revoked_tx),
+                },
+            )
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let app = f.app.clone();
+        let binding_id = a.id.clone();
+        let revoke = std::thread::spawn(move || app.revoke_agent(app.human_owner(), &binding_id));
+        revoked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        clean_tx.send(()).unwrap();
+        assert_eq!(worker.join().unwrap(), Err(DirectRequestError::Unavailable));
+        assert_eq!(revoke.join().unwrap(), Err(DirectRequestError::Unavailable));
+        assert_eq!(
+            f.app.revoke_agent(f.app.human_owner(), &a.id),
+            Err(DirectRequestError::Unavailable)
+        );
+        assert!(f.app.admission_closed());
+        assert_eq!(records(&f)["requests"][0]["status"], "running");
+    }
+}
+#[test]
+fn agent_revoke_before_final_release_never_starts_and_waits_for_unstarted_claim_cleanup() {
+    struct BeforeRelease {
+        entered: std::sync::mpsc::Sender<()>,
+        resume: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+    impl ProcessSupervisor<ExecutionPreparation> for BeforeRelease {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("unexpected test fixture path")
+        }
+        fn supervise_controlled(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            self.entered.send(()).unwrap();
+            self.resume
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap();
+            let mut released = false;
+            let result = control.release(&mut || {
+                released = true;
+                Ok(())
+            });
+            assert_eq!(result, Err(ExecutionError::Cancelled));
+            assert!(!released);
+            Supervision {
+                outcome: result.map(|_| ExecutionOutcome::ExitedZero),
+                cleanup: CleanupEvidence::NotStarted,
+                helper_reaped: false,
+            }
+        }
+    }
+    let f = fixture();
+    let a = agent_pair(&f, "a", 82);
+    let id = agent_approved(&f, &a);
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let execution_id = id.clone();
+    let worker = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &execution_id,
+            &ExecutionPreparation::default(),
+            &BeforeRelease {
+                entered: entered_tx,
+                resume: Mutex::new(resume_rx),
+            },
+        )
+    });
+    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let app = f.app.clone();
+    let binding_id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK
+            .with(|h| *h.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+        app.revoke_agent(app.human_owner(), &binding_id)
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Approved)
+    );
+    resume_tx.send(()).unwrap();
+    assert_eq!(worker.join().unwrap(), Err(DirectRequestError::Unavailable));
+    assert!(revoke.join().unwrap().is_ok());
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Failed {
+            reason: DirectFailure::ExecutionUnavailable
+        })
+    );
+    assert!(!f.app.admission_closed());
+}
+#[test]
+fn agent_revocation_during_admission_denies_before_persistence_without_harming_other_agent() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 83);
+    let b = agent_pair(&f, "b", 84);
+    let before = records(&f)["requests"].clone();
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    *f.on_wall_read.lock().unwrap() = Some(Box::new(move || {
+        entered_tx.send(()).unwrap();
+        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    }));
+    let app = f.app.clone();
+    let binding = a.clone();
+    let worker = std::thread::spawn(move || {
+        let launcher = Launcher::default();
+        let result =
+            app.submit_agent_for_test(&binding.id, binding.uid, &[binding.gid], input(), &launcher);
+        (result, launcher.calls.load(Ordering::SeqCst))
+    });
+    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK
+            .with(|h| *h.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+        app.revoke_agent(app.human_owner(), &id)
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    resume_tx.send(()).unwrap();
+    assert_eq!(
+        worker.join().unwrap(),
+        (Err(DirectRequestError::Unauthorized), 0)
+    );
+    assert!(revoke.join().unwrap().is_ok());
+    assert_eq!(records(&f)["requests"], before);
+    assert!(!f.app.admission_closed());
+    let id = agent_pending(&f, &b);
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&b), b.uid, &[b.gid], &id),
+        Ok(DirectStatus::Pending)
+    );
+}
+#[test]
+fn agent_request_seals_and_legacy_migration_cannot_rewrite_attribution() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 85);
+    let id = agent_pending(&f, &a);
+    let state = records(&f);
+    let original: DirectRecord =
+        serde_json::from_value(state["requests"][0]["direct"].clone()).unwrap();
+    for field in ["binding_id", "label", "fingerprint", "uid", "gid"] {
+        let mut changed = serde_json::to_value(&original).unwrap();
+        changed["agent_owner"][field] = if matches!(field, "uid" | "gid") {
+            serde_json::json!(99999)
+        } else {
+            serde_json::json!("changed")
+        };
+        assert!(
+            serde_json::from_value::<DirectRecord>(changed).map_or(true, |record| !record
+                .validate(&id, state["lifecycle_epoch"].as_u64().unwrap())),
+            "{field}"
+        );
+    }
+    let mut legacy = serde_json::to_value(&original).unwrap();
+    legacy.as_object_mut().unwrap().remove("history_version");
+    legacy["audit"] = serde_json::json!([]);
+    assert!(serde_json::from_value::<DirectRecord>(legacy).is_err());
+    let mut tampered = original.clone();
+    tampered.agent_owner.as_mut().unwrap().binding_id =
+        super::RequestId::new_random().unwrap().as_str().into();
+    tampered.seal();
+    refresh_fixture_history(&mut tampered);
+    assert!(tampered.validate(&id, state["lifecycle_epoch"].as_u64().unwrap()));
+    let mut invalid = state;
+    invalid["requests"][0]["direct"] = serde_json::to_value(tampered).unwrap();
+    std::fs::write(
+        f.dir.path().join("provider/provider-state.json"),
+        serde_json::to_vec(&invalid).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&a), a.uid, &[a.gid], &id),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert!(f.app.admission_closed());
+}
+
+#[test]
+fn agent_persistence_racing_revoke_serializes_admission_then_expires_exact_binding() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 86);
+    let b = agent_pair(&f, "b", 87);
+    let (writing_tx, writing_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let binding = a.clone();
+    let admission = std::thread::spawn(move || {
+        let mut fired = false;
+        super::provider_store::WRITE_TEST_HOOK.with(|h| {
+            *h.borrow_mut() = Some(Box::new(move |stage| {
+                if stage == 0 && !fired {
+                    fired = true;
+                    writing_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }
+                false
+            }))
+        });
+        let receipt = app.submit_agent_for_test(
+            &binding.id,
+            binding.uid,
+            &[binding.gid],
+            input(),
+            &Launcher::default(),
+        );
+        super::provider_store::WRITE_TEST_HOOK.with(|h| *h.borrow_mut() = None);
+        receipt
+    });
+    writing_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (attempt_tx, attempt_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        attempt_tx.send(()).unwrap();
+        app.revoke_agent(app.human_owner(), &id)
+    });
+    attempt_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    resume_tx.send(()).unwrap();
+    let receipt = admission.join().unwrap().unwrap();
+    assert!(revoke.join().unwrap().is_ok());
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &receipt.id),
+        Ok(DirectStatus::Expired)
+    );
+    assert!(!f.app.admission_closed());
+    let id = agent_approved(&f, &b);
+    assert_eq!(
+        f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &RecordingSupervisor::default()
+        ),
+        Ok(DirectStatus::Completed { exit_code: 0 })
+    );
+}
+#[test]
+fn agent_provider_administration_revalidates_human_independently_of_application() {
+    let f = fixture();
+    let a = agent_pair(&f, "a", 88);
+    let root = f.dir.path().join("provider");
+    drop(f.app);
+    let mut provider = Provider::start(&root).unwrap();
+    let wrong = AuthenticatedHuman::from_peer_uid(provider.owner_uid() + 1);
+    assert_eq!(
+        provider.list_agents(wrong),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        provider.revoke_agent(wrong, &a.id, 10),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        provider.pair_agent(
+            wrong,
+            super::agent_binding::AgentPairing {
+                label: "b".into(),
+                public_key: super::encode_public_key(
+                    &ed25519_dalek::SigningKey::from_bytes(&[89; 32]).verifying_key()
+                ),
+                uid: 41089,
+                gid: 42089
+            },
+            10
+        ),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        provider
+            .list_agents(AuthenticatedHuman::from_peer_uid(provider.owner_uid()))
+            .unwrap(),
+        vec![a]
+    );
+}
+
+#[test]
+fn agent_review_distinguishes_a_label_that_matches_human_presentation() {
+    let f = fixture();
+    let a = agent_pair(&f, "local human terminal", 90);
+    let id = agent_pending(&f, &a);
+    let review = f.app.review_direct(f.app.human_owner(), &id).unwrap();
+    assert_eq!(
+        review.requester,
+        format!("agent local human terminal ({})", a.fingerprint)
+    );
+    let event = f.app.history(f.app.human_owner(), None).unwrap().remove(0);
+    assert_eq!(
+        event.requester,
+        super::history::RequesterSnapshot::Agent {
+            label: a.label,
+            fingerprint: a.fingerprint
+        }
+    );
+}
+
+#[test]
+fn agent_same_label_and_os_replacement_retains_running_work_during_old_id_retry() {
+    let f = fixture();
+    let old = agent_pair(&f, "reused-label", 91);
+    let old_request = agent_pending(&f, &old);
+    f.app.revoke_agent(f.app.human_owner(), &old.id).unwrap();
+    let replacement = agent_pair(&f, "reused-label", 92);
+    assert_eq!(
+        (&old.label, old.uid, old.gid),
+        (&replacement.label, replacement.uid, replacement.gid)
+    );
+    assert_ne!(old.id, replacement.id);
+    assert_ne!(old.fingerprint, replacement.fingerprint);
+    let pending_id = agent_pending(&f, &replacement);
+    let running_id = agent_approved(&f, &replacement);
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&old), old.uid, &[old.gid], &old_request),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        f.app
+            .agent_status(&agent_snapshot(&old), old.uid, &[old.gid], &pending_id),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        f.app.agent_status(
+            &agent_snapshot(&replacement),
+            replacement.uid,
+            &[replacement.gid],
+            &old_request
+        ),
+        Err(DirectRequestError::NotFound)
+    );
+
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = running_id.clone();
+    let worker = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &ContainmentBarrier {
+                started: started_tx,
+                clean: Mutex::new(clean_rx),
+                evidence: CleanupEvidence::Reaped,
+                revoked: None,
+            },
+        )
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let before = records(&f);
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let old_id = old.id.clone();
+    let retry = std::thread::spawn(move || {
+        done_tx
+            .send(app.revoke_agent(app.human_owner(), &old_id))
+            .unwrap()
+    });
+    let result = done_rx.recv_timeout(Duration::from_secs(5));
+    // Always let the worker finish before checking a failed retry, so even a
+    // mutant targeting the replacement by UID/label leaves no blocked fixture.
+    let replacement_status = f.app.agent_status(
+        &agent_snapshot(&replacement),
+        replacement.uid,
+        &[replacement.gid],
+        &running_id,
+    );
+    clean_tx.send(()).unwrap();
+    let completion = worker.join().unwrap();
+    retry.join().unwrap();
+    assert_eq!(result.unwrap().unwrap().id, old.id);
+    assert_eq!(replacement_status, Ok(DirectStatus::Running));
+    assert_eq!(completion, Ok(DirectStatus::Completed { exit_code: 0 }));
+    assert_eq!(
+        f.app.agent_status(
+            &agent_snapshot(&replacement),
+            replacement.uid,
+            &[replacement.gid],
+            &pending_id
+        ),
+        Ok(DirectStatus::Pending)
+    );
+    let after = records(&f);
+    assert_eq!(after["agent_audit"], before["agent_audit"]);
+    assert_eq!(after["lifecycle_epoch"], before["lifecycle_epoch"]);
+    assert!(!f.app.admission_closed());
+}
+
+#[test]
+fn agent_warmed_authority_revalidates_actual_unsafe_storage_for_each_entrypoint() {
+    for shape in [
+        "root_mode",
+        "file_mode",
+        "state_symlink",
+        "invalid_public_key",
+    ] {
+        for entrypoint in ["list", "pair", "revoke", "poll"] {
+            let f = fixture();
+            let binding = agent_pair(&f, "existing", 93);
+            let id = agent_pending(&f, &binding);
+            let human = f.app.human_owner();
+            assert_eq!(f.app.list_agents(human).unwrap(), vec![binding.clone()]);
+            assert_eq!(
+                f.app
+                    .agent_status(&agent_snapshot(&binding), binding.uid, &[binding.gid], &id),
+                Ok(DirectStatus::Pending)
+            );
+            let root = f.dir.path().join("provider");
+            let path = root.join("provider-state.json");
+            let copy = root.join("state-copy.json");
+            match shape {
+                "root_mode" => {
+                    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o750)).unwrap()
+                }
+                "file_mode" => {
+                    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap()
+                }
+                "state_symlink" => {
+                    std::fs::rename(&path, &copy).unwrap();
+                    std::os::unix::fs::symlink(&copy, &path).unwrap();
+                }
+                "invalid_public_key" => {
+                    let mut state = records(&f);
+                    // The historical owner and audit still match every stored
+                    // identity field; only registry key validation can reject.
+                    state["pairings"][0]["public_key"] = "invalid-public-key-sentinel".into();
+                    std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+                }
+                _ => panic!("unexpected test fixture path"),
+            }
+            let before = std::fs::read(&path).unwrap();
+            let result = match entrypoint {
+                "list" => f.app.list_agents(human).map(|_| ()),
+                "pair" => f
+                    .app
+                    .pair_agent(
+                        human,
+                        super::agent_binding::AgentPairing {
+                            label: "fresh".into(),
+                            public_key: super::encode_public_key(
+                                &ed25519_dalek::SigningKey::from_bytes(&[94; 32]).verifying_key(),
+                            ),
+                            uid: binding.uid,
+                            gid: binding.gid,
+                        },
+                    )
+                    .map(|_| ()),
+                "revoke" => f.app.revoke_agent(human, &binding.id).map(|_| ()),
+                "poll" => f
+                    .app
+                    .agent_status(&agent_snapshot(&binding), binding.uid, &[binding.gid], &id)
+                    .map(|_| ()),
+                _ => panic!("unexpected test fixture path"),
+            };
+            let after = std::fs::read(&path).unwrap();
+            // Restore fixture shape for cleanup independently of the outcome.
+            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            if shape == "state_symlink" {
+                std::fs::remove_file(&path).unwrap();
+                std::fs::rename(&copy, &path).unwrap();
+            }
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            assert_eq!(
+                result,
+                Err(DirectRequestError::Unavailable),
+                "{shape}/{entrypoint}"
+            );
+            assert_eq!(after, before, "{shape}/{entrypoint}");
+            assert!(f.app.admission_closed(), "{shape}/{entrypoint}");
+        }
+    }
+}
+
+#[test]
+fn agent_cleanup_timeout_keeps_running_nonterminal_until_confirmed_reaping() {
+    struct HeldCleanup {
+        started: std::sync::mpsc::Sender<()>,
+        finish: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+    impl ProcessSupervisor<ExecutionPreparation> for HeldCleanup {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("unexpected test fixture path")
+        }
+        fn supervise_controlled(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            control.release(&mut || Ok(())).unwrap();
+            control.started().unwrap();
+            self.started.send(()).unwrap();
+            self.finish
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(60))
+                .unwrap();
+            assert!(!control.live());
+            Supervision {
+                outcome: Err(ExecutionError::Cancelled),
+                cleanup: CleanupEvidence::Reaped,
+                helper_reaped: true,
+            }
+        }
+    }
+    let f = fixture();
+    let binding = agent_pair(&f, "cleanup-timeout", 95);
+    let id = agent_approved(&f, &binding);
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (finish_tx, finish_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let request = id.clone();
+    let worker = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &request,
+            &ExecutionPreparation::default(),
+            &HeldCleanup {
+                started: started_tx,
+                finish: Mutex::new(finish_rx),
+            },
+        )
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    // Hold cleanup beyond the real bounded wait; no timer guess releases it.
+    let result = f.app.revoke_agent(f.app.human_owner(), &binding.id);
+    let during = records(&f);
+    let closed = f.app.admission_closed();
+    finish_tx.send(()).unwrap();
+    let completion = worker.join().unwrap();
+    assert_eq!(result, Err(DirectRequestError::Unavailable));
+    assert!(closed);
+    assert_eq!(during["pairings"][0]["status"], "revoked");
+    assert_eq!(during["requests"][0]["status"], "running");
+    assert_eq!(completion, Err(DirectRequestError::Unavailable));
+    assert_eq!(records(&f)["requests"][0]["status"], "failed");
+}
+
+#[test]
+fn agent_provider_rechecks_revocation_without_application_tokens() {
+    let f = fixture();
+    let binding = agent_pair(&f, "provider-boundary", 96);
+    let root = f.dir.path().join("provider");
+    drop(f.app);
+    let mut provider = Provider::start(&root).unwrap();
+    let human = AuthenticatedHuman::from_peer_uid(provider.owner_uid());
+    let owner = provider
+        .agent_binding_for_peer(&binding.id, binding.uid, &[binding.gid])
+        .unwrap();
+    let now = 1_700_000_000;
+    let review = provider
+        .create_agent_for_test(owner.clone(), input(), now, now + 60, || true)
+        .unwrap();
+    let approval = provider.prepare_direct(human, &review.id).unwrap();
+    assert_eq!(
+        provider.decide_direct(&approval, true, now, || true),
+        Ok(DirectStatus::Approved)
+    );
+    let claim = provider
+        .claim_execution(human, &review.id, || true)
+        .unwrap();
+    assert_eq!(provider.execution_matches(&claim), Ok(true));
+    assert!(provider.approved_execution(human, &review.id).is_ok());
+    provider.revoke_agent(human, &binding.id, now + 1).unwrap();
+    // Claimed authority remains nonterminal for cleanup, so status invalidation
+    // cannot mask the independent current-binding checks.
+    assert_eq!(
+        provider.direct_review(human, &review.id).unwrap().status,
+        DirectStatus::Approved
+    );
+    assert_eq!(provider.execution_matches(&claim), Ok(false));
+    assert!(matches!(
+        provider.approved_execution(human, &review.id),
+        Err(DirectRequestError::Unauthorized)
+    ));
+    assert!(matches!(
+        provider.create_agent_for_test(owner, input(), now + 1, now + 61, || true),
+        Err(DirectRequestError::Unauthorized)
+    ));
+}
+
+#[test]
+fn agent_revoke_targets_requested_id_when_another_binding_precedes_it() {
+    let f = fixture();
+    let first = agent_pair(&f, "first", 97);
+    let second = agent_pair(&f, "second", 98);
+    let first_request = agent_pending(&f, &first);
+    let second_request = agent_pending(&f, &second);
+    let revoked = f.app.revoke_agent(f.app.human_owner(), &second.id).unwrap();
+    assert_eq!(revoked.id, second.id);
+    assert_eq!(
+        revoked.status,
+        super::agent_binding::AgentBindingStatus::Revoked
+    );
+    assert_eq!(
+        f.app.list_agents(f.app.human_owner()).unwrap(),
+        vec![first.clone(), revoked.clone()]
+    );
+    assert_eq!(
+        f.app.agent_status(
+            &agent_snapshot(&first),
+            first.uid,
+            &[first.gid],
+            &first_request
+        ),
+        Ok(DirectStatus::Pending)
+    );
+    assert_eq!(
+        f.app.agent_status(
+            &agent_snapshot(&second),
+            second.uid,
+            &[second.gid],
+            &second_request
+        ),
+        Err(DirectRequestError::Unauthorized)
+    );
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &second_request),
+        Ok(DirectStatus::Expired)
+    );
+    assert_eq!(
+        f.app.revoke_agent(f.app.human_owner(), &second.id).unwrap(),
+        revoked
+    );
+    let root = f.dir.path().join("provider");
+    drop(f.app);
+    let provider = Provider::start(root).unwrap();
+    let human = AuthenticatedHuman::from_peer_uid(provider.owner_uid());
+    assert_eq!(
+        provider.list_agents(human).unwrap(),
+        vec![first.clone(), revoked]
+    );
+    assert!(
+        provider
+            .agent_binding_for_peer(&first.id, first.uid, &[first.gid])
+            .is_ok()
+    );
+    assert_eq!(
+        provider.agent_binding_for_peer(&second.id, second.uid, &[second.gid]),
+        Err(DirectRequestError::Unauthorized)
+    );
+}
+
+#[test]
+fn agent_request_preparation_rejects_published_intent_before_durable_revoke() {
+    let f = fixture();
+    let a = agent_pair(&f, "revoking", 99);
+    let b = agent_pair(&f, "unaffected", 100);
+    let a_request = agent_pending(&f, &a);
+    let b_request = agent_pending(&f, &b);
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK.with(|h| {
+            *h.borrow_mut() = Some(Box::new(move || {
+                intent_tx.send(()).unwrap();
+                resume_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            }))
+        });
+        app.revoke_agent(app.human_owner(), &id)
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    // The published intent is the only revoked state at this point. The hook
+    // prevents durable invalidation from masking the request-token check.
+    let durable_status = records(&f)["pairings"][0]["status"].clone();
+    let denied = f.app.prepare_approval(f.app.human_owner(), &a_request);
+    let unaffected = f.app.prepare_approval(f.app.human_owner(), &b_request);
+    resume_tx.send(()).unwrap();
+    let revoked = revoke.join().unwrap();
+    assert_eq!(durable_status, "enabled");
+    assert!(matches!(denied, Err(DirectRequestError::Unauthorized)));
+    assert!(unaffected.is_ok());
+    assert!(revoked.is_ok());
+    assert!(!f.app.admission_closed());
 }

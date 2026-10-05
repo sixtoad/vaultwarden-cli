@@ -99,6 +99,154 @@ impl Provider {
     pub(crate) fn owner_uid(&self) -> u32 {
         self.store.owner_uid()
     }
+    fn check_administrator(
+        &self,
+        human: super::direct_request::AuthenticatedHuman,
+    ) -> Result<(), super::direct_request::DirectRequestError> {
+        if human.uid() != self.owner_uid() {
+            return Err(super::direct_request::DirectRequestError::Unauthorized);
+        }
+        Ok(())
+    }
+    pub(crate) fn list_agents(
+        &self,
+        human: super::direct_request::AuthenticatedHuman,
+    ) -> Result<
+        Vec<super::agent_binding::AgentBindingView>,
+        super::direct_request::DirectRequestError,
+    > {
+        self.check_administrator(human)?;
+        Ok(self
+            .store
+            .read_state()?
+            .pairings
+            .iter()
+            .map(|b| b.view())
+            .collect())
+    }
+    pub(crate) fn pair_agent(
+        &mut self,
+        human: super::direct_request::AuthenticatedHuman,
+        input: super::agent_binding::AgentPairing,
+        now: u64,
+    ) -> Result<super::agent_binding::AgentBindingView, super::direct_request::DirectRequestError>
+    {
+        use super::{agent_binding::*, direct_request::DirectRequestError};
+        self.check_administrator(human)?;
+        let binding = AgentBinding::new(input, self.owner_uid())
+            .map_err(|_error| DirectRequestError::InvalidRequest)?;
+        let mut state = self.store.read_state()?;
+        if state.pairings.iter().any(|b| {
+            b.public_key == binding.public_key
+                || (b.status == AgentBindingStatus::Enabled && b.label == binding.label)
+        }) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        let view = binding.view();
+        state
+            .agent_audit
+            .push(binding.audit(human.uid(), now, AgentAuditAction::Paired));
+        state.pairings.push(binding);
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(view)
+    }
+    pub(crate) fn revoke_agent(
+        &mut self,
+        human: super::direct_request::AuthenticatedHuman,
+        id: &str,
+        now: u64,
+    ) -> Result<super::agent_binding::AgentBindingView, super::direct_request::DirectRequestError>
+    {
+        use super::{agent_binding::*, direct_request::*};
+        self.check_administrator(human)?;
+        let mut state = self.store.read_state()?;
+        let binding = state
+            .pairings
+            .iter_mut()
+            .find(|b| b.id == id)
+            .ok_or(DirectRequestError::NotFound)?;
+        let changed = binding.status == AgentBindingStatus::Enabled;
+        if changed {
+            binding.status = AgentBindingStatus::Revoked;
+            state
+                .agent_audit
+                .push(binding.audit(human.uid(), now, AgentAuditAction::Revoked));
+        }
+        let view = binding.view();
+        if changed {
+            for request in &mut state.requests {
+                if request.direct.as_ref().is_some_and(|d| {
+                    !d.execution_claimed
+                        && d.agent_owner.as_ref().is_some_and(|a| a.binding_id == id)
+                        && matches!(
+                            d.review.status,
+                            DirectStatus::Pending | DirectStatus::Approved
+                        )
+                }) {
+                    request.transition(DirectStatus::Expired, DecisionOutcome::Invalidated, now)?;
+                }
+            }
+            self.store.write_state(&state)?;
+        }
+        self.state = state;
+        Ok(view)
+    }
+    /// OS-bound lookup is a prerequisite only; it never authenticates a signature.
+    #[allow(dead_code)] // Shared with the later signed transport.
+    pub(crate) fn agent_binding_for_peer(
+        &self,
+        id: &str,
+        uid: u32,
+        groups: &[u32],
+    ) -> Result<super::direct_request::AgentOwner, super::direct_request::DirectRequestError> {
+        use super::direct_request::*;
+        self.store
+            .read_state()?
+            .pairings
+            .iter()
+            .find(|b| b.id == id && b.matches_os(uid, groups))
+            .map(AgentOwner::from_binding)
+            .ok_or(DirectRequestError::Unauthorized)
+    }
+    fn agent_current(
+        state: &ProviderState,
+        owner: &Option<super::direct_request::AgentOwner>,
+    ) -> bool {
+        owner.as_ref().is_none_or(|owner| {
+            state.pairings.iter().any(|b| {
+                owner.matches(b) && b.status == super::agent_binding::AgentBindingStatus::Enabled
+            })
+        })
+    }
+    /// Exact immutable ownership, distinct from human administration authority.
+    #[allow(dead_code)] // The polling transport will supply authenticated OS/signature evidence.
+    pub(crate) fn agent_status(
+        &self,
+        owner: &super::direct_request::AgentOwner,
+        uid: u32,
+        groups: &[u32],
+        id: &str,
+    ) -> Result<super::direct_request::DirectStatus, super::direct_request::DirectRequestError>
+    {
+        use super::direct_request::*;
+        let state = self.store.read_state()?;
+        if !state
+            .pairings
+            .iter()
+            .any(|b| owner.matches(b) && b.matches_os(uid, groups))
+        {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        state
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .filter(|d| d.agent_owner.as_ref() == Some(owner))
+            .map(|d| d.review.status.clone())
+            .ok_or(DirectRequestError::NotFound)
+    }
     pub(crate) fn history(
         &self,
         owner: super::direct_request::AuthenticatedHuman,
@@ -114,7 +262,7 @@ impl Provider {
                 .requests
                 .into_iter()
                 .filter_map(|r| r.direct)
-                .filter(|d| d.owner_uid == owner.uid())
+                .filter(|d| d.human_visible(owner, self.owner_uid()))
                 .flat_map(|d| d.audit)
                 .collect(),
             limit,
@@ -123,6 +271,37 @@ impl Provider {
     pub(crate) fn create_direct(
         &mut self,
         owner: super::direct_request::AuthenticatedHuman,
+        input: super::direct_request::DirectSubmission,
+        now: u64,
+        expires: u64,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
+    {
+        self.create_owned(owner.uid(), None, input, now, expires, still_authorized)
+    }
+    #[cfg(test)]
+    pub(crate) fn create_agent_for_test(
+        &mut self,
+        owner: super::direct_request::AgentOwner,
+        input: super::direct_request::DirectSubmission,
+        now: u64,
+        expires: u64,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
+    {
+        self.create_owned(
+            owner.uid,
+            Some(owner),
+            input,
+            now,
+            expires,
+            still_authorized,
+        )
+    }
+    fn create_owned(
+        &mut self,
+        uid: u32,
+        agent_owner: Option<super::direct_request::AgentOwner>,
         input: super::direct_request::DirectSubmission,
         now: u64,
         expires: u64,
@@ -138,7 +317,11 @@ impl Provider {
         {
             return Err(DirectRequestError::InvalidRequest);
         }
+        let is_agent = agent_owner.is_some();
         let mut state = self.store.read_state()?;
+        if !Self::agent_current(&state, &agent_owner) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         let policy = state
             .operations
             .iter()
@@ -161,9 +344,13 @@ impl Provider {
             .map_err(|_error| DirectRequestError::Unavailable)?
             .as_str()
             .to_owned();
-        let review = policy.direct_review(id.clone(), args, expires);
+        let mut review = policy.direct_review(id.clone(), args, expires);
+        if let Some(owner) = &agent_owner {
+            review.requester = owner.review_requester();
+        }
         let mut direct = DirectRecord {
-            owner_uid: owner.uid(),
+            owner_uid: uid,
+            agent_owner,
             created_at_unix_seconds: now,
             lifecycle_epoch: state.lifecycle_epoch,
             review: review.clone(),
@@ -186,7 +373,11 @@ impl Provider {
             status: super::provider_store::RequestLifecycleStatus::Pending,
             direct: Some(direct),
         });
-        self.store.write_state(&state)?;
+        if is_agent {
+            self.store.write_state_guarded(&state, still_authorized)?;
+        } else {
+            self.store.write_state(&state)?;
+        }
         self.state = state;
         Ok(review)
     }
@@ -243,7 +434,7 @@ impl Provider {
             .iter()
             .find(|r| r.id == id)
             .and_then(|r| r.direct.as_ref())
-            .filter(|d| d.owner_uid == owner.uid())
+            .filter(|d| d.human_visible(owner, self.owner_uid()))
             .map(|d| d.review.clone())
             .ok_or(DirectRequestError::NotFound)
     }
@@ -279,8 +470,11 @@ impl Provider {
             .iter()
             .find(|r| r.id == id)
             .and_then(|r| r.direct.as_ref())
-            .filter(|d| d.owner_uid == owner.uid())
+            .filter(|d| d.human_visible(owner, self.owner_uid()))
             .ok_or(DirectRequestError::NotFound)?;
+        if !Self::agent_current(&state, &direct.agent_owner) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         if direct.review.status != DirectStatus::Pending {
             return Err(DirectRequestError::AlreadyDecided);
         }
@@ -322,8 +516,11 @@ impl Provider {
             .iter()
             .find(|r| r.id == id)
             .and_then(|r| r.direct.as_ref())
-            .filter(|d| d.owner_uid == owner.uid())
+            .filter(|d| d.human_visible(owner, self.owner_uid()))
             .ok_or(DirectRequestError::NotFound)?;
+        if !Self::agent_current(&state, &direct.agent_owner) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         if direct.review.status != DirectStatus::Approved {
             return Err(DirectRequestError::AlreadyDecided);
         }
@@ -351,6 +548,7 @@ impl Provider {
             direct.review.expires_at_unix_seconds,
         );
         expected.status = DirectStatus::Approved;
+        expected.requester = direct.review.requester.clone();
         if arguments != direct.review.arguments || expected != direct.review {
             return Err(DirectRequestError::InvalidRequest);
         }
@@ -377,7 +575,7 @@ impl Provider {
         let direct = request
             .direct
             .as_ref()
-            .filter(|direct| direct.owner_uid == owner.uid())
+            .filter(|direct| direct.human_visible(owner, self.owner_uid()))
             .ok_or(DirectRequestError::NotFound)?;
         if direct.review.status != DirectStatus::Approved || direct.execution_claimed {
             return Err(DirectRequestError::AlreadyDecided);
@@ -403,6 +601,15 @@ impl Provider {
         use super::direct_request::*;
         let mut state = self.store.read_state()?;
         let lifecycle_epoch = state.lifecycle_epoch;
+        let owner_snapshot = state
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .and_then(|d| d.agent_owner.clone());
+        if !Self::agent_current(&state, &owner_snapshot) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         let request = state
             .requests
             .iter_mut()
@@ -412,7 +619,7 @@ impl Provider {
         let direct = request
             .direct
             .as_mut()
-            .filter(|direct| direct.owner_uid == owner.uid())
+            .filter(|direct| direct.human_visible(owner, self.owner_uid()))
             .ok_or(DirectRequestError::NotFound)?;
         if request_status != super::provider_store::RequestLifecycleStatus::Approved
             || direct.review.status != DirectStatus::Approved
@@ -435,7 +642,8 @@ impl Provider {
         binding: &super::direct_request::ApprovalBinding,
     ) -> Result<bool, super::direct_request::DirectRequestError> {
         let state = self.store.read_state()?;
-        Ok(state.lifecycle_epoch == binding.lifecycle_epoch
+        Ok(Self::agent_current(&state, &binding.agent_owner)
+            && state.lifecycle_epoch == binding.lifecycle_epoch
             && state
                 .operations
                 .iter()
@@ -515,6 +723,7 @@ impl Provider {
                 direct.review.status,
                 DirectStatus::Approved | DirectStatus::Running
             )
+            || (direct.review.status == DirectStatus::Running && cleanup != CleanupEvidence::Reaped)
             || (matches!(status, DirectStatus::Completed { .. })
                 && (cleanup != CleanupEvidence::Reaped
                     || direct.review.status != DirectStatus::Running))
@@ -541,7 +750,11 @@ impl Provider {
         binding: &super::direct_request::ApprovalBinding,
     ) -> Result<OperationPolicy, super::direct_request::DirectRequestError> {
         use super::direct_request::*;
-        let owner = AuthenticatedHuman::from_peer_uid(binding.requester_uid);
+        let owner = AuthenticatedHuman::from_peer_uid(if binding.agent_owner.is_some() {
+            self.owner_uid()
+        } else {
+            binding.requester_uid
+        });
         if self.prepare_direct(owner, &binding.request_id)? != *binding {
             return Err(DirectRequestError::InvalidRequest);
         }
@@ -562,7 +775,11 @@ impl Provider {
     {
         use super::direct_request::*;
         if self.prepare_direct(
-            AuthenticatedHuman::from_peer_uid(binding.requester_uid),
+            AuthenticatedHuman::from_peer_uid(if binding.agent_owner.is_some() {
+                self.owner_uid()
+            } else {
+                binding.requester_uid
+            }),
             &binding.request_id,
         )? != *binding
         {

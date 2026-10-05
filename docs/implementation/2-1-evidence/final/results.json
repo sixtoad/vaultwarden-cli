@@ -1,0 +1,99 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 3.03
+  },
+  {
+    "name": "all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 286.14
+  },
+  {
+    "name": "agents",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "agent_"
+    ],
+    "exit": 0,
+    "seconds": 21.5
+  },
+  {
+    "name": "persistence",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "provider_store::"
+    ],
+    "exit": 0,
+    "seconds": 1.17
+  },
+  {
+    "name": "human-integrations",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "human_cli",
+      "--test",
+      "direct_request",
+      "--test",
+      "provider_session"
+    ],
+    "exit": 0,
+    "seconds": 8.9
+  },
+  {
+    "name": "real-systemd",
+    "command": [
+      "scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 0,
+    "seconds": 87.61
+  },
+  {
+    "name": "build-human-cli",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--bin",
+      "vw-access"
+    ],
+    "exit": 0,
+    "seconds": 3.53
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 1,
+    "seconds": 35.53
+  }
+]

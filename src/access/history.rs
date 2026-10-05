@@ -101,9 +101,15 @@ impl HistoryEvent {
             version: HISTORY_VERSION,
             request_id: record.review.id.clone(),
             operation: record.review.operation.clone(),
-            requester: RequesterSnapshot::Human {
-                uid: record.owner_uid,
-                label: record.review.requester.clone(),
+            requester: match record.owner() {
+                super::direct_request::RequestOwner::Human(uid) => RequesterSnapshot::Human {
+                    uid,
+                    label: record.review.requester.clone(),
+                },
+                super::direct_request::RequestOwner::Agent(owner) => RequesterSnapshot::Agent {
+                    label: owner.label,
+                    fingerprint: owner.fingerprint,
+                },
             },
             policy_revision: record.review.policy_digest.clone(),
             credentials: record.review.credentials.clone(),

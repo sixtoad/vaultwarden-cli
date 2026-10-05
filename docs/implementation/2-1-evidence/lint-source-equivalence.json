@@ -1,0 +1,20 @@
+[
+  {
+    "path": "src/access/agent_binding.rs",
+    "mutation_source_sha256": "ba1f1bcafc52a220d8e1fe945cc42f954ad3cf5141bb9b643b087242d98ef1aa",
+    "final_source_sha256": "0cecf544c410596b6ffd272e9b7b1364025352917a4e34d1f71949db846a8006",
+    "equivalence": "Identical after whitespace normalization and renaming ignored map_err parameter to _error"
+  },
+  {
+    "path": "src/access/application.rs",
+    "mutation_source_sha256": "6c68750cb6234121bcc3fe4490e7f81f53497280cc0f4080d1f7b460b16aa395",
+    "final_source_sha256": "eae6afc390d6ab8ebad530148bea907efa8115d12e5ef350fbca552929c821b7",
+    "equivalence": "Identical after whitespace normalization and renaming ignored map_err parameter to _error"
+  },
+  {
+    "path": "src/access/provider.rs",
+    "mutation_source_sha256": "24a2de5be736cd4fb82b44a9d5d3b1f5f9edf94493031ef0b0c627222932f655",
+    "final_source_sha256": "2482df6381463b98d26b1f85f11da1e5feb7ca9fd93261c4fb9b7124ea8368e5",
+    "equivalence": "Identical after whitespace normalization and renaming ignored map_err parameter to _error"
+  }
+]

@@ -13,13 +13,14 @@ use std::os::unix::{
 };
 use std::path::{Path, PathBuf};
 
+use super::agent_binding::{AgentAuditEvent, AgentBinding, validate_registry};
 use super::policy::{ApprovedImage, OperationPolicy};
 use super::provider::{ProviderDiagnostic, ProviderError};
 
 const STATE_FILE: &str = "provider-state.json";
 const LOCK_FILE: &str = ".provider-state.lock";
 const TEMP_FILE: &str = ".provider-state.json.new";
-const STATE_SCHEMA_VERSION: u8 = 1;
+const STATE_SCHEMA_VERSION: u8 = 2;
 const PRIVATE_DIR_MODE: u32 = 0o700;
 const PRIVATE_FILE_MODE: u32 = 0o600;
 #[cfg(test)]
@@ -42,15 +43,54 @@ fn write_test_failure(stage: u8) -> bool {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "StoredProviderState")]
 pub(crate) struct ProviderState {
     pub(crate) schema_version: u8,
     pub(crate) lifecycle_epoch: u64,
-    pub(crate) pairings: Vec<String>,
+    pub(crate) pairings: Vec<AgentBinding>,
+    pub(crate) agent_audit: Vec<AgentAuditEvent>,
     #[serde(default)]
     pub(crate) approved_images: Vec<ApprovedImage>,
     pub(crate) operations: Vec<OperationPolicy>,
     pub(crate) requests: Vec<RequestRecord>,
+}
+
+// Only schema 1 with no pairings can acquire the new representation. Decode
+// directly into a closed struct to retain duplicate-field rejection.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredProviderState {
+    schema_version: u8,
+    lifecycle_epoch: u64,
+    pairings: Vec<AgentBinding>,
+    agent_audit: Option<Vec<AgentAuditEvent>>,
+    #[serde(default)]
+    approved_images: Vec<ApprovedImage>,
+    operations: Vec<OperationPolicy>,
+    requests: Vec<RequestRecord>,
+}
+
+impl TryFrom<StoredProviderState> for ProviderState {
+    type Error = ProviderError;
+
+    fn try_from(raw: StoredProviderState) -> Result<Self, Self::Error> {
+        let agent_audit = match raw.schema_version {
+            1 if raw.pairings.is_empty() && raw.agent_audit.is_none() => Vec::new(),
+            STATE_SCHEMA_VERSION => raw
+                .agent_audit
+                .ok_or_else(|| error(ProviderDiagnostic::InvalidState))?,
+            _ => return Err(error(ProviderDiagnostic::InvalidState)),
+        };
+        Ok(Self {
+            schema_version: STATE_SCHEMA_VERSION,
+            lifecycle_epoch: raw.lifecycle_epoch,
+            pairings: raw.pairings,
+            agent_audit,
+            approved_images: raw.approved_images,
+            operations: raw.operations,
+            requests: raw.requests,
+        })
+    }
 }
 
 impl ProviderState {
@@ -59,15 +99,20 @@ impl ProviderState {
             schema_version: STATE_SCHEMA_VERSION,
             lifecycle_epoch: 0,
             pairings: Vec::new(),
+            agent_audit: Vec::new(),
             approved_images: Vec::new(),
             operations: Vec::new(),
             requests: Vec::new(),
         }
     }
     pub(crate) fn validate(&self) -> Result<(), ProviderError> {
+        self.validate_for_owner(current_uid())
+    }
+    fn validate_for_owner(&self, owner_uid: u32) -> Result<(), ProviderError> {
         if self.schema_version != STATE_SCHEMA_VERSION {
             return Err(error(ProviderDiagnostic::InvalidState));
         }
+        validate_registry(&self.pairings, &self.agent_audit, owner_uid)?;
         let mut image_ids: Vec<&str> = self.approved_images.iter().map(ApprovedImage::id).collect();
         image_ids.sort_unstable();
         if image_ids.windows(2).any(|pair| pair[0] == pair[1]) {
@@ -119,6 +164,11 @@ impl ProviderState {
                         )
                         | (RequestLifecycleStatus::Failed, DirectStatus::Failed { .. })
                 );
+                if direct.agent_owner.as_ref().is_some_and(|owner| {
+                    !self.pairings.iter().any(|binding| owner.matches(binding))
+                }) {
+                    return Err(error(ProviderDiagnostic::InvalidState));
+                }
                 if !consistent
                     || !direct.validate(&request.id, self.lifecycle_epoch)
                     || (request.status.is_unexecuted()
@@ -271,7 +321,7 @@ impl ProviderStore {
         }
         let state: ProviderState =
             serde_json::from_str(&raw).map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
-        state.validate()?;
+        state.validate_for_owner(self.owner_uid)?;
         Ok(state)
     }
     pub(crate) fn write_state(&mut self, state: &ProviderState) -> Result<(), ProviderError> {
@@ -283,7 +333,7 @@ impl ProviderStore {
         still_authorized: impl Fn() -> bool,
     ) -> Result<(), ProviderError> {
         self.ensure_healthy()?;
-        state.validate()?;
+        state.validate_for_owner(self.owner_uid)?;
         validate_layout(&self.root, self.owner_uid)?;
         let encoded = serde_json::to_vec(state)
             .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;

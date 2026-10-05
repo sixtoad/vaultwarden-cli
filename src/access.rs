@@ -13,6 +13,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod agent_binding;
+#[cfg(test)]
+mod agent_binding_tests;
 pub mod application;
 pub mod direct_request;
 #[cfg(test)]
@@ -221,7 +224,14 @@ pub fn decode_public_key(encoded: &str) -> Result<VerifyingKey> {
     let key_bytes: [u8; 32] = bytes
         .try_into()
         .map_err(|_error| anyhow::anyhow!("agent public key must be 32 bytes"))?;
-    VerifyingKey::from_bytes(&key_bytes).context("agent public key is invalid")
+    let key = VerifyingKey::from_bytes(&key_bytes).context("agent public key is invalid")?;
+    if key.is_weak()
+        || key.to_edwards().compress().to_bytes() != key_bytes
+        || encode_public_key(&key) != encoded
+    {
+        bail!("agent public key is invalid")
+    }
+    Ok(key)
 }
 
 /// The only terminal outcomes an agent may observe. The approved variant does

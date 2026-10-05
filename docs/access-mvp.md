@@ -7,7 +7,8 @@ memory and keyring and is not a supported secret boundary. The existing direct
 
 Stories 1.1–1.9 provide private state, constrained operation policy, a protected
 provider session, authenticated one-time browser decisions and immutable executable
-preparation, login-backed execution, descendant containment and redacted history. Agent transport
+preparation, login-backed execution, descendant containment and redacted history.
+Story 2.1 adds durable restricted-agent pairing and selective revocation. Agent transport
 and platform/WebAuthn authentication
 are later stories.
 The provider has no agent-facing item lookup, secret export or password command.
@@ -235,6 +236,47 @@ proof, backend values, argument values or raw errors. The public status remains 
 Legacy schema-v1 `{id,status}` records remain readable by the store but carry no
 human ownership and cannot be queried or reviewed as direct requests.
 
+## Restricted agent identities (Story 2.1)
+
+Run these commands from the provider's human OS account, using the same
+`--state-root` or `VAULTWARDEN_ACCESS_STATE_ROOT` as other human commands:
+
+```sh
+vw-access agent pair builder --public-key <base64url-public-key> --uid 42001 --gid 42003
+vw-access agent list
+vw-access agent revoke <binding-id>
+```
+
+All three commands use the private, kernel-authenticated `human.sock` and work
+while the vault is locked. Pairing does not unlock the vault or approve work.
+The public key must be canonical unpadded base64url encoding of a valid,
+non-weak 32-byte Ed25519 verification key. Never supply a private key. Labels
+are bounded printable ASCII (1–128 bytes). Numeric UID/GID values exclude zero
+and `4294967295`; the UID must differ from the provider's UID. No OS account
+lookup or account creation occurs. Future agent admission requires the exact
+UID and membership in the configured primary or supplementary GID, together
+with verified signed transport proof; a key alone grants no access.
+
+Pair/list/revoke responses expose only immutable binding ID, label, SHA-256
+public-key fingerprint, UID, GID and enabled/revoked status. Public verification
+bytes remain in private durable storage; views and administrative audit omit
+keys. Pairing and revocation record the human actor and identity metadata in a
+separate closed audit record. There are no default agents. Enabled labels are
+unique, and every previously paired key stays reserved after revocation. To
+reuse a revoked label, pair a fresh key; this creates a fresh immutable ID.
+
+Revoke uses that ID rather than the label. Retrying an old ID cannot revoke a
+replacement with the same label. Revocation denies further authority, expires
+the binding's unclaimed work and cancels its claimed/running executions. A
+successful response waits for confirmed affected-process cleanup; repeats also
+wait for outstanding cleanup. Other agents and human work retain authority
+after a successful scoped revoke. Uncertain persistence or containment closes
+admission and returns a failure rather than claiming cleanup succeeded. The
+client allows 30 seconds for a revocation response; transport failure is not
+proof of success, so retry the same immutable ID. Bindings and tombstones
+survive restart, and historical requester snapshots retain their original
+identity. Agent request and polling transports remain later stories.
+
 ## Redacted operation history (Story 1.9)
 
 Run `vw-access history` or `vw-access history --limit 200` from the human desktop
@@ -255,8 +297,9 @@ recovery have distinct outcomes. Confirmed cleanup and reaping still precede
 terminal execution records. Historical labels never join the current policy.
 No argument values, targets, environment mappings, backend item IDs, secrets,
 process streams, sessions, browser/launch capabilities or reusable approval
-material enter history. Agent attribution is reserved for future agent support;
-no agent history or discovery endpoint is provided.
+material enter history. Agent work records immutable requester label/fingerprint
+snapshots; revocation and re-pairing cannot rewrite earlier attribution. No
+agent-facing history or discovery endpoint is provided.
 
 Events sort newest first by event timestamp, then request ID, then per-request
 ordinal, all descending. Supported legacy records migrate atomically into the

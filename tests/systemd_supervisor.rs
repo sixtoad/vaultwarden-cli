@@ -315,6 +315,7 @@ fn independent_descendants_provider_crash_and_recovery() {
         "app-lock",
         "app-cancel",
         "app-revoke",
+        "app-agent-revoke",
         "app-shutdown",
         "app-deadline",
         "app-persistence",
@@ -382,7 +383,26 @@ fn independent_descendants_provider_crash_and_recovery() {
         let mut cleanup = Cleanup::new(root.path(), &unit);
         start(root.path(), &unit, mode);
         eprintln!("real-manager scenario: {mode}; provider: {unit}");
-        if mode.starts_with("app-")
+        if mode == "app-agent-revoke" {
+            until(root.path(), || root.path().join("agent-revoked").exists());
+            let scoped: Vec<Identity> = serde_json::from_slice(
+                &std::fs::read(root.path().join("scoped-identities.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(scoped.len(), 2);
+            assert_ne!(scoped[0].name, scoped[1].name);
+            assert!(
+                empty(&scoped[0].cgroup),
+                "revoked agent descendants survived acknowledgement"
+            );
+            assert!(
+                !empty(&scoped[1].cgroup),
+                "other agent was terminated by scoped revocation"
+            );
+            assert_eq!(run(&["is-active", &scoped[1].name]).trim(), "active");
+            std::fs::write(root.path().join("scoped-observation-complete"), b"observed").unwrap();
+            until(root.path(), || root.path().join("finished").exists());
+        } else if mode.starts_with("app-")
             || mode.starts_with("fault-")
             || mode.starts_with("phase-")
             || matches!(
@@ -469,7 +489,7 @@ fn independent_descendants_provider_crash_and_recovery() {
         } else {
             assert_eq!(
                 created.len(),
-                1,
+                if mode == "app-agent-revoke" { 2 } else { 1 },
                 "every scenario must record its request identity: {mode}"
             );
         }

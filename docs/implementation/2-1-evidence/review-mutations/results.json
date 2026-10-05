@@ -1,0 +1,129 @@
+[
+  {
+    "name": "pair-after-gate-closure",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::application::tests::pair_agent_rechecks_closed_admission_after_waiting_for_gate",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.12,
+    "mutant_exit": 101,
+    "mutant_seconds": 10.45,
+    "classification": "caught",
+    "source_sha256": "2bfe3cd61e18a640ac2974e0d0b5880fb986ef4624831a58891ea5e5f0508146"
+  },
+  {
+    "name": "pair-before-publication-closure",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::application::tests::pair_agent_rechecks_closed_admission_before_token_publication",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.07,
+    "mutant_exit": 101,
+    "mutant_seconds": 13.03,
+    "classification": "caught",
+    "source_sha256": "2bfe3cd61e18a640ac2974e0d0b5880fb986ef4624831a58891ea5e5f0508146"
+  },
+  {
+    "name": "poll-session-expiry",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::application::tests::agent_status_refreshes_request_and_session_expiry_at_exact_deadlines",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.47,
+    "mutant_exit": 101,
+    "mutant_seconds": 14.77,
+    "classification": "caught",
+    "source_sha256": "2bfe3cd61e18a640ac2974e0d0b5880fb986ef4624831a58891ea5e5f0508146"
+  },
+  {
+    "name": "poll-request-expiry",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::application::tests::agent_status_refreshes_request_and_session_expiry_at_exact_deadlines",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.07,
+    "mutant_exit": 101,
+    "mutant_seconds": 14.52,
+    "classification": "caught",
+    "source_sha256": "2bfe3cd61e18a640ac2974e0d0b5880fb986ef4624831a58891ea5e5f0508146"
+  },
+  {
+    "name": "cli-leading-hyphen-label",
+    "path": "src/bin/vw-access.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "human_cli",
+      "agent_commands_send_exact_identity_fields_and_print_only_safe_views",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.02,
+    "mutant_exit": 101,
+    "mutant_seconds": 10.97,
+    "classification": "caught",
+    "source_sha256": "36ed57c3e1e053f0760b92b1ec3b16deb2fea66dc424bcdf16257aae85804445"
+  },
+  {
+    "name": "revoke-response-timeout",
+    "path": "src/adapters/human_socket.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "adapters::human_socket::tests::agent_revoke_exchange_waits_beyond_the_ordinary_response_timeout",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 11.91,
+    "mutant_exit": 101,
+    "mutant_seconds": 24.91,
+    "classification": "caught",
+    "source_sha256": "ad2e9ecc0df92a201831ffd4886cd059701e4899db1866ea4a647b078dc7c72a"
+  }
+]

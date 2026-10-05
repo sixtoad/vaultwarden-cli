@@ -1,0 +1,15 @@
+[
+  {
+    "name": "agents",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "agent_"
+    ],
+    "exit": 124,
+    "seconds": 360.37
+  }
+]

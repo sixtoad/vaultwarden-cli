@@ -1,0 +1,125 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.92
+  },
+  {
+    "name": "all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 272.06
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 17.59
+  },
+  {
+    "name": "agents",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "agent_"
+    ],
+    "exit": 0,
+    "seconds": 21.96
+  },
+  {
+    "name": "persistence",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "provider_store::"
+    ],
+    "exit": 0,
+    "seconds": 1.17
+  },
+  {
+    "name": "human-integrations",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "human_cli",
+      "--test",
+      "direct_request",
+      "--test",
+      "provider_session"
+    ],
+    "exit": 0,
+    "seconds": 8.85
+  },
+  {
+    "name": "real-systemd",
+    "command": [
+      "scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 0,
+    "seconds": 86.46
+  },
+  {
+    "name": "build-human-cli",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--bin",
+      "vw-access"
+    ],
+    "exit": 0,
+    "seconds": 2.83
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 0,
+    "seconds": 70.49
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.27
+  }
+]

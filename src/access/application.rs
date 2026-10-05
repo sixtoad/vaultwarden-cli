@@ -12,6 +12,10 @@ use std::{
 type CleanupWaitHook = std::cell::RefCell<Option<Box<dyn FnOnce()>>>;
 #[cfg(test)]
 thread_local! { static CLEANUP_WAIT_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static AGENT_REVOKE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { static PAIR_AGENT_GATE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
 
 pub const MAX_SESSION: Duration = Duration::from_secs(15 * 60);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,6 +30,7 @@ struct Authority {
     cleanup_failed: bool,
     generation: u64,
     request_deadlines: std::collections::HashMap<String, Duration>,
+    request_agents: std::collections::HashMap<String, String>,
 }
 pub struct ProviderApplication {
     gate: Mutex<Authority>,
@@ -37,9 +42,14 @@ pub struct ProviderApplication {
     request_lifetime: Duration,
     owner: AuthenticatedHuman,
     release_gate: Mutex<()>,
-    executions: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+    executions: Mutex<std::collections::HashMap<String, ActiveExecution>>,
+    agent_tokens: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
     reaped: Condvar,
     cleanup_uncertain: AtomicBool,
+}
+struct ActiveExecution {
+    cancel: Arc<AtomicBool>,
+    agent_id: Option<String>,
 }
 struct ApplicationExecution<'a> {
     app: &'a ProviderApplication,
@@ -48,10 +58,15 @@ struct ApplicationExecution<'a> {
     epoch: u64,
     deadline: Duration,
     cancel: Arc<AtomicBool>,
+    agent_token: Option<Arc<AtomicBool>>,
 }
 impl ApplicationExecution<'_> {
     fn live_fast(&self) -> bool {
         !self.cancel.load(Ordering::Acquire)
+            && self
+                .agent_token
+                .as_ref()
+                .is_none_or(|token| !token.load(Ordering::Acquire))
             && !self.app.closing.load(Ordering::Acquire)
             && self.app.revocation_epoch.load(Ordering::Acquire) == self.epoch
             && self.app.clock.now() < self.deadline
@@ -133,6 +148,19 @@ impl ProviderApplication {
             return Err(SessionError::InvalidRequest);
         }
         let owner = AuthenticatedHuman::from_peer_uid(provider.owner_uid());
+        let agent_tokens = provider
+            .list_agents(owner)
+            .map_err(|_error| SessionError::CleanupFailed)?
+            .into_iter()
+            .map(|binding| {
+                (
+                    binding.id,
+                    Arc::new(AtomicBool::new(
+                        binding.status == super::agent_binding::AgentBindingStatus::Revoked,
+                    )),
+                )
+            })
+            .collect();
         let app = Self {
             gate: Mutex::new(Authority {
                 provider,
@@ -141,6 +169,7 @@ impl ProviderApplication {
                 cleanup_failed: true,
                 generation: 0,
                 request_deadlines: std::collections::HashMap::new(),
+                request_agents: std::collections::HashMap::new(),
             }),
             clock,
             closing: AtomicBool::new(false),
@@ -149,6 +178,7 @@ impl ProviderApplication {
             owner,
             release_gate: Mutex::new(()),
             executions: Mutex::new(std::collections::HashMap::new()),
+            agent_tokens: Mutex::new(agent_tokens),
             reaped: Condvar::new(),
             cleanup_uncertain: AtomicBool::new(false),
         };
@@ -258,7 +288,7 @@ impl ProviderApplication {
                 .lock()
                 .map_err(|_error| DirectRequestError::Unavailable)?;
             if let Some(cancel) = active.get(id) {
-                cancel.store(true, Ordering::Release);
+                cancel.cancel.store(true, Ordering::Release);
                 drop(active);
                 drop(_release);
                 return self.await_cleanup(Some(id)).map_err(Into::into);
@@ -282,7 +312,7 @@ impl ProviderApplication {
                 .lock()
                 .map_err(|_error| DirectRequestError::Unavailable)?;
             if let Some(cancel) = active.get(id) {
-                cancel.store(true, Ordering::Release);
+                cancel.cancel.store(true, Ordering::Release);
                 Ok(())
             } else {
                 authority.provider.cancel_unclaimed_execution(owner, id)
@@ -294,7 +324,242 @@ impl ProviderApplication {
         result?;
         self.await_cleanup(Some(id)).map_err(Into::into)
     }
-    /// Future pairing administration calls this hook before acknowledging revocation.
+    pub fn pair_agent(
+        &self,
+        human: AuthenticatedHuman,
+        input: super::agent_binding::AgentPairing,
+    ) -> Result<super::agent_binding::AgentBindingView, DirectRequestError> {
+        self.check_owner(human)?;
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        #[cfg(test)]
+        PAIR_AGENT_GATE_HOOK.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe();
+            }
+        });
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let result = authority
+            .provider
+            .pair_agent(human, input, self.clock.unix_seconds()?);
+        match &result {
+            Ok(binding) => {
+                // Publish only after the durable transaction, in gate -> release order.
+                let _release = self
+                    .release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                if self.admission_closed() {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                self.agent_tokens
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?
+                    .insert(binding.id.clone(), Arc::new(AtomicBool::new(false)));
+            }
+            Err(DirectRequestError::Unavailable) => self.close_admission(),
+            _ => {}
+        }
+        result
+    }
+    pub fn list_agents(
+        &self,
+        human: AuthenticatedHuman,
+    ) -> Result<Vec<super::agent_binding::AgentBindingView>, DirectRequestError> {
+        self.check_owner(human)?;
+        let result = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .provider
+            .list_agents(human);
+        if result == Err(DirectRequestError::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+    pub fn revoke_agent(
+        &self,
+        human: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::agent_binding::AgentBindingView, DirectRequestError> {
+        self.check_owner(human)?;
+        // Metadata lookup never acquires gate while holding release_gate. Tokens
+        // are immutable by binding ID, including tombstones and retries.
+        {
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let tokens = self
+                .agent_tokens
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let token = tokens.get(id).ok_or(DirectRequestError::NotFound)?;
+            token.store(true, Ordering::Release);
+        }
+        #[cfg(test)]
+        AGENT_REVOKE_HOOK.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe();
+            }
+        });
+        let (result, affected) = {
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let result = self
+                .clock
+                .unix_seconds()
+                .map_err(DirectRequestError::from)
+                .and_then(|now| authority.provider.revoke_agent(human, id, now));
+            let active = self
+                .executions
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let mut affected = Vec::new();
+            for (request, execution) in active
+                .iter()
+                .filter(|(_, execution)| execution.agent_id.as_deref() == Some(id))
+            {
+                execution.cancel.store(true, Ordering::Release);
+                affected.push(request.clone());
+            }
+            (result, affected)
+        };
+        if result.is_err() {
+            self.close_admission();
+        }
+        // A claim holds gate until registration. No matching claim can appear
+        // after this snapshot because its token was irreversibly denied above.
+        self.await_agent_cleanup(&affected)?;
+        result
+    }
+    fn await_agent_cleanup(&self, ids: &[String]) -> Result<(), DirectRequestError> {
+        let active = self
+            .executions
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let (active, _wait) = self
+            .reaped
+            .wait_timeout_while(active, Duration::from_secs(20), |active| {
+                ids.iter().any(|id| active.contains_key(id))
+            })
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let uncertain = ids.iter().any(|id| active.contains_key(id))
+            || self.cleanup_uncertain.load(Ordering::Acquire)
+            || self.admission_closed();
+        drop(active);
+        if uncertain {
+            self.close_admission();
+            return Err(DirectRequestError::Unavailable);
+        }
+        Ok(())
+    }
+    fn agent_token(
+        &self,
+        owner: &Option<AgentOwner>,
+    ) -> Result<Option<Arc<AtomicBool>>, DirectRequestError> {
+        owner
+            .as_ref()
+            .map(|owner| {
+                self.agent_tokens
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?
+                    .get(&owner.binding_id)
+                    .cloned()
+                    .ok_or(DirectRequestError::Unauthorized)
+            })
+            .transpose()
+    }
+    fn token_live(token: &Option<Arc<AtomicBool>>) -> bool {
+        token
+            .as_ref()
+            .is_none_or(|token| !token.load(Ordering::Acquire))
+    }
+    fn request_agent_live(
+        &self,
+        authority: &Authority,
+        id: &str,
+    ) -> Result<(), DirectRequestError> {
+        if let Some(agent) = authority.request_agents.get(id) {
+            let tokens = self
+                .agent_tokens
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if tokens
+                .get(agent)
+                .is_none_or(|token| token.load(Ordering::Acquire))
+            {
+                return Err(DirectRequestError::Unauthorized);
+            }
+        }
+        Ok(())
+    }
+    #[allow(dead_code)] // Exact poll ownership shared with the later authenticated transport.
+    pub(crate) fn agent_status(
+        &self,
+        owner: &AgentOwner,
+        uid: u32,
+        groups: &[u32],
+        id: &str,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let token = self.agent_token(&Some(owner.clone()))?;
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let result = (|| {
+            match self.admit(&mut authority) {
+                Ok(()) | Err(SessionError::Locked) => {}
+                Err(error) => return Err(error.into()),
+            }
+            self.expire_requests(&mut authority)?;
+            authority.provider.agent_status(owner, uid, groups, id)
+        })();
+        if result == Err(DirectRequestError::Unavailable) {
+            self.close_admission();
+        }
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        result
+    }
+    #[cfg(test)]
+    pub(crate) fn submit_agent_for_test(
+        &self,
+        binding_id: &str,
+        uid: u32,
+        groups: &[u32],
+        input: DirectSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<SubmissionReceipt, DirectRequestError> {
+        let owner = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .provider
+            .agent_binding_for_peer(binding_id, uid, groups)?;
+        self.submit_owned(self.owner, Some(owner), input, launcher)
+    }
+    /// Legacy global human lifecycle hook. Agent administration uses `revoke_agent`.
     pub fn revoke_requester(&self, owner: AuthenticatedHuman) -> Result<(), DirectRequestError> {
         self.check_owner(owner)?;
         self.lock().map_err(Into::into)
@@ -336,7 +601,20 @@ impl ProviderApplication {
         input: DirectSubmission,
         launcher: &dyn DirectReviewLauncher,
     ) -> Result<SubmissionReceipt, DirectRequestError> {
+        self.submit_owned(owner, None, input, launcher)
+    }
+    fn submit_owned(
+        &self,
+        owner: AuthenticatedHuman,
+        agent_owner: Option<AgentOwner>,
+        input: DirectSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<SubmissionReceipt, DirectRequestError> {
         self.check_owner(owner)?;
+        let token = self.agent_token(&agent_owner)?;
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         let mut authority = self
             .gate
             .try_lock()
@@ -352,13 +630,38 @@ impl ProviderApplication {
             .checked_add(self.request_lifetime.as_secs())
             .ok_or(DirectRequestError::Unavailable)?;
         let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
-        let result = authority
-            .provider
-            .create_direct(owner, input, now, expires, || {
-                !self.closing.load(Ordering::Acquire)
-                    && self.clock.now() < session_deadline
-                    && self.clock.now() < deadline
-            });
+        let live = || {
+            !self.closing.load(Ordering::Acquire)
+                && Self::token_live(&token)
+                && self.clock.now() < session_deadline
+                && self.clock.now() < deadline
+        };
+        let release = if agent_owner.is_some() {
+            Some(
+                self.release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            )
+        } else {
+            None
+        };
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let result = match &agent_owner {
+            None => authority
+                .provider
+                .create_direct(owner, input, now, expires, live),
+            #[cfg(test)]
+            Some(agent) => {
+                authority
+                    .provider
+                    .create_agent_for_test(agent.clone(), input, now, expires, live)
+            }
+            #[cfg(not(test))]
+            Some(_) => return Err(DirectRequestError::Unauthorized),
+        };
+        drop(release);
         // Once creation succeeds, lifecycle revocation must preserve its receipt.
         // Observe the deadline before admission so closing during a slow clock or
         // durable write is checked before any desktop handoff.
@@ -367,10 +670,18 @@ impl ProviderApplication {
         let review = match result {
             Ok(review) => review,
             Err(error) => {
+                if error == DirectRequestError::Unavailable {
+                    self.close_admission();
+                }
                 admission?;
                 return Err(error);
             }
         };
+        if let Some(agent) = &agent_owner {
+            authority
+                .request_agents
+                .insert(review.id.clone(), agent.binding_id.clone());
+        }
         match admission {
             Ok(()) => {
                 authority
@@ -380,7 +691,7 @@ impl ProviderApplication {
             Err(SessionError::Locked) => {}
             Err(error) => return Err(error.into()),
         }
-        if admission.is_err() || request_expired {
+        if admission.is_err() || request_expired || !Self::token_live(&token) {
             self.expire_requests(&mut authority)?;
         } else {
             let launched = launcher.launch(&review.id);
@@ -487,6 +798,7 @@ impl ProviderApplication {
             .map_err(|_error| DirectRequestError::Unavailable)?;
         self.admit(&mut authority)?;
         self.expire_requests(&mut authority)?;
+        self.request_agent_live(&authority, id)?;
         Ok(PreparedApproval {
             binding: authority.provider.prepare_direct(owner, id)?,
             generation: authority.generation,
@@ -535,18 +847,50 @@ impl ProviderApplication {
             .get(id)
             .ok_or(DirectRequestError::AlreadyDecided)?;
         let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let agent_id = authority.request_agents.get(id).cloned();
+        let agent_token = agent_id
+            .as_ref()
+            .map(|id| {
+                self.agent_tokens
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?
+                    .get(id)
+                    .cloned()
+                    .ok_or(DirectRequestError::Unauthorized)
+            })
+            .transpose()?;
         let live = || {
-            !self.closing.load(Ordering::Acquire)
+            Self::token_live(&agent_token)
+                && !self.closing.load(Ordering::Acquire)
                 && self.revocation_epoch.load(Ordering::Acquire) == revocation_epoch
                 && self.clock.now() < deadline
                 && self.clock.now() < session_deadline
         };
+        let claim_release = if agent_id.is_some() {
+            Some(
+                self.release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            )
+        } else {
+            None
+        };
+        if !Self::token_live(&agent_token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         let binding = authority.provider.claim_execution(owner, id, live)?;
         let cancel = Arc::new(AtomicBool::new(false));
         self.executions
             .lock()
             .map_err(|_error| DirectRequestError::Unavailable)?
-            .insert(id.to_owned(), cancel.clone());
+            .insert(
+                id.to_owned(),
+                ActiveExecution {
+                    cancel: cancel.clone(),
+                    agent_id,
+                },
+            );
+        drop(claim_release);
         let candidate = self.execution_authority_current(
             &mut authority,
             owner,
@@ -622,6 +966,7 @@ impl ProviderApplication {
             epoch: revocation_epoch,
             deadline: deadline.min(session_deadline),
             cancel,
+            agent_token,
         };
         let report = match result {
             Ok((prepared, environment)) => {
@@ -745,6 +1090,15 @@ impl ProviderApplication {
         // the strength of authority checked before that read.
         self.execution_live(authority, id)?;
         let candidate = candidate?;
+        if candidate
+            .0
+            .agent_owner
+            .as_ref()
+            .map(|owner| owner.binding_id.as_str())
+            != authority.request_agents.get(id).map(String::as_str)
+        {
+            return Err(DirectRequestError::InvalidRequest);
+        }
         if expected.is_some_and(|binding| binding != &candidate.0) {
             return Err(DirectRequestError::InvalidRequest);
         }
@@ -772,6 +1126,7 @@ impl ProviderApplication {
         id: &str,
     ) -> Result<(), DirectRequestError> {
         self.admit(authority)?;
+        self.request_agent_live(authority, id)?;
         if authority
             .request_deadlines
             .get(id)
@@ -813,12 +1168,21 @@ impl ProviderApplication {
             return Err(DirectRequestError::Locked);
         }
         let binding = &prepared.binding;
-        self.check_owner(AuthenticatedHuman::from_peer_uid(binding.requester_uid))?;
+        if binding.agent_owner.is_none() {
+            self.check_owner(AuthenticatedHuman::from_peer_uid(binding.requester_uid))?;
+        }
+        let token = self.agent_token(&binding.agent_owner)?;
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         let policy = authority.provider.decision_policy(binding)?;
         if approve {
             let probe = authority.backend.probe_compatibility();
             self.admit(&mut authority)?;
             self.expire_requests(&mut authority)?;
+            if !Self::token_live(&token) {
+                return Err(DirectRequestError::Unauthorized);
+            }
             probe?;
             let marker = format!("vw-access={}", policy.id());
             for login in policy.login_bindings() {
@@ -829,6 +1193,9 @@ impl ProviderApplication {
                 });
                 self.admit(&mut authority)?;
                 self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
                 if !eligible.unwrap_or(false) {
                     return Err(DirectRequestError::Unavailable);
                 }
@@ -841,11 +1208,25 @@ impl ProviderApplication {
         let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
         let now = self.clock.unix_seconds()?;
         // Revalidate the exact durable binding after potentially slow eligibility.
+        let decision_release = if binding.agent_owner.is_some() {
+            Some(
+                self.release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            )
+        } else {
+            None
+        };
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
         let result = authority.provider.decide_direct(binding, approve, now, || {
             !self.closing.load(Ordering::Acquire)
+                && Self::token_live(&token)
                 && self.clock.now() < deadline
                 && self.clock.now() < session_deadline
         });
+        drop(decision_release);
         if result == Err(DirectRequestError::Unavailable) {
             // All persistence failures close process authority, including uncertain rename durability.
             self.close_admission();
@@ -1868,6 +2249,144 @@ mod tests {
                 "session={session}, observed={observed}"
             );
             assert_eq!(preparer.0.load(Ordering::SeqCst), usize::from(accepted));
+        }
+    }
+
+    fn pairing_input(app: &ProviderApplication) -> super::super::agent_binding::AgentPairing {
+        super::super::agent_binding::AgentPairing {
+            label: "pairing-race".into(),
+            public_key: super::super::encode_public_key(
+                &ed25519_dalek::SigningKey::from_bytes(&[101; 32]).verifying_key(),
+            ),
+            uid: if app.human_owner().uid() == 41001 {
+                41002
+            } else {
+                41001
+            },
+            gid: 42001,
+        }
+    }
+    #[test]
+    fn pair_agent_rechecks_closed_admission_after_waiting_for_gate() {
+        use crate::access::direct_request_tests::{fixture, records};
+        let f = fixture();
+        let before = records(&f);
+        let gate = f.app.gate.lock().unwrap();
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let app = f.app.clone();
+        let worker = std::thread::spawn(move || {
+            PAIR_AGENT_GATE_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || entered_tx.send(()).unwrap()))
+            });
+            app.pair_agent(app.human_owner(), pairing_input(&app))
+        });
+        // The pair call has passed its initial check while gate remains held.
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        f.app.close_admission();
+        drop(gate);
+        assert_eq!(worker.join().unwrap(), Err(DirectRequestError::Unavailable));
+        assert_eq!(records(&f), before);
+        assert!(f.app.agent_tokens.lock().unwrap().is_empty());
+    }
+    #[test]
+    fn pair_agent_rechecks_closed_admission_before_token_publication() {
+        use crate::access::direct_request_tests::{fixture, records};
+        use crate::access::provider_store::WRITE_TEST_HOOK;
+        let f = fixture();
+        let (persisted_tx, persisted_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let app = f.app.clone();
+        let worker = std::thread::spawn(move || {
+            WRITE_TEST_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move |stage| {
+                    if stage == 1 {
+                        persisted_tx.send(()).unwrap();
+                        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
+                    false
+                }))
+            });
+            let result = app.pair_agent(app.human_owner(), pairing_input(&app));
+            WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+            result
+        });
+        persisted_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        f.app.close_admission();
+        resume_tx.send(()).unwrap();
+        assert_eq!(worker.join().unwrap(), Err(DirectRequestError::Unavailable));
+        // A completed durable transaction is retained, but no live authority is
+        // published and the caller never receives successful pairing after close.
+        assert_eq!(records(&f)["pairings"].as_array().unwrap().len(), 1);
+        assert!(f.app.agent_tokens.lock().unwrap().is_empty());
+    }
+    #[test]
+    fn agent_status_refreshes_request_and_session_expiry_at_exact_deadlines() {
+        use crate::access::direct_request_tests::{Launcher, approval, fixture, input, records};
+        for session_expiry in [false, true] {
+            for approved in [false, true] {
+                let mut f = fixture();
+                if session_expiry {
+                    Arc::get_mut(&mut f.app).unwrap().request_lifetime = Duration::from_secs(3600);
+                }
+                let input_pairing = pairing_input(&f.app);
+                let binding = f
+                    .app
+                    .pair_agent(f.app.human_owner(), input_pairing)
+                    .unwrap();
+                let receipt = f
+                    .app
+                    .submit_agent_for_test(
+                        &binding.id,
+                        binding.uid,
+                        &[binding.gid],
+                        input(),
+                        &Launcher::default(),
+                    )
+                    .unwrap();
+                if approved {
+                    f.app.commit_approval(approval(&f, &receipt.id)).unwrap();
+                }
+                let owner = AgentOwner {
+                    binding_id: binding.id,
+                    label: binding.label,
+                    fingerprint: binding.fingerprint,
+                    uid: binding.uid,
+                    gid: binding.gid,
+                };
+                let deadline = if session_expiry { 910 } else { 310 };
+                f.monotonic.store(deadline - 1, Ordering::SeqCst);
+                assert_eq!(
+                    f.app
+                        .agent_status(&owner, owner.uid, &[owner.gid], &receipt.id),
+                    Ok(if approved {
+                        DirectStatus::Approved
+                    } else {
+                        DirectStatus::Pending
+                    })
+                );
+                f.monotonic.store(deadline, Ordering::SeqCst);
+                assert_eq!(
+                    f.app
+                        .agent_status(&owner, owner.uid, &[owner.gid], &receipt.id),
+                    Ok(DirectStatus::Expired)
+                );
+                let expired = records(&f);
+                assert_eq!(
+                    expired["requests"][0]["direct"]["review"]["status"]["status"],
+                    "expired"
+                );
+                assert_eq!(
+                    f.app.gate.lock().unwrap().deadline.is_none(),
+                    session_expiry
+                );
+                assert_eq!(
+                    f.app
+                        .agent_status(&owner, owner.uid, &[owner.gid], &receipt.id),
+                    Ok(DirectStatus::Expired)
+                );
+                assert_eq!(records(&f), expired);
+                assert!(!f.app.admission_closed());
+            }
         }
     }
 }

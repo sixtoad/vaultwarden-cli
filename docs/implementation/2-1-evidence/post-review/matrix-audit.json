@@ -1,0 +1,202 @@
+[
+  {
+    "test": "access::agent_binding_tests::bindings_have_random_ids_derived_fingerprints_and_closed_safe_views",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_administration_checks_human_authority_even_while_locked_and_retains_tombstones",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::key_codec_rejects_encoding_length_invalid_points_weak_and_noncanonical_points",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::pairing_rejects_each_invalid_label_and_os_identity_independently",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::registry_enforces_unique_ids_keys_enabled_labels_and_immutable_audit",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::duplicate_binding_id_is_rejected_independently_of_key_label_and_audit_checks",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::stored_binding_ids_require_canonical_32_byte_values",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::revoked_label_needs_fresh_key_and_id_and_retains_both_audit_events",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::store_round_trips_revoked_tombstones_and_audit_on_repeated_restart",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::schema_migration_is_narrow_closed_and_repeatable",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_provider_administration_revalidates_human_independently_of_application",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_administration_checks_human_authority_even_while_locked_and_retains_tombstones",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::os_match_requires_enabled_exact_uid_and_required_membership",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_provider_rechecks_revocation_without_application_tokens",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_os_lookup_and_exact_poll_ownership_reject_each_independent_mismatch",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_warmed_authority_revalidates_actual_unsafe_storage_for_each_entrypoint",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::agent_binding_tests::durable_binding_registry_corruption_rejects_warmed_reads_and_restart_independently",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_pair_and_revoke_persistence_failures_close_admission_and_preserve_denial",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_durable_read_failure_closes_otherwise_valid_poll_authority",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_revoke_invalidates_only_unclaimed_owned_work_and_preserves_attribution",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_revoke_targets_requested_id_when_another_binding_precedes_it",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_running_revoke_and_retry_wait_for_confirmed_scoped_cleanup",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_running_revoke_rejects_uncertain_and_impossible_not_started_cleanup",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_cleanup_timeout_keeps_running_nonterminal_until_confirmed_reaping",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_revocation_during_admission_denies_before_persistence_without_harming_other_agent",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_persistence_racing_revoke_serializes_admission_then_expires_exact_binding",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_request_preparation_rejects_published_intent_before_durable_revoke",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_revocation_intent_fences_backend_continuation_before_gate_is_available",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_revoke_before_final_release_never_starts_and_waits_for_unstarted_claim_cleanup",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_revocation_persists_across_restart_without_rewriting_old_owners",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_same_label_and_os_replacement_retains_running_work_during_old_id_retry",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_request_seals_and_legacy_migration_cannot_rewrite_attribution",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::direct_request_tests::agent_review_distinguishes_a_label_that_matches_human_presentation",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "adapters::human_socket::tests::locked_socket_agent_administration_is_closed_redacted_and_durable",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "agent_commands_send_exact_identity_fields_and_print_only_safe_views",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "agent_parser_failures_are_redacted_and_help_describes_identity_not_authority",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::application::tests::pair_agent_rechecks_closed_admission_after_waiting_for_gate",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::application::tests::pair_agent_rechecks_closed_admission_before_token_publication",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "access::application::tests::agent_status_refreshes_request_and_session_expiry_at_exact_deadlines",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  },
+  {
+    "test": "adapters::human_socket::tests::agent_revoke_exchange_waits_beyond_the_ordinary_response_timeout",
+    "result": "passed",
+    "log": "post-review/all-targets.log.gz"
+  }
+]

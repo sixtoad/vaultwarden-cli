@@ -1,5 +1,6 @@
 //! Private, bounded human-only Unix transport. No browser capability crosses it.
 use crate::access::{
+    agent_binding::{AgentBindingView, AgentPairing},
     application::ProviderApplication,
     direct_request::{
         AuthenticatedHuman, DirectRequestError, DirectStatus, DirectSubmission, SubmissionReceipt,
@@ -45,6 +46,9 @@ pub enum HumanCommand {
     Request { submission: DirectSubmission },
     Status { id: String },
     History { limit: Option<u32> },
+    AgentPair { pairing: AgentPairing },
+    AgentList {},
+    AgentRevoke { id: String },
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
@@ -52,6 +56,9 @@ pub enum HumanResponse {
     Submitted { receipt: SubmissionReceipt },
     Status { state: DirectStatus },
     History { events: Vec<HistoryEvent> },
+    AgentPaired { agent: AgentBindingView },
+    Agents { agents: Vec<AgentBindingView> },
+    AgentRevoked { agent: AgentBindingView },
     Rejected { reason: DirectRequestError },
     InvalidRequest,
     Unauthorized,
@@ -382,6 +389,18 @@ fn serve_one(
                 Ok(state) => HumanResponse::Status { state },
                 Err(reason) => HumanResponse::Rejected { reason },
             },
+            HumanCommand::AgentPair { pairing } => match app.pair_agent(owner, pairing) {
+                Ok(agent) => HumanResponse::AgentPaired { agent },
+                Err(reason) => HumanResponse::Rejected { reason },
+            },
+            HumanCommand::AgentList {} => match app.list_agents(owner) {
+                Ok(agents) => HumanResponse::Agents { agents },
+                Err(reason) => HumanResponse::Rejected { reason },
+            },
+            HumanCommand::AgentRevoke { id } => match app.revoke_agent(owner, &id) {
+                Ok(agent) => HumanResponse::AgentRevoked { agent },
+                Err(reason) => HumanResponse::Rejected { reason },
+            },
         },
         _ => HumanResponse::InvalidRequest,
     };
@@ -399,6 +418,12 @@ fn response_frame(response: &HumanResponse) -> Vec<u8> {
 
 /// Validate filesystem ownership and server kernel credentials before sending input.
 pub fn exchange(root: &Path, command: HumanCommand) -> Result<HumanResponse, HumanTransportError> {
+    // Revocation must await the application's bounded (20s) execution cleanup.
+    let response_timeout = if matches!(&command, HumanCommand::AgentRevoke { .. }) {
+        Duration::from_secs(30)
+    } else {
+        Duration::from_secs(10)
+    };
     private_directory(root)?;
     let path = root.join(SOCKET_NAME);
     private_socket(&fs::symlink_metadata(&path).map_err(|_error| HumanTransportError)?)?;
@@ -410,7 +435,7 @@ pub fn exchange(root: &Path, command: HumanCommand) -> Result<HumanResponse, Hum
     })
     .map_err(|_error| HumanTransportError)?;
     write_frame(&mut stream, &bytes)?;
-    serde_json::from_slice(&read_frame(&mut stream, Duration::from_secs(10))?)
+    serde_json::from_slice(&read_frame(&mut stream, response_timeout)?)
         .map_err(|_error| HumanTransportError)
 }
 
@@ -459,6 +484,187 @@ mod tests {
         let mut client = connect_private(&root.join(SOCKET_NAME)).unwrap();
         write_frame(&mut client, bytes).unwrap();
         serde_json::from_slice(&read_frame(&mut client, Duration::from_secs(10)).unwrap()).unwrap()
+    }
+    #[test]
+    fn agent_revoke_exchange_waits_beyond_the_ordinary_response_timeout() {
+        use crate::access::{RequestId, agent_binding::AgentBindingStatus};
+        let directory = private_temp();
+        let path = directory.path().join(SOCKET_NAME);
+        let listener = UnixListener::bind(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let expected = AgentBindingView {
+            id: RequestId::new_random().unwrap().as_str().into(),
+            label: "delayed-revocation".into(),
+            fingerprint: "a".repeat(64),
+            uid: 41001,
+            gid: 42001,
+            status: AgentBindingStatus::Revoked,
+        };
+        let response = expected.clone();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request: HumanMessage =
+                serde_json::from_slice(&read_frame(&mut stream, Duration::from_secs(5)).unwrap())
+                    .unwrap();
+            assert_eq!(request.version, 1);
+            assert!(
+                matches!(request.command, HumanCommand::AgentRevoke { id } if id == response.id)
+            );
+            // Deliberately cross the former ten-second exchange deadline using
+            // a valid response, so parse failure cannot masquerade as timeout.
+            std::thread::sleep(Duration::from_secs(11));
+            write_frame(
+                &mut stream,
+                &serde_json::to_vec(&HumanResponse::AgentRevoked { agent: response }).unwrap(),
+            )
+        });
+        let response = exchange(
+            directory.path(),
+            HumanCommand::AgentRevoke {
+                id: expected.id.clone(),
+            },
+        );
+        server.join().unwrap().unwrap();
+        let HumanResponse::AgentRevoked { agent } = response.unwrap() else {
+            panic!("expected delayed revocation response")
+        };
+        assert_eq!(agent, expected);
+        assert_eq!(agent.status, AgentBindingStatus::Revoked);
+    }
+    #[test]
+    fn locked_socket_agent_administration_is_closed_redacted_and_durable() {
+        use crate::access::{agent_binding::AgentBindingStatus, encode_public_key};
+        let directory = private_temp();
+        let root = directory.path().join("provider");
+        let app = Arc::new(
+            ProviderApplication::new(
+                Provider::start(&root).unwrap(),
+                Box::new(Backend),
+                Box::<MonotonicClock>::default(),
+            )
+            .unwrap(),
+        );
+        let socket = HumanSocket::bind(&root).unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let launcher = Arc::new(Launcher(AtomicUsize::new(0)));
+        let worker = {
+            let (app, stop, launcher) = (app.clone(), stop.clone(), launcher.clone());
+            std::thread::spawn(move || socket.serve(app, launcher, stop))
+        };
+        assert!(
+            matches!(exchange(&root, HumanCommand::AgentList {}).unwrap(),
+            HumanResponse::Agents { agents } if agents.is_empty())
+        );
+        let uid = if unsafe { libc::geteuid() } == 42001 {
+            42002
+        } else {
+            42001
+        };
+        let pairing = AgentPairing {
+            label: "restricted-builder".into(),
+            public_key: encode_public_key(
+                &ed25519_dalek::SigningKey::from_bytes(&[41; 32]).verifying_key(),
+            ),
+            uid,
+            gid: 42003,
+        };
+        let before = fs::read(root.join("provider-state.json")).unwrap();
+        let valid =
+            serde_json::json!({"version":1,"command":{"kind":"agent_pair","pairing":pairing}});
+        let mut inputs = vec![
+            serde_json::json!({"version":1,"command":{"kind":"agent_list","uid":uid}}),
+            serde_json::json!({"version":1,"command":{"kind":"agent_revoke","id":"sentinel","label":"sentinel"}}),
+        ];
+        for field in ["fingerprint", "private_key", "status", "id"] {
+            let mut input = valid.clone();
+            input["command"]["pairing"][field] = "private-input-sentinel".into();
+            inputs.push(input);
+        }
+        for input in inputs {
+            assert!(matches!(
+                raw_exchange(&root, &serde_json::to_vec(&input).unwrap()),
+                HumanResponse::InvalidRequest
+            ));
+        }
+        let mut invalid = pairing.clone();
+        invalid.public_key = "private-input-sentinel".into();
+        let rejected = exchange(&root, HumanCommand::AgentPair { pairing: invalid }).unwrap();
+        assert!(matches!(rejected, HumanResponse::Rejected { .. }));
+        assert!(
+            !serde_json::to_string(&rejected)
+                .unwrap()
+                .contains("private-input-sentinel")
+        );
+        assert_eq!(fs::read(root.join("provider-state.json")).unwrap(), before);
+        let paired = exchange(
+            &root,
+            HumanCommand::AgentPair {
+                pairing: pairing.clone(),
+            },
+        )
+        .unwrap();
+        let encoded = serde_json::to_value(&paired).unwrap();
+        assert_eq!(encoded["agent"].as_object().unwrap().len(), 6);
+        assert!(!encoded.to_string().contains(&pairing.public_key));
+        let HumanResponse::AgentPaired { agent: old } = paired else {
+            panic!("pair failed")
+        };
+        assert_eq!(old.label, pairing.label);
+        assert_eq!(
+            (old.uid, old.gid, old.status),
+            (uid, 42003, AgentBindingStatus::Enabled)
+        );
+        assert!(
+            matches!(exchange(&root, HumanCommand::AgentList {}).unwrap(),
+            HumanResponse::Agents { agents } if agents == vec![old.clone()])
+        );
+        let revoked = exchange(&root, HumanCommand::AgentRevoke { id: old.id.clone() }).unwrap();
+        let HumanResponse::AgentRevoked { agent: revoked } = revoked else {
+            panic!("revoke failed")
+        };
+        assert_eq!(revoked.status, AgentBindingStatus::Revoked);
+        assert_eq!(revoked.id, old.id);
+        let mut replacement = pairing.clone();
+        replacement.public_key =
+            encode_public_key(&ed25519_dalek::SigningKey::from_bytes(&[42; 32]).verifying_key());
+        let HumanResponse::AgentPaired { agent: replacement } = exchange(
+            &root,
+            HumanCommand::AgentPair {
+                pairing: replacement,
+            },
+        )
+        .unwrap() else {
+            panic!("replacement failed")
+        };
+        assert_ne!(replacement.id, old.id);
+        assert!(
+            matches!(exchange(&root, HumanCommand::AgentRevoke { id: old.id }).unwrap(),
+            HumanResponse::AgentRevoked { agent } if agent == revoked)
+        );
+        let HumanResponse::Agents { agents } = exchange(&root, HumanCommand::AgentList {}).unwrap()
+        else {
+            panic!("list failed")
+        };
+        assert_eq!(agents.len(), 2);
+        assert!(agents.contains(&revoked) && agents.contains(&replacement));
+        assert_eq!(launcher.0.load(Ordering::Relaxed), 0);
+        stop.store(true, Ordering::Release);
+        worker.join().unwrap().unwrap();
+        drop(app);
+        let restarted = ProviderApplication::new(
+            Provider::start(&root).unwrap(),
+            Box::new(Backend),
+            Box::<MonotonicClock>::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            restarted
+                .list_agents(AuthenticatedHuman::from_peer_uid(unsafe {
+                    libc::geteuid()
+                }))
+                .unwrap(),
+            agents
+        );
     }
     #[test]
     fn actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up() {

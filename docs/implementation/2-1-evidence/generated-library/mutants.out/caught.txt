@@ -1,0 +1,61 @@
+src/access/agent_binding.rs:71:9: replace AgentBinding::validate -> Result<(), ProviderError> with Ok(())
+src/access/agent_binding.rs:80:13: replace || with && in AgentBinding::validate
+src/access/agent_binding.rs:79:13: replace || with && in AgentBinding::validate
+src/access/agent_binding.rs:78:13: replace || with && in AgentBinding::validate
+src/access/agent_binding.rs:77:13: replace || with && in AgentBinding::validate
+src/access/agent_binding.rs:76:13: replace || with && in AgentBinding::validate
+src/access/agent_binding.rs:74:21: replace != with == in AgentBinding::validate
+src/access/agent_binding.rs:75:44: replace != with == in AgentBinding::validate
+src/access/agent_binding.rs:76:16: delete ! in AgentBinding::validate
+src/access/agent_binding.rs:77:16: delete ! in AgentBinding::validate
+src/access/agent_binding.rs:78:16: delete ! in AgentBinding::validate
+src/access/agent_binding.rs:79:25: replace == with != in AgentBinding::validate
+src/access/agent_binding.rs:80:33: replace != with == in AgentBinding::validate
+src/access/agent_binding.rs:89:9: replace AgentBinding::matches_os -> bool with true
+src/access/agent_binding.rs:89:9: replace AgentBinding::matches_os -> bool with false
+src/access/agent_binding.rs:89:71: replace && with || in AgentBinding::matches_os
+src/access/agent_binding.rs:89:52: replace && with || in AgentBinding::matches_os
+src/access/agent_binding.rs:89:21: replace == with != in AgentBinding::matches_os
+src/access/agent_binding.rs:89:64: replace == with != in AgentBinding::matches_os
+src/access/agent_binding.rs:148:5: replace validate_registry -> Result<(), ProviderError> with Ok(())
+src/access/agent_binding.rs:156:13: replace || with && in validate_registry
+src/access/agent_binding.rs:155:13: replace || with && in validate_registry
+src/access/agent_binding.rs:155:16: delete ! in validate_registry
+src/access/agent_binding.rs:156:63: replace && with || in validate_registry
+src/access/agent_binding.rs:156:32: replace == with != in validate_registry
+src/access/agent_binding.rs:156:66: delete ! in validate_registry
+src/access/agent_binding.rs:164:18: replace != with == in validate_registry
+src/access/agent_binding.rs:168:12: delete ! in validate_registry
+src/access/agent_binding.rs:181:45: replace != with == in validate_registry
+src/access/agent_binding.rs:189:5: replace valid_label -> bool with true
+src/access/agent_binding.rs:189:5: replace valid_label -> bool with false
+src/access/agent_binding.rs:194:9: replace && with || in valid_label
+src/access/agent_binding.rs:191:9: replace && with || in valid_label
+src/access/agent_binding.rs:190:9: replace && with || in valid_label
+src/access/agent_binding.rs:189:5: delete ! in valid_label
+src/access/agent_binding.rs:190:24: replace <= with > in valid_label
+src/access/agent_binding.rs:193:49: replace || with && in valid_label
+src/access/agent_binding.rs:193:57: replace == with != in valid_label
+src/access/agent_binding.rs:198:5: replace valid_os_id -> bool with true
+src/access/agent_binding.rs:198:5: replace valid_os_id -> bool with false
+src/access/agent_binding.rs:198:13: replace && with || in valid_os_id
+src/access/agent_binding.rs:198:8: replace != with == in valid_os_id
+src/access/agent_binding.rs:198:19: replace != with == in valid_os_id
+src/access/application.rs:433:9: replace ProviderApplication::await_agent_cleanup -> Result<(), DirectRequestError> with Ok(())
+src/access/application.rs:445:13: replace || with && in ProviderApplication::await_agent_cleanup
+src/access/application.rs:470:9: replace ProviderApplication::token_live -> bool with true
+src/access/application.rs:470:9: replace ProviderApplication::token_live -> bool with false
+src/access/application.rs:472:33: delete ! in ProviderApplication::token_live
+src/access/direct_request.rs:183:9: replace AgentOwner::matches -> bool with true
+src/access/direct_request.rs:183:9: replace AgentOwner::matches -> bool with false
+src/access/direct_request.rs:183:15: replace == with != in AgentOwner::matches
+src/access/provider.rs:106:9: replace Provider::check_administrator -> Result<(), super::direct_request::DirectRequestError> with Ok(())
+src/access/provider.rs:106:24: replace != with == in Provider::check_administrator
+src/access/provider.rs:208:34: replace && with || in Provider::agent_binding_for_peer
+src/access/provider.rs:208:28: replace == with != in Provider::agent_binding_for_peer
+src/access/provider.rs:216:9: replace Provider::agent_current -> bool with false
+src/access/provider.rs:218:46: replace == with != in Provider::agent_current
+src/access/provider.rs:234:12: delete ! in Provider::agent_status
+src/access/provider.rs:237:39: replace && with || in Provider::agent_status
+src/access/provider.rs:244:28: replace == with != in Provider::agent_status
+src/access/provider.rs:246:48: replace == with != in Provider::agent_status

@@ -155,10 +155,60 @@ pub struct DirectReview {
     pub one_time: String,
     pub status: DirectStatus,
 }
+/// Immutable attribution, not authentication proof. Only a verified future
+/// transport may authorize admission; a stored snapshot never grants it.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AgentOwner {
+    pub binding_id: String,
+    pub label: String,
+    pub fingerprint: String,
+    pub uid: u32,
+    pub gid: u32,
+}
+impl AgentOwner {
+    pub(crate) fn from_binding(binding: &super::agent_binding::AgentBinding) -> Self {
+        Self {
+            binding_id: binding.id.clone(),
+            label: binding.label.clone(),
+            fingerprint: binding.fingerprint.clone(),
+            uid: binding.uid,
+            gid: binding.gid,
+        }
+    }
+    pub(crate) fn review_requester(&self) -> String {
+        format!("agent {} ({})", self.label, self.fingerprint)
+    }
+    pub(crate) fn matches(&self, binding: &super::agent_binding::AgentBinding) -> bool {
+        *self == Self::from_binding(binding)
+    }
+    fn valid(&self) -> bool {
+        valid_request_id(&self.binding_id)
+            && super::valid_sha256(&self.fingerprint)
+            && !self.label.is_empty()
+            && self.label.len() <= 128
+            && self
+                .label
+                .bytes()
+                .all(|b| b.is_ascii_graphic() || b == b' ')
+            && self.label.bytes().any(|b| b.is_ascii_graphic())
+            && self.uid != 0
+            && self.uid != u32::MAX
+            && self.gid != 0
+            && self.gid != u32::MAX
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RequestOwner {
+    Human(u32),
+    Agent(AgentOwner),
+}
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "DirectRecordWire")]
 pub(crate) struct DirectRecord {
     pub owner_uid: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_owner: Option<AgentOwner>,
     pub created_at_unix_seconds: u64,
     pub lifecycle_epoch: u64,
     pub review: DirectReview,
@@ -177,6 +227,8 @@ pub(crate) struct DirectRecord {
 pub(crate) struct ApprovalBinding {
     pub request_id: String,
     pub requester_uid: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_owner: Option<AgentOwner>,
     pub policy_digest: String,
     pub arguments_digest: String,
     pub expires_at_unix_seconds: u64,
@@ -212,6 +264,8 @@ enum StoredAudit {
 #[serde(deny_unknown_fields)]
 struct DirectRecordWire {
     owner_uid: u32,
+    #[serde(default)]
+    agent_owner: Option<AgentOwner>,
     created_at_unix_seconds: u64,
     lifecycle_epoch: u64,
     review: DirectReview,
@@ -228,8 +282,12 @@ impl TryFrom<DirectRecordWire> for DirectRecord {
     type Error = &'static str;
     fn try_from(w: DirectRecordWire) -> Result<Self, Self::Error> {
         use super::history::{HISTORY_VERSION, HistoryEvent, HistoryOutcome};
+        if w.agent_owner.is_some() && w.history_version != Some(HISTORY_VERSION) {
+            return Err("invalid agent history format");
+        }
         let mut record = Self {
             owner_uid: w.owner_uid,
+            agent_owner: w.agent_owner,
             created_at_unix_seconds: w.created_at_unix_seconds,
             lifecycle_epoch: w.lifecycle_epoch,
             review: w.review,
@@ -375,6 +433,17 @@ pub(crate) fn valid_request_id(id: &str) -> bool {
         })
 }
 impl DirectRecord {
+    pub(crate) fn owner(&self) -> RequestOwner {
+        self.agent_owner
+            .clone()
+            .map_or(RequestOwner::Human(self.owner_uid), RequestOwner::Agent)
+    }
+    pub(crate) fn human_visible(&self, human: AuthenticatedHuman, provider_uid: u32) -> bool {
+        match self.owner() {
+            RequestOwner::Human(uid) => uid == human.uid(),
+            RequestOwner::Agent(_) => human.uid() == provider_uid,
+        }
+    }
     fn validate_history(&self) -> bool {
         use super::history::{HISTORY_VERSION, HistoryOutcome as O};
         if self.history_version != HISTORY_VERSION || self.audit.is_empty() || self.audit.len() > 4
@@ -433,6 +502,7 @@ impl DirectRecord {
         ApprovalBinding {
             request_id: self.review.id.clone(),
             requester_uid: self.owner_uid,
+            agent_owner: self.agent_owner.clone(),
             policy_digest: self.review.policy_digest.clone(),
             arguments_digest: self.review.arguments_digest.clone(),
             expires_at_unix_seconds: self.review.expires_at_unix_seconds,
@@ -446,6 +516,19 @@ impl DirectRecord {
     fn digest(&self) -> String {
         let mut review = self.review.clone();
         review.status = DirectStatus::Pending;
+        if let Some(owner) = &self.agent_owner {
+            return hex_sha256(
+                &serde_json::to_vec(&(
+                    2u8,
+                    self.owner_uid,
+                    owner,
+                    self.created_at_unix_seconds,
+                    self.lifecycle_epoch,
+                    review,
+                ))
+                .expect("agent record projection serialization"),
+            );
+        }
         hex_sha256(
             &serde_json::to_vec(&(
                 1u8,
@@ -474,7 +557,14 @@ impl DirectRecord {
             && self.owner_uid != u32::MAX
             && self.lifecycle_epoch <= epoch
             && self.created_at_unix_seconds < r.expires_at_unix_seconds
-            && r.requester == "local human terminal"
+            && match &self.agent_owner {
+                Some(owner) => {
+                    owner.valid()
+                        && owner.uid == self.owner_uid
+                        && r.requester == owner.review_requester()
+                }
+                None => r.requester == "local human terminal",
+            }
             && valid_operation_id(&r.operation)
             && text(&r.effect)
             && text(&r.target)
