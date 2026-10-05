@@ -145,12 +145,20 @@ impl ProviderState {
             }
         }
         let mut ids = std::collections::HashSet::new();
+        let mut replay_markers = std::collections::HashSet::new();
         for request in &self.requests {
             if !ids.insert(&request.id) {
                 return Err(error(ProviderDiagnostic::InvalidState));
             }
             if let Some(direct) = &request.direct {
                 use super::direct_request::DirectStatus;
+                if direct
+                    .replay_digest
+                    .as_ref()
+                    .is_some_and(|digest| !replay_markers.insert(digest))
+                {
+                    return Err(error(ProviderDiagnostic::InvalidState));
+                }
                 let consistent = matches!(
                     (&request.status, &direct.review.status),
                     (RequestLifecycleStatus::Pending, DirectStatus::Pending)
@@ -364,8 +372,9 @@ impl ProviderStore {
             return Err(error(ProviderDiagnostic::PersistenceFailure));
         }
         if !still_authorized() {
-            let _ignored = fs::remove_file(&temporary);
-            return Err(error(ProviderDiagnostic::PersistenceFailure));
+            fs::remove_file(&temporary)
+                .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
+            return Err(error(ProviderDiagnostic::ExpiredAccessRequest));
         }
         fs::rename(&temporary, self.state_path())
             .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;

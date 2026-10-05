@@ -2273,6 +2273,32 @@ mod tests {
         );
         let fixture = direct_request_tests::fixture();
         let root = fixture.dir.path().join("provider");
+        // Synthetic paired identity; admission below uses the production signed
+        // core path and real human launcher, never an injected rendering record.
+        let signed_key = ed25519_dalek::SigningKey::from_bytes(&[125; 32]);
+        let signed_binding = fixture
+            .app
+            .pair_agent(
+                fixture.app.human_owner(),
+                crate::access::agent_binding::AgentPairing {
+                    label: "Signed browser <agent>".into(),
+                    public_key: crate::access::encode_public_key(&signed_key.verifying_key()),
+                    uid: if fixture.app.human_owner().uid() == 41001 {
+                        41002
+                    } else {
+                        41001
+                    },
+                    gid: 42001,
+                },
+            )
+            .unwrap();
+        let initial_state: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(root.join("provider-state.json")).unwrap())
+                .unwrap();
+        let signed_revision = initial_state["operations"][0]["revision"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         let (cert, key) = identity(&root);
         let artifact = root.join("launch.html");
         struct Authenticator;
@@ -2296,6 +2322,7 @@ mod tests {
         }
         Arc::get_mut(&mut ui.broker).unwrap().desktop = Box::new(Desktop);
         let launcher = ui.request_launcher();
+        let signed_launcher = launcher.clone();
         let socket = HumanSocket::bind(&root).unwrap();
         let stop = Arc::new(AtomicBool::new(false));
         let human = {
@@ -2308,7 +2335,7 @@ mod tests {
         };
         std::fs::write(
             control.join("ready.json"),
-            serde_json::json!({"root":root,"artifact":artifact}).to_string(),
+            serde_json::json!({"root":root,"artifact":artifact,"signed_binding":signed_binding,"signed_revision":signed_revision}).to_string(),
         )
         .unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(180);
@@ -2317,6 +2344,47 @@ mod tests {
                 fixture
                     .monotonic
                     .store(value.parse().unwrap(), Ordering::SeqCst);
+            }
+            if control.join("signed-submit").exists()
+                && !control.join("signed-result.json").exists()
+            {
+                use crate::access::protocol::{AgentRejection, AgentResponse, SignedSubmission};
+                let input = SignedSubmission::sign(
+                    signed_binding.id.clone(),
+                    [126; 32],
+                    "deploy".into(),
+                    signed_revision.clone(),
+                    vec!["staging".into(), "safe|\"quoted\"".into(), "+0003".into()],
+                    &signed_key,
+                )
+                .unwrap();
+                let result = fixture
+                    .app
+                    .agent_peer_eligible(signed_binding.uid, &[signed_binding.gid])
+                    .and_then(|()| {
+                        fixture.app.submit_signed(
+                            signed_binding.uid,
+                            &[signed_binding.gid],
+                            input,
+                            signed_launcher.as_ref(),
+                        )
+                    });
+                if result != Err(AgentRejection::Busy) {
+                    let response = match result {
+                        Ok(id) => AgentResponse::pending(id),
+                        Err(category) => AgentResponse::rejected(category),
+                    };
+                    std::fs::write(
+                        control.join("signed-result.new"),
+                        serde_json::to_vec(&response).unwrap(),
+                    )
+                    .unwrap();
+                    std::fs::rename(
+                        control.join("signed-result.new"),
+                        control.join("signed-result.json"),
+                    )
+                    .unwrap();
+                }
             }
             fixture.app.status().unwrap();
             std::thread::sleep(Duration::from_millis(25));

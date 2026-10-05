@@ -209,6 +209,9 @@ pub(crate) struct DirectRecord {
     pub owner_uid: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_owner: Option<AgentOwner>,
+    /// Binding-scoped nonce tombstone, retained through every terminal state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replay_digest: Option<String>,
     pub created_at_unix_seconds: u64,
     pub lifecycle_epoch: u64,
     pub review: DirectReview,
@@ -266,6 +269,8 @@ struct DirectRecordWire {
     owner_uid: u32,
     #[serde(default)]
     agent_owner: Option<AgentOwner>,
+    #[serde(default)]
+    replay_digest: Option<String>,
     created_at_unix_seconds: u64,
     lifecycle_epoch: u64,
     review: DirectReview,
@@ -288,6 +293,7 @@ impl TryFrom<DirectRecordWire> for DirectRecord {
         let mut record = Self {
             owner_uid: w.owner_uid,
             agent_owner: w.agent_owner,
+            replay_digest: w.replay_digest,
             created_at_unix_seconds: w.created_at_unix_seconds,
             lifecycle_epoch: w.lifecycle_epoch,
             review: w.review,
@@ -516,6 +522,20 @@ impl DirectRecord {
     fn digest(&self) -> String {
         let mut review = self.review.clone();
         review.status = DirectStatus::Pending;
+        if let Some(replay_digest) = &self.replay_digest {
+            return hex_sha256(
+                &serde_json::to_vec(&(
+                    3u8,
+                    self.owner_uid,
+                    &self.agent_owner,
+                    replay_digest,
+                    self.created_at_unix_seconds,
+                    self.lifecycle_epoch,
+                    review,
+                ))
+                .expect("signed agent record projection serialization"),
+            );
+        }
         if let Some(owner) = &self.agent_owner {
             return hex_sha256(
                 &serde_json::to_vec(&(
@@ -544,6 +564,10 @@ impl DirectRecord {
         let r = &self.review;
         let text = |s: &str| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control);
         self.binding_digest == self.digest()
+            && self
+                .replay_digest
+                .as_ref()
+                .is_none_or(|digest| self.agent_owner.is_some() && valid_sha256(digest))
             && self
                 .approval
                 .as_ref()

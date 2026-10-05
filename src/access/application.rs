@@ -15,6 +15,8 @@ thread_local! { static CLEANUP_WAIT_HOOK: CleanupWaitHook = std::cell::RefCell::
 #[cfg(test)]
 thread_local! { pub(crate) static AGENT_REVOKE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
 #[cfg(test)]
+thread_local! { pub(crate) static SIGNED_COMMIT_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
 thread_local! { static PAIR_AGENT_GATE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
 
 pub const MAX_SESSION: Duration = Duration::from_secs(15 * 60);
@@ -29,6 +31,7 @@ struct Authority {
     deadline: Option<Duration>,
     cleanup_failed: bool,
     generation: u64,
+    session_epoch: u64,
     request_deadlines: std::collections::HashMap<String, Duration>,
     request_agents: std::collections::HashMap<String, String>,
 }
@@ -168,6 +171,7 @@ impl ProviderApplication {
                 deadline: None,
                 cleanup_failed: true,
                 generation: 0,
+                session_epoch: 0,
                 request_deadlines: std::collections::HashMap::new(),
                 request_agents: std::collections::HashMap::new(),
             }),
@@ -542,6 +546,147 @@ impl ProviderApplication {
         }
         result
     }
+    /// The adapter must obtain both primary and supplementary groups from the kernel
+    /// and call this before reading or parsing any agent payload.
+    pub fn agent_peer_eligible(
+        &self,
+        uid: u32,
+        groups: &[u32],
+    ) -> Result<(), super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        let result = (|| {
+            if self.admission_closed() {
+                return Err(AgentRejection::Unavailable);
+            }
+            let authority = self.gate.try_lock().map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => AgentRejection::Busy,
+                std::sync::TryLockError::Poisoned(_) => AgentRejection::Unavailable,
+            })?;
+            let ids = authority.provider.eligible_agent_ids(uid, groups)?;
+            let tokens = self
+                .agent_tokens
+                .lock()
+                .map_err(|_error| AgentRejection::Unavailable)?;
+            if !ids.iter().any(|id| {
+                tokens
+                    .get(id)
+                    .is_some_and(|token| !token.load(Ordering::Acquire))
+            }) {
+                return Err(AgentRejection::Unauthorized);
+            }
+            Ok(())
+        })();
+        if result == Err(AgentRejection::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+
+    /// Returns only the ID of the committed pending snapshot. Later lifecycle
+    /// changes are intentionally not observable through this submission response.
+    pub fn submit_signed(
+        &self,
+        uid: u32,
+        groups: &[u32],
+        input: super::protocol::SignedSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<String, super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        let result = (|| {
+            if self.admission_closed() {
+                return Err(AgentRejection::Unavailable);
+            }
+            let mut authority = self.gate.try_lock().map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => AgentRejection::Busy,
+                std::sync::TryLockError::Poisoned(_) => AgentRejection::Unavailable,
+            })?;
+            self.admit(&mut authority)?;
+            self.expire_requests(&mut authority)?;
+            let epoch = authority.session_epoch;
+            if self.revocation_epoch.load(Ordering::Acquire) != epoch {
+                return Err(AgentRejection::Locked);
+            }
+            let owner = authority.provider.authenticate_agent(uid, groups, &input)?;
+            let token = self.agent_token(&Some(owner.clone()))?;
+            if !Self::token_live(&token) {
+                return Err(AgentRejection::Unauthorized);
+            }
+            let deadline = self
+                .clock
+                .now()
+                .checked_add(self.request_lifetime)
+                .ok_or(AgentRejection::Unavailable)?;
+            let now = self.clock.unix_seconds()?;
+            let expires = now
+                .checked_add(self.request_lifetime.as_secs())
+                .ok_or(AgentRejection::Unavailable)?;
+            let session_deadline = authority.deadline.ok_or(AgentRejection::Locked)?;
+            let live = || {
+                !self.admission_closed()
+                    && Self::token_live(&token)
+                    && self.revocation_epoch.load(Ordering::Acquire) == epoch
+                    && self.clock.now() < session_deadline
+                    && self.clock.now() < deadline
+            };
+            // Same gate -> release order as execution. Revocation intent either
+            // wins before this check, or waits until the guarded snapshot commits.
+            let release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| AgentRejection::Unavailable)?;
+            if !Self::token_live(&token) {
+                return Err(AgentRejection::Unauthorized);
+            }
+            if !live() {
+                return Err(AgentRejection::Locked);
+            }
+            let review =
+                authority
+                    .provider
+                    .create_signed(owner.clone(), input, now, expires, live)?;
+            drop(release);
+            #[cfg(test)]
+            SIGNED_COMMIT_HOOK.with(|hook| {
+                if let Some(observe) = hook.borrow_mut().take() {
+                    observe();
+                }
+            });
+            authority
+                .request_agents
+                .insert(review.id.clone(), owner.binding_id);
+            authority
+                .request_deadlines
+                .insert(review.id.clone(), deadline);
+            // Keep launch linearized with lock/revoke; its capability remains
+            // exclusively in the human adapter. Slow launch retains one bounded job.
+            let release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| AgentRejection::Unavailable)?;
+            if live() && launcher.launch(&review.id).is_err() {
+                authority
+                    .provider
+                    .fail_direct_launch(&review.id)
+                    .map_err(|_error| AgentRejection::Unavailable)?;
+            }
+            drop(release);
+            if self.revocation_epoch.load(Ordering::Acquire) != epoch {
+                Self::revoke(&mut authority)?;
+            } else {
+                match self.admit(&mut authority) {
+                    Ok(()) | Err(SessionError::Locked) => {}
+                    Err(error) => return Err(error.into()),
+                }
+                self.expire_requests(&mut authority)?;
+            }
+            Ok(review.id)
+        })();
+        if result == Err(AgentRejection::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+
     #[cfg(test)]
     pub(crate) fn submit_agent_for_test(
         &self,
@@ -1346,6 +1491,7 @@ impl ApprovalAuthenticator for ProviderApplication {
         }
         Self::revoke(&mut authority)?;
         let started = self.clock.now();
+        let session_epoch = self.revocation_epoch.load(Ordering::Acquire);
         let attempt = authority
             .backend
             .probe_compatibility()
@@ -1361,6 +1507,7 @@ impl ApprovalAuthenticator for ProviderApplication {
                     return Err(SessionError::Locked);
                 }
                 authority.deadline = Some(deadline);
+                authority.session_epoch = session_epoch;
                 Ok(())
             }
             result => {
@@ -1368,6 +1515,23 @@ impl ApprovalAuthenticator for ProviderApplication {
                 Err(result.err().unwrap_or(SessionError::AuthenticationFailed))
             }
         }
+    }
+}
+
+impl From<DirectRequestError> for super::protocol::AgentRejection {
+    fn from(error: DirectRequestError) -> Self {
+        match error {
+            DirectRequestError::Unauthorized => Self::Unauthorized,
+            DirectRequestError::Locked => Self::Locked,
+            DirectRequestError::InvalidRequest => Self::InvalidArguments,
+            DirectRequestError::StaleRevision => Self::StaleRevision,
+            _ => Self::Unavailable,
+        }
+    }
+}
+impl From<SessionError> for super::protocol::AgentRejection {
+    fn from(error: SessionError) -> Self {
+        DirectRequestError::from(error).into()
     }
 }
 

@@ -18,6 +18,7 @@ use vaultwarden_cli::{
         loopback_ui::LoopbackUi,
         session::{MonotonicClock, clear_persisted_session},
         supervisor::{ExecutionWorker, SystemdProcessSupervisor},
+        unix_socket::AgentSocket,
         vaultwarden::VaultwardenBackend,
     },
 };
@@ -29,6 +30,12 @@ struct Args {
     /// Provider-owned directory for lifecycle state.
     #[arg(long, env = "VAULTWARDEN_ACCESS_STATE_ROOT")]
     state_root: PathBuf,
+    /// Preprovisioned provider-owned 0750 directory for the agent socket.
+    #[arg(long, requires_all = ["agent_socket_gid", "backend_config", "ui_tls_cert", "ui_tls_key"])]
+    agent_socket_dir: Option<PathBuf>,
+    /// Access group owning the 0660 agent socket.
+    #[arg(long, requires = "agent_socket_dir")]
+    agent_socket_gid: Option<u32>,
     /// Provider-owned lifetime for one-time human requests, in seconds.
     #[arg(long, env = "VAULTWARDEN_ACCESS_REQUEST_LIFETIME_SECONDS", default_value_t = 300, value_parser = clap::value_parser!(u64).range(1..=86400))]
     request_lifetime_seconds: u64,
@@ -97,6 +104,13 @@ fn run(args: Args) -> Result<(), ()> {
     );
     let execution_worker = ExecutionWorker::start(app.clone(), supervisor).map_err(|_error| ())?;
     let human_socket = HumanSocket::bind(&args.state_root).map_err(|_error| ())?;
+    let agent_socket = args
+        .agent_socket_dir
+        .as_deref()
+        .map(|directory| {
+            AgentSocket::bind(directory, args.agent_socket_gid.ok_or(())?).map_err(|_error| ())
+        })
+        .transpose()?;
     let artifact = args.state_root.join("open-vaultwarden-access.html");
     let ui = LoopbackUi::bind(
         &artifact,
@@ -107,6 +121,9 @@ fn run(args: Args) -> Result<(), ()> {
     .with_approval_authenticator(approval_authenticator)
     .with_execution_dispatcher(execution_worker.dispatcher());
     let stop = Arc::new(AtomicBool::new(false));
+    let agent_worker = agent_socket.map(|socket| {
+        runtime.spawn(socket.serve(app.clone(), ui.request_launcher(), stop.clone()))
+    });
     let human_worker = {
         let app = app.clone();
         let stop = stop.clone();
@@ -123,9 +140,22 @@ fn run(args: Args) -> Result<(), ()> {
         async {
             tokio::select! { _ = interrupt.recv() => {}, _ = term.recv() => {} }
         },
-        || transport_finished(&worker, &human_worker) || execution_worker.is_finished(),
+        || {
+            transport_finished(&worker, &human_worker)
+                || execution_worker.is_finished()
+                || agent_worker
+                    .as_ref()
+                    .is_some_and(|worker| worker.is_finished())
+        },
     ));
     stop.store(true, Ordering::Release);
+    let agent_cleanup = match agent_worker {
+        Some(worker) => runtime
+            .block_on(worker)
+            .map_err(|_error| ())
+            .and_then(|result| result.map_err(|_error| ())),
+        None => Ok(()),
+    };
     // Never short-circuit joining or final revocation on a worker error.
     let cleanup = join_then_revoke(worker, || {
         let human = human_worker
@@ -138,7 +168,10 @@ fn run(args: Args) -> Result<(), ()> {
     });
     let artifact_cleanup = std::fs::remove_file(artifact).map_err(|_error| ());
     let execution_cleanup = execution_worker.join().map_err(|_error| ());
-    cleanup.and(artifact_cleanup).and(execution_cleanup)
+    cleanup
+        .and(artifact_cleanup)
+        .and(execution_cleanup)
+        .and(agent_cleanup)
 }
 
 #[cfg(target_os = "linux")]
@@ -227,6 +260,72 @@ fn clear_previous_launch(path: &std::path::Path) -> Result<(), ()> {
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn agent_listener_requires_explicit_paired_options_backend_and_tls() {
+        for extra in [
+            vec!["--agent-socket-dir", "/socket"],
+            vec!["--agent-socket-gid", "7"],
+            vec!["--agent-socket-dir", "/socket", "--agent-socket-gid", "7"],
+        ] {
+            assert!(
+                Args::try_parse_from(
+                    ["accessd", "--state-root", "/private"]
+                        .into_iter()
+                        .chain(extra)
+                )
+                .is_err()
+            );
+        }
+        for tls in [
+            vec![],
+            vec!["--ui-tls-cert", "/cert"],
+            vec!["--ui-tls-key", "/key"],
+        ] {
+            assert!(
+                Args::try_parse_from(
+                    [
+                        "accessd",
+                        "--state-root",
+                        "/private",
+                        "--backend-config",
+                        "/setup",
+                        "--agent-socket-dir",
+                        "/socket",
+                        "--agent-socket-gid",
+                        "7",
+                    ]
+                    .into_iter()
+                    .chain(tls)
+                )
+                .is_err()
+            );
+        }
+        let args = Args::try_parse_from([
+            "accessd",
+            "--state-root",
+            "/private",
+            "--backend-config",
+            "/setup",
+            "--agent-socket-dir",
+            "/socket",
+            "--agent-socket-gid",
+            "7",
+            "--ui-tls-cert",
+            "/cert",
+            "--ui-tls-key",
+            "/key",
+        ])
+        .unwrap();
+        assert_eq!(args.agent_socket_gid, Some(7));
+        assert_eq!(args.agent_socket_dir, Some(PathBuf::from("/socket")));
+        assert!(
+            Args::try_parse_from(["accessd", "--state-root", "/private"])
+                .unwrap()
+                .agent_socket_dir
+                .is_none()
+        );
+    }
 
     #[test]
     fn lifetime_is_provider_configured_with_five_minute_default_and_bounds() {

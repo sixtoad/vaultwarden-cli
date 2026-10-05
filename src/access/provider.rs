@@ -209,6 +209,90 @@ impl Provider {
             .map(AgentOwner::from_binding)
             .ok_or(DirectRequestError::Unauthorized)
     }
+    pub(crate) fn eligible_agent_ids(
+        &self,
+        uid: u32,
+        groups: &[u32],
+    ) -> Result<Vec<String>, super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        if uid == self.owner_uid() {
+            return Err(AgentRejection::Unauthorized);
+        }
+        Ok(self
+            .store
+            .read_state()
+            .map_err(|_error| AgentRejection::Unavailable)?
+            .pairings
+            .iter()
+            .filter(|binding| binding.matches_os(uid, groups))
+            .map(|binding| binding.id.clone())
+            .collect())
+    }
+
+    pub(crate) fn authenticate_agent(
+        &self,
+        uid: u32,
+        groups: &[u32],
+        input: &super::protocol::SignedSubmission,
+    ) -> Result<super::direct_request::AgentOwner, super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        if uid == self.owner_uid() {
+            return Err(AgentRejection::Unauthorized);
+        }
+        let state = self
+            .store
+            .read_state()
+            .map_err(|_error| AgentRejection::Unavailable)?;
+        let binding = state
+            .pairings
+            .iter()
+            .find(|binding| binding.id == input.binding_id && binding.matches_os(uid, groups))
+            .ok_or(AgentRejection::Unauthorized)?;
+        input.verify(&binding.public_key)?;
+        Ok(super::direct_request::AgentOwner::from_binding(binding))
+    }
+
+    pub(crate) fn create_signed(
+        &mut self,
+        owner: super::direct_request::AgentOwner,
+        input: super::protocol::SignedSubmission,
+        now: u64,
+        expires: u64,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::direct_request::DirectReview, super::protocol::AgentRejection> {
+        use super::{direct_request::DirectSubmission, protocol::AgentRejection};
+        if input.binding_id != owner.binding_id {
+            return Err(AgentRejection::Unauthorized);
+        }
+        let marker = input.replay_digest()?;
+        let state = self
+            .store
+            .read_state()
+            .map_err(|_error| AgentRejection::Unavailable)?;
+        if state.requests.iter().any(|request| {
+            request
+                .direct
+                .as_ref()
+                .is_some_and(|record| record.replay_digest.as_ref() == Some(&marker))
+        }) {
+            return Err(AgentRejection::Replay);
+        }
+        self.create_owned(
+            owner.uid,
+            Some(owner),
+            Some(marker),
+            DirectSubmission {
+                operation: input.operation_id,
+                revision: Some(input.expected_policy_revision),
+                values: input.args,
+            },
+            now,
+            expires,
+            still_authorized,
+        )
+        .map_err(Into::into)
+    }
+
     fn agent_current(
         state: &ProviderState,
         owner: &Option<super::direct_request::AgentOwner>,
@@ -277,7 +361,15 @@ impl Provider {
         still_authorized: impl Fn() -> bool,
     ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
     {
-        self.create_owned(owner.uid(), None, input, now, expires, still_authorized)
+        self.create_owned(
+            owner.uid(),
+            None,
+            None,
+            input,
+            now,
+            expires,
+            still_authorized,
+        )
     }
     #[cfg(test)]
     pub(crate) fn create_agent_for_test(
@@ -292,16 +384,19 @@ impl Provider {
         self.create_owned(
             owner.uid,
             Some(owner),
+            None,
             input,
             now,
             expires,
             still_authorized,
         )
     }
+    #[allow(clippy::too_many_arguments)]
     fn create_owned(
         &mut self,
         uid: u32,
         agent_owner: Option<super::direct_request::AgentOwner>,
+        replay_digest: Option<String>,
         input: super::direct_request::DirectSubmission,
         now: u64,
         expires: u64,
@@ -351,6 +446,7 @@ impl Provider {
         let mut direct = DirectRecord {
             owner_uid: uid,
             agent_owner,
+            replay_digest,
             created_at_unix_seconds: now,
             lifecycle_epoch: state.lifecycle_epoch,
             review: review.clone(),
@@ -374,7 +470,15 @@ impl Provider {
             direct: Some(direct),
         });
         if is_agent {
-            self.store.write_state_guarded(&state, still_authorized)?;
+            self.store
+                .write_state_guarded(&state, still_authorized)
+                .map_err(|error| {
+                    if error.diagnostic() == ProviderDiagnostic::ExpiredAccessRequest {
+                        DirectRequestError::Locked
+                    } else {
+                        DirectRequestError::Unavailable
+                    }
+                })?;
         } else {
             self.store.write_state(&state)?;
         }
