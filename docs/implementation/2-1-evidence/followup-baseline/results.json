@@ -1,0 +1,27 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 3.08
+  },
+  {
+    "name": "agents",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "agent_"
+    ],
+    "exit": 0,
+    "seconds": 50.27
+  }
+]

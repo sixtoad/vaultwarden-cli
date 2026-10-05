@@ -1,0 +1,36 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 3.18
+  },
+  {
+    "name": "all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 245.48
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.22
+  }
+]

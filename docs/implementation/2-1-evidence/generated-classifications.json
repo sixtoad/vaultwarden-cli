@@ -1,0 +1,483 @@
+[
+  {
+    "name": "src/access/agent_binding.rs:71:9: replace AgentBinding::validate -> Result<(), ProviderError> with Ok(())",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_71_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_71_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:80:13: replace || with && in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_80_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_80_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:79:13: replace || with && in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_79_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_79_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:78:13: replace || with && in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_78_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_78_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:77:13: replace || with && in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_77_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_77_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:76:13: replace || with && in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_76_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_76_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:75:13: replace || with && in AgentBinding::validate",
+    "initial": "MissedMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_75_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_75_col_13.diff.gz",
+    "final": "CaughtMutant",
+    "followup_log": "generated-followup/mutants.out/log/src__access__agent_binding.rs_line_75_col_13.log.gz"
+  },
+  {
+    "name": "src/access/agent_binding.rs:74:21: replace != with == in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_74_col_21.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_74_col_21.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:75:44: replace != with == in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_75_col_44.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_75_col_44.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:76:16: delete ! in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_76_col_16.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_76_col_16.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:77:16: delete ! in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_77_col_16.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_77_col_16.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:78:16: delete ! in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_78_col_16.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_78_col_16.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:79:25: replace == with != in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_79_col_25.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_79_col_25.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:80:33: replace != with == in AgentBinding::validate",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_80_col_33.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_80_col_33.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:89:9: replace AgentBinding::matches_os -> bool with true",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_89_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_89_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:89:9: replace AgentBinding::matches_os -> bool with false",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_89_col_9_001.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_89_col_9_001.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:89:71: replace && with || in AgentBinding::matches_os",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_89_col_71.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_89_col_71.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:89:52: replace && with || in AgentBinding::matches_os",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_89_col_52.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_89_col_52.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:89:21: replace == with != in AgentBinding::matches_os",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_89_col_21.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_89_col_21.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:89:64: replace == with != in AgentBinding::matches_os",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_89_col_64.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_89_col_64.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:148:5: replace validate_registry -> Result<(), ProviderError> with Ok(())",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_148_col_5.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_148_col_5.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:156:13: replace || with && in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_156_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_156_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:155:13: replace || with && in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_155_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_155_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:155:16: delete ! in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_155_col_16.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_155_col_16.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:156:63: replace && with || in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_156_col_63.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_156_col_63.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:156:32: replace == with != in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_156_col_32.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_156_col_32.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:156:66: delete ! in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_156_col_66.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_156_col_66.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:164:18: replace != with == in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_164_col_18.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_164_col_18.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:168:12: delete ! in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_168_col_12.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_168_col_12.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:181:45: replace != with == in validate_registry",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_181_col_45.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_181_col_45.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:189:5: replace valid_label -> bool with true",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_189_col_5.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_189_col_5.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:189:5: replace valid_label -> bool with false",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_189_col_5_001.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_189_col_5_001.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:194:9: replace && with || in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_194_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_194_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:191:9: replace && with || in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_191_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_191_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:190:9: replace && with || in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_190_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_190_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:189:5: delete ! in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_189_col_5_002.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_189_col_5_002.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:190:24: replace <= with > in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_190_col_24.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_190_col_24.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:193:49: replace || with && in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_193_col_49.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_193_col_49.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:193:57: replace == with != in valid_label",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_193_col_57.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_193_col_57.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:198:5: replace valid_os_id -> bool with true",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_198_col_5.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_198_col_5.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:198:5: replace valid_os_id -> bool with false",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_198_col_5_001.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_198_col_5_001.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:198:13: replace && with || in valid_os_id",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_198_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_198_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:198:8: replace != with == in valid_os_id",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_198_col_8.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_198_col_8.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/agent_binding.rs:198:19: replace != with == in valid_os_id",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__agent_binding.rs_line_198_col_19.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__agent_binding.rs_line_198_col_19.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/application.rs:433:9: replace ProviderApplication::await_agent_cleanup -> Result<(), DirectRequestError> with Ok(())",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_433_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_433_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/application.rs:445:13: replace || with && in ProviderApplication::await_agent_cleanup",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_445_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_445_col_13.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/application.rs:444:13: replace || with && in ProviderApplication::await_agent_cleanup",
+    "initial": "MissedMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_444_col_13.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_444_col_13.diff.gz",
+    "final": "CaughtMutant",
+    "followup_log": "generated-followup/mutants.out/log/src__access__application.rs_line_444_col_13.log.gz"
+  },
+  {
+    "name": "src/access/application.rs:470:9: replace ProviderApplication::token_live -> bool with true",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_470_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_470_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/application.rs:470:9: replace ProviderApplication::token_live -> bool with false",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_470_col_9_001.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_470_col_9_001.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/application.rs:472:33: delete ! in ProviderApplication::token_live",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_472_col_33.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_472_col_33.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/application.rs:479:9: replace ProviderApplication::request_agent_live -> Result<(), DirectRequestError> with Ok(())",
+    "initial": "MissedMutant",
+    "log": "generated-library/mutants.out/log/src__access__application.rs_line_479_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__application.rs_line_479_col_9.diff.gz",
+    "final": "CaughtMutant",
+    "followup_log": "generated-followup/mutants.out/log/src__access__application.rs_line_479_col_9.log.gz"
+  },
+  {
+    "name": "src/access/direct_request.rs:183:9: replace AgentOwner::matches -> bool with true",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__direct_request.rs_line_183_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__direct_request.rs_line_183_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/direct_request.rs:183:9: replace AgentOwner::matches -> bool with false",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__direct_request.rs_line_183_col_9_001.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__direct_request.rs_line_183_col_9_001.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/direct_request.rs:183:15: replace == with != in AgentOwner::matches",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__direct_request.rs_line_183_col_15.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__direct_request.rs_line_183_col_15.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:106:9: replace Provider::check_administrator -> Result<(), super::direct_request::DirectRequestError> with Ok(())",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_106_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_106_col_9.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:106:24: replace != with == in Provider::check_administrator",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_106_col_24.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_106_col_24.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:203:9: replace Provider::agent_binding_for_peer -> Result<super::direct_request::AgentOwner, super::direct_request::DirectRequestError> with Ok(Default::default())",
+    "initial": "Unviable",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_203_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_203_col_9.diff.gz",
+    "final": "Unviable"
+  },
+  {
+    "name": "src/access/provider.rs:208:34: replace && with || in Provider::agent_binding_for_peer",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_208_col_34.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_208_col_34.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:208:28: replace == with != in Provider::agent_binding_for_peer",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_208_col_28.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_208_col_28.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:216:9: replace Provider::agent_current -> bool with true",
+    "initial": "MissedMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_216_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_216_col_9.diff.gz",
+    "final": "CaughtMutant",
+    "followup_log": "generated-followup/mutants.out/log/src__access__provider.rs_line_216_col_9.log.gz"
+  },
+  {
+    "name": "src/access/provider.rs:216:9: replace Provider::agent_current -> bool with false",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_216_col_9_001.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_216_col_9_001.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:218:34: replace && with || in Provider::agent_current",
+    "initial": "MissedMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_218_col_34.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_218_col_34.diff.gz",
+    "final": "CaughtMutant",
+    "followup_log": "generated-followup/mutants.out/log/src__access__provider.rs_line_218_col_34.log.gz"
+  },
+  {
+    "name": "src/access/provider.rs:218:46: replace == with != in Provider::agent_current",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_218_col_46.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_218_col_46.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:232:9: replace Provider::agent_status -> Result<super::direct_request::DirectStatus, super::direct_request::DirectRequestError> with Ok(Default::default())",
+    "initial": "Unviable",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_232_col_9.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_232_col_9.diff.gz",
+    "final": "Unviable"
+  },
+  {
+    "name": "src/access/provider.rs:234:12: delete ! in Provider::agent_status",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_234_col_12.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_234_col_12.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:237:39: replace && with || in Provider::agent_status",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_237_col_39.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_237_col_39.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:244:28: replace == with != in Provider::agent_status",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_244_col_28.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_244_col_28.diff.gz",
+    "final": "CaughtMutant"
+  },
+  {
+    "name": "src/access/provider.rs:246:48: replace == with != in Provider::agent_status",
+    "initial": "CaughtMutant",
+    "log": "generated-library/mutants.out/log/src__access__provider.rs_line_246_col_48.log.gz",
+    "patch": "generated-library/mutants.out/diff/src__access__provider.rs_line_246_col_48.diff.gz",
+    "final": "CaughtMutant"
+  }
+]

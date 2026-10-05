@@ -1,0 +1,9 @@
+{
+  "source_changes_after_real_systemd": [
+    "src/bin/vw-access.rs",
+    "tests/human_cli.rs"
+  ],
+  "unchanged_provider_and_supervisor": true,
+  "real_systemd_log": "final/real-systemd.log.gz",
+  "final_cli_sources": "cli-fix/source-hashes.json"
+}

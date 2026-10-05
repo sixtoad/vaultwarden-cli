@@ -1,0 +1,30 @@
+{
+  "all-targets": {
+    "reported_passed": 874,
+    "failed": 0,
+    "ignored": 13,
+    "test_binaries": 18,
+    "benchmark_successes": 13
+  },
+  "agents": {
+    "reported_passed": 35,
+    "failed": 0,
+    "ignored": 0,
+    "test_binaries": 1,
+    "benchmark_successes": 0
+  },
+  "persistence": {
+    "reported_passed": 13,
+    "failed": 0,
+    "ignored": 0,
+    "test_binaries": 1,
+    "benchmark_successes": 0
+  },
+  "human-integrations": {
+    "reported_passed": 14,
+    "failed": 0,
+    "ignored": 0,
+    "test_binaries": 3,
+    "benchmark_successes": 0
+  }
+}

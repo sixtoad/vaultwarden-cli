@@ -1,0 +1,31 @@
+{
+  "command": [
+    "cargo",
+    "mutants",
+    "--no-config",
+    "--in-place",
+    "--file",
+    "src/access/agent_binding.rs",
+    "--file",
+    "src/access/direct_request.rs",
+    "--file",
+    "src/access/provider.rs",
+    "--file",
+    "src/access/application.rs",
+    "--file",
+    "src/access/provider_store.rs",
+    "--re",
+    "AgentBinding::(validate|matches_os)|valid_label|valid_os_id|validate_registry|AgentOwner::matches|Provider::(check_administrator|agent_binding_for_peer|agent_current|agent_status)|ProviderApplication::(token_live|request_agent_live|await_agent_cleanup)",
+    "--output",
+    "/home/sixtocantolla/sessions/day-to-day/vaultwarden-pair-revoke-agent/docs/implementation/2-1-evidence/generated",
+    "--timeout",
+    "120",
+    "--build-timeout",
+    "900",
+    "--",
+    "--lib",
+    "agent_"
+  ],
+  "exit": 1,
+  "seconds": 174.13
+}

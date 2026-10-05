@@ -1,0 +1,107 @@
+[
+  {
+    "name": "cleanup-timeout",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::direct_request_tests::agent_cleanup_timeout_keeps_running_nonterminal_until_confirmed_reaping",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 21.3,
+    "mutant_exit": 101,
+    "mutant_seconds": 33.05,
+    "classification": "caught",
+    "source_sha256": "6c68750cb6234121bcc3fe4490e7f81f53497280cc0f4080d1f7b460b16aa395"
+  },
+  {
+    "name": "pair-label-preflight",
+    "path": "src/access/provider.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::direct_request_tests::agent_administration_checks_human_authority_even_while_locked_and_retains_tombstones",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.22,
+    "mutant_exit": 101,
+    "mutant_seconds": 13.27,
+    "classification": "caught",
+    "source_sha256": "24a2de5be736cd4fb82b44a9d5d3b1f5f9edf94493031ef0b0c627222932f655"
+  },
+  {
+    "name": "pair-key-preflight",
+    "path": "src/access/provider.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::direct_request_tests::agent_administration_checks_human_authority_even_while_locked_and_retains_tombstones",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.17,
+    "mutant_exit": 101,
+    "mutant_seconds": 12.22,
+    "classification": "caught",
+    "source_sha256": "24a2de5be736cd4fb82b44a9d5d3b1f5f9edf94493031ef0b0c627222932f655"
+  },
+  {
+    "name": "revoke-exact-id",
+    "path": "src/access/provider.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::direct_request_tests::agent_revoke_targets_requested_id_when_another_binding_precedes_it",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.42,
+    "mutant_exit": 101,
+    "mutant_seconds": 12.77,
+    "classification": "caught",
+    "source_sha256": "24a2de5be736cd4fb82b44a9d5d3b1f5f9edf94493031ef0b0c627222932f655"
+  },
+  {
+    "name": "running-scope",
+    "path": "src/access/application.rs",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "access::direct_request_tests::agent_running_revoke_and_retry_wait_for_confirmed_scoped_cleanup",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "baseline_exit": 0,
+    "baseline_seconds": 1.77,
+    "mutant_exit": 101,
+    "mutant_seconds": 19.49,
+    "classification": "caught",
+    "source_sha256": "6c68750cb6234121bcc3fe4490e7f81f53497280cc0f4080d1f7b460b16aa395"
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "checks": [
+    {
+      "command": "scripts/with-secure-test-tmpdir.sh cargo test --offline --locked --lib access::application::tests::",
+      "exit": 0,
+      "passed": 21,
+      "ignored": 0
+    },
+    {
+      "command": "scripts/with-secure-test-tmpdir.sh cargo test --offline --locked --lib adapters::human_socket::tests::",
+      "exit": 0,
+      "passed": 21,
+      "ignored": 1
+    },
+    {
+      "command": "scripts/with-secure-test-tmpdir.sh cargo test --offline --locked --test human_cli",
+      "exit": 0,
+      "passed": 7,
+      "ignored": 0
+    },
+    {
+      "command": "python3 docs/implementation/2-1-evidence/runner-tests.py -v",
+      "exit": 0,
+      "passed": 2
+    }
+  ],
+  "rust_environment": {
+    "RUST_TEST_THREADS": "4",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_hashes": {
+    "src/access/application.rs": "2bfe3cd61e18a640ac2974e0d0b5880fb986ef4624831a58891ea5e5f0508146",
+    "src/adapters/human_socket.rs": "ad2e9ecc0df92a201831ffd4886cd059701e4899db1866ea4a647b078dc7c72a",
+    "src/bin/vw-access.rs": "36ed57c3e1e053f0760b92b1ec3b16deb2fea66dc424bcdf16257aae85804445",
+    "tests/human_cli.rs": "93ce6febf39ece2e82b34d336fd077361c5163ea208562bd1b893472f7275cd7",
+    "docs/implementation/2-1-evidence/semantic-runner.py": "f5343add72caef882ff132f31c1e8a168f55a4acd75625d0769d04337e718185",
+    "docs/implementation/2-1-evidence/verification-runner.py": "2b88f3a9e5db3c7d62daaa039a19510cfcf23aa6fea632a70871f189ae3ffc97",
+    "docs/implementation/2-1-evidence/runner-tests.py": "b8e6980a723ee0ae04ebb8d8090e540ce75631079ead48ac15d07d44f5d56084",
+    "docs/implementation/2-1-verification.md": "a7f08032813d861747449ec1d5c62f5d7b54abd9dc33db4bd59a03b362fd5374"
+  }
+}

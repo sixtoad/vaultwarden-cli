@@ -1,0 +1,26 @@
+{
+  "unchanged_files_since_final_cli": {
+    "src/access.rs": "0d58cd85d5bb785b77ca8a33d152cafc1383609555de17e6b55a0258aa5e37f2",
+    "src/access/agent_binding.rs": "0cecf544c410596b6ffd272e9b7b1364025352917a4e34d1f71949db846a8006",
+    "src/access/direct_request.rs": "947bc06d1b700bd4478016b11e28e65cb8d62658e67a65f7e6168ee6ef42d186",
+    "src/access/provider.rs": "2482df6381463b98d26b1f85f11da1e5feb7ca9fd93261c4fb9b7124ea8368e5",
+    "src/access/provider_store.rs": "d02ae4c80085eab2da0e022738ce32a0d9e2dd0f4bb247e6a7a25cfe91350454"
+  },
+  "unchanged_application_methods_since_review": {
+    "revoke_agent": "d5ae0b7356499480b62fba7eb1fc31c0cf76b3b69882cee2dd8e7b46c2c237ef",
+    "await_agent_cleanup": "68ed172b1776d6b9501d52bd63f6708266a1e217795aa4b9a55a4df0e00d416d",
+    "token_live": "5bd4b4987591512756bf60fd1d3a1759fa777d59d11149def75283aae384b70b",
+    "request_agent_live": "5e954e4a459c89a989cc1d950f75dfa75ff992097a5c6ca426dd6e338da63434"
+  },
+  "new_mutations": 6,
+  "new_caught": 6,
+  "original_mutations": 99,
+  "original_caught": 97,
+  "original_unviable": 2,
+  "unique_total": 105,
+  "caught_total": 103,
+  "unviable_total": 2,
+  "viable_survivors": 0,
+  "equivalent_exclusions": 0,
+  "source_restoration_checked": true
+}

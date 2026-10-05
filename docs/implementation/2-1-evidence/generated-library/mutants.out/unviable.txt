@@ -1,0 +1,2 @@
+src/access/provider.rs:203:9: replace Provider::agent_binding_for_peer -> Result<super::direct_request::AgentOwner, super::direct_request::DirectRequestError> with Ok(Default::default())
+src/access/provider.rs:232:9: replace Provider::agent_status -> Result<super::direct_request::DirectStatus, super::direct_request::DirectRequestError> with Ok(Default::default())

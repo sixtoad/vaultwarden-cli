@@ -1,0 +1,23 @@
+[
+  {
+    "name": "agents",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "agent_"
+    ],
+    "exit": 0,
+    "seconds": 43.31
+  },
+  {
+    "name": "real-systemd",
+    "command": [
+      "scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 0,
+    "seconds": 13.79
+  }
+]

@@ -1,0 +1,5 @@
+src/access/agent_binding.rs:75:13: replace || with && in AgentBinding::validate
+src/access/application.rs:444:13: replace || with && in ProviderApplication::await_agent_cleanup
+src/access/application.rs:479:9: replace ProviderApplication::request_agent_live -> Result<(), DirectRequestError> with Ok(())
+src/access/provider.rs:216:9: replace Provider::agent_current -> bool with true
+src/access/provider.rs:218:34: replace && with || in Provider::agent_current

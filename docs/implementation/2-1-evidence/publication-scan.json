@@ -1,0 +1,14 @@
+{
+  "command": [
+    "scripts/scan-staged-secrets.sh"
+  ],
+  "exit": 1,
+  "classification": "three verified false positives",
+  "file": "src/access/application.rs",
+  "lines": [
+    518,
+    614,
+    1174
+  ],
+  "evidence": "Every match invokes self.agent_token on an agent owner. The method returns Option<Arc<AtomicBool>> for in-memory revocation; no credential literal is present. No source change or hook bypass was made."
+}
