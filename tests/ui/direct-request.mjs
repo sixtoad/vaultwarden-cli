@@ -36,7 +36,7 @@ try{
   const focus=await page.evaluate(()=>({name:document.activeElement.textContent,style:getComputedStyle(document.activeElement).outlineStyle,width:getComputedStyle(document.activeElement).outlineWidth}));assert.match(focus.name,/Unlock/);assert.equal(focus.style,'solid');assert.equal(focus.width,'3px');
   await page.keyboard.press('Enter');await page.waitForFunction(()=>document.querySelector('#result').textContent.includes('Provider unlocked'));
   assert.equal(await page.$eval('#password',e=>e.value),'');
-  const run=(args)=>JSON.parse(execFileSync(path.join(repo,'target/debug/vw-access'),['--state-root',ready.root,...args],{encoding:'utf8',stdio:'pipe'}));
+  const run=(args)=>JSON.parse(execFileSync(path.join(path.resolve(repo,process.env.CARGO_TARGET_DIR || 'target'),'debug/vw-access'),['--state-root',ready.root,...args],{encoding:'utf8',stdio:'pipe'}));
   // Valid fixture creation may contend with UI polling. Retry only the explicit
   // unavailable rejection, never a transport/delivery error or another rejection.
   const submit=async(values)=>{
@@ -340,10 +340,33 @@ try{
     await tab.waitForFunction(n=>window.reviewDelivered>n,{},polls);assert.equal(await tab.$eval('#decision-feedback',e=>e.textContent),message);await assertUnavailable(tab);
     await tab.close();await fresh.tab.close();
   }
+  // A real signed admission creates the private launch artifact and complete
+  // attributed review. Only its closed acknowledgment crosses the agent boundary.
+  fs.writeFileSync(path.join(control,'signed-submit'),'submit');
+  for(let attempt=0;attempt<200&&!fs.existsSync(path.join(control,'signed-result.json'));attempt++)await sleep(25);
+  const signedResponse=JSON.parse(fs.readFileSync(path.join(control,'signed-result.json'),'utf8'));
+  assert.deepEqual(Object.keys(signedResponse).sort(),['protocol_version','request_id','status']);
+  assert.equal(signedResponse.protocol_version,1);assert.equal(signedResponse.status,'pending');
+  const signedStored=JSON.parse(fs.readFileSync(path.join(ready.root,'provider-state.json'),'utf8')).requests.find(request=>request.id===signedResponse.request_id).direct;
+  assert(signedStored.replay_digest);assert.equal(signedStored.agent_owner.binding_id,ready.signed_binding.id);
+  const signedTab=await browser.newPage();signedTab.on('pageerror',e=>errors.push(String(e)));
+  const signedArtifact=path.join(ready.root,`review-${signedResponse.request_id}.html`);
+  assert.equal(fs.statSync(signedArtifact).mode&0o777,0o600);
+  await signedTab.goto(pathToFileURL(signedArtifact).href);
+  await signedTab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+  const signedDetails=await signedTab.$$eval('#details dt',terms=>Object.fromEntries(terms.map(term=>[term.textContent,term.nextElementSibling.textContent])));
+  const expectedReview=signedStored.review;
+  for(const [name,value] of Object.entries({'Request ID':signedResponse.request_id,'Requester':`agent ${ready.signed_binding.label} (${ready.signed_binding.fingerprint})`,'Operation':expectedReview.operation,'Effect':expectedReview.effect,'Target':expectedReview.target,'Credentials and use types':expectedReview.credentials.map(credential=>`${credential.label} (${credential.use_type})`).join(' · '),'Executable digest':expectedReview.executable_digest,'Policy digest':ready.signed_revision,'Arguments digest':expectedReview.arguments_digest,'Expires at':new Date(expectedReview.expires_at_unix_seconds*1000).toISOString(),'One-time meaning':expectedReview.one_time}))assert.equal(signedDetails[name],value,name);
+  assert.deepEqual(await signedTab.$$eval('#arguments > li',items=>items.map(item=>item.textContent)),['staging','safe|"quoted"','3']);
+  assert.equal(await signedTab.$eval('#details',element=>element.querySelectorAll('img,script').length),0);
+  for(const excluded of ['capability','https://','synthetic-browser-password','Deployment','seed','private_key'])assert(!JSON.stringify(signedResponse).includes(excluded));
+  await signedTab.click('#deny');await signedTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: denied; no operation will run');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ready.root,'provider-state.json'),'utf8')).requests.find(request=>request.id===signedResponse.request_id).direct.review.status.status,'denied');
+  await signedTab.close();
   const knownDiagnostics=errors.filter(e=>e.includes('Permission denied to access property \"__bidi_args\"')||e==='Error: Error: Permission denied to access property \"length\"'||(e.includes('Content-Security-Policy')&&e.includes('/favicon.ico')));
   assert.deepEqual(errors.filter(e=>!knownDiagnostics.includes(e)),[]);
   for(const error of errors)for(const secret of ['synthetic-browser-password','cancelled-password-sentinel','wrong-password-sentinel','retired-password-sentinel',capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
   const diagnosticCategories=[...new Set(knownDiagnostics.map(e=>e.replace(/https:\/\/127\.0\.0\.1:\d+/g,'https://127.0.0.1:<port>')))];
-  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
+  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,signedAgentAdmission:true,signedAgentCompleteReview:true,signedAgentCapabilityIsolation:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
   fs.writeFileSync(path.join(control,'stop'),'stop');assert.equal(await closed,0,childOutput);
 }finally{fs.writeFileSync(path.join(control,'stop'),'stop');await browser?.close();if(child.exitCode===null)child.kill('SIGTERM');}

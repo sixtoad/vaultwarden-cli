@@ -25,6 +25,9 @@ pub mod history;
 mod history_tests;
 pub mod policy;
 pub mod ports;
+pub mod protocol;
+#[cfg(test)]
+mod protocol_tests;
 pub mod provider;
 pub(crate) mod provider_store;
 

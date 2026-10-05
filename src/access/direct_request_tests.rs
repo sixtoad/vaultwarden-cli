@@ -4894,3 +4894,622 @@ fn agent_request_preparation_rejects_published_intent_before_durable_revoke() {
     assert!(revoked.is_ok());
     assert!(!f.app.admission_closed());
 }
+
+fn signed_input(
+    f: &Fixture,
+    binding: &super::agent_binding::AgentBindingView,
+    seed: u8,
+    nonce: u8,
+) -> super::protocol::SignedSubmission {
+    super::protocol::SignedSubmission::sign(
+        binding.id.clone(),
+        [nonce; 32],
+        "deploy".into(),
+        records(f)["operations"][0]["revision"]
+            .as_str()
+            .unwrap()
+            .into(),
+        input().values,
+        &ed25519_dalek::SigningKey::from_bytes(&[seed; 32]),
+    )
+    .unwrap()
+}
+
+fn signed_assert_no_effects(f: &Fixture, launcher: &Launcher) {
+    assert!(records(f)["requests"].as_array().unwrap().is_empty());
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    crate::adapters::execution::TEST_EXECUTION_ATTEMPTS.with(|calls| assert_eq!(calls.get(), 0));
+    crate::adapters::execution::TEST_LAUNCH_ATTEMPTS.with(|calls| assert_eq!(calls.get(), 0));
+}
+
+#[test]
+fn signed_independent_rejections_have_zero_admission_launch_resolution_and_execution() {
+    use super::protocol::AgentRejection as E;
+    for case in [
+        "uid",
+        "group",
+        "provider",
+        "key",
+        "signature",
+        "selector",
+        "revoked",
+        "unknown",
+        "stale",
+        "operation",
+        "target",
+        "argument",
+        "locked",
+        "expired",
+        "closed",
+    ] {
+        let f = fixture();
+        let a = agent_pair(&f, "signed", 111);
+        let other = agent_pair(&f, "other", 112);
+        let mut message = signed_input(&f, &a, 111, 1);
+        let mut uid = a.uid;
+        let mut groups = vec![a.gid];
+        let expected = match case {
+            "uid" => {
+                uid += 1;
+                E::Unauthorized
+            }
+            "group" => {
+                groups.clear();
+                E::Unauthorized
+            }
+            "provider" => {
+                uid = f.app.human_owner().uid();
+                E::Unauthorized
+            }
+            "key" => {
+                message = signed_input(&f, &a, 112, 1);
+                E::Unauthorized
+            }
+            "signature" => {
+                message.signature = signed_input(&f, &a, 111, 2).signature;
+                E::Unauthorized
+            }
+            "selector" => {
+                message = signed_input(&f, &other, 111, 1);
+                E::Unauthorized
+            }
+            "revoked" => {
+                f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+                E::Unauthorized
+            }
+            "unknown" => {
+                message.binding_id = super::RequestId::new_random().unwrap().as_str().into();
+                use base64::Engine;
+                use ed25519_dalek::Signer;
+                message.signature = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
+                    ed25519_dalek::SigningKey::from_bytes(&[111; 32])
+                        .sign(&message.signing_bytes().unwrap())
+                        .to_bytes(),
+                );
+                E::Unauthorized
+            }
+            "locked" => {
+                f.app.lock().unwrap();
+                E::Locked
+            }
+            "expired" => {
+                f.monotonic.store(910, Ordering::SeqCst);
+                E::Locked
+            }
+            "closed" => {
+                f.app.close_admission();
+                E::Unavailable
+            }
+            _ => {
+                match case {
+                    "stale" => message.expected_policy_revision = "0".repeat(64),
+                    "operation" => message.operation_id = "missing".into(),
+                    "target" => message.args[0] = "production".into(),
+                    "argument" => message.args[1] = "forbidden".into(),
+                    _ => panic!("case"),
+                }
+                use base64::Engine;
+                use ed25519_dalek::Signer;
+                message.signature = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
+                    ed25519_dalek::SigningKey::from_bytes(&[111; 32])
+                        .sign(&message.signing_bytes().unwrap())
+                        .to_bytes(),
+                );
+                if case == "stale" {
+                    E::StaleRevision
+                } else {
+                    E::InvalidArguments
+                }
+            }
+        };
+        EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(0));
+        crate::adapters::execution::TEST_EXECUTION_ATTEMPTS.with(|calls| calls.set(0));
+        crate::adapters::execution::TEST_LAUNCH_ATTEMPTS.with(|calls| calls.set(0));
+        let launcher = Launcher::default();
+        assert_eq!(
+            f.app.submit_signed(uid, &groups, message, &launcher),
+            Err(expected),
+            "{case}"
+        );
+        signed_assert_no_effects(&f, &launcher);
+    }
+}
+
+#[test]
+fn signed_commit_attributes_complete_review_and_replay_is_binding_scoped() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let a = agent_pair(&f, "signed", 113);
+    let b = agent_pair(&f, "another", 114);
+    let launcher = Launcher::default();
+    let message = signed_input(&f, &a, 113, 3);
+    let marker = message.replay_digest().unwrap();
+    let id = f
+        .app
+        .submit_signed(a.uid, &[a.gid], message.clone(), &launcher)
+        .unwrap();
+    let review = f.app.review_direct(f.app.human_owner(), &id).unwrap();
+    assert_eq!(review.status, DirectStatus::Pending);
+    assert_eq!(
+        review.requester,
+        format!("agent signed ({})", a.fingerprint)
+    );
+    assert_eq!(review.arguments, ["staging", "safe", "3"]);
+    assert_eq!(review.target, "staging");
+    assert_eq!(review.credentials.len(), 1);
+    assert_eq!(review.expires_at_unix_seconds, 1700000300);
+    assert_eq!(
+        records(&f)["requests"][0]["direct"]["replay_digest"],
+        marker
+    );
+    assert_eq!(
+        f.app.submit_signed(a.uid, &[a.gid], message, &launcher),
+        Err(AgentRejection::Replay)
+    );
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
+    assert!(
+        f.app
+            .submit_signed(a.uid, &[a.gid], signed_input(&f, &a, 113, 4), &launcher)
+            .is_ok()
+    );
+    assert!(
+        f.app
+            .submit_signed(b.uid, &[b.gid], signed_input(&f, &b, 114, 3), &launcher)
+            .is_ok()
+    );
+    assert_eq!(records(&f)["requests"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn signed_replay_survives_lock_restart_and_terminal_transition() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let a = agent_pair(&f, "signed", 115);
+    let message = signed_input(&f, &a, 115, 5);
+    let id = f
+        .app
+        .submit_signed(a.uid, &[a.gid], message.clone(), &Launcher::default())
+        .unwrap();
+    f.app.lock().unwrap();
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Expired)
+    );
+    let Fixture {
+        dir,
+        app,
+        monotonic,
+        wall,
+        on_wall_read,
+    } = f;
+    drop(app);
+    let app = ProviderApplication::new(
+        Provider::start(dir.path().join("provider")).unwrap(),
+        Box::new(Backend),
+        Box::new(Clock {
+            monotonic,
+            wall,
+            on_wall_read,
+        }),
+    )
+    .unwrap();
+    app.authenticate(SensitiveString::new("synthetic-password".into()))
+        .unwrap();
+    let launcher = Launcher::default();
+    assert_eq!(
+        app.submit_signed(a.uid, &[a.gid], message, &launcher),
+        Err(AgentRejection::Replay)
+    );
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+    let state: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(dir.path().join("provider/provider-state.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(state["requests"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn signed_concurrent_duplicate_commits_at_most_once_and_retry_is_replay() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let a = agent_pair(&f, "signed", 116);
+    let message = signed_input(&f, &a, 116, 6);
+    let barrier = Arc::new(std::sync::Barrier::new(9));
+    let launcher = Arc::new(Launcher::default());
+    let mut workers = Vec::new();
+    for _ in 0..8 {
+        let app = f.app.clone();
+        let message = message.clone();
+        let barrier = barrier.clone();
+        let launcher = launcher.clone();
+        let a = a.clone();
+        workers.push(std::thread::spawn(move || {
+            barrier.wait();
+            app.submit_signed(a.uid, &[a.gid], message, launcher.as_ref())
+        }));
+    }
+    barrier.wait();
+    let mut committed = 0;
+    for worker in workers {
+        match worker.join().unwrap() {
+            Ok(_) => committed += 1,
+            Err(AgentRejection::Busy | AgentRejection::Replay) => {}
+            other => panic!("{other:?}"),
+        }
+    }
+    assert_eq!(committed, 1);
+    assert_eq!(records(&f)["requests"].as_array().unwrap().len(), 1);
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        f.app
+            .submit_signed(a.uid, &[a.gid], message, launcher.as_ref()),
+        Err(AgentRejection::Replay)
+    );
+}
+
+#[test]
+fn signed_failed_snapshot_consumes_neither_or_both_nonce_and_request() {
+    use super::protocol::AgentRejection;
+    for stage in [0, 1] {
+        let f = fixture();
+        let a = agent_pair(&f, "signed", 117);
+        let message = signed_input(&f, &a, 117, 7);
+        let launcher = Launcher::default();
+        super::provider_store::WRITE_TEST_HOOK
+            .with(|h| *h.borrow_mut() = Some(Box::new(move |at| at == stage)));
+        let result = f
+            .app
+            .submit_signed(a.uid, &[a.gid], message.clone(), &launcher);
+        super::provider_store::WRITE_TEST_HOOK.with(|h| *h.borrow_mut() = None);
+        assert_eq!(result, Err(AgentRejection::Unavailable));
+        assert!(f.app.admission_closed());
+        assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            records(&f)["requests"].as_array().unwrap().len(),
+            usize::from(stage)
+        );
+        let Fixture {
+            dir,
+            app,
+            monotonic,
+            wall,
+            on_wall_read,
+        } = f;
+        drop(app);
+        let app = ProviderApplication::new(
+            Provider::start(dir.path().join("provider")).unwrap(),
+            Box::new(Backend),
+            Box::new(Clock {
+                monotonic,
+                wall,
+                on_wall_read,
+            }),
+        )
+        .unwrap();
+        app.authenticate(SensitiveString::new("synthetic-password".into()))
+            .unwrap();
+        let retried = app.submit_signed(a.uid, &[a.gid], message, &launcher);
+        if stage == 0 {
+            assert!(retried.is_ok());
+        } else {
+            assert_eq!(retried, Err(AgentRejection::Replay));
+        }
+    }
+}
+
+#[test]
+fn signed_stored_marker_is_sealed_canonical_unique_and_agent_only() {
+    let f = fixture();
+    let a = agent_pair(&f, "signed", 118);
+    for nonce in [8, 9] {
+        f.app
+            .submit_signed(
+                a.uid,
+                &[a.gid],
+                signed_input(&f, &a, 118, nonce),
+                &Launcher::default(),
+            )
+            .unwrap();
+    }
+    let state: super::provider_store::ProviderState = serde_json::from_value(records(&f)).unwrap();
+    state.validate().unwrap();
+    for case in ["malformed", "changed", "removed", "human", "duplicate"] {
+        let mut corrupted = state.clone();
+        let first_marker = corrupted.requests[0]
+            .direct
+            .as_ref()
+            .unwrap()
+            .replay_digest
+            .clone();
+        let second = corrupted.requests[1].direct.as_mut().unwrap();
+        match case {
+            "malformed" => {
+                second.replay_digest = Some("bad".into());
+                second.seal();
+            }
+            "changed" => second.replay_digest = Some("0".repeat(64)),
+            "removed" => second.replay_digest = None,
+            "human" => {
+                second.agent_owner = None;
+                second.seal();
+            }
+            "duplicate" => {
+                second.replay_digest = first_marker;
+                second.seal();
+            }
+            _ => panic!("case"),
+        }
+        assert!(corrupted.validate().is_err(), "{case}");
+    }
+}
+
+#[test]
+fn signed_revocation_intent_during_verification_prevents_commit_and_ui() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let a = agent_pair(&f, "signed", 119);
+    let message = signed_input(&f, &a, 119, 10);
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    *f.on_wall_read.lock().unwrap() = Some(Box::new(move || {
+        entered_tx.send(()).unwrap();
+        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    }));
+    let app = f.app.clone();
+    let agent = a.clone();
+    let worker = std::thread::spawn(move || {
+        let launcher = Launcher::default();
+        let result = app.submit_signed(agent.uid, &[agent.gid], message, &launcher);
+        (result, launcher.calls.load(Ordering::SeqCst))
+    });
+    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK
+            .with(|h| *h.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+        app.revoke_agent(app.human_owner(), &id)
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    resume_tx.send(()).unwrap();
+    assert_eq!(
+        worker.join().unwrap(),
+        (Err(AgentRejection::Unauthorized), 0)
+    );
+    assert!(revoke.join().unwrap().is_ok());
+    assert!(records(&f)["requests"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn signed_deadlines_are_rechecked_at_guarded_snapshot_rename() {
+    use super::protocol::AgentRejection;
+    for deadline in [310, 910] {
+        // Keep the other deadline live so neither guard can mask its absence.
+        let f = if deadline == 910 {
+            fixture_with_lifetime(Duration::from_secs(3600))
+        } else {
+            fixture()
+        };
+        let a = agent_pair(&f, "signed deadline", 120);
+        let message = signed_input(&f, &a, 120, 11);
+        let clock = f.monotonic.clone();
+        super::provider_store::WRITE_TEST_HOOK.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move |stage| {
+                if stage == 0 {
+                    clock.store(deadline, Ordering::SeqCst);
+                }
+                false
+            }))
+        });
+        let launcher = Launcher::default();
+        let result = f
+            .app
+            .submit_signed(a.uid, &[a.gid], message.clone(), &launcher);
+        super::provider_store::WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+        assert_eq!(result, Err(AgentRejection::Locked));
+        assert!(!f.app.admission_closed());
+        assert!(records(&f)["requests"].as_array().unwrap().is_empty());
+        assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+        if deadline == 910 {
+            f.app
+                .authenticate(SensitiveString::new("synthetic-password".into()))
+                .unwrap();
+        }
+        assert!(
+            f.app
+                .submit_signed(a.uid, &[a.gid], message, &launcher)
+                .is_ok()
+        );
+        assert_eq!(records(&f)["requests"].as_array().unwrap().len(), 1);
+        assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+fn signed_lock_intent_before_commit_cannot_admit_under_the_old_session() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let a = agent_pair(&f, "signed lock", 121);
+    let message = signed_input(&f, &a, 121, 12);
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    *f.on_wall_read.lock().unwrap() = Some(Box::new(move || {
+        entered_tx.send(()).unwrap();
+        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    }));
+    let app = f.app.clone();
+    let worker = std::thread::spawn(move || {
+        let launcher = Launcher::default();
+        let result = app.submit_signed(a.uid, &[a.gid], message, &launcher);
+        (result, launcher.calls.load(Ordering::SeqCst))
+    });
+    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let epoch = f.app.revocation_epoch_for_test();
+    let app = f.app.clone();
+    let lock = std::thread::spawn(move || app.lock());
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while f.app.revocation_epoch_for_test() == epoch {
+        assert!(std::time::Instant::now() < until);
+        std::thread::yield_now();
+    }
+    resume_tx.send(()).unwrap();
+    assert_eq!(worker.join().unwrap(), (Err(AgentRejection::Locked), 0));
+    lock.join().unwrap().unwrap();
+    assert!(records(&f)["requests"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn signed_authority_loss_after_commit_retains_one_tombstone_without_stale_ui() {
+    use super::protocol::AgentRejection;
+    for revoke in [false, true] {
+        let f = fixture();
+        let a = agent_pair(&f, "signed postcommit", 122);
+        let b = agent_pair(&f, "unaffected", 123);
+        let message = signed_input(&f, &a, 122, 13);
+        let marker = message.replay_digest().unwrap();
+        let (committed_tx, committed_rx) = std::sync::mpsc::channel();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        let app = f.app.clone();
+        let binding = a.clone();
+        let worker = std::thread::spawn(move || {
+            super::application::SIGNED_COMMIT_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    committed_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }))
+            });
+            let launcher = Launcher::default();
+            let result = app.submit_signed(binding.uid, &[binding.gid], message, &launcher);
+            (result, launcher.calls.load(Ordering::SeqCst))
+        });
+        committed_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let epoch = f.app.revocation_epoch_for_test();
+        let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+        let app = f.app.clone();
+        let binding = a.clone();
+        let invalidator = std::thread::spawn(move || {
+            if revoke {
+                super::application::AGENT_REVOKE_HOOK.with(|hook| {
+                    *hook.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap()))
+                });
+                app.revoke_agent(app.human_owner(), &binding.id)
+                    .map(|_| ())
+                    .unwrap();
+            } else {
+                app.lock().unwrap();
+            }
+        });
+        if revoke {
+            intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        } else {
+            let until = std::time::Instant::now() + Duration::from_secs(5);
+            while f.app.revocation_epoch_for_test() == epoch {
+                assert!(std::time::Instant::now() < until);
+                std::thread::yield_now();
+            }
+        }
+        resume_tx.send(()).unwrap();
+        let (id, calls) = worker.join().unwrap();
+        let id = id.unwrap();
+        assert_eq!(calls, 0);
+        invalidator.join().unwrap();
+        assert_eq!(records(&f)["requests"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            records(&f)["requests"][0]["direct"]["replay_digest"],
+            marker
+        );
+        assert_eq!(
+            f.app.direct_status(f.app.human_owner(), &id),
+            Ok(DirectStatus::Expired)
+        );
+        if !revoke {
+            f.app
+                .authenticate(SensitiveString::new("synthetic-password".into()))
+                .unwrap();
+        }
+        let duplicate = signed_input(&f, &a, 122, 13);
+        assert_eq!(
+            f.app
+                .submit_signed(a.uid, &[a.gid], duplicate, &Launcher::default()),
+            Err(if revoke {
+                AgentRejection::Unauthorized
+            } else {
+                AgentRejection::Replay
+            })
+        );
+        assert!(
+            f.app
+                .submit_signed(
+                    b.uid,
+                    &[b.gid],
+                    signed_input(&f, &b, 123, 14),
+                    &Launcher::default()
+                )
+                .is_ok()
+        );
+    }
+}
+
+#[test]
+fn signed_restart_expires_pending_and_preserves_replay_evidence_without_prior_lock() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let a = agent_pair(&f, "signed restart", 124);
+    let message = signed_input(&f, &a, 124, 15);
+    let id = f
+        .app
+        .submit_signed(a.uid, &[a.gid], message.clone(), &Launcher::default())
+        .unwrap();
+    let Fixture {
+        dir,
+        app,
+        monotonic,
+        wall,
+        on_wall_read,
+    } = f;
+    drop(app);
+    let app = ProviderApplication::new(
+        Provider::start(dir.path().join("provider")).unwrap(),
+        Box::new(Backend),
+        Box::new(Clock {
+            monotonic,
+            wall,
+            on_wall_read,
+        }),
+    )
+    .unwrap();
+    assert_eq!(
+        app.direct_status(app.human_owner(), &id),
+        Ok(DirectStatus::Expired)
+    );
+    app.authenticate(SensitiveString::new("synthetic-password".into()))
+        .unwrap();
+    let launcher = Launcher::default();
+    assert_eq!(
+        app.submit_signed(a.uid, &[a.gid], message, &launcher),
+        Err(AgentRejection::Replay)
+    );
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+}

@@ -24,13 +24,28 @@ use vaultwarden_cli::{
 struct Args {
     /// Private provider directory, also accepted from VAULTWARDEN_ACCESS_STATE_ROOT.
     #[arg(long, env = "VAULTWARDEN_ACCESS_STATE_ROOT")]
-    state_root: PathBuf,
+    state_root: Option<PathBuf>,
     #[command(subcommand)]
     command: Command,
 }
 #[cfg(target_os = "linux")]
 #[derive(Subcommand)]
 enum Command {
+    /// Submit a signed agent request without a terminal or provider-state access.
+    Submit {
+        operation: String,
+        #[arg(long)]
+        socket: PathBuf,
+        /// Agent-owned 0600 file containing exactly one raw 32-byte seed.
+        #[arg(long)]
+        key_file: PathBuf,
+        #[arg(long, allow_hyphen_values = true)]
+        binding_id: String,
+        #[arg(long)]
+        revision: String,
+        #[arg(last = true)]
+        values: Vec<String>,
+    },
     /// Submit and wait for a terminal status (approval is unavailable at this stage).
     Request {
         operation: String,
@@ -110,6 +125,10 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    if args.state_root.is_none() && !matches!(&args.command, Command::Submit { .. }) {
+        eprintln!("vw-access: invalid command; use --help");
+        return ExitCode::from(2);
+    }
     match run(args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -120,7 +139,50 @@ fn main() -> ExitCode {
 }
 #[cfg(target_os = "linux")]
 fn run(args: Args) -> Result<(), String> {
+    if let Command::Submit {
+        operation,
+        socket,
+        key_file,
+        binding_id,
+        revision,
+        values,
+    } = &args.command
+    {
+        use vaultwarden_cli::{
+            access::protocol::{AgentResponse, SignedSubmission},
+            adapters::unix_socket,
+        };
+        let key =
+            unix_socket::load_signing_key(key_file).map_err(|_error| "agent key unavailable")?;
+        let mut nonce = [0u8; 32];
+        getrandom::fill(&mut nonce).map_err(|_error| "agent submission unavailable")?;
+        let input = SignedSubmission::sign(
+            binding_id.clone(),
+            nonce,
+            operation.clone(),
+            revision.clone(),
+            values.clone(),
+            &key,
+        )
+        .map_err(|_error| "invalid agent submission")?;
+        drop(key);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_error| "agent submission unavailable")?;
+        let response = runtime
+            .block_on(unix_socket::exchange(socket, &input))
+            .map_err(|_error| "agent transport unavailable")?;
+        output(&response)?;
+        return if matches!(response, AgentResponse::Pending { .. }) {
+            Ok(())
+        } else {
+            Err("agent submission rejected".into())
+        };
+    }
+    let state_root = args.state_root.ok_or("provider state root required")?;
     let (command, wait) = match args.command {
+        Command::Submit { .. } => return Err("invalid command".into()),
         Command::Request {
             operation,
             revision,
@@ -159,7 +221,7 @@ fn run(args: Args) -> Result<(), String> {
             false,
         ),
     };
-    let response = exchange(&args.state_root, command).map_err(|error| error.to_string())?;
+    let response = exchange(&state_root, command).map_err(|error| error.to_string())?;
     reject_error(&response)?;
     output(&response)?;
     if let HumanResponse::Submitted { receipt } = response
@@ -170,7 +232,7 @@ fn run(args: Args) -> Result<(), String> {
         loop {
             std::thread::sleep(Duration::from_millis(500));
             let response = exchange(
-                &args.state_root,
+                &state_root,
                 HumanCommand::Status {
                     id: receipt.id.clone(),
                 },
@@ -202,7 +264,7 @@ fn reject_error(response: &HumanResponse) -> Result<(), String> {
     }
 }
 #[cfg(target_os = "linux")]
-fn output(response: &HumanResponse) -> Result<(), String> {
+fn output(response: &impl serde::Serialize) -> Result<(), String> {
     let encoded = terminal_json(response)?;
     let mut stdout = io::stdout().lock();
     stdout

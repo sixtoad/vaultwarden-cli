@@ -330,3 +330,138 @@ fn history_parser_errors_and_help_are_static() {
         .stdout(predicate::str::contains("--limit"))
         .stdout(predicate::str::contains("default 50; range 1–200"));
 }
+
+#[test]
+fn signed_submit_without_stdin_or_tty_sends_only_signed_envelope() {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use std::{
+        fs,
+        io::{Read, Write},
+        net::Shutdown,
+        os::unix::{fs::PermissionsExt, net::UnixListener, process::CommandExt},
+        process::Stdio,
+    };
+    use vaultwarden_cli::access::protocol::SignedSubmission;
+    for rejected in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o750)).unwrap();
+        let seed = directory.path().join("seed");
+        fs::write(&seed, [17u8; 32]).unwrap();
+        fs::set_permissions(&seed, fs::Permissions::from_mode(0o600)).unwrap();
+        let path = directory.path().join("agent.sock");
+        let listener = UnixListener::bind(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o660)).unwrap();
+        let id = URL_SAFE_NO_PAD.encode([19u8; 32]);
+        let binding = URL_SAFE_NO_PAD.encode([18u8; 32]);
+        let server_listener = listener.try_clone().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = server_listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            let mut bytes = Vec::new();
+            stream.read_to_end(&mut bytes).unwrap();
+            assert_eq!(bytes.pop(), Some(b'\n'));
+            let input = SignedSubmission::parse(&bytes).unwrap();
+            input
+                .verify(
+                    &URL_SAFE_NO_PAD.encode(
+                        ed25519_dalek::SigningKey::from_bytes(&[17; 32])
+                            .verifying_key()
+                            .to_bytes(),
+                    ),
+                )
+                .unwrap();
+            assert_eq!(input.binding_id, binding);
+            assert_eq!(input.operation_id, "deploy");
+            assert_eq!(input.expected_policy_revision, "a".repeat(64));
+            assert_eq!(input.args, ["staging"]);
+            let response = if rejected {
+                serde_json::json!({"protocol_version":1,"status":"rejected","category":"unauthorized"})
+            } else {
+                serde_json::json!({"protocol_version":1,"status":"pending","request_id":id})
+            };
+            writeln!(stream, "{response}").unwrap();
+            stream.shutdown(Shutdown::Write).unwrap();
+            response
+        });
+        let mut command = std::process::Command::new(assert_cmd::cargo::cargo_bin!("vw-access"));
+        command
+            .args(["submit", "deploy", "--socket"])
+            .arg(path)
+            .arg("--key-file")
+            .arg(seed)
+            .arg("--binding-id")
+            .arg(URL_SAFE_NO_PAD.encode([18u8; 32]))
+            .arg("--revision")
+            .arg("a".repeat(64))
+            .args(["--", "staging"])
+            .env_remove("VAULTWARDEN_ACCESS_STATE_ROOT")
+            .stdin(Stdio::null());
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if libc::isatty(0) != 0 {
+                    return Err(std::io::Error::other("unexpected tty"));
+                }
+                Ok(())
+            });
+        }
+        let output = command.output().unwrap();
+        let response = server.join().unwrap();
+        if rejected {
+            assert_eq!(output.status.code(), Some(1));
+            assert_eq!(
+                output.stdout,
+                b"{\"status\":\"rejected\",\"protocol_version\":1,\"category\":\"unauthorized\"}\n"
+            );
+            assert_eq!(output.stderr, b"vw-access: agent submission rejected\n");
+        } else {
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.stderr.is_empty());
+        }
+        listener.set_nonblocking(true).unwrap();
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock,
+            "client must not retry"
+        );
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
+            response
+        );
+    }
+}
+
+#[test]
+fn signed_submit_missing_arguments_and_unsafe_seed_errors_are_redacted() {
+    Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+        .args(["submit", "private-sentinel", "--socket", "private-sentinel"])
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr("vw-access: invalid command; use --help\n");
+    Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+        .args([
+            "submit",
+            "deploy",
+            "--socket",
+            "/absent",
+            "--key-file",
+            "/absent-private-sentinel",
+            "--binding-id",
+            "private-sentinel",
+            "--revision",
+            "private-sentinel",
+        ])
+        .assert()
+        .failure()
+        .stdout("")
+        .stderr("vw-access: agent key unavailable\n");
+}

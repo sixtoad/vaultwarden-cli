@@ -8,9 +8,9 @@ memory and keyring and is not a supported secret boundary. The existing direct
 Stories 1.1–1.9 provide private state, constrained operation policy, a protected
 provider session, authenticated one-time browser decisions and immutable executable
 preparation, login-backed execution, descendant containment and redacted history.
-Story 2.1 adds durable restricted-agent pairing and selective revocation. Agent transport
-and platform/WebAuthn authentication
-are later stories.
+Story 2.1 adds durable restricted-agent pairing and selective revocation. Story 2.2
+adds signed noninteractive agent submission over a bounded Unix socket. Signed
+polling/waiting and platform/WebAuthn authentication remain later stories.
 The provider has no agent-facing item lookup, secret export or password command.
 
 ## Supported platform
@@ -253,7 +253,7 @@ The public key must be canonical unpadded base64url encoding of a valid,
 non-weak 32-byte Ed25519 verification key. Never supply a private key. Labels
 are bounded printable ASCII (1–128 bytes). Numeric UID/GID values exclude zero
 and `4294967295`; the UID must differ from the provider's UID. No OS account
-lookup or account creation occurs. Future agent admission requires the exact
+lookup or account creation occurs. Agent admission requires the exact
 UID and membership in the configured primary or supplementary GID, together
 with verified signed transport proof; a key alone grants no access.
 
@@ -275,7 +275,109 @@ admission and returns a failure rather than claiming cleanup succeeded. The
 client allows 30 seconds for a revocation response; transport failure is not
 proof of success, so retry the same immutable ID. Bindings and tombstones
 survive restart, and historical requester snapshots retain their original
-identity. Agent request and polling transports remain later stories.
+identity. Signed submission is described below; agent polling remains a later story.
+
+## Signed noninteractive agent submission (Story 2.2)
+
+Provision a separate provider-owned directory with mode `0750` and the chosen
+access group. Its parents must be traversable by the restricted agents; do not
+place it inside the private `0700` provider state directory or an inaccessible
+human runtime directory. No path component may be a symlink. The provider account
+must be permitted to assign the socket to that group. Enable the optional listener
+alongside the existing backend and HTTPS configuration with both flags:
+
+```sh
+vaultwarden-accessd --state-root <private-state> --backend-config <private-setup.json> \
+  --ui-tls-cert <private-server-chain.pem> --ui-tls-key <private-server-key.pem> \
+  --agent-socket-dir <shared-socket-directory> --agent-socket-gid 42003
+```
+
+The daemon validates the preprovisioned directory, creates `agent.sock` with mode
+`0660` and the configured group, and refuses unsafe or active socket paths. It
+removes only a verified stale socket and unlinks only its own socket inode on
+shutdown. Directory descriptors pin path resolution and cleanup. Omitting both
+agent flags preserves human-only operation. The existing service supervision and
+execution containment requirements still apply; these flags do not create an OS
+account, change group memberships or grant access to provider state.
+
+Pair the agent's public key through the human interface described above. Provision
+its corresponding raw 32-byte Ed25519 seed separately, in an agent-owned regular
+file with mode `0600`; PEM, JSON, base64 text, symbolic links, trailing bytes and permissive
+modes are rejected. No key generation or password prompt is added. As that
+restricted UID, submit without a TTY, stdin, human state access or browser access:
+
+```sh
+vw-access submit deploy --socket <shared-socket-directory>/agent.sock \
+  --key-file <agent-private-seed> --binding-id <paired-binding-id> \
+  --revision <current-operation-sha256> -- staging safe 3
+```
+
+The current operation revision is mandatory and supplied through human-managed
+configuration. The client generates a fresh random 32-byte nonce, signs the input,
+checks socket ownership and the server's kernel UID, writes one JSON line, closes
+its write half and reads one closed response. The expected provider UID comes
+from the human-provisioned socket directory owner; the client has no separately
+pinned provider UID. Trust the configured pathname and ensure its ancestors are
+owned and permissioned so an agent or other untrusted user cannot replace that
+directory. Descriptor pinning prevents races after opening a directory; it does
+not establish trust in a malicious directory selected beforehand. It neither waits for approval nor
+polls, reads passwords, resolves credentials, launches a browser or falls back to
+human authentication. Seed buffers are bounded and zeroized. Successful stdout is
+only the pending commit acknowledgment:
+
+```json
+{"status":"pending","protocol_version":1,"request_id":"<opaque-provider-generated-id>"}
+```
+
+Rejections contain `status: "rejected"`, `protocol_version: 1` and one closed
+`category`: `unauthorized`, `malformed`, `unsupported_version`, `replay`,
+`stale_revision`, `invalid_arguments`, `locked`, `busy` or `unavailable`. No
+caller input, label, policy detail, approval URL/capability, secret or child output
+is reflected. The client also exits unsuccessfully on rejection. Transport
+failure or a lost acknowledgment can occur after commit. The client never retries;
+re-running the command creates a new nonce and can create another request. Ask the
+human to inspect retained history when delivery is uncertain. Replaying the exact
+original signed message never grants another admission.
+
+Before parsing any payload, the provider obtains `SO_PEERCRED` and `SO_PEERGROUPS`
+from the connected Linux socket. The non-provider UID must match a current enabled
+binding and the required GID must occur in the union of primary and supplementary
+groups. Account database or PID lookups are not used. After parsing, the selected
+binding independently must match the same kernel evidence and its current stored
+key must pass strict Ed25519 verification. A key alone is insufficient. Policy
+revision and ordered values are checked through the existing normalization rules;
+identity, ID, creation time and expiry are exclusively provider-derived.
+
+The listener admits at most 32 connection tasks and configures backlog 32. A
+request frame is at most 64 KiB including its final LF; one LF-terminated JSON
+object must be followed by write-half EOF, with no extra frame or trailing data.
+Responses are at most 1 KiB. Input has a five-second total deadline starting at
+accept; response writes have a five-second deadline. Supplementary-group storage
+is capped at 65,536 entries. Overload closes connections or returns `busy`.
+Synchronous authority and storage work runs in bounded blocking jobs, retaining
+capacity until those jobs finish. Filesystem and desktop stalls can outlast socket
+deadlines and delay shutdown; the daemon joins admitted work instead of detaching
+unbounded authority jobs. Kernel credential failures fail closed.
+
+Admission atomically stores the request, submitted audit and binding-scoped nonce
+digest in one guarded snapshot replacement. Lock/revoke intent, session epoch and
+request/session deadlines are rechecked at commit and before human launch. If
+admission wins, later authority loss invalidates that retained request. The
+acknowledgment describes the pending commit snapshot, even if review launch fails
+or later lifecycle changes expire it. The human receives the existing complete
+review with the immutable agent label and key fingerprint. All browser authority
+stays in the private human interface.
+
+Replay markers remain through approval, denial, completion, expiry, revocation,
+lock and restart; there is no TTL or pruning. Startup expires old unexecuted work,
+and unlocking never restores its nonce. A failed pre-rename write consumes neither
+request nor nonce; post-rename uncertainty closes admission while preserving durable
+evidence. Pre-rename authority expiry returns `locked` without poisoning admission;
+actual storage failures remain fatal. Renew the session when necessary before
+retrying an unconsumed nonce. Future history pruning must retain replay tombstones. Legacy human and
+Story 2.1 records without markers retain their existing integrity checks. See the
+[wire and persistence contract](implementation/2-2-protocol-contract.md) for exact
+signed bytes and the frozen test vector.
 
 ## Redacted operation history (Story 1.9)
 

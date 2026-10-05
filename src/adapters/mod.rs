@@ -6,6 +6,8 @@ pub mod human_socket;
 pub mod loopback_ui;
 pub mod session;
 pub mod supervisor;
+#[cfg(target_os = "linux")]
+pub mod unix_socket;
 pub mod vaultwarden;
 
 /// Entry point for the dedicated, single-threaded systemd execution helper.
