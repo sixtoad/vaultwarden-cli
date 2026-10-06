@@ -5513,3 +5513,789 @@ fn signed_restart_expires_pending_and_preserves_replay_evidence_without_prior_lo
     );
     assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
 }
+
+fn status_query(
+    binding: &super::agent_binding::AgentBindingView,
+    seed: u8,
+    nonce: u8,
+    id: &str,
+) -> super::protocol::SignedStatusQuery {
+    super::protocol::SignedStatusQuery::sign(
+        binding.id.clone(),
+        [nonce; 32],
+        id.into(),
+        &ed25519_dalek::SigningKey::from_bytes(&[seed; 32]),
+    )
+    .unwrap()
+}
+
+fn restart_status_fixture(f: Fixture) -> Fixture {
+    let Fixture {
+        dir,
+        app,
+        monotonic,
+        wall,
+        on_wall_read,
+    } = f;
+    drop(app);
+    let app = Arc::new(
+        ProviderApplication::new(
+            Provider::start(dir.path().join("provider")).unwrap(),
+            Box::new(Backend),
+            Box::new(Clock {
+                monotonic: monotonic.clone(),
+                wall: wall.clone(),
+                on_wall_read: on_wall_read.clone(),
+            }),
+        )
+        .unwrap(),
+    );
+    Fixture {
+        dir,
+        app,
+        monotonic,
+        wall,
+        on_wall_read,
+    }
+}
+
+#[test]
+fn signed_status_projects_every_validated_state_without_mutating_terminal_records() {
+    use super::protocol::{AgentFailure as F, AgentStatus as S};
+    let cases = [
+        (DirectStatus::Pending, S::Pending),
+        (DirectStatus::Approved, S::Approved),
+        (DirectStatus::Running, S::Running),
+        (DirectStatus::Denied, S::Denied),
+        (DirectStatus::Expired, S::Expired),
+        (
+            DirectStatus::Completed { exit_code: 0 },
+            S::Completed { exit_code: 0 },
+        ),
+        (
+            DirectStatus::Completed { exit_code: 255 },
+            S::Completed { exit_code: 255 },
+        ),
+        (
+            DirectStatus::Failed {
+                reason: DirectFailure::ReviewUnavailable,
+            },
+            S::Failed {
+                category: F::ReviewUnavailable,
+            },
+        ),
+        (
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionUnavailable,
+            },
+            S::Failed {
+                category: F::ExecutionUnavailable,
+            },
+        ),
+        (
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionRejected,
+            },
+            S::Failed {
+                category: F::ExecutionRejected,
+            },
+        ),
+        (
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionNonzero,
+            },
+            S::Failed {
+                category: F::ExecutionNonzero,
+            },
+        ),
+        (
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionSignaled,
+            },
+            S::Failed {
+                category: F::ExecutionSignaled,
+            },
+        ),
+    ];
+    for (direct, expected) in cases {
+        let f = fixture();
+        let a = agent_pair(&f, "status-label-sentinel", 131);
+        let id = agent_pending(&f, &a);
+        // Build validated lifecycle snapshots through the production transition
+        // primitive to cover even historical failure codes not newly emitted.
+        let mut state: super::provider_store::ProviderState =
+            serde_json::from_value(records(&f)).unwrap();
+        let record = &mut state.requests[0];
+        match direct {
+            DirectStatus::Pending => {}
+            DirectStatus::Denied | DirectStatus::Expired => record
+                .transition(direct.clone(), DecisionOutcome::Denied, 1700000001)
+                .unwrap(),
+            _ => {
+                record
+                    .transition(
+                        DirectStatus::Approved,
+                        DecisionOutcome::Approved,
+                        1700000001,
+                    )
+                    .unwrap();
+                if direct != DirectStatus::Approved {
+                    record.direct.as_mut().unwrap().execution_claimed = true;
+                    record
+                        .transition(DirectStatus::Running, DecisionOutcome::Approved, 1700000002)
+                        .unwrap();
+                    if direct != DirectStatus::Running {
+                        record
+                            .transition(
+                                direct.clone(),
+                                DecisionOutcome::ExecutionUnavailable,
+                                1700000003,
+                            )
+                            .unwrap();
+                    }
+                }
+            }
+        }
+        state.validate().unwrap();
+        std::fs::write(
+            f.dir.path().join("provider/provider-state.json"),
+            serde_json::to_vec(&state).unwrap(),
+        )
+        .unwrap();
+        let before = records(&f);
+        let baseline = (
+            EXECUTION_PROBE_CALLS.with(|c| c.get()),
+            EXECUTION_ELIGIBILITY_CALLS.with(|c| c.get()),
+            EXECUTION_RESOLUTION_CALLS.with(|c| c.get()),
+            BACKEND_UNLOCKS.with(|c| c.get()),
+        );
+        for nonce in [1, 2] {
+            let observed = f
+                .app
+                .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 131, nonce, &id))
+                .unwrap();
+            assert_eq!(observed, expected);
+            let wire = serde_json::to_string(&super::protocol::AgentResponse::Status {
+                protocol_version: super::PROTOCOL_VERSION,
+                request_id: id.clone(),
+                state: observed,
+            })
+            .unwrap();
+            for forbidden in [
+                "status-label-sentinel",
+                "Deployment",
+                "deploy",
+                "synthetic-password",
+                "staging",
+                "http",
+                "capability",
+                "fingerprint",
+                "audit",
+                "output",
+                "environment",
+            ] {
+                assert!(!wire.contains(forbidden), "{wire}");
+            }
+        }
+        assert_eq!(records(&f)["requests"], before["requests"]);
+        assert_eq!(records(&f)["agent_audit"], before["agent_audit"]);
+        assert_eq!(
+            records(&f)["query_replay_markers"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            baseline,
+            (
+                EXECUTION_PROBE_CALLS.with(|c| c.get()),
+                EXECUTION_ELIGIBILITY_CALLS.with(|c| c.get()),
+                EXECUTION_RESOLUTION_CALLS.with(|c| c.get()),
+                BACKEND_UNLOCKS.with(|c| c.get()),
+            )
+        );
+        if direct.is_terminal() {
+            let f = restart_status_fixture(f);
+            assert_eq!(
+                f.app
+                    .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 131, 3, &id)),
+                Ok(expected)
+            );
+            assert_eq!(records(&f)["requests"], before["requests"]);
+        }
+    }
+}
+
+#[test]
+fn signed_status_inaccessible_ids_and_authority_rejections_have_no_effects() {
+    use super::protocol::AgentRejection as E;
+    use base64::Engine;
+    for case in [
+        "other_owner",
+        "human_owner",
+        "unknown",
+        "unknown_binding",
+        "revoked",
+        "uid",
+        "group",
+        "provider",
+        "key",
+        "tampered_id",
+        "signature",
+        "purpose",
+    ] {
+        let f = fixture();
+        let a = agent_pair(&f, "owner", 132);
+        let b = agent_pair(&f, "eligible-other-owner", 133);
+        let id = agent_pending(&f, &a);
+        let other_id = agent_pending(&f, &b);
+        let human = f
+            .app
+            .submit_direct(f.app.human_owner(), input(), &Launcher::default())
+            .unwrap()
+            .id;
+        let unknown = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([234; 32]);
+        let target = match case {
+            "other_owner" => &other_id,
+            "human_owner" => &human,
+            "unknown" => &unknown,
+            _ => &id,
+        };
+        let mut query = status_query(&a, if case == "key" { 133 } else { 132 }, 5, target);
+        let mut uid = a.uid;
+        let mut groups = vec![a.gid];
+        match case {
+            "unknown_binding" => {
+                query = super::protocol::SignedStatusQuery::sign(
+                    unknown.clone(),
+                    [5; 32],
+                    id.clone(),
+                    &ed25519_dalek::SigningKey::from_bytes(&[132; 32]),
+                )
+                .unwrap()
+            }
+            "revoked" => {
+                f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+            }
+            "uid" => uid += 1,
+            "provider" => uid = f.app.human_owner().uid(),
+            "group" => groups = vec![a.gid + 1],
+            "tampered_id" => query.request_id = other_id,
+            "signature" => query.signature = status_query(&a, 132, 6, &id).signature,
+            "purpose" => query.purpose = "submit".into(),
+            _ => {}
+        }
+        let before = records(&f);
+        assert_eq!(
+            f.app.signed_agent_status(uid, &groups, &query),
+            Err(if case == "purpose" {
+                E::Malformed
+            } else {
+                E::Unauthorized
+            }),
+            "{case}"
+        );
+        assert_eq!(records(&f), before, "{case}");
+        EXECUTION_RESOLUTION_CALLS.with(|c| assert_eq!(c.get(), 0));
+    }
+}
+
+#[test]
+fn signed_status_shared_nonce_replay_precedes_neither_authentication_nor_ownership() {
+    use super::protocol::{AgentRejection as E, AgentStatus as S};
+    let f = fixture();
+    let a = agent_pair(&f, "owner", 134);
+    let b = agent_pair(&f, "other", 135);
+    let launcher = Launcher::default();
+    let submit = signed_input(&f, &a, 134, 1);
+    let id = f
+        .app
+        .submit_signed(a.uid, &[a.gid], submit, &launcher)
+        .unwrap();
+    let other_id = agent_pending(&f, &b);
+    assert_eq!(
+        f.app
+            .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 134, 1, &id)),
+        Err(E::Replay)
+    );
+    let query = status_query(&a, 134, 2, &id);
+    assert_eq!(
+        f.app.signed_agent_status(a.uid, &[1, a.gid, 2], &query),
+        Ok(S::Pending)
+    );
+    // Nonce uniqueness is binding-scoped: a second enabled owner may use the
+    // same nonce for its own immutable request without colliding with the first.
+    let other_query = status_query(&b, 135, 2, &other_id);
+    assert_eq!(query.nonce, other_query.nonce);
+    assert_eq!(
+        f.app.signed_agent_status(b.uid, &[b.gid], &other_query),
+        Ok(S::Pending)
+    );
+    assert_eq!(
+        f.app.signed_agent_status(a.uid, &[a.gid], &query),
+        Err(E::Replay)
+    );
+    assert_eq!(
+        f.app
+            .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 134, 2, &other_id)),
+        Err(E::Unauthorized)
+    );
+    assert_eq!(
+        f.app
+            .submit_signed(a.uid, &[a.gid], signed_input(&f, &a, 134, 2), &launcher),
+        Err(E::Replay)
+    );
+    f.app.lock().unwrap();
+    assert_eq!(
+        f.app.signed_agent_status(a.uid, &[a.gid], &query),
+        Err(E::Replay)
+    );
+    assert_eq!(
+        f.app
+            .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 134, 3, &id)),
+        Ok(S::Expired)
+    );
+    let f = restart_status_fixture(f);
+    assert_eq!(
+        f.app.signed_agent_status(a.uid, &[a.gid], &query),
+        Err(E::Replay)
+    );
+    assert_eq!(
+        f.app
+            .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 134, 4, &id)),
+        Ok(S::Expired)
+    );
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn signed_status_failed_persistence_never_discloses_and_retains_post_rename_nonce() {
+    use super::protocol::{AgentRejection as E, AgentStatus as S};
+    for stage in [0, 1] {
+        let f = fixture();
+        let a = agent_pair(&f, "owner", 136);
+        let id = agent_pending(&f, &a);
+        let query = status_query(&a, 136, 10, &id);
+        let before = records(&f)["requests"].clone();
+        super::provider_store::WRITE_TEST_HOOK
+            .with(|hook| *hook.borrow_mut() = Some(Box::new(move |at| at == stage)));
+        let result = f.app.signed_agent_status(a.uid, &[a.gid], &query);
+        super::provider_store::WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+        assert_eq!(result, Err(E::Unavailable));
+        assert!(f.app.admission_closed());
+        assert_eq!(records(&f)["requests"], before);
+        assert_eq!(
+            records(&f)["query_replay_markers"]
+                .as_array()
+                .unwrap()
+                .len(),
+            usize::from(stage)
+        );
+        let f = restart_status_fixture(f);
+        assert_eq!(
+            f.app.signed_agent_status(a.uid, &[a.gid], &query),
+            if stage == 0 {
+                Ok(S::Expired)
+            } else {
+                Err(E::Replay)
+            }
+        );
+    }
+}
+
+#[test]
+fn signed_status_concurrent_identical_queries_consume_once() {
+    use super::protocol::{AgentRejection as E, AgentStatus as S};
+    let f = fixture();
+    let a = agent_pair(&f, "owner", 137);
+    let id = agent_pending(&f, &a);
+    let query = status_query(&a, 137, 1, &id);
+    let barrier = Arc::new(std::sync::Barrier::new(9));
+    let workers: Vec<_> = (0..8)
+        .map(|_| {
+            let (app, a, query, barrier) =
+                (f.app.clone(), a.clone(), query.clone(), barrier.clone());
+            std::thread::spawn(move || {
+                barrier.wait();
+                app.signed_agent_status(a.uid, &[a.gid], &query)
+            })
+        })
+        .collect();
+    barrier.wait();
+    let mut success = 0;
+    for worker in workers {
+        match worker.join().unwrap() {
+            Ok(S::Pending) => success += 1,
+            Err(E::Busy | E::Replay) => {}
+            other => panic!("{other:?}"),
+        }
+    }
+    assert_eq!(success, 1);
+    assert_eq!(
+        records(&f)["query_replay_markers"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        f.app.signed_agent_status(a.uid, &[a.gid], &query),
+        Err(E::Replay)
+    );
+}
+
+#[test]
+fn signed_status_query_markers_are_backward_compatible_canonical_unique_and_disjoint() {
+    let f = fixture();
+    let a = agent_pair(&f, "owner", 138);
+    let id = f
+        .app
+        .submit_signed(
+            a.uid,
+            &[a.gid],
+            signed_input(&f, &a, 138, 1),
+            &Launcher::default(),
+        )
+        .unwrap();
+    f.app
+        .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 138, 2, &id))
+        .unwrap();
+    let good = records(&f);
+    let mut legacy = good.clone();
+    legacy
+        .as_object_mut()
+        .unwrap()
+        .remove("query_replay_markers");
+    let state: super::provider_store::ProviderState = serde_json::from_value(legacy).unwrap();
+    state.validate().unwrap();
+    assert!(state.query_replay_markers.is_empty());
+    for invalid in [
+        serde_json::json!(["not-a-digest"]),
+        serde_json::json!(["A".repeat(64)]),
+        serde_json::json!([
+            good["query_replay_markers"][0],
+            good["query_replay_markers"][0]
+        ]),
+        serde_json::json!([good["requests"][0]["direct"]["replay_digest"]]),
+        serde_json::Value::Null,
+    ] {
+        let mut bad = good.clone();
+        bad["query_replay_markers"] = invalid;
+        assert!(
+            serde_json::from_value::<super::provider_store::ProviderState>(bad)
+                .map_or(true, |state| state.validate().is_err())
+        );
+    }
+    let wire = serde_json::to_string(&good).unwrap();
+    let duplicated = wire.replacen(
+        "\"query_replay_markers\":",
+        "\"query_replay_markers\":[],\"query_replay_markers\":",
+        1,
+    );
+    assert!(serde_json::from_str::<super::provider_store::ProviderState>(&duplicated).is_err());
+}
+
+#[test]
+fn signed_status_repairing_same_label_and_principal_never_transfers_ownership() {
+    use super::protocol::AgentRejection as E;
+    let f = fixture();
+    let a = agent_pair(&f, "same-label", 139);
+    let id = agent_pending(&f, &a);
+    f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+    let b = agent_pair(&f, "same-label", 140);
+    assert_eq!((a.uid, a.gid), (b.uid, b.gid));
+    assert_ne!(a.id, b.id);
+    let before = records(&f);
+    for (binding, seed) in [(&a, 139), (&b, 140)] {
+        assert_eq!(
+            f.app.signed_agent_status(
+                binding.uid,
+                &[binding.gid],
+                &status_query(binding, seed, 1, &id)
+            ),
+            Err(E::Unauthorized)
+        );
+    }
+    assert_eq!(records(&f), before);
+}
+
+#[test]
+fn signed_status_uses_provider_deadlines_even_when_storage_crosses_expiry() {
+    use super::protocol::AgentStatus as S;
+    for session in [false, true] {
+        for approved in [false, true] {
+            for crossing in ["before", "write", "final_read"] {
+                let f =
+                    fixture_with_lifetime(Duration::from_secs(if session { 3600 } else { 300 }));
+                let a = agent_pair(&f, "owner", 141);
+                let id = if approved {
+                    agent_approved(&f, &a)
+                } else {
+                    agent_pending(&f, &a)
+                };
+                let deadline = if session { 910 } else { 310 };
+                f.monotonic.store(deadline - 1, Ordering::SeqCst);
+                // Client/wall skew cannot expire authority before its monotonic deadline.
+                f.wall.store(1900000000, Ordering::SeqCst);
+                assert_eq!(
+                    f.app
+                        .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 141, 1, &id)),
+                    Ok(if approved { S::Approved } else { S::Pending })
+                );
+                let clock = f.monotonic.clone();
+                match crossing {
+                    "before" => clock.store(deadline, Ordering::SeqCst),
+                    "write" => super::provider_store::WRITE_TEST_HOOK.with(|h| {
+                        *h.borrow_mut() = Some(Box::new(move |_| {
+                            clock.store(deadline, Ordering::SeqCst);
+                            false
+                        }))
+                    }),
+                    "final_read" => {
+                        // Authentication, initial expiry, marker transaction,
+                        // post-write expiry, then the final owned snapshot read.
+                        let mut reads = 0;
+                        super::provider_store::READ_TEST_HOOK.with(|h| {
+                            *h.borrow_mut() = Some(Box::new(move || {
+                                reads += 1;
+                                if reads == 5 {
+                                    clock.store(deadline, Ordering::SeqCst);
+                                }
+                                false
+                            }))
+                        });
+                    }
+                    _ => panic!("invalid fixture case"),
+                }
+                let observed =
+                    f.app
+                        .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 141, 2, &id));
+                super::provider_store::READ_TEST_HOOK.with(|h| *h.borrow_mut() = None);
+                super::provider_store::WRITE_TEST_HOOK.with(|h| *h.borrow_mut() = None);
+                assert_eq!(f.monotonic.load(Ordering::SeqCst), deadline);
+                assert_eq!(
+                    observed,
+                    Ok(S::Expired),
+                    "session={session}, approved={approved}, crossing={crossing}"
+                );
+                assert_eq!(
+                    records(&f)["requests"][0]["direct"]["review"]["status"]["status"],
+                    "expired"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn signed_status_revocation_intent_during_authentication_prevents_marker_and_disclosure() {
+    use super::protocol::AgentRejection as E;
+    let f = fixture();
+    let a = agent_pair(&f, "owner", 142);
+    let id = agent_pending(&f, &a);
+    let query = status_query(&a, 142, 1, &id);
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let agent = a.clone();
+    let worker = std::thread::spawn(move || {
+        let mut once = true;
+        super::provider_store::READ_TEST_HOOK.with(|h| {
+            *h.borrow_mut() = Some(Box::new(move || {
+                if once {
+                    once = false;
+                    entered_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }
+                false
+            }))
+        });
+        let result = app.signed_agent_status(agent.uid, &[agent.gid], &query);
+        super::provider_store::READ_TEST_HOOK.with(|h| *h.borrow_mut() = None);
+        result
+    });
+    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let binding_id = a.id.clone();
+    let revoke = std::thread::spawn(move || {
+        super::application::AGENT_REVOKE_HOOK
+            .with(|h| *h.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+        app.revoke_agent(app.human_owner(), &binding_id)
+    });
+    intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    resume_tx.send(()).unwrap();
+    assert_eq!(worker.join().unwrap(), Err(E::Unauthorized));
+    revoke.join().unwrap().unwrap();
+    assert!(
+        records(&f)["query_replay_markers"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(!f.app.admission_closed());
+}
+
+#[test]
+fn signed_status_revocation_intent_is_published_during_blocked_query_write() {
+    use super::protocol::AgentRejection as E;
+    for stage in [0, 1] {
+        let f = fixture();
+        let a = agent_pair(&f, "owner", 144);
+        let id = agent_pending(&f, &a);
+        let query = status_query(&a, 144, 1, &id);
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        let app = f.app.clone();
+        let agent = a.clone();
+        let worker = std::thread::spawn(move || {
+            super::provider_store::WRITE_TEST_HOOK.with(|h| {
+                *h.borrow_mut() = Some(Box::new(move |at| {
+                    if at == stage {
+                        entered_tx.send(()).unwrap();
+                        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
+                    false
+                }))
+            });
+            let result = app.signed_agent_status(agent.uid, &[agent.gid], &query);
+            super::provider_store::WRITE_TEST_HOOK.with(|h| *h.borrow_mut() = None);
+            result
+        });
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+        let app = f.app.clone();
+        let binding = a.id.clone();
+        let revoke = std::thread::spawn(move || {
+            super::application::AGENT_REVOKE_HOOK
+                .with(|h| *h.borrow_mut() = Some(Box::new(move || intent_tx.send(()).unwrap())));
+            app.revoke_agent(app.human_owner(), &binding)
+        });
+        // This must arrive while persistence is still blocked, independently of
+        // poll completion. Release even on failure so the witness cannot hang.
+        let published = intent_rx.recv_timeout(Duration::from_secs(2));
+        resume_tx.send(()).unwrap();
+        let result = worker.join().unwrap();
+        let revoked = revoke.join().unwrap();
+        assert!(
+            published.is_ok(),
+            "revocation intent blocked on query persistence"
+        );
+        assert_eq!(
+            result,
+            Err(if stage == 0 {
+                E::Unauthorized
+            } else {
+                E::Unavailable
+            })
+        );
+        assert_eq!(revoked.is_ok(), stage == 0);
+        assert_eq!(
+            records(&f)["query_replay_markers"]
+                .as_array()
+                .unwrap()
+                .len(),
+            usize::from(stage)
+        );
+        assert_eq!(f.app.admission_closed(), stage == 1);
+    }
+}
+
+#[test]
+fn signed_status_running_remains_nonterminal_until_confirmed_cleanup() {
+    use super::protocol::AgentStatus as S;
+    struct AwaitCleanup {
+        started: std::sync::mpsc::Sender<()>,
+        clean: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+    impl ProcessSupervisor<ExecutionPreparation> for AwaitCleanup {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("controlled supervision required")
+        }
+        fn supervise_controlled(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            control.release(&mut || Ok(())).unwrap();
+            control.started().unwrap();
+            self.started.send(()).unwrap();
+            // Remain outside application locks until cleanup is explicitly
+            // released, so observation is deterministic rather than Busy-racy.
+            self.clean
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap();
+            Supervision {
+                outcome: Ok(ExecutionOutcome::ExitedZero),
+                cleanup: CleanupEvidence::Reaped,
+                helper_reaped: true,
+            }
+        }
+    }
+    let f = fixture();
+    let a = agent_pair(&f, "owner", 143);
+    let id = agent_approved(&f, &a);
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (clean_tx, clean_rx) = std::sync::mpsc::channel();
+    let app = f.app.clone();
+    let request = id.clone();
+    let worker = std::thread::spawn(move || {
+        app.run_execution(
+            app.human_owner(),
+            &request,
+            &ExecutionPreparation::default(),
+            &AwaitCleanup {
+                started: started_tx,
+                clean: Mutex::new(clean_rx),
+            },
+        )
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    for nonce in [1, 2] {
+        assert_eq!(
+            f.app
+                .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 143, nonce, &id)),
+            Ok(S::Running)
+        );
+    }
+    clean_tx.send(()).unwrap();
+    assert_eq!(
+        worker.join().unwrap(),
+        Ok(DirectStatus::Completed { exit_code: 0 })
+    );
+    assert_eq!(
+        f.app
+            .signed_agent_status(a.uid, &[a.gid], &status_query(&a, 143, 3, &id)),
+        Ok(S::Completed { exit_code: 0 })
+    );
+}
+
+#[test]
+fn signed_status_stored_enabled_pairing_is_independent_of_application_token() {
+    use super::protocol::AgentRejection;
+    let f = fixture();
+    let agent = agent_pair(&f, "stored-enabled-guard", 144);
+    let id = agent_pending(&f, &agent);
+    let query = status_query(&agent, 144, 1, &id);
+    f.app.revoke_agent(f.app.human_owner(), &agent.id).unwrap();
+    let Fixture { dir, app, .. } = f;
+    drop(app);
+    let provider = Provider::start(dir.path().join("provider")).unwrap();
+    // No application token exists here: current persisted enabled state must
+    // independently reject an otherwise correct signature, peer and owner.
+    assert_eq!(
+        provider.authenticate_status_query(agent.uid, &[agent.gid], &query),
+        Err(AgentRejection::Unauthorized)
+    );
+}

@@ -384,3 +384,199 @@ async fn framing_remembers_a_terminal_lf_across_partial_reads() {
         writer.await.unwrap();
     }
 }
+
+#[tokio::test]
+async fn signed_query_exchange_checks_framing_signature_projection_and_exact_response_id() {
+    use crate::access::protocol::AgentStatus;
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    for scenario in ["matching", "other_id", "ack", "injected", "rejected"] {
+        let directory = socket_directory();
+        let path = directory.path().join(SOCKET_NAME);
+        let listener = UnixListener::bind(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o660)).unwrap();
+        let id = URL_SAFE_NO_PAD.encode([3; 32]);
+        let input = SignedStatusQuery::sign(
+            URL_SAFE_NO_PAD.encode([2; 32]),
+            [4; 32],
+            id.clone(),
+            &SigningKey::from_bytes(&[7; 32]),
+        )
+        .unwrap();
+        let expected = input.clone();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let bytes = read_frame(
+                &mut stream,
+                MAX_REQUEST_FRAME_BYTES,
+                Instant::now() + IO_TIMEOUT,
+            )
+            .await
+            .unwrap();
+            let received = SignedStatusQuery::parse(&bytes).unwrap();
+            assert!(received == expected);
+            received
+                .verify(
+                    &URL_SAFE_NO_PAD
+                        .encode(SigningKey::from_bytes(&[7; 32]).verifying_key().to_bytes()),
+                )
+                .unwrap();
+            let response = match scenario {
+                "matching" | "injected" => AgentResponse::Status {
+                    protocol_version: 1,
+                    request_id: received.request_id,
+                    state: AgentStatus::Running,
+                },
+                "other_id" => AgentResponse::Status {
+                    protocol_version: 1,
+                    request_id: URL_SAFE_NO_PAD.encode([5; 32]),
+                    state: AgentStatus::Running,
+                },
+                "ack" => AgentResponse::pending(received.request_id),
+                _ => AgentResponse::rejected(AgentRejection::Unauthorized),
+            };
+            if scenario == "injected" {
+                let mut value = serde_json::to_value(response).unwrap();
+                value["state"]["output"] = "secret-url-output-capability".into();
+                let mut bytes = serde_json::to_vec(&value).unwrap();
+                bytes.push(b'\n');
+                stream.write_all(&bytes).await.unwrap();
+                stream.shutdown().await.unwrap();
+            } else {
+                write_response(&mut stream, &response).await.unwrap();
+            }
+        });
+        let observed = query_exchange(&path, &input).await;
+        assert_eq!(
+            observed.is_ok(),
+            matches!(scenario, "matching" | "rejected"),
+            "{scenario}"
+        );
+        server.await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn signed_query_rechecks_revocation_after_admission_and_partial_frame() {
+    use crate::access::{
+        agent_binding::AgentPairing,
+        direct_request_tests::{Launcher, fixture, input, records},
+    };
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    let f = fixture();
+    let key = SigningKey::from_bytes(&[155; 32]);
+    let uid = f.app.human_owner().uid().wrapping_add(1);
+    let agent = f
+        .app
+        .pair_agent(
+            f.app.human_owner(),
+            AgentPairing {
+                label: "query-frame-revocation".into(),
+                public_key: URL_SAFE_NO_PAD.encode(key.verifying_key().to_bytes()),
+                uid,
+                gid: 42001,
+            },
+        )
+        .unwrap();
+    let launcher = Arc::new(Launcher::default());
+    let id = f
+        .app
+        .submit_agent_for_test(&agent.id, uid, &[42001], input(), launcher.as_ref())
+        .unwrap()
+        .id;
+    let query = SignedStatusQuery::sign(agent.id.clone(), [1; 32], id, &key).unwrap();
+    let mut wire = serde_json::to_vec(&query).unwrap();
+    wire.push(b'\n');
+    let (mut client, server) = UnixStream::pair().unwrap();
+    let (consumed_tx, consumed_rx) = tokio::sync::oneshot::channel();
+    let mut consumed_tx = Some(consumed_tx);
+    FRAME_CHUNK_HOOK.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move |_| {
+            if let Some(sender) = consumed_tx.take() {
+                sender.send(()).unwrap();
+            }
+        }))
+    });
+    let capacity = Arc::new(Semaphore::new(1));
+    let permit = Arc::new(capacity.acquire_owned().await.unwrap());
+    let app = f.app.clone();
+    let serving = tokio::spawn(serve_one(
+        server,
+        PeerCredentials {
+            uid,
+            groups: vec![42001],
+        },
+        app,
+        launcher,
+        permit,
+        Instant::now() + IO_TIMEOUT,
+    ));
+    client.write_all(&wire[..1]).await.unwrap();
+    // Unlike connect alone, this proves preflight passed and the server read a
+    // frame chunk before authority changes. No scheduler sleeps establish order.
+    consumed_rx.await.unwrap();
+    FRAME_CHUNK_HOOK.with(|hook| *hook.borrow_mut() = None);
+    f.app.revoke_agent(f.app.human_owner(), &agent.id).unwrap();
+    let before = records(&f);
+    client.write_all(&wire[1..]).await.unwrap();
+    client.shutdown().await.unwrap();
+    let response = read_frame(
+        &mut client,
+        MAX_RESPONSE_FRAME_BYTES,
+        Instant::now() + IO_TIMEOUT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        response,
+        br#"{"status":"rejected","protocol_version":1,"category":"unauthorized"}"#
+    );
+    serving.await.unwrap();
+    assert_eq!(records(&f), before);
+}
+
+#[tokio::test(start_paused = true)]
+async fn query_exchange_response_read_retains_the_original_exchange_deadline() {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    let directory = socket_directory();
+    let path = directory.path().join(SOCKET_NAME);
+    // The listening socket accepts the bounded request into its kernel queue but
+    // never responds. No server timer or scheduler delay controls the deadline.
+    let _listener = StdListener::bind(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o660)).unwrap();
+    let query = SignedStatusQuery::sign(
+        URL_SAFE_NO_PAD.encode([2; 32]),
+        [4; 32],
+        URL_SAFE_NO_PAD.encode([3; 32]),
+        &SigningKey::from_bytes(&[7; 32]),
+    )
+    .unwrap();
+    let (reached_tx, mut reached_rx) = tokio::sync::oneshot::channel();
+    let (resume_tx, resume_rx) = tokio::sync::oneshot::channel();
+    CLIENT_RESPONSE_READ_HOOK.with(|hook| *hook.borrow_mut() = Some((reached_tx, resume_rx)));
+    let start = Instant::now();
+    let client = tokio::spawn(async move { query_exchange(&path, &query).await });
+    // Keep virtual time stationary while the real socket connection/write runs.
+    let fixture_bound = std::time::Instant::now() + Duration::from_secs(5);
+    while reached_rx.try_recv().is_err() {
+        assert!(
+            !client.is_finished(),
+            "exchange failed before response-read boundary"
+        );
+        assert!(
+            std::time::Instant::now() < fixture_bound,
+            "exchange did not reach response read"
+        );
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(Instant::now(), start);
+    tokio::time::advance(Duration::from_secs(4)).await;
+    resume_tx.send(()).unwrap();
+    assert!(
+        timeout_at(start + IO_TIMEOUT * 2, client)
+            .await
+            .expect("exchange exceeded independent fixture budget")
+            .unwrap()
+            .is_err()
+    );
+    assert_eq!(Instant::now() - start, IO_TIMEOUT);
+}

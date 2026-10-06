@@ -1,6 +1,10 @@
 //! Real distinct-UID/group and stdin-closed CLI evidence in an isolated user namespace.
 #![cfg(target_os = "linux")]
+#[path = "support/bounded_process.rs"]
+#[allow(dead_code)]
+mod bounded_process;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use bounded_process::BoundedChild;
 use ed25519_dalek::SigningKey;
 use std::{
     fs,
@@ -20,7 +24,9 @@ use vaultwarden_cli::{
         direct_request::*,
         policy::*,
         ports::*,
-        protocol::{AgentRejection, AgentResponse, SignedSubmission},
+        protocol::{
+            AgentRejection, AgentResponse, AgentStatus, SignedStatusQuery, SignedSubmission,
+        },
         provider::Provider,
     },
     adapters::{
@@ -72,14 +78,14 @@ fn identity(command: &mut Command, uid: u32, gid: u32, groups: Vec<u32>) {
     }
     command.stdin(Stdio::null());
 }
-fn peer(
+fn peer_bytes(
     path: &Path,
     uid: u32,
     gid: u32,
     groups: Vec<u32>,
     bytes: &str,
     no_write: bool,
-) -> AgentResponse {
+) -> Vec<u8> {
     let mut command = Command::new("python3");
     command
         .args([
@@ -101,14 +107,24 @@ sys.stdout.buffer.write(data)
         .env("PAYLOAD", bytes)
         .env("NO_WRITE", if no_write { "1" } else { "0" });
     identity(&mut command, uid, gid, groups);
-    let output = command.output().unwrap();
+    let output = bounded_process::output(&mut command);
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(output.stderr.is_empty());
-    AgentResponse::parse(&output.stdout).unwrap()
+    output.stdout
+}
+fn peer(
+    path: &Path,
+    uid: u32,
+    gid: u32,
+    groups: Vec<u32>,
+    bytes: &str,
+    no_write: bool,
+) -> AgentResponse {
+    AgentResponse::parse(&peer_bytes(path, uid, gid, groups, bytes, no_write)).unwrap()
 }
 fn count(root: &Path) -> usize {
     let state: serde_json::Value =
@@ -424,7 +440,7 @@ while True:
 assert json.loads(data)['category']=='malformed'
 "#]).env("SOCKET",&path);
     identity(&mut capacity, 8, 9, vec![7]);
-    let observed = capacity.output().unwrap();
+    let observed = bounded_process::output(&mut capacity);
     assert!(
         observed.status.success(),
         "{}",
@@ -492,17 +508,19 @@ assert json.loads(data)['category']=='malformed'
         .args(["--", "staging", "3"])
         .env_remove("VAULTWARDEN_ACCESS_STATE_ROOT");
     identity(&mut client, 8, 10, vec![7, 9]);
-    let output = client.output().unwrap();
+    let output = bounded_process::output(&mut client);
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(output.stderr.is_empty());
-    assert!(matches!(
-        AgentResponse::parse(&output.stdout).unwrap(),
-        AgentResponse::Pending { .. }
-    ));
+    let AgentResponse::Pending {
+        request_id: cli_id, ..
+    } = AgentResponse::parse(&output.stdout).unwrap()
+    else {
+        panic!("expected receipt")
+    };
     assert_eq!(count(&root), 3);
     assert_eq!(launcher.0.load(Ordering::SeqCst), 3);
     assert_eq!(resolutions.load(Ordering::SeqCst), 0);
@@ -535,10 +553,14 @@ assert json.loads(data)['category']=='malformed'
             .args(["--", "staging", "3"])
             .env_remove("VAULTWARDEN_ACCESS_STATE_ROOT");
         identity(&mut client, 8, 10, vec![7, 9]);
-        let output = client.output().unwrap();
+        let output = bounded_process::output(&mut client);
         assert!(!output.status.success());
         assert!(output.stdout.is_empty());
-        assert_eq!(output.stderr, b"vw-access: agent transport unavailable\n");
+        assert_eq!(output.status.code(), Some(3));
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&output.stderr).unwrap(),
+            serde_json::json!({"event":"client_error","category":"transport_uncertain","request_id":null})
+        );
         listener.set_nonblocking(true).unwrap();
         if socket_owner_mismatch {
             assert_eq!(
@@ -559,9 +581,386 @@ assert json.loads(data)['category']=='malformed'
             );
         }
     }
+
+    // Story 2.3: real kernel peers authenticate every observation, without
+    // accessing provider state, stdin, a controlling TTY, or browser authority.
+    let query = |nonce, id: &str| {
+        SignedStatusQuery::sign(agent.id.clone(), [nonce; 32], id.into(), &key).unwrap()
+    };
+    let wire = |query: &SignedStatusQuery| format!("{}\n", serde_json::to_string(query).unwrap());
+    let snapshot = || -> serde_json::Value {
+        serde_json::from_slice(&fs::read(&state_path).unwrap()).unwrap()
+    };
+    let before = snapshot();
+    for (nonce, gid, groups) in [(40, 9, vec![7]), (41, 10, vec![7, 9])] {
+        let raw = peer_bytes(&path, 8, gid, groups, &wire(&query(nonce, &cli_id)), false);
+        assert_eq!(
+            AgentResponse::parse(&raw).unwrap(),
+            AgentResponse::Status {
+                protocol_version: 1,
+                request_id: cli_id.clone(),
+                state: AgentStatus::Pending
+            }
+        );
+        for sentinel in [
+            "namespace-agent",
+            "Deploy login",
+            "DEPLOY_PASSWORD",
+            "http",
+            "secret",
+            "capability",
+        ] {
+            assert!(!String::from_utf8_lossy(&raw).contains(sentinel));
+        }
+    }
+    assert_eq!(snapshot()["requests"], before["requests"]);
+    assert_eq!(snapshot()["agent_audit"], before["agent_audit"]);
+    assert_eq!(
+        snapshot()["query_replay_markers"].as_array().unwrap().len(),
+        2
+    );
+    for replay in [query(1, &cli_id), query(40, &cli_id)] {
+        assert!(matches!(
+            peer(&path, 8, 9, vec![7], &wire(&replay), false),
+            AgentResponse::Rejected {
+                category: AgentRejection::Replay,
+                ..
+            }
+        ));
+    }
+    let replay_submit = signed(
+        40,
+        &key,
+        revision.clone(),
+        vec!["staging".into(), "3".into()],
+    );
+    assert!(matches!(
+        peer(
+            &path,
+            8,
+            9,
+            vec![7],
+            &format!("{}\n", serde_json::to_string(&replay_submit).unwrap()),
+            false
+        ),
+        AgentResponse::Rejected {
+            category: AgentRejection::Replay,
+            ..
+        }
+    ));
+
+    let other_key = SigningKey::from_bytes(&[8; 32]);
+    let HumanResponse::AgentPaired { agent: other } = exchange(
+        &root,
+        HumanCommand::AgentPair {
+            pairing: AgentPairing {
+                label: "independently-eligible-other".into(),
+                public_key: URL_SAFE_NO_PAD.encode(other_key.verifying_key().to_bytes()),
+                uid: 10,
+                gid: 9,
+            },
+        },
+    )
+    .unwrap() else {
+        panic!("other pairing failed")
+    };
+    // Otherwise eligible UID/group evidence keeps selected-binding group checks independent.
+    let decoy_key = SigningKey::from_bytes(&[9; 32]);
+    assert!(matches!(
+        exchange(
+            &root,
+            HumanCommand::AgentPair {
+                pairing: AgentPairing {
+                    label: "group-decoy".into(),
+                    public_key: URL_SAFE_NO_PAD.encode(decoy_key.verifying_key().to_bytes()),
+                    uid: 8,
+                    gid: 10,
+                }
+            }
+        )
+        .unwrap(),
+        HumanResponse::AgentPaired { .. }
+    ));
+    let unknown = URL_SAFE_NO_PAD.encode([231; 32]);
+    let rejected =
+        b"{\"status\":\"rejected\",\"protocol_version\":1,\"category\":\"unauthorized\"}\n";
+    let before = snapshot();
+    for id in [&cli_id, &unknown] {
+        let q =
+            SignedStatusQuery::sign(other.id.clone(), [42; 32], id.clone(), &other_key).unwrap();
+        assert_eq!(
+            peer_bytes(&path, 10, 9, vec![7], &wire(&q), false),
+            rejected
+        );
+    }
+    let mut tampered = query(43, &cli_id);
+    tampered.request_id = unknown.clone();
+    let bad_key =
+        SignedStatusQuery::sign(agent.id.clone(), [43; 32], cli_id.clone(), &other_key).unwrap();
+    let unpaired =
+        SignedStatusQuery::sign(unknown.clone(), [43; 32], cli_id.clone(), &key).unwrap();
+    for (uid, gid, groups, q) in [
+        (10, 9, vec![7], query(43, &cli_id)),
+        (8, 10, vec![7], query(43, &cli_id)),
+        (0, 9, vec![7], query(43, &cli_id)),
+        (8, 9, vec![7], tampered),
+        (8, 9, vec![7], bad_key),
+        (8, 9, vec![7], unpaired),
+        (8, 9, vec![7], query(43, &unknown)),
+    ] {
+        assert_eq!(
+            peer_bytes(&path, uid, gid, groups, &wire(&q), false),
+            rejected
+        );
+    }
+    assert_eq!(
+        snapshot(),
+        before,
+        "rejected polling must not consume markers or alter audit"
+    );
+
+    let cli = |verb: &str, id: &str| {
+        let mut command = Command::new(&binary);
+        command
+            .arg(verb)
+            .arg(id)
+            .arg("--socket")
+            .arg(&path)
+            .arg("--key-file")
+            .arg(&seed)
+            .arg("--binding-id")
+            .arg(&agent.id)
+            .env_remove("VAULTWARDEN_ACCESS_STATE_ROOT");
+        identity(&mut command, 8, 10, vec![7, 9]);
+        command
+    };
+    let before = snapshot();
+    let poll = bounded_process::output(&mut cli("poll", &cli_id));
+    assert!(poll.status.success());
+    assert!(poll.stderr.is_empty());
+    assert!(matches!(
+        AgentResponse::parse(&poll.stdout).unwrap(),
+        AgentResponse::Status {
+            state: AgentStatus::Pending,
+            ..
+        }
+    ));
+    let wait = bounded_process::output(cli("wait", &cli_id).args(["--timeout-seconds", "1"]));
+    assert_eq!(wait.status.code(), Some(4));
+    assert_eq!(
+        wait.stdout
+            .split(|b| *b == b'\n')
+            .filter(|line| !line.is_empty())
+            .count(),
+        1,
+        "unchanged state emitted once"
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&wait.stderr).unwrap(),
+        serde_json::json!({"event":"client_error","category":"wait_timeout","request_id":cli_id})
+    );
+    let resumed = bounded_process::output(&mut cli("poll", &cli_id));
+    assert!(resumed.status.success());
+    assert_eq!(snapshot()["requests"], before["requests"]);
+    assert_eq!(snapshot()["agent_audit"], before["agent_audit"]);
+    assert_eq!(count(&root), 3);
+
+    let mut submit_wait = Command::new(&binary);
+    submit_wait
+        .args([
+            "submit",
+            "deploy",
+            "--wait",
+            "--timeout-seconds",
+            "1",
+            "--socket",
+        ])
+        .arg(&path)
+        .arg("--key-file")
+        .arg(&seed)
+        .arg("--binding-id")
+        .arg(&agent.id)
+        .arg("--revision")
+        .arg(&revision)
+        .args(["--", "staging", "3"]);
+    identity(&mut submit_wait, 8, 10, vec![7, 9]);
+    let observed = bounded_process::output(&mut submit_wait);
+    assert_eq!(observed.status.code(), Some(4));
+    let lines: Vec<_> = observed
+        .stdout
+        .split(|b| *b == b'\n')
+        .filter(|line| !line.is_empty())
+        .collect();
+    assert_eq!(lines.len(), 2);
+    let AgentResponse::Pending {
+        request_id: waited_id,
+        ..
+    } = AgentResponse::parse(lines[0]).unwrap()
+    else {
+        panic!("receipt must precede observation")
+    };
+    assert!(matches!(
+        AgentResponse::parse(lines[1]).unwrap(),
+        AgentResponse::Status {
+            state: AgentStatus::Pending,
+            ..
+        }
+    ));
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&observed.stderr).unwrap()["request_id"],
+        waited_id
+    );
+    assert_eq!(count(&root), 4, "wait must never resubmit");
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 4);
+    assert_eq!(resolutions.load(Ordering::SeqCst), 0);
+
+    // Kernel send-queue consumption proves admitted reading of a harmless JSON
+    // whitespace prefix. Pipe synchronization withholds the signed query until
+    // revocation completes; no competing waiter holds the authority gate.
+    use std::io::{BufRead, Read, Write};
+    let mut held = Command::new("python3");
+    held.args([
+        "-c",
+        r#"import os,socket,sys,fcntl,struct,time
+s=socket.socket(socket.AF_UNIX);s.settimeout(8);s.connect(os.environ['SOCKET'])
+s.sendall(b' ')
+deadline=time.monotonic()+3
+while struct.unpack('i',fcntl.ioctl(s,0x5411,struct.pack('i',0)))[0]:
+ assert time.monotonic()<deadline
+s.setblocking(False)
+try: s.recv(1,socket.MSG_PEEK)
+except BlockingIOError: pass
+else: raise AssertionError('preflight rejected before query')
+s.settimeout(8)
+print('admitted',flush=True)
+assert sys.stdin.readline()=='go\n'
+s.sendall(os.environ['PAYLOAD'].encode());s.shutdown(socket.SHUT_WR)
+data=b''
+while True:
+ chunk=s.recv(1024)
+ if not chunk:break
+ data+=chunk
+sys.stdout.buffer.write(data)
+"#,
+    ])
+    .env("SOCKET", &path)
+    .env("PAYLOAD", wire(&query(49, &cli_id)));
+    identity(&mut held, 8, 9, vec![7]);
+    let mut held = BoundedChild::spawn(
+        held.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
+    let mut held_stdout = std::io::BufReader::new(held.stdout());
+    let (mut held_stdout, ready) = bounded_process::io(move || {
+        let mut ready = String::new();
+        held_stdout.read_line(&mut ready).unwrap();
+        (held_stdout, ready)
+    });
+    assert_eq!(ready, "admitted\n");
+    let revoked = exchange(
+        &root,
+        HumanCommand::AgentRevoke {
+            id: agent.id.clone(),
+        },
+    )
+    .unwrap();
+    assert!(!matches!(revoked, HumanResponse::Rejected { .. }));
+    held.stdin().write_all(b"go\n").unwrap();
+    let held_raw = bounded_process::io(move || {
+        let mut bytes = Vec::new();
+        held_stdout.read_to_end(&mut bytes).unwrap();
+        bytes
+    });
+    assert_eq!(held_raw, rejected);
+    assert!(held.wait_with_output().status.success());
+    // A separate owner/phase tests active waiting, so its periodic gate access
+    // cannot mask the held-connection authorization check with legitimate Busy.
+    let other_submission = SignedSubmission::sign(
+        other.id.clone(),
+        [60; 32],
+        "deploy".into(),
+        revision.clone(),
+        vec!["staging".into(), "3".into()],
+        &other_key,
+    )
+    .unwrap();
+    let AgentResponse::Pending {
+        request_id: other_id,
+        ..
+    } = peer(
+        &path,
+        10,
+        9,
+        vec![7],
+        &format!("{}\n", serde_json::to_string(&other_submission).unwrap()),
+        false,
+    )
+    else {
+        panic!("other request receipt")
+    };
+    let other_seed = dir.path().join("other-seed");
+    fs::write(&other_seed, [8; 32]).unwrap();
+    set_owner(&other_seed, 10, 9);
+    fs::set_permissions(&other_seed, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut waiting = Command::new(&binary);
+    waiting
+        .arg("wait")
+        .arg(&other_id)
+        .arg("--socket")
+        .arg(&path)
+        .arg("--key-file")
+        .arg(&other_seed)
+        .arg("--binding-id")
+        .arg(&other.id);
+    identity(&mut waiting, 10, 9, vec![7]);
+    let mut waiting = BoundedChild::spawn(waiting.stdout(Stdio::piped()).stderr(Stdio::piped()));
+    let mut waiting_stdout = std::io::BufReader::new(waiting.stdout());
+    let (mut waiting_stdout, first) = bounded_process::io(move || {
+        let mut first = String::new();
+        waiting_stdout.read_line(&mut first).unwrap();
+        (waiting_stdout, first)
+    });
+    assert!(matches!(
+        AgentResponse::parse(first.as_bytes()).unwrap(),
+        AgentResponse::Status {
+            state: AgentStatus::Pending,
+            ..
+        }
+    ));
+    assert!(matches!(
+        exchange(
+            &root,
+            HumanCommand::AgentRevoke {
+                id: other.id.clone()
+            }
+        )
+        .unwrap(),
+        HumanResponse::AgentRevoked { .. }
+    ));
+    let later = bounded_process::io(move || {
+        let mut bytes = Vec::new();
+        waiting_stdout.read_to_end(&mut bytes).unwrap();
+        bytes
+    });
+    assert_eq!(later, rejected);
+    assert_eq!(waiting.wait_with_output().status.code(), Some(1));
+    let before = snapshot();
+    assert_eq!(
+        peer_bytes(&path, 8, 9, vec![7], &wire(&query(50, &unknown)), false),
+        rejected
+    );
+    assert_eq!(
+        peer_bytes(&path, 8, 9, vec![7], &wire(&query(50, &cli_id)), false),
+        rejected
+    );
+    assert_eq!(snapshot(), before);
+    assert_eq!(count(&root), 5);
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+    assert_eq!(resolutions.load(Ordering::SeqCst), 0);
     stop.store(true, Ordering::Release);
     runtime.block_on(worker).unwrap().unwrap();
-    human_worker.join().unwrap().unwrap();
+    bounded_process::join(human_worker).unwrap();
     app.shutdown().unwrap();
     assert!(!path.exists());
 }

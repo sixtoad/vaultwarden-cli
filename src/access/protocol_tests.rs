@@ -246,3 +246,185 @@ fn signed_strict_verification_rejects_an_ordinary_valid_small_order_r_witness() 
         Err(AgentRejection::Unauthorized)
     );
 }
+
+fn query_fixture() -> SignedStatusQuery {
+    SignedStatusQuery::sign(
+        URL_SAFE_NO_PAD.encode([0x11; 32]),
+        [0x22; 32],
+        URL_SAFE_NO_PAD.encode([0x33; 32]),
+        &SigningKey::from_bytes(&[7; 32]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn signed_query_canonical_vector_and_cross_purpose_separation() {
+    let query = query_fixture();
+    let hex: String = query
+        .signing_bytes()
+        .unwrap()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    // Independently computed with Python cryptography, including binary request ID.
+    assert_eq!(
+        hex,
+        "7661756c7477617264656e2d61636365737300010100000006737461747573000000201111111111111111111111111111111111111111111111111111111111111111000000202222222222222222222222222222222222222222222222222222222222222222000000203333333333333333333333333333333333333333333333333333333333333333"
+    );
+    assert_eq!(
+        query.signature,
+        "rnI_EBzbEGy7_MHDfbV_a3Fh13DFBAn7yTgtEaIEQWwGYFVt7fL3ipL92m8OF4TAfTCZnEwqFBtU9vAhwmWNAw"
+    );
+    query.verify(&public_key()).unwrap();
+    let mut submission = fixture();
+    assert_eq!(
+        query.replay_digest().unwrap(),
+        submission.replay_digest().unwrap()
+    );
+    submission.signature = query.signature.clone();
+    assert_eq!(
+        submission.verify(&public_key()),
+        Err(AgentRejection::Unauthorized)
+    );
+    let mut query = query;
+    query.signature = fixture().signature;
+    assert_eq!(
+        query.verify(&public_key()),
+        Err(AgentRejection::Unauthorized)
+    );
+}
+
+#[test]
+fn signed_query_binds_every_field_and_uses_strict_verification() {
+    use ed25519_dalek::{Signature, Verifier};
+    let baseline = query_fixture();
+    type Mutation = Box<dyn Fn(&mut SignedStatusQuery)>;
+    let mutations: Vec<Mutation> = vec![
+        Box::new(|q| q.protocol_version = 2),
+        Box::new(|q| q.purpose = "submit".into()),
+        Box::new(|q| q.binding_id = URL_SAFE_NO_PAD.encode([8; 32])),
+        Box::new(|q| q.nonce = URL_SAFE_NO_PAD.encode([8; 32])),
+        Box::new(|q| q.request_id = URL_SAFE_NO_PAD.encode([8; 32])),
+    ];
+    for mutate in mutations {
+        let mut query = baseline.clone();
+        mutate(&mut query);
+        assert!(query.verify(&public_key()).is_err());
+    }
+    let mut query = baseline;
+    query.signature =
+        "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGEfoBqLFplwwt-68pvaiwSx0bVpiM-P2BnsjJ0v9yDw"
+            .into();
+    let sig = Signature::from_slice(&URL_SAFE_NO_PAD.decode(&query.signature).unwrap()).unwrap();
+    SigningKey::from_bytes(&[7; 32])
+        .verifying_key()
+        .verify(&query.signing_bytes().unwrap(), &sig)
+        .unwrap();
+    assert_eq!(
+        query.verify(&public_key()),
+        Err(AgentRejection::Unauthorized)
+    );
+}
+
+#[test]
+fn signed_query_and_dispatch_reject_duplicate_missing_unknown_and_noncanonical_fields() {
+    let query = query_fixture();
+    let json = serde_json::to_string(&query).unwrap();
+    assert!(matches!(
+        AgentEnvelope::parse(json.as_bytes()).unwrap(),
+        AgentEnvelope::Status(_)
+    ));
+    let value = serde_json::to_value(&query).unwrap();
+    for field in [
+        "protocol_version",
+        "purpose",
+        "binding_id",
+        "nonce",
+        "request_id",
+        "signature",
+    ] {
+        let mut missing = value.clone();
+        missing.as_object_mut().unwrap().remove(field);
+        let duplicate = format!("{{\"{field}\":{},{}", value[field], &json[1..]);
+        let mut null = value.clone();
+        null[field] = serde_json::Value::Null;
+        for invalid in [
+            serde_json::to_vec(&missing).unwrap(),
+            duplicate.into_bytes(),
+            serde_json::to_vec(&null).unwrap(),
+        ] {
+            assert!(SignedStatusQuery::parse(&invalid).is_err(), "{field}");
+            assert!(AgentEnvelope::parse(&invalid).is_err(), "{field}");
+        }
+    }
+    for invalid in [
+        json.replacen('{', "{\"owner\":\"secret\",", 1),
+        json.replace(&query.request_id, &(query.request_id.clone() + "=")),
+        json.replace(&query.nonce, &URL_SAFE_NO_PAD.encode([8; 31])),
+        json.replace(&query.signature, &URL_SAFE_NO_PAD.encode([8; 63])),
+        format!("{json}{{}}"),
+    ] {
+        assert!(AgentEnvelope::parse(invalid.as_bytes()).is_err());
+    }
+    // Submission duplicate fields must remain rejected by the shared dispatcher.
+    let submission = serde_json::to_string(&fixture()).unwrap();
+    assert!(
+        AgentEnvelope::parse(
+            submission
+                .replacen('{', "{\"purpose\":\"submit\",", 1)
+                .as_bytes()
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn signed_status_projection_is_closed_and_validates_every_lifecycle() {
+    let mut states = vec![
+        AgentStatus::Pending,
+        AgentStatus::Approved,
+        AgentStatus::Running,
+        AgentStatus::Denied,
+        AgentStatus::Expired,
+        AgentStatus::Completed { exit_code: 0 },
+        AgentStatus::Completed { exit_code: 255 },
+    ];
+    for category in [
+        AgentFailure::ReviewUnavailable,
+        AgentFailure::ExecutionUnavailable,
+        AgentFailure::ExecutionRejected,
+        AgentFailure::ExecutionNonzero,
+        AgentFailure::ExecutionSignaled,
+    ] {
+        states.push(AgentStatus::Failed { category });
+    }
+    for state in states {
+        let response = AgentResponse::Status {
+            protocol_version: 1,
+            request_id: query_fixture().request_id,
+            state,
+        };
+        let json = serde_json::to_vec(&response).unwrap();
+        assert!(json.len() < MAX_RESPONSE_FRAME_BYTES);
+        assert_eq!(AgentResponse::parse(&json).unwrap(), response);
+        let mut value = serde_json::to_value(&response).unwrap();
+        assert_eq!(value.as_object().unwrap().len(), 4);
+        value["state"]["output"] = "secret-output-url-capability".into();
+        assert!(AgentResponse::parse(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+    for state in [
+        r#"{"status":"completed","exit_code":-1}"#,
+        r#"{"status":"completed","exit_code":256}"#,
+        r#"{"status":"failed","category":"backend-secret"}"#,
+        r#"{"status":"pending","operation":"secret"}"#,
+        r#"{"status":"pending","status":"running"}"#,
+        r#"{"status":"completed","exit_code":0,"exit_code":1}"#,
+        r#"{"status":"failed","category":"execution_nonzero","category":"execution_signaled"}"#,
+    ] {
+        let json = format!(
+            r#"{{"status":"status","protocol_version":1,"request_id":"{}","state":{state}}}"#,
+            query_fixture().request_id
+        );
+        assert!(AgentResponse::parse(json.as_bytes()).is_err());
+    }
+}

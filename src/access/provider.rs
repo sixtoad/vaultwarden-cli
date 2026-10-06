@@ -269,12 +269,14 @@ impl Provider {
             .store
             .read_state()
             .map_err(|_error| AgentRejection::Unavailable)?;
-        if state.requests.iter().any(|request| {
-            request
-                .direct
-                .as_ref()
-                .is_some_and(|record| record.replay_digest.as_ref() == Some(&marker))
-        }) {
+        if state.query_replay_markers.contains(&marker)
+            || state.requests.iter().any(|request| {
+                request
+                    .direct
+                    .as_ref()
+                    .is_some_and(|record| record.replay_digest.as_ref() == Some(&marker))
+            })
+        {
             return Err(AgentRejection::Replay);
         }
         self.create_owned(
@@ -302,6 +304,86 @@ impl Provider {
                 owner.matches(b) && b.status == super::agent_binding::AgentBindingStatus::Enabled
             })
         })
+    }
+    pub(crate) fn authenticate_status_query(
+        &self,
+        uid: u32,
+        groups: &[u32],
+        query: &super::protocol::SignedStatusQuery,
+    ) -> Result<super::direct_request::AgentOwner, super::protocol::AgentRejection> {
+        use super::{direct_request::AgentOwner, protocol::AgentRejection};
+        if uid == self.owner_uid() {
+            return Err(AgentRejection::Unauthorized);
+        }
+        let state = self
+            .store
+            .read_state()
+            .map_err(|_error| AgentRejection::Unavailable)?;
+        let binding = state
+            .pairings
+            .iter()
+            .find(|binding| binding.id == query.binding_id && binding.matches_os(uid, groups))
+            .ok_or(AgentRejection::Unauthorized)?;
+        query.verify(&binding.public_key)?;
+        let owner = AgentOwner::from_binding(binding);
+        // Check ownership before replay so inaccessible IDs have one rejection.
+        Self::owned_agent_status(&state, &owner, &query.request_id)?;
+        Ok(owner)
+    }
+    fn owned_agent_status(
+        state: &ProviderState,
+        owner: &super::direct_request::AgentOwner,
+        id: &str,
+    ) -> Result<super::direct_request::DirectStatus, super::protocol::AgentRejection> {
+        state
+            .requests
+            .iter()
+            .find(|request| request.id == id)
+            .and_then(|request| request.direct.as_ref())
+            .filter(|record| record.agent_owner.as_ref() == Some(owner))
+            .map(|record| record.review.status.clone())
+            .ok_or(super::protocol::AgentRejection::Unauthorized)
+    }
+    pub(crate) fn consume_status_query(
+        &mut self,
+        owner: &super::direct_request::AgentOwner,
+        query: &super::protocol::SignedStatusQuery,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<(), super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        let mut state = self
+            .store
+            .read_state()
+            .map_err(|_error| AgentRejection::Unavailable)?;
+        if query.binding_id != owner.binding_id
+            || !Self::agent_current(&state, &Some(owner.clone()))
+        {
+            return Err(AgentRejection::Unauthorized);
+        }
+        Self::owned_agent_status(&state, owner, &query.request_id)?;
+        let marker = query.replay_digest()?;
+        if state.query_replay_markers.contains(&marker)
+            || state.requests.iter().any(|request| {
+                request
+                    .direct
+                    .as_ref()
+                    .is_some_and(|record| record.replay_digest.as_ref() == Some(&marker))
+            })
+        {
+            return Err(AgentRejection::Replay);
+        }
+        state.query_replay_markers.push(marker);
+        self.store
+            .write_state_guarded(&state, still_authorized)
+            .map_err(|error| {
+                if error.diagnostic() == ProviderDiagnostic::ExpiredAccessRequest {
+                    AgentRejection::Unauthorized
+                } else {
+                    AgentRejection::Unavailable
+                }
+            })?;
+        self.state = state;
+        Ok(())
     }
     /// Exact immutable ownership, distinct from human administration authority.
     #[allow(dead_code)] // The polling transport will supply authenticated OS/signature evidence.

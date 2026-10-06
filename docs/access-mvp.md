@@ -9,8 +9,9 @@ Stories 1.1–1.9 provide private state, constrained operation policy, a protect
 provider session, authenticated one-time browser decisions and immutable executable
 preparation, login-backed execution, descendant containment and redacted history.
 Story 2.1 adds durable restricted-agent pairing and selective revocation. Story 2.2
-adds signed noninteractive agent submission over a bounded Unix socket. Signed
-polling/waiting and platform/WebAuthn authentication remain later stories.
+adds signed noninteractive agent submission over a bounded Unix socket. Story 2.3
+adds owner-authenticated polling and interruptible noninteractive waiting.
+Platform/WebAuthn authentication remains a later story.
 The provider has no agent-facing item lookup, secret export or password command.
 
 ## Supported platform
@@ -275,7 +276,7 @@ admission and returns a failure rather than claiming cleanup succeeded. The
 client allows 30 seconds for a revocation response; transport failure is not
 proof of success, so retry the same immutable ID. Bindings and tombstones
 survive restart, and historical requester snapshots retain their original
-identity. Signed submission is described below; agent polling remains a later story.
+identity. Signed submission and owner-authenticated polling are described below.
 
 ## Signed noninteractive agent submission (Story 2.2)
 
@@ -320,9 +321,9 @@ from the human-provisioned socket directory owner; the client has no separately
 pinned provider UID. Trust the configured pathname and ensure its ancestors are
 owned and permissioned so an agent or other untrusted user cannot replace that
 directory. Descriptor pinning prevents races after opening a directory; it does
-not establish trust in a malicious directory selected beforehand. It neither waits for approval nor
-polls, reads passwords, resolves credentials, launches a browser or falls back to
-human authentication. Seed buffers are bounded and zeroized. Successful stdout is
+not establish trust in a malicious directory selected beforehand. Without `--wait`,
+submission returns after acknowledgment. The agent client never reads passwords,
+resolves credentials, launches a browser or falls back to human authentication. Seed buffers are bounded and zeroized. Successful stdout is
 only the pending commit acknowledgment:
 
 ```json
@@ -378,6 +379,84 @@ retrying an unconsumed nonce. Future history pruning must retain replay tombston
 Story 2.1 records without markers retain their existing integrity checks. See the
 [wire and persistence contract](implementation/2-2-protocol-contract.md) for exact
 signed bytes and the frozen test vector.
+
+## Polling delegated work (Story 2.3)
+
+Use the same socket, private seed and immutable binding ID for each command:
+
+```sh
+vw-access poll <request-id> --socket <shared-directory>/agent.sock \
+  --key-file <agent-private-seed> --binding-id <paired-binding-id>
+vw-access wait <request-id> --timeout-seconds 300 \
+  --socket <shared-directory>/agent.sock --key-file <agent-private-seed> \
+  --binding-id <paired-binding-id>
+vw-access submit deploy --wait --timeout-seconds 300 \
+  --socket <shared-directory>/agent.sock --key-file <agent-private-seed> \
+  --binding-id <paired-binding-id> --revision <current-operation-sha256> \
+  -- staging safe 3
+```
+
+`poll` observes once. `wait` resumes an existing request; `submit --wait` prints
+and flushes the accepted request ID before observing it. Waiting immediately
+queries, then delays 100, 200, 400, 800 and at most 1000 milliseconds between
+queries. Each exchange uses a fresh random nonce and signature. Temporary `busy`
+admission responses retry under the same deadline; other rejections end waiting.
+Only changed provider states print to stdout. The default monotonic client deadline
+is 300 seconds, including submission acknowledgment, flushed receipt and changed
+state output, exchanges and sleeps. Full stdout pipes remain interruptible by the
+same deadline and SIGINT/SIGTERM handlers. Stderr diagnostics are best effort with
+a bounded 50 ms delivery allowance; an unread pipe cannot prevent process exit.
+A cancelled output may be partial or absent, while the diagnostic retains any
+known accepted ID. Synchronous filesystem checks retain the existing limitation:
+a filesystem stall can exceed the network/wait deadline.
+`--timeout-seconds` accepts positive whole seconds that fit the local monotonic
+clock; on `submit` it requires `--wait`. Options and canonical request/binding
+selectors are checked before key loading and submission; malformed selectors
+receive the redacted usage error (exit 2).
+
+```json
+{"status":"status","protocol_version":1,"request_id":"<opaque-id>","state":{"status":"running"}}
+{"status":"status","protocol_version":1,"request_id":"<opaque-id>","state":{"status":"completed","exit_code":0}}
+```
+
+The closed states are `pending`, `approved`, `running`, `denied`, `expired`,
+`completed` (exit code 0–255), and `failed` with one category:
+`review_unavailable`, `execution_unavailable`, `execution_rejected`,
+`execution_nonzero`, or `execution_signaled`. Responses contain no operation,
+arguments, labels, timestamps, secret/output data, history, URLs or capabilities.
+Provider clocks determine expiry. Running work remains nonterminal until existing
+cleanup and reaping requirements are confirmed. Terminal request/audit content is
+immutable, and enabled owners can observe terminal work after lock/restart.
+
+Each query rechecks kernel UID/group evidence, the enabled stored key, strict
+signature, immutable request ownership and revocation. Unknown, other-owner,
+unpaired and revoked requests all receive the identical `unauthorized` rejection.
+Re-pairing a label or OS principal does not transfer ownership. Query nonce digests
+are persisted before disclosure, separately from request/audit records. Submission
+and querying reject nonce reuse across either action; signatures bind their distinct
+purposes. Markers have no TTL or eviction. Every successful poll rewrites a full
+provider snapshot and permanently grows replay metadata; quotas and compaction
+are outside this story. The new reader accepts older snapshots without query
+metadata, but older executables reject snapshots containing `query_replay_markers`.
+Downgrade compatibility is not provided. Preserve replay evidence; stripping these
+markers or restoring stale snapshots would invalidate the authority/replay contract.
+
+CLI exit codes are 0 for acknowledgment, nonterminal observation or completion;
+1 for unsuccessful terminal states, rejection or local failure; 2 for usage;
+3 for transport uncertainty; 4 for wait timeout; 130 for SIGINT; and 143 for SIGTERM.
+The protected operation's exit code stays in JSON and is separate from these codes.
+Client failures print a separate stderr JSON diagnostic, for example:
+
+```json
+{"event":"client_error","category":"wait_timeout","request_id":"<known-id>"}
+```
+
+Other local categories are `local_failure`, `transport_uncertain`, `interrupted`
+and `terminated`. A lost acknowledgment can leave `request_id: null`. Timeout,
+interruption and disconnect do not expire, complete or cancel provider work.
+Retain the known ID and resume with `wait` or `poll`. The client never retries
+submission, prompts, cancels, discovers requests or falls back to human access.
+See the [wire contract](implementation/2-3-protocol-contract.md).
 
 ## Redacted operation history (Story 1.9)
 
