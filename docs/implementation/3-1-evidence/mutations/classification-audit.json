@@ -1,0 +1,543 @@
+[
+  {
+    "mutant": "policy-immutable-uuid",
+    "evidence": "policy-immutable-uuid",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "2affe06c58881854f560dc706f1996ecde509e53bcb262e54d509dc9bcc9bb47"
+  },
+  {
+    "mutant": "policy-explicit-ssh-use",
+    "evidence": "policy-explicit-ssh-use",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "12698a8f81fd05500d4a2ef32605ae0d4a7a88fe96dffc3d8515e6537bddccc7"
+  },
+  {
+    "mutant": "backend-exact-uuid",
+    "evidence": "backend-exact-uuid",
+    "classification": "killed",
+    "failing_tests": [
+      "adapters::vaultwarden::tests::ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "3ae6b40fce46641f0820afd9702ce337a1793906baa88f0f66fd906064ca7abd"
+  },
+  {
+    "mutant": "backend-actual-type-five",
+    "evidence": "backend-actual-type-five",
+    "classification": "killed",
+    "failing_tests": [
+      "adapters::vaultwarden::tests::ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "1e49798fbea890be67c12a93a7d81c29cdcb69146c3f01fb3fa2933f769eb5eb"
+  },
+  {
+    "mutant": "backend-undeleted",
+    "evidence": "backend-undeleted",
+    "classification": "killed",
+    "failing_tests": [
+      "adapters::vaultwarden::tests::ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "031bfdcea6619feb47bdd2a2bbb66127515caaf7721eaf630450760a4d91bca0"
+  },
+  {
+    "mutant": "backend-required-ssh-body",
+    "evidence": "backend-required-ssh-body",
+    "classification": "killed",
+    "failing_tests": [
+      "adapters::vaultwarden::tests::ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "f770b0ac76efb8e994ba96ca01333262fcd37a836b7748780a19b232495c8081"
+  },
+  {
+    "mutant": "backend-nonempty-key-field",
+    "evidence": "backend-nonempty-key-field",
+    "classification": "killed",
+    "failing_tests": [
+      "adapters::vaultwarden::tests::ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "c9508b50da4907876ff34381213294433625af123798bb95afebe6dd6af966b3"
+  },
+  {
+    "mutant": "backend-duplicate-members",
+    "evidence": "fixed-backend-duplicate-members",
+    "classification": "killed",
+    "failing_tests": [
+      "adapters::vaultwarden::tests::ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "8960b63a32ec98b7d1ec5d010b253e47476a7fc2e502e404a92a2d9e233f182b"
+  },
+  {
+    "mutant": "backend-default-deny",
+    "evidence": "backend-default-deny",
+    "classification": "killed",
+    "failing_tests": [
+      "unsupported_session_backend_denies_ssh_metadata_without_resolving"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "344e070ece973e40a71c299b996dd195e509d3865a44ccd5276c9640e41be886"
+  },
+  {
+    "mutant": "verifier-default-deny",
+    "evidence": "fixed-verifier-default-deny",
+    "classification": "killed",
+    "failing_tests": [
+      "access::ports::tests::ssh_verifier_default_denies_eligibility"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "f040dc9698fa0cf70727799834ae8546974fc40d046a8a7e7a709ee3751847e0"
+  },
+  {
+    "mutant": "no-generic-targets",
+    "evidence": "no-generic-targets",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "f1d49213ae15244ee41d59ce7ec002417aa758ccf3146d82d24a3fcec84b8b0b"
+  },
+  {
+    "mutant": "no-generic-schemas",
+    "evidence": "no-generic-schemas",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "b47975a95b307be015b18d74adb6a489141272ff0adea1cebee35f03abff89b8"
+  },
+  {
+    "mutant": "no-mixed-credentials",
+    "evidence": "no-mixed-credentials",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "95dd4086399af649707b0438907513efe04269b31a665955ae4ad795aa1705b9"
+  },
+  {
+    "mutant": "working-directory-validation",
+    "evidence": "working-directory-validation",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "270992048d9488fc1ad95f4effcdf6f6291cab909057f3638882b9bcd7230ac5"
+  },
+  {
+    "mutant": "resource-path-validation",
+    "evidence": "resource-path-validation",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "0b18d26305c5d5ac75269cce8d80f0d4befa4d50c3db11d6b19cfccfcaac4c83"
+  },
+  {
+    "mutant": "host-validation",
+    "evidence": "host-validation",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "56713f4cc2ce0b5670bd301fb57753fcfdf4ecf883bae29819e2f750e23768b2"
+  },
+  {
+    "mutant": "explicit-nonzero-port",
+    "evidence": "explicit-nonzero-port",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "851918749d6f3e5d217716dc4d1a66d16e467b44d7092eba6c96ce8a069ced3a"
+  },
+  {
+    "mutant": "user-validation",
+    "evidence": "user-validation",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "44251fb6e8129ddaf7d5b82f9f379bb34fda5de0c5b06bc47e9c0f1c432bc839"
+  },
+  {
+    "mutant": "absolute-unambiguous-path",
+    "evidence": "absolute-unambiguous-path",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "401af065a1fa179e281125b410d958ce579bce98df440353e6ba73543ab72873"
+  },
+  {
+    "mutant": "numeric-host-ambiguity",
+    "evidence": "numeric-host-ambiguity",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "61e9ff7edeff879bfb718ae68601a8dc5d8c863a0790810fe5499a6972d3e50b"
+  },
+  {
+    "mutant": "fingerprint-sha256-prefix",
+    "evidence": "fixed-fingerprint-sha256-prefix",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "06fe230f392c87c31bac23cc627218f39b7f92574603022272e9723ec1757d0d"
+  },
+  {
+    "mutant": "fingerprint-exact-32-bytes",
+    "evidence": "fingerprint-exact-32-bytes",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "76ab5122eff5069542836369d49b2eeb9542e3b4686c2e8a5c396e950921ecf0"
+  },
+  {
+    "mutant": "fingerprint-base64-decoding",
+    "evidence": "fixed-fingerprint-base64-decoding",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "45f6deb8d8700cbf8927c0429d09e9646e24c8e46a28c390db2a42ce370de3df"
+  },
+  {
+    "mutant": "ssh-request-arguments",
+    "evidence": "ssh-request-arguments",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_approval_review_history_and_execution_are_secret_free_and_unavailable",
+      "access::direct_request_tests::ssh_caller_selector_wire_members_and_values_are_independently_rejected",
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_signed_admission_rejects_arguments_and_stale_revision_before_review"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "75c517a4bd66f828a531e14da854f8d31044925294eace23378c458933228de6"
+  },
+  {
+    "mutant": "ssh-unknown-authority-members",
+    "evidence": "ssh-unknown-authority-members",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_rejects_each_invalid_authority_and_selector_independently"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "379480929067eac99e49acb573fe8c4c1db8a476f378e499aaa7be447bf48e42"
+  },
+  {
+    "mutant": "digest-omit-id",
+    "evidence": "digest-omit-id",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "acaba0180d0b985f7a149baf8695d89cd9dc0f9bbc1b54b93972929efc350943"
+  },
+  {
+    "mutant": "digest-omit-image",
+    "evidence": "digest-omit-image",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "e15f6bb7ca7b40dd6fb24082e8e86e24193c8ebb19e60d98b0e9aca7b519e67c"
+  },
+  {
+    "mutant": "digest-omit-item_id",
+    "evidence": "digest-omit-item_id",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals",
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "09b12aad2b165bbb37274986df06654882c822851b2ab46b7f6984500d859ada"
+  },
+  {
+    "mutant": "digest-omit-use_type",
+    "evidence": "fixed-digest-omit-use_type",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_revision_projection_matches_explicit_v3_contract"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "89ce905ed3588a71d64411b6e31fede51636b05af83f2e42f498b53824468f60"
+  },
+  {
+    "mutant": "digest-omit-working_directory",
+    "evidence": "digest-omit-working_directory",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "c33ec26f9945f5bf9eaf6c4ee9eb71cba12d0d278e6b5cc5a5eef0fa8d0a733a"
+  },
+  {
+    "mutant": "digest-omit-destination-host",
+    "evidence": "digest-omit-destination-host",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "0051d8699d397e5551bd7cf90a5f03047143f51e583eda72e0c65fd7de186a2f"
+  },
+  {
+    "mutant": "digest-omit-destination-port",
+    "evidence": "digest-omit-destination-port",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "b09e8fe23b4b5d0c8eae1c62eeb5aa0e8a8ebc94b452e342491b80ff376e6568"
+  },
+  {
+    "mutant": "digest-omit-destination-user",
+    "evidence": "digest-omit-destination-user",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "3606a49359f45832e545f77b67026e139a40cbae42bd9e65acfc089778188fe2"
+  },
+  {
+    "mutant": "digest-omit-destination-resource_path",
+    "evidence": "digest-omit-destination-resource_path",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "4bc11031611990f9033fc2f12fc5928a139887958a48fc9e2bdd2cd9e0da11ad"
+  },
+  {
+    "mutant": "digest-omit-destination-host_fingerprint",
+    "evidence": "digest-omit-destination-host_fingerprint",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "a72f1c1dfcfe8333fe2924d0b07686f1eec9aa5b531628e30203b4bb74b83e52"
+  },
+  {
+    "mutant": "digest-omit-image-image_id",
+    "evidence": "digest-omit-image-image_id",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "3a29ce156a26a8771b5b27880950a0cb7c6651715b27b845e3fc6d053df350ed"
+  },
+  {
+    "mutant": "digest-omit-image-execution_root",
+    "evidence": "digest-omit-image-execution_root",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "33462d8cdd702bb0521dfbbd01011b1e4e465c67dc98c1ab9043eab2a1731d5b"
+  },
+  {
+    "mutant": "digest-omit-image-path",
+    "evidence": "digest-omit-image-path",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "2371e58302ad749c6ce133a1c29e269e5177cc747762a875e57c538282157d76"
+  },
+  {
+    "mutant": "digest-omit-image-sha256",
+    "evidence": "digest-omit-image-sha256",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "a1f761165f63dbdd93aee1e1acf498debc121385a41ad28bbc0ff401ddc919d7"
+  },
+  {
+    "mutant": "digest-omit-image-profile",
+    "evidence": "fixed-digest-omit-image-profile",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_revision_projection_matches_explicit_v3_contract"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "5309343ca3267f5add271641ff99da1bd5355fc11e36ff7a820081b1f39051f1"
+  },
+  {
+    "mutant": "review-fixed-target",
+    "evidence": "review-fixed-target",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals",
+      "access::direct_request_tests::ssh_activation_and_approval_recheck_eligibility_without_publication_or_secrets",
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_approval_review_history_and_execution_are_secret_free_and_unavailable",
+      "access::direct_request_tests::ssh_signed_admission_rejects_arguments_and_stale_revision_before_review"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "6f258cab13974526f87696589047bb892112da6cb228b3ea4facd0845434c1f8"
+  },
+  {
+    "mutant": "review-credential-label",
+    "evidence": "review-credential-label",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_activation_and_approval_recheck_eligibility_without_publication_or_secrets",
+      "access::direct_request_tests::ssh_each_authority_change_rejects_stale_requests_and_approvals",
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_approval_review_history_and_execution_are_secret_free_and_unavailable",
+      "access::direct_request_tests::ssh_signed_admission_rejects_arguments_and_stale_revision_before_review"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "4576f8e8972bded84db7475c5f07f9142cf1ff51de42563fd8c11d5ae56cb4a1"
+  },
+  {
+    "mutant": "review-credential-use",
+    "evidence": "review-credential-use",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_approval_review_history_and_execution_are_secret_free_and_unavailable",
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence",
+      "access::direct_request_tests::ssh_signed_admission_rejects_arguments_and_stale_revision_before_review"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "3f83ac0f5650c128b7ebfb38e414f859f4b495e7e6ce224b4589da6ad5b092c4"
+  },
+  {
+    "mutant": "review-working-directory",
+    "evidence": "fixed-review-working-directory",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "f8ae97b9e62027808fe348831c5c6134d7a88e6d3d444fc751303dcf479b799e"
+  },
+  {
+    "mutant": "review-host-pin",
+    "evidence": "fixed-review-host-pin",
+    "classification": "killed",
+    "failing_tests": [
+      "access::policy::tests::ssh_normalization_revision_review_and_persistence"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "c2fcb584f09a69e2799722499bd12582a66e41a4621f082d0e23ad908bac3f7a"
+  },
+  {
+    "mutant": "activation-eligibility",
+    "evidence": "activation-eligibility",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_activation_and_approval_recheck_eligibility_without_publication_or_secrets"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "0042675922d250572b4d4ba9b0c782ef222be26edbdc0ed4329d2f17b00be416"
+  },
+  {
+    "mutant": "approval-eligibility",
+    "evidence": "approval-eligibility",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_activation_and_approval_recheck_eligibility_without_publication_or_secrets"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "10fc6cddcc49e567086e60c328b91554dc6fadb5955002288b1ba6e4653d8038"
+  },
+  {
+    "mutant": "ssh-execution-entrypoint-guard",
+    "evidence": "ssh-execution-entrypoint-guard",
+    "classification": "killed",
+    "failing_tests": [
+      "access::direct_request_tests::ssh_approval_review_history_and_execution_are_secret_free_and_unavailable"
+    ],
+    "browser_assertions": [],
+    "log_sha256": "3fc6e232055a25b71594886da165a25fd39e3e7ceb30951714d42328b4adbe97"
+  },
+  {
+    "mutant": "ui-host-pin",
+    "evidence": "ui-host-pin",
+    "classification": "killed",
+    "failing_tests": [],
+    "browser_assertions": [
+      "AssertionError [ERR_ASSERTION]: Pinned host fingerprint"
+    ],
+    "log_sha256": "1aa8896acc9a06318d138672caca490aef2df1bb1adf4a8ff7dad0aeb688b549"
+  },
+  {
+    "mutant": "ui-working-directory",
+    "evidence": "ui-working-directory",
+    "classification": "killed",
+    "failing_tests": [],
+    "browser_assertions": [
+      "AssertionError [ERR_ASSERTION]: Working directory"
+    ],
+    "log_sha256": "9a77a945ec7fd58881c595b11d12c7f2a5ceb26f5fb26d0f74ca719653c0cf94"
+  },
+  {
+    "mutant": "ui-credential-use",
+    "evidence": "ui-credential-use",
+    "classification": "killed",
+    "failing_tests": [],
+    "browser_assertions": [
+      "AssertionError [ERR_ASSERTION]: Credentials and use types"
+    ],
+    "log_sha256": "db1c21ec6e1f977dc8d09c7e432e457f1fca1f4ced2522b87f5e9e4d84577a79"
+  },
+  {
+    "mutant": "ui-history-credential-use",
+    "evidence": "fixed-ui-history-credential-use",
+    "classification": "killed",
+    "failing_tests": [],
+    "browser_assertions": [
+      "AssertionError [ERR_ASSERTION]: Backup SSH (ssh)"
+    ],
+    "log_sha256": "e747580b429f88c63a668f200a496ebf6177893389e42aa8083d9b844871d87e"
+  }
+]

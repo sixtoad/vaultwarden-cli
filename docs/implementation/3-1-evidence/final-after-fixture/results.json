@@ -1,0 +1,764 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 5.27,
+    "suites": []
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 26.86,
+    "suites": []
+  },
+  {
+    "name": "all-targets",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 317.46,
+    "suites": [
+      [
+        "685",
+        "0",
+        "11"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "34",
+        "0",
+        "0"
+      ],
+      [
+        "4",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "1"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "31",
+        "0",
+        "0"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "18",
+        "0",
+        "0"
+      ],
+      [
+        "22",
+        "0",
+        "0"
+      ],
+      [
+        "71",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "7",
+        "0",
+        "0"
+      ],
+      [
+        "23",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "2"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "ssh",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "ssh_",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 2.78,
+    "suites": [
+      [
+        "16",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "policy",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "access::policy",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 26.8,
+    "suites": [
+      [
+        "19",
+        "0",
+        "1"
+      ]
+    ]
+  },
+  {
+    "name": "store",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "provider_store",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 1.63,
+    "suites": [
+      [
+        "13",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "backend",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::vaultwarden",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 5.96,
+    "suites": [
+      [
+        "13",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "integration",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--test",
+      "direct_request",
+      "--test",
+      "provider_session",
+      "--test",
+      "agent_submission",
+      "--test",
+      "human_cli",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 16.82,
+    "suites": [
+      [
+        "1",
+        "0",
+        "1"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "18",
+        "0",
+        "0"
+      ],
+      [
+        "7",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "build-cli",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--bin",
+      "vw-access"
+    ],
+    "exit": 0,
+    "seconds": 8.35,
+    "suites": []
+  },
+  {
+    "name": "browser",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 0,
+    "seconds": 88.52,
+    "suites": []
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.03,
+    "suites": []
+  },
+  {
+    "name": "real-peer",
+    "command": [
+      "env",
+      "VW_AGENT_NAMESPACE=1",
+      "unshare",
+      "--user",
+      "--map-auto",
+      "--map-root-user",
+      "--fork",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "agent_submission",
+      "real_linux_peer_matrix_and_noninteractive_cli",
+      "--",
+      "--ignored",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 8.35,
+    "suites": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "doc",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 2.73,
+    "suites": [
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "msrv-all-targets",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "+1.88.0",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 453.99,
+    "suites": [
+      [
+        "685",
+        "0",
+        "11"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "34",
+        "0",
+        "0"
+      ],
+      [
+        "4",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "1"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "31",
+        "0",
+        "0"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "18",
+        "0",
+        "0"
+      ],
+      [
+        "22",
+        "0",
+        "0"
+      ],
+      [
+        "71",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "7",
+        "0",
+        "0"
+      ],
+      [
+        "23",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "2"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "systemd",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "./scripts/test-systemd-supervisor.sh"
+    ],
+    "exit": 0,
+    "seconds": 67.33,
+    "suites": [
+      [
+        "2",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "native-fixtures",
+    "command": [
+      "./scripts/check-native-fixtures.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.52,
+    "suites": []
+  },
+  {
+    "name": "all-features",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--all-features",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 214.68,
+    "suites": [
+      [
+        "685",
+        "0",
+        "11"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "34",
+        "0",
+        "0"
+      ],
+      [
+        "4",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "1"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "31",
+        "0",
+        "0"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "18",
+        "0",
+        "0"
+      ],
+      [
+        "22",
+        "0",
+        "0"
+      ],
+      [
+        "71",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "7",
+        "0",
+        "0"
+      ],
+      [
+        "23",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "2"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "doc-all-features",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--all-features",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 3.23,
+    "suites": [
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "no-default-features",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--no-default-features",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 203.95,
+    "suites": [
+      [
+        "685",
+        "0",
+        "11"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "34",
+        "0",
+        "0"
+      ],
+      [
+        "4",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "1"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "10",
+        "0",
+        "0"
+      ],
+      [
+        "31",
+        "0",
+        "0"
+      ],
+      [
+        "21",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "18",
+        "0",
+        "0"
+      ],
+      [
+        "22",
+        "0",
+        "0"
+      ],
+      [
+        "71",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "0"
+      ],
+      [
+        "7",
+        "0",
+        "0"
+      ],
+      [
+        "23",
+        "0",
+        "0"
+      ],
+      [
+        "1",
+        "0",
+        "2"
+      ],
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "doc-no-default-features",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--no-default-features",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 3.08,
+    "suites": [
+      [
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  }
+]

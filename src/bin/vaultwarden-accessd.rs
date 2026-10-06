@@ -719,6 +719,7 @@ mod tests {
         state["approved_images"] = serde_json::json!([{"id":"image","execution_root":dir.path(),"path":image,"sha256":digest,"profile":"reviewed_self_contained_elf64_v1"}]);
         std::fs::write(state_path, serde_json::to_vec(&state).unwrap()).unwrap();
         app.activate_operation(OperationPolicyDraft {
+            ssh: None,
             id: "deploy".into(),
             description: "Synthetic".into(),
             image_id: "image".into(),

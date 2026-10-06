@@ -1,0 +1,33 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 3.53,
+    "suites": []
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 101,
+    "seconds": 11.11,
+    "suites": []
+  }
+]

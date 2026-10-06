@@ -3,11 +3,16 @@
 //! A draft selects a provider-owned image ID only. Paths and hashes are held
 //! in the private registry, resolved by the provider, and snapshotted here.
 
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD},
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::Read;
+use std::net::IpAddr;
 #[cfg(test)]
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -35,6 +40,8 @@ pub struct OperationPolicyDraft {
     pub targets: Vec<String>,
     pub arguments: Vec<ArgumentSpec>,
     pub credentials: Vec<LoginCredentialDraft>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh: Option<SshOperation>,
 }
 
 /// Provider declaration that the pinned artifact was reviewed to contain no
@@ -130,6 +137,7 @@ pub struct LoginFieldMapping {
 #[serde(rename_all = "snake_case")]
 pub enum CredentialUse {
     Login,
+    Ssh,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -141,6 +149,121 @@ pub struct LoginCredentialDraft {
     pub field_mappings: Vec<LoginFieldMapping>,
 }
 
+/// Closed provider policy: no command, key path, options, or caller selectors.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SshCredential {
+    pub item_id: String,
+    pub label: String,
+    pub use_type: CredentialUse,
+}
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SshDestination {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub resource_path: String,
+    pub host_fingerprint: String,
+}
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SshOperation {
+    pub credential: SshCredential,
+    pub working_directory: String,
+    pub destination: SshDestination,
+}
+/// Secret-free authority shown at review and retained in audit history.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SshReview {
+    pub working_directory: String,
+    pub destination: SshDestination,
+}
+impl SshOperation {
+    fn review(&self) -> SshReview {
+        SshReview {
+            working_directory: self.working_directory.clone(),
+            destination: self.destination.clone(),
+        }
+    }
+}
+fn normalize_host(value: &str) -> Option<String> {
+    if let Ok(ip) = value.parse::<IpAddr>() {
+        return Some(ip.to_string());
+    }
+    let host = value.strip_suffix('.').unwrap_or(value);
+    if host.is_empty()
+        || host.len() > 253
+        || host.split('.').all(|part| {
+            part.bytes().all(|b| b.is_ascii_digit())
+                || part
+                    .strip_prefix("0x")
+                    .or_else(|| part.strip_prefix("0X"))
+                    .is_some_and(|hex| {
+                        !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit())
+                    })
+        })
+        || !host.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && label.as_bytes()[0].is_ascii_alphanumeric()
+                && label.as_bytes()[label.len() - 1].is_ascii_alphanumeric()
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
+    {
+        return None;
+    }
+    Some(host.to_ascii_lowercase())
+}
+fn normalize_fingerprint(value: &str) -> Option<String> {
+    let encoded = value.strip_prefix("SHA256:")?;
+    let bytes = STANDARD_NO_PAD
+        .decode(encoded)
+        .or_else(|_| STANDARD.decode(encoded))
+        .ok()?;
+    (bytes.len() == 32).then(|| format!("SHA256:{}", STANDARD_NO_PAD.encode(bytes)))
+}
+fn valid_ssh_path(value: &str) -> bool {
+    (value == "/" || valid_image_path(value))
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
+}
+fn valid_ssh_review(working_directory: &str, destination: &SshDestination) -> bool {
+    valid_ssh_path(working_directory)
+        && valid_ssh_path(&destination.resource_path)
+        && normalize_host(&destination.host).is_some()
+        && destination.port != 0
+        && !destination.user.is_empty()
+        && destination.user.len() <= 64
+        && destination.user.as_bytes()[0].is_ascii_alphanumeric()
+        && destination
+            .user
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
+        && normalize_fingerprint(&destination.host_fingerprint).is_some()
+}
+impl SshReview {
+    pub(crate) fn target(&self) -> String {
+        let d = &self.destination;
+        let host = if d.host.contains(':') {
+            format!("[{}]", d.host)
+        } else {
+            d.host.clone()
+        };
+        format!("{}@{}:{}{}", d.user, host, d.port, d.resource_path)
+    }
+    pub(crate) fn valid(&self) -> bool {
+        valid_ssh_review(&self.working_directory, &self.destination)
+            && normalize_host(&self.destination.host).as_ref() == Some(&self.destination.host)
+            && normalize_fingerprint(&self.destination.host_fingerprint).as_ref()
+                == Some(&self.destination.host_fingerprint)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(try_from = "StoredOperationPolicy")]
 pub(crate) struct OperationPolicy {
@@ -150,6 +273,8 @@ pub(crate) struct OperationPolicy {
     targets: Vec<String>,
     arguments: Vec<ArgumentSpec>,
     credentials: Vec<LoginCredentialDraft>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ssh: Option<SshOperation>,
     revision: String,
 }
 
@@ -199,6 +324,7 @@ impl OperationPolicy {
             targets: draft.targets,
             arguments: draft.arguments,
             credentials: draft.credentials,
+            ssh: draft.ssh,
             revision,
         })
     }
@@ -227,6 +353,9 @@ impl OperationPolicy {
             profile: self.image.profile,
         }
     }
+    pub(crate) fn ssh(&self) -> Option<&SshOperation> {
+        self.ssh.as_ref()
+    }
     pub(crate) fn login_bindings(&self) -> impl Iterator<Item = LoginBindingRef<'_>> {
         self.credentials.iter().map(|credential| LoginBindingRef {
             item_id: &credential.item_id,
@@ -239,6 +368,9 @@ impl OperationPolicy {
         })
     }
     pub(crate) fn validates_args(&self, values: &[String]) -> bool {
+        if self.ssh.is_some() {
+            return values.is_empty();
+        }
         values.len() == self.arguments.len()
             && self
                 .arguments
@@ -290,7 +422,12 @@ impl OperationPolicy {
             requester: "local human terminal".into(),
             operation: self.id.clone(),
             effect: self.description.clone(),
-            target,
+            target: self
+                .ssh
+                .as_ref()
+                .map(|ssh| ssh.review().target())
+                .unwrap_or(target),
+            ssh: self.ssh.as_ref().map(SshOperation::review),
             arguments_digest: arguments_digest(&arguments),
             arguments,
             credentials: self
@@ -300,11 +437,20 @@ impl OperationPolicy {
                     label: c.label.clone(),
                     use_type: c.use_type,
                 })
+                .chain(self.ssh.iter().map(|ssh| ReviewCredential {
+                    label: ssh.credential.label.clone(),
+                    use_type: ssh.credential.use_type,
+                }))
                 .collect(),
             executable_digest: self.image.sha256.clone(),
             policy_digest: self.revision.clone(),
             expires_at_unix_seconds,
-            one_time: super::direct_request::ONE_TIME.into(),
+            one_time: if self.ssh.is_some() {
+                super::direct_request::PREVIOUS_ONE_TIME
+            } else {
+                super::direct_request::ONE_TIME
+            }
+            .into(),
             status: DirectStatus::Pending,
         }
     }
@@ -324,6 +470,7 @@ impl OperationPolicy {
                 targets: self.targets.clone(),
                 arguments: self.arguments.clone(),
                 credentials: self.credentials.clone(),
+                ssh: self.ssh.clone(),
             },
             &image,
         )?;
@@ -351,6 +498,8 @@ struct StoredOperationPolicy {
     targets: Vec<String>,
     arguments: Vec<ArgumentSpec>,
     credentials: Vec<LoginCredentialDraft>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ssh: Option<SshOperation>,
     revision: String,
 }
 
@@ -372,6 +521,7 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
                 targets: stored.targets,
                 arguments: stored.arguments,
                 credentials: stored.credentials,
+                ssh: stored.ssh,
             },
             &image,
         )?;
@@ -384,6 +534,23 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
 }
 
 fn validate_draft(draft: &OperationPolicyDraft) -> Result<(), PolicyValidationError> {
+    if let Some(ssh) = &draft.ssh {
+        return if valid_operation_id(&draft.id)
+            && valid_display_text(&draft.description, MAX_DESCRIPTION_LEN)
+            && valid_operation_id(&draft.image_id)
+            && draft.targets.is_empty()
+            && draft.arguments.is_empty()
+            && draft.credentials.is_empty()
+            && valid_item_id(&ssh.credential.item_id)
+            && valid_display_text(&ssh.credential.label, MAX_DESCRIPTION_LEN)
+            && ssh.credential.use_type == CredentialUse::Ssh
+            && valid_ssh_review(&ssh.working_directory, &ssh.destination)
+        {
+            Ok(())
+        } else {
+            Err(PolicyValidationError)
+        };
+    }
     if !valid_operation_id(&draft.id)
         || !valid_display_text(&draft.description, MAX_DESCRIPTION_LEN)
         || !valid_operation_id(&draft.image_id)
@@ -543,7 +710,8 @@ fn valid_credentials(credentials: &[LoginCredentialDraft]) -> bool {
     !has_duplicates(&ids)
         && unique_credential_environments(credentials)
         && credentials.iter().all(|credential| {
-            valid_item_id(&credential.item_id)
+            credential.use_type == CredentialUse::Login
+                && valid_item_id(&credential.item_id)
                 && valid_display_text(&credential.label, MAX_DESCRIPTION_LEN)
                 && !credential.field_mappings.is_empty()
                 && credential.field_mappings.len() <= MAX_FIELD_MAPPINGS
@@ -638,6 +806,11 @@ fn unique_credential_environments(values: &[LoginCredentialDraft]) -> bool {
     )
 }
 fn canonicalize_draft(draft: &mut OperationPolicyDraft) {
+    if let Some(ssh) = &mut draft.ssh {
+        ssh.destination.host = normalize_host(&ssh.destination.host).expect("validated SSH host");
+        ssh.destination.host_fingerprint = normalize_fingerprint(&ssh.destination.host_fingerprint)
+            .expect("validated SSH fingerprint");
+    }
     draft.targets.sort_unstable();
     for argument in &mut draft.arguments {
         if let ArgumentSpec::Choice { choices } = argument {
@@ -657,6 +830,30 @@ fn canonicalize_draft(draft: &mut OperationPolicyDraft) {
 }
 
 fn revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
+    if let Some(ssh) = &draft.ssh {
+        #[derive(Serialize)]
+        struct SshProjection<'a> {
+            version: u8,
+            id: &'a str,
+            image: &'a ResolvedImage,
+            item_id: &'a str,
+            use_type: CredentialUse,
+            working_directory: &'a str,
+            destination: &'a SshDestination,
+        }
+        return hex_digest(
+            &serde_json::to_vec(&SshProjection {
+                version: 3,
+                id: &draft.id,
+                image,
+                item_id: &ssh.credential.item_id,
+                use_type: ssh.credential.use_type,
+                working_directory: &ssh.working_directory,
+                destination: &ssh.destination,
+            })
+            .expect("canonical SSH projection serializes"),
+        );
+    }
     #[derive(Serialize)]
     struct Projection<'a> {
         version: u8,
@@ -733,8 +930,353 @@ pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
 }
 
 #[cfg(test)]
+pub(crate) fn test_ssh_draft() -> OperationPolicyDraft {
+    OperationPolicyDraft {
+        id: "ssh-backup".into(),
+        description: "Back up the fixed resource".into(),
+        image_id: "deploy-image".into(),
+        targets: vec![],
+        arguments: vec![],
+        credentials: vec![],
+        ssh: Some(SshOperation {
+            credential: SshCredential {
+                item_id: "11111111-1111-1111-1111-111111111111".into(),
+                label: "Backup SSH".into(),
+                use_type: CredentialUse::Ssh,
+            },
+            working_directory: "/var/empty".into(),
+            destination: SshDestination {
+                host: "backup.example.test".into(),
+                port: 2222,
+                user: "backup".into(),
+                resource_path: "/srv/archive".into(),
+                host_fingerprint: format!("SHA256:{}", "A".repeat(43)),
+            },
+        }),
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ssh_revision_projection_matches_explicit_v3_contract() {
+        // Independent golden projection uses stable symbolic executable paths,
+        // so omitting a constant field (SSH use or execution profile) is visible.
+        let image = ResolvedImage {
+            image_id: "deploy-image".into(),
+            execution_root: "/opt/vw-access".into(),
+            path: "/opt/vw-access/deploy".into(),
+            sha256: "a".repeat(64),
+            profile: ExecutionProfile::ReviewedSelfContainedElf64V1,
+        };
+        assert_eq!(
+            revision_for(&test_ssh_draft(), &image),
+            "a97fb6ff3bca64fb5339c76464e8b8b7da88e6022f7cac90598310d647e5e065"
+        );
+    }
+    #[test]
+    fn ssh_normalization_revision_review_and_persistence() {
+        let root = root();
+        let image = test_approved_image(root.path(), "deploy-image");
+        let draft = test_ssh_draft();
+        let baseline = OperationPolicy::from_draft(draft.clone(), &image).unwrap();
+        let mut equivalent = draft.clone();
+        let ssh = equivalent.ssh.as_mut().unwrap();
+        ssh.destination.host = "BACKUP.Example.Test.".into();
+        ssh.destination.host_fingerprint.push('=');
+        assert_eq!(
+            OperationPolicy::from_draft(equivalent, &image).unwrap(),
+            baseline
+        );
+        assert_eq!(
+            normalize_host("2001:0DB8:0000:0000:0000:0000:0000:0001"),
+            Some("2001:db8::1".into())
+        );
+        assert_eq!(normalize_host("192.0.2.10"), Some("192.0.2.10".into()));
+        let mut ipv6_draft = draft.clone();
+        ipv6_draft.ssh.as_mut().unwrap().destination.host = "2001:db8::1".into();
+        let ipv6 = OperationPolicy::from_draft(ipv6_draft.clone(), &image).unwrap();
+        ipv6_draft.ssh.as_mut().unwrap().destination.host =
+            "2001:0DB8:0000:0000:0000:0000:0000:0001".into();
+        let expanded = OperationPolicy::from_draft(ipv6_draft, &image).unwrap();
+        assert_eq!(expanded.revision(), ipv6.revision());
+        assert_eq!(expanded, ipv6);
+        let restored: OperationPolicy =
+            serde_json::from_slice(&serde_json::to_vec(&expanded).unwrap()).unwrap();
+        assert_eq!(restored, ipv6);
+        let ipv6_review = restored.direct_review("request".into(), vec![], 100);
+        assert_eq!(ipv6_review.target, "backup@[2001:db8::1]:2222/srv/archive");
+        assert_eq!(
+            ipv6_review.ssh.unwrap().destination,
+            SshDestination {
+                host: "2001:db8::1".into(),
+                port: 2222,
+                user: "backup".into(),
+                resource_path: "/srv/archive".into(),
+                host_fingerprint: format!("SHA256:{}", "A".repeat(43)),
+            }
+        );
+        assert!(baseline.validate_integrity().is_ok());
+        let bytes = serde_json::to_vec(&baseline).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<OperationPolicy>(&bytes).unwrap(),
+            baseline
+        );
+        assert!(baseline.login_bindings().next().is_none());
+        assert!(baseline.normalize_args(&[]).unwrap().is_empty());
+        for value in ["", "--host", "production", "ssh-key-sentinel"] {
+            assert!(baseline.normalize_args(&[value.into()]).is_err());
+        }
+        let review = baseline.direct_review("request".into(), vec![], 100);
+        assert_eq!(review.target, "backup@backup.example.test:2222/srv/archive");
+        assert_eq!(
+            review.one_time,
+            super::super::direct_request::PREVIOUS_ONE_TIME
+        );
+        assert_eq!(
+            review.ssh,
+            Some(SshReview {
+                working_directory: "/var/empty".into(),
+                destination: SshDestination {
+                    host: "backup.example.test".into(),
+                    port: 2222,
+                    user: "backup".into(),
+                    resource_path: "/srv/archive".into(),
+                    host_fingerprint: format!("SHA256:{}", "A".repeat(43)),
+                },
+            })
+        );
+        assert_eq!(
+            review.credentials,
+            vec![super::super::direct_request::ReviewCredential {
+                label: "Backup SSH".into(),
+                use_type: CredentialUse::Ssh
+            }]
+        );
+        let encoded = serde_json::to_string(&review).unwrap();
+        assert!(!encoded.contains("11111111"));
+        for (pointer, value) in [
+            ("/id", serde_json::json!("other")),
+            (
+                "/ssh/credential/item_id",
+                serde_json::json!("22222222-2222-2222-2222-222222222222"),
+            ),
+            ("/ssh/working_directory", serde_json::json!("/srv")),
+            (
+                "/ssh/destination/host",
+                serde_json::json!("other.example.test"),
+            ),
+            ("/ssh/destination/port", serde_json::json!(22)),
+            ("/ssh/destination/user", serde_json::json!("other")),
+            (
+                "/ssh/destination/resource_path",
+                serde_json::json!("/other"),
+            ),
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!(format!("SHA256:{}", STANDARD_NO_PAD.encode([1; 32]))),
+            ),
+        ] {
+            let mut changed = serde_json::to_value(&draft).unwrap();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            let changed: OperationPolicyDraft = serde_json::from_value(changed).unwrap();
+            let policy = OperationPolicy::from_draft(changed, &image).unwrap();
+            assert_ne!(policy.revision(), baseline.revision(), "{pointer}");
+            let mut tampered = serde_json::to_value(&baseline).unwrap();
+            *tampered.pointer_mut(pointer).unwrap() = serde_json::to_value(&policy)
+                .unwrap()
+                .pointer(pointer)
+                .unwrap()
+                .clone();
+            assert!(
+                serde_json::from_value::<OperationPolicy>(tampered).is_err(),
+                "{pointer}"
+            );
+        }
+        for field in ["image_id", "execution_root", "path", "sha256"] {
+            let mut changed = baseline.image.clone();
+            match field {
+                "image_id" => changed.image_id = "other".into(),
+                "execution_root" => changed.execution_root = "/other".into(),
+                "path" => changed.path = "/other/image".into(),
+                _ => changed.sha256 = "b".repeat(64),
+            }
+            assert_ne!(
+                revision_for(&draft, &changed),
+                baseline.revision(),
+                "{field}"
+            );
+        }
+        let mut labels = draft;
+        labels.description = "New description".into();
+        labels.ssh.as_mut().unwrap().credential.label = "New label".into();
+        assert_eq!(
+            OperationPolicy::from_draft(labels, &image)
+                .unwrap()
+                .revision(),
+            baseline.revision()
+        );
+    }
+    #[test]
+    fn ssh_rejects_each_invalid_authority_and_selector_independently() {
+        let baseline = serde_json::to_value(test_ssh_draft()).unwrap();
+        for (pointer, value) in [
+            ("/ssh/credential/item_id", serde_json::json!("mutable-name")),
+            ("/ssh/credential/use_type", serde_json::json!("login")),
+            ("/ssh/credential/label", serde_json::json!("")),
+            ("/ssh/working_directory", serde_json::json!("relative")),
+            ("/ssh/destination/port", serde_json::json!(0)),
+            ("/ssh/destination/user", serde_json::json!("-oProxyCommand")),
+            ("/ssh/destination/user", serde_json::json!("root@other")),
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!("SHA256:AA"),
+            ),
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!("MD5:aa:bb"),
+            ),
+            // Change only the algorithm prefix; keep valid base64 for 32 bytes.
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!(format!("MD5:{}", "A".repeat(43))),
+            ),
+            // Change only one base64 character; preserve the encoded length.
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!(format!("SHA256:?{}", "A".repeat(42))),
+            ),
+            // Valid SHA256/base64 envelope, one byte below/above the digest size.
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!(format!("SHA256:{}", STANDARD_NO_PAD.encode([0; 31]))),
+            ),
+            (
+                "/ssh/destination/host_fingerprint",
+                serde_json::json!(format!("SHA256:{}", STANDARD_NO_PAD.encode([0; 33]))),
+            ),
+            ("/targets", serde_json::json!(["generic"])),
+            ("/arguments", serde_json::json!([{"type":"target"}])),
+            (
+                "/arguments",
+                serde_json::json!([{"type":"integer","minimum":0,"maximum":9}]),
+            ),
+            (
+                "/arguments",
+                serde_json::json!([{"type":"choice","choices":["fixed"]}]),
+            ),
+            (
+                "/credentials",
+                serde_json::to_value(draft().credentials).unwrap(),
+            ),
+        ] {
+            let mut bad = baseline.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            let bad: OperationPolicyDraft = serde_json::from_value(bad).unwrap();
+            assert!(validate_draft(&bad).is_err(), "{pointer}");
+        }
+        for host in [
+            "",
+            "-host",
+            "host:22",
+            "ssh://host",
+            "user@host",
+            "[::1]",
+            "::1%eth0",
+            "127.1",
+            "0177.0.0.1",
+            "2130706433",
+            "0x7f000001",
+            "0x7f.0.0.1",
+            "host..",
+            "host/other",
+            "host\n",
+            "höst",
+            "a_b",
+        ] {
+            let mut bad = test_ssh_draft();
+            bad.ssh.as_mut().unwrap().destination.host = host.into();
+            assert!(validate_draft(&bad).is_err(), "host {host:?}");
+        }
+        for path in [
+            "", "relative", "/a/../b", "/a//b", "/a/./b", "/a/", "/a b", "/a;b", "/a%20b", "/a\nb",
+            "~/b", "/a\\b",
+        ] {
+            for directory in [false, true] {
+                let mut bad = test_ssh_draft();
+                let ssh = bad.ssh.as_mut().unwrap();
+                if directory {
+                    ssh.working_directory = path.into()
+                } else {
+                    ssh.destination.resource_path = path.into()
+                }
+                assert!(validate_draft(&bad).is_err(), "{path:?}");
+            }
+        }
+        for (parent, member) in [
+            ("", "remote"),
+            ("", "host"),
+            ("", "key_path"),
+            ("", "options"),
+            ("", "working_directory"),
+            ("/ssh", "remote"),
+            ("/ssh", "host"),
+            ("/ssh/destination", "command"),
+            ("/ssh/destination", "key_path"),
+            ("/ssh/destination", "options"),
+            ("/ssh/destination", "working_directory"),
+            ("", "command"),
+            ("/ssh", "command"),
+            ("/ssh", "key_path"),
+            ("/ssh", "options"),
+            ("/ssh", "trust_override"),
+            ("/ssh/credential", "field_mappings"),
+            ("/ssh/credential", "name"),
+            ("/ssh/destination", "known_hosts"),
+            ("/ssh/destination", "strict_host_key_checking"),
+        ] {
+            let mut bad = baseline.clone();
+            bad.pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert(member.into(), serde_json::json!("sentinel"));
+            assert!(
+                serde_json::from_value::<OperationPolicyDraft>(bad).is_err(),
+                "{parent}/{member}"
+            );
+        }
+        for pointer in [
+            "/ssh/credential/item_id",
+            "/ssh/credential/use_type",
+            "/ssh/destination/host",
+            "/ssh/destination/port",
+            "/ssh/destination/user",
+            "/ssh/destination/resource_path",
+            "/ssh/destination/host_fingerprint",
+            "/ssh/working_directory",
+        ] {
+            let (parent, member) = pointer.rsplit_once('/').unwrap();
+            let mut bad = baseline.clone();
+            bad.pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(member);
+            assert!(
+                serde_json::from_value::<OperationPolicyDraft>(bad).is_err(),
+                "missing {pointer}"
+            );
+        }
+        let serialized = serde_json::to_string(&test_ssh_draft()).unwrap();
+        let duplicate = serialized.replace("\"port\":2222", "\"port\":2222,\"port\":22");
+        assert!(serde_json::from_str::<OperationPolicyDraft>(&duplicate).is_err());
+        let mut login = draft();
+        login.credentials[0].use_type = CredentialUse::Ssh;
+        assert!(validate_draft(&login).is_err());
+    }
     const ITEM: &str = "11111111-1111-1111-1111-111111111111";
     fn root() -> tempfile::TempDir {
         let root = tempfile::tempdir().unwrap();
@@ -743,6 +1285,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            ssh: None,
             id: "deploy-homelab".into(),
             description: "Deploy".into(),
             image_id: "deploy-image".into(),
