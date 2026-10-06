@@ -1160,6 +1160,12 @@ mod tests {
     }
 
     #[test]
+    // Tarpaulin uses ptrace for instrumentation; nesting this fixture's
+    // PTRACE_TRACEME/PTRACE_EVENT_EXEC handshake under that tracer changes the
+    // child-stop semantics it is specifically testing. Run it in the normal
+    // process test suite instead of treating coverage instrumentation as the
+    // provider's exec-event implementation.
+    #[cfg_attr(tarpaulin, ignore)]
     fn pre_exec_sigkill_with_empty_error_pipe_reports_failure_and_confirmed_cleanup() {
         let (sender, receiver) = pair();
         // Keep reap_all's waitpid(-1) away from the multithreaded test runner's

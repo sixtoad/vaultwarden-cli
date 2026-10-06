@@ -131,6 +131,164 @@ impl SignedSubmission {
     }
 }
 
+/// Owner-authenticated observation. No timestamps or caller identity are accepted.
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SignedStatusQuery {
+    pub protocol_version: u8,
+    pub purpose: String,
+    pub binding_id: String,
+    pub nonce: String,
+    pub request_id: String,
+    pub signature: String,
+}
+impl SignedStatusQuery {
+    pub fn parse(bytes: &[u8]) -> Result<Self, AgentRejection> {
+        if bytes.len() > MAX_REQUEST_FRAME_BYTES {
+            return Err(AgentRejection::Malformed);
+        }
+        let query: Self =
+            serde_json::from_slice(bytes).map_err(|_error| AgentRejection::Malformed)?;
+        query.validate()?;
+        Ok(query)
+    }
+    pub fn sign(
+        binding_id: String,
+        nonce: [u8; 32],
+        request_id: String,
+        key: &SigningKey,
+    ) -> Result<Self, AgentRejection> {
+        let mut query = Self {
+            protocol_version: PROTOCOL_VERSION,
+            purpose: "status".into(),
+            binding_id,
+            nonce: URL_SAFE_NO_PAD.encode(nonce),
+            request_id,
+            signature: URL_SAFE_NO_PAD.encode([0u8; 64]),
+        };
+        query.signature = URL_SAFE_NO_PAD.encode(key.sign(&query.signing_bytes()?).to_bytes());
+        Ok(query)
+    }
+    pub fn validate(&self) -> Result<(), AgentRejection> {
+        if self.protocol_version != PROTOCOL_VERSION {
+            return Err(AgentRejection::UnsupportedVersion);
+        }
+        if self.purpose != "status" || !super::direct_request::valid_request_id(&self.request_id) {
+            return Err(AgentRejection::Malformed);
+        }
+        decode_fixed::<32>(&self.binding_id)?;
+        decode_fixed::<32>(&self.nonce)?;
+        decode_fixed::<64>(&self.signature)?;
+        Ok(())
+    }
+    /// Same canonical prefix as submission; purpose separates the signed actions.
+    pub fn signing_bytes(&self) -> Result<Vec<u8>, AgentRejection> {
+        self.validate()?;
+        let mut bytes = SIGNING_DOMAIN.to_vec();
+        bytes.extend([ENCODING_VERSION, self.protocol_version]);
+        append_field(&mut bytes, self.purpose.as_bytes());
+        append_field(&mut bytes, &decode_fixed::<32>(&self.binding_id)?);
+        append_field(&mut bytes, &decode_fixed::<32>(&self.nonce)?);
+        append_field(&mut bytes, &decode_fixed::<32>(&self.request_id)?);
+        Ok(bytes)
+    }
+    pub fn verify(&self, stored_public_key: &str) -> Result<(), AgentRejection> {
+        let bytes = self.signing_bytes()?;
+        let key =
+            decode_public_key(stored_public_key).map_err(|_error| AgentRejection::Unauthorized)?;
+        let signature = Signature::from_bytes(&decode_fixed::<64>(&self.signature)?);
+        key.verify_strict(&bytes, &signature)
+            .map_err(|_error| AgentRejection::Unauthorized)
+    }
+    pub fn replay_digest(&self) -> Result<String, AgentRejection> {
+        self.validate()?;
+        let mut bytes = REPLAY_DOMAIN.to_vec();
+        bytes.push(ENCODING_VERSION);
+        append_field(&mut bytes, &decode_fixed::<32>(&self.binding_id)?);
+        append_field(&mut bytes, &decode_fixed::<32>(&self.nonce)?);
+        Ok(hex_sha256(&bytes))
+    }
+}
+
+/// Untagged dispatch still decodes each closed struct directly, preserving duplicate-field rejection.
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum AgentEnvelope {
+    Submission(SignedSubmission),
+    Status(SignedStatusQuery),
+}
+impl AgentEnvelope {
+    pub fn parse(bytes: &[u8]) -> Result<Self, AgentRejection> {
+        if bytes.len() > MAX_REQUEST_FRAME_BYTES {
+            return Err(AgentRejection::Malformed);
+        }
+        let envelope: Self =
+            serde_json::from_slice(bytes).map_err(|_error| AgentRejection::Malformed)?;
+        match &envelope {
+            Self::Submission(input) => input.validate()?,
+            Self::Status(input) => input.validate()?,
+        }
+        Ok(envelope)
+    }
+}
+
+/// Agent-only closed failure codes. Never serialize a backend diagnostic.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentFailure {
+    ReviewUnavailable,
+    ExecutionUnavailable,
+    ExecutionRejected,
+    ExecutionNonzero,
+    ExecutionSignaled,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "status", rename_all = "snake_case", from = "StrictAgentStatus")]
+pub enum AgentStatus {
+    Pending,
+    Approved,
+    Running,
+    Denied,
+    Expired,
+    Completed { exit_code: i32 },
+    Failed { category: AgentFailure },
+}
+// Empty struct variants reject fields that Serde unit variants would ignore.
+#[derive(Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+enum StrictAgentStatus {
+    Pending {},
+    Approved {},
+    Running {},
+    Denied {},
+    Expired {},
+    Completed { exit_code: u8 },
+    Failed { category: AgentFailure },
+}
+impl From<StrictAgentStatus> for AgentStatus {
+    fn from(value: StrictAgentStatus) -> Self {
+        match value {
+            StrictAgentStatus::Pending {} => Self::Pending,
+            StrictAgentStatus::Approved {} => Self::Approved,
+            StrictAgentStatus::Running {} => Self::Running,
+            StrictAgentStatus::Denied {} => Self::Denied,
+            StrictAgentStatus::Expired {} => Self::Expired,
+            StrictAgentStatus::Completed { exit_code } => Self::Completed {
+                exit_code: i32::from(exit_code),
+            },
+            StrictAgentStatus::Failed { category } => Self::Failed { category },
+        }
+    }
+}
+impl AgentStatus {
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Denied | Self::Expired | Self::Completed { .. } | Self::Failed { .. }
+        )
+    }
+}
+
 fn hex_nibble(byte: u8) -> u8 {
     if byte.is_ascii_digit() {
         byte - b'0'
@@ -178,13 +336,18 @@ pub enum AgentRejection {
     Unavailable,
 }
 
-/// Commit acknowledgment only; no review URL, polling state or execution output.
+/// Closed acknowledgments and lifecycle observations without execution output.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AgentResponse {
     Pending {
         protocol_version: u8,
         request_id: String,
+    },
+    Status {
+        protocol_version: u8,
+        request_id: String,
+        state: AgentStatus,
     },
     Rejected {
         protocol_version: u8,
@@ -217,6 +380,11 @@ impl AgentResponse {
             Self::Pending {
                 protocol_version,
                 request_id,
+            }
+            | Self::Status {
+                protocol_version,
+                request_id,
+                ..
             } => {
                 if *protocol_version != PROTOCOL_VERSION
                     || !super::direct_request::valid_request_id(request_id)

@@ -687,6 +687,120 @@ impl ProviderApplication {
         result
     }
 
+    /// Authenticate every observation and durably consume its nonce before
+    /// returning only the agent lifecycle projection. A locked vault does not
+    /// prevent its still-enabled owner from observing historical work.
+    pub fn signed_agent_status(
+        &self,
+        uid: u32,
+        groups: &[u32],
+        query: &super::protocol::SignedStatusQuery,
+    ) -> Result<super::protocol::AgentStatus, super::protocol::AgentRejection> {
+        use super::protocol::{AgentFailure as F, AgentRejection as E, AgentStatus as S};
+        let result = (|| {
+            if self.admission_closed() {
+                return Err(E::Unavailable);
+            }
+            let mut authority = self.gate.try_lock().map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => E::Busy,
+                std::sync::TryLockError::Poisoned(_) => E::Unavailable,
+            })?;
+            let owner = authority
+                .provider
+                .authenticate_status_query(uid, groups, query)?;
+            let token = self.agent_token(&Some(owner.clone()))?;
+            // Storage must not retain release_gate: control intent can be
+            // published even while refresh or nonce persistence is stalled.
+            if !Self::token_live(&token) {
+                return Err(E::Unauthorized);
+            }
+            if self.admission_closed() {
+                return Err(E::Unavailable);
+            }
+            let refresh = |authority: &mut Authority| -> Result<(), E> {
+                if authority.deadline.is_some()
+                    && self.revocation_epoch.load(Ordering::Acquire) != authority.session_epoch
+                {
+                    Self::revoke(authority)?;
+                }
+                match self.admit(authority) {
+                    Ok(()) | Err(SessionError::Locked) => {}
+                    Err(error) => return Err(error.into()),
+                }
+                self.expire_requests(authority)?;
+                Ok(())
+            };
+            refresh(&mut authority)?;
+            authority.provider.consume_status_query(&owner, query, || {
+                !self.admission_closed() && Self::token_live(&token)
+            })?;
+            // Persistence can be slow: read provider clocks again before taking
+            // the final snapshot. Terminal records remain immutable.
+            refresh(&mut authority)?;
+            let (status, _release) = loop {
+                let status = authority
+                    .provider
+                    .agent_status(&owner, uid, groups, &query.request_id)
+                    .map_err(|error| match error {
+                        DirectRequestError::NotFound | DirectRequestError::Unauthorized => {
+                            E::Unauthorized
+                        }
+                        _ => E::Unavailable,
+                    })?;
+                // Only the in-memory final checks/projection retain the control
+                // gate. If control intent crossed a storage read, refresh outside it.
+                let release = self.release_gate.lock().map_err(|_error| E::Unavailable)?;
+                let now = self.clock.now();
+                let session_expired = authority.deadline.is_some_and(|deadline| now >= deadline);
+                let request_expired =
+                    matches!(status, DirectStatus::Pending | DirectStatus::Approved)
+                        && authority
+                            .request_deadlines
+                            .get(&query.request_id)
+                            .is_some_and(|deadline| now >= *deadline);
+                let session_revoked = authority.deadline.is_some()
+                    && self.revocation_epoch.load(Ordering::Acquire) != authority.session_epoch;
+                if !session_expired && !request_expired && !session_revoked {
+                    break (status, release);
+                }
+                drop(release);
+                // Refresh removes crossed deadlines, so this loop cannot spin
+                // on claimed executions whose nonterminal state must be retained.
+                refresh(&mut authority)?;
+            };
+            if !Self::token_live(&token) {
+                return Err(E::Unauthorized);
+            }
+            if self.admission_closed() {
+                return Err(E::Unavailable);
+            }
+            Ok(match status {
+                DirectStatus::Pending => S::Pending,
+                DirectStatus::Approved => S::Approved,
+                DirectStatus::Running => S::Running,
+                DirectStatus::Denied => S::Denied,
+                DirectStatus::Expired => S::Expired,
+                DirectStatus::Completed { exit_code } if (0..=255).contains(&exit_code) => {
+                    S::Completed { exit_code }
+                }
+                DirectStatus::Completed { .. } => return Err(E::Unavailable),
+                DirectStatus::Failed { reason } => S::Failed {
+                    category: match reason {
+                        DirectFailure::ReviewUnavailable => F::ReviewUnavailable,
+                        DirectFailure::ExecutionUnavailable => F::ExecutionUnavailable,
+                        DirectFailure::ExecutionRejected => F::ExecutionRejected,
+                        DirectFailure::ExecutionNonzero => F::ExecutionNonzero,
+                        DirectFailure::ExecutionSignaled => F::ExecutionSignaled,
+                    },
+                },
+            })
+        })();
+        if result == Err(E::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+
     #[cfg(test)]
     pub(crate) fn submit_agent_for_test(
         &self,

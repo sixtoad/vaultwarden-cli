@@ -49,6 +49,8 @@ pub(crate) struct ProviderState {
     pub(crate) lifecycle_epoch: u64,
     pub(crate) pairings: Vec<AgentBinding>,
     pub(crate) agent_audit: Vec<AgentAuditEvent>,
+    /// Consumed status-query nonces, outside immutable request/audit records.
+    pub(crate) query_replay_markers: Vec<String>,
     #[serde(default)]
     pub(crate) approved_images: Vec<ApprovedImage>,
     pub(crate) operations: Vec<OperationPolicy>,
@@ -64,6 +66,8 @@ struct StoredProviderState {
     lifecycle_epoch: u64,
     pairings: Vec<AgentBinding>,
     agent_audit: Option<Vec<AgentAuditEvent>>,
+    #[serde(default)]
+    query_replay_markers: Vec<String>,
     #[serde(default)]
     approved_images: Vec<ApprovedImage>,
     operations: Vec<OperationPolicy>,
@@ -86,6 +90,7 @@ impl TryFrom<StoredProviderState> for ProviderState {
             lifecycle_epoch: raw.lifecycle_epoch,
             pairings: raw.pairings,
             agent_audit,
+            query_replay_markers: raw.query_replay_markers,
             approved_images: raw.approved_images,
             operations: raw.operations,
             requests: raw.requests,
@@ -100,6 +105,7 @@ impl ProviderState {
             lifecycle_epoch: 0,
             pairings: Vec::new(),
             agent_audit: Vec::new(),
+            query_replay_markers: Vec::new(),
             approved_images: Vec::new(),
             operations: Vec::new(),
             requests: Vec::new(),
@@ -146,6 +152,11 @@ impl ProviderState {
         }
         let mut ids = std::collections::HashSet::new();
         let mut replay_markers = std::collections::HashSet::new();
+        for marker in &self.query_replay_markers {
+            if !super::valid_sha256(marker) || !replay_markers.insert(marker) {
+                return Err(error(ProviderDiagnostic::InvalidState));
+            }
+        }
         for request in &self.requests {
             if !ids.insert(&request.id) {
                 return Err(error(ProviderDiagnostic::InvalidState));

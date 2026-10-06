@@ -43,8 +43,39 @@ enum Command {
         binding_id: String,
         #[arg(long)]
         revision: String,
+        /// Observe the accepted request until terminal, without prompting.
+        #[arg(long)]
+        wait: bool,
+        /// Monotonic client deadline in seconds (default 300; requires --wait).
+        #[arg(long, requires = "wait", value_parser = parse_timeout_seconds)]
+        timeout_seconds: Option<u64>,
         #[arg(last = true)]
         values: Vec<String>,
+    },
+    /// Observe a delegated request once using its immutable owner identity.
+    Poll {
+        #[arg(allow_hyphen_values = true)]
+        id: String,
+        #[arg(long)]
+        socket: PathBuf,
+        #[arg(long)]
+        key_file: PathBuf,
+        #[arg(long, allow_hyphen_values = true)]
+        binding_id: String,
+    },
+    /// Resume observing delegated work; never resubmits or cancels it.
+    Wait {
+        #[arg(allow_hyphen_values = true)]
+        id: String,
+        #[arg(long)]
+        socket: PathBuf,
+        #[arg(long)]
+        key_file: PathBuf,
+        #[arg(long, allow_hyphen_values = true)]
+        binding_id: String,
+        /// Monotonic client deadline in seconds.
+        #[arg(long, default_value_t = 300, value_parser = parse_timeout_seconds)]
+        timeout_seconds: u64,
     },
     /// Submit and wait for a terminal status (approval is unavailable at this stage).
     Request {
@@ -125,7 +156,13 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    if args.state_root.is_none() && !matches!(&args.command, Command::Submit { .. }) {
+    if matches!(
+        &args.command,
+        Command::Submit { .. } | Command::Poll { .. } | Command::Wait { .. }
+    ) {
+        return ExitCode::from(run_agent(&args.command));
+    }
+    if args.state_root.is_none() {
         eprintln!("vw-access: invalid command; use --help");
         return ExitCode::from(2);
     }
@@ -138,51 +175,177 @@ fn main() -> ExitCode {
     }
 }
 #[cfg(target_os = "linux")]
-fn run(args: Args) -> Result<(), String> {
-    if let Command::Submit {
-        operation,
-        socket,
-        key_file,
-        binding_id,
-        revision,
-        values,
-    } = &args.command
+fn parse_timeout_seconds(value: &str) -> Result<u64, &'static str> {
+    let seconds = value.parse::<u64>().map_err(|_error| "invalid timeout")?;
+    if seconds == 0
+        || std::time::Instant::now()
+            .checked_add(Duration::from_secs(seconds))
+            .is_none()
     {
-        use vaultwarden_cli::{
-            access::protocol::{AgentResponse, SignedSubmission},
-            adapters::unix_socket,
-        };
+        return Err("invalid timeout");
+    }
+    Ok(seconds)
+}
+#[cfg(target_os = "linux")]
+fn valid_agent_id(id: &str) -> bool {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    URL_SAFE_NO_PAD
+        .decode(id)
+        .is_ok_and(|bytes| bytes.len() == 32 && URL_SAFE_NO_PAD.encode(bytes) == id)
+}
+#[cfg(target_os = "linux")]
+fn run_agent(command: &Command) -> u8 {
+    use vaultwarden_cli::{
+        access::protocol::{SignedStatusQuery, SignedSubmission},
+        adapters::{
+            agent_wait::{self, ClientError, WaitSignals},
+            unix_socket,
+        },
+    };
+    let (socket, key_file, binding_id, timeout, mut known_id) = match command {
+        Command::Submit {
+            socket,
+            key_file,
+            binding_id,
+            wait,
+            timeout_seconds,
+            ..
+        } => (
+            socket,
+            key_file,
+            binding_id,
+            wait.then_some(timeout_seconds.unwrap_or(300)),
+            None,
+        ),
+        Command::Poll {
+            socket,
+            key_file,
+            binding_id,
+            id,
+        } => (socket, key_file, binding_id, None, Some(id.clone())),
+        Command::Wait {
+            socket,
+            key_file,
+            binding_id,
+            id,
+            timeout_seconds,
+        } => (
+            socket,
+            key_file,
+            binding_id,
+            Some(*timeout_seconds),
+            Some(id.clone()),
+        ),
+        _ => return 2,
+    };
+    // Only canonical IDs may be reflected in diagnostics, even on local failure.
+    if !valid_agent_id(binding_id) || known_id.as_ref().is_some_and(|id| !valid_agent_id(id)) {
+        eprintln!("vw-access: invalid command; use --help");
+        return 2;
+    }
+    let result = (|| {
         let key =
-            unix_socket::load_signing_key(key_file).map_err(|_error| "agent key unavailable")?;
-        let mut nonce = [0u8; 32];
-        getrandom::fill(&mut nonce).map_err(|_error| "agent submission unavailable")?;
-        let input = SignedSubmission::sign(
-            binding_id.clone(),
-            nonce,
-            operation.clone(),
-            revision.clone(),
-            values.clone(),
-            &key,
-        )
-        .map_err(|_error| "invalid agent submission")?;
-        drop(key);
+            unix_socket::load_signing_key(key_file).map_err(|_error| ClientError::LocalFailure)?;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|_error| "agent submission unavailable")?;
-        let response = runtime
-            .block_on(unix_socket::exchange(socket, &input))
-            .map_err(|_error| "agent transport unavailable")?;
-        output(&response)?;
-        return if matches!(response, AgentResponse::Pending { .. }) {
-            Ok(())
-        } else {
-            Err("agent submission rejected".into())
-        };
+            .map_err(|_error| ClientError::LocalFailure)?;
+        runtime.block_on(async {
+            let mut signals = if timeout.is_some() {
+                Some(WaitSignals::arm()?)
+            } else {
+                None
+            };
+            let deadline = timeout
+                .map(|seconds| {
+                    tokio::time::Instant::now()
+                        .checked_add(Duration::from_secs(seconds))
+                        .ok_or(ClientError::LocalFailure)
+                })
+                .transpose()?;
+            let submission = if let Command::Submit {
+                operation,
+                revision,
+                values,
+                ..
+            } = command
+            {
+                Some(async {
+                    let mut nonce = [0; 32];
+                    getrandom::fill(&mut nonce).map_err(|_error| ClientError::LocalFailure)?;
+                    let input = SignedSubmission::sign(
+                        binding_id.clone(),
+                        nonce,
+                        operation.clone(),
+                        revision.clone(),
+                        values.clone(),
+                        &key,
+                    )
+                    .map_err(|_error| ClientError::LocalFailure)?;
+                    unix_socket::exchange(socket, &input)
+                        .await
+                        .map_err(|_error| ClientError::TransportUncertain)
+                })
+            } else {
+                None
+            };
+            let query = |id: String| {
+                let key = &key;
+                async move {
+                    let mut nonce = [0; 32];
+                    getrandom::fill(&mut nonce).map_err(|_error| ClientError::LocalFailure)?;
+                    let input = SignedStatusQuery::sign(binding_id.clone(), nonce, id, key)
+                        .map_err(|_error| ClientError::LocalFailure)?;
+                    unix_socket::query_exchange(socket, &input)
+                        .await
+                        .map_err(|_error| ClientError::TransportUncertain)
+                }
+            };
+            let cancellation = async {
+                match signals.as_mut() {
+                    Some(signals) => signals.cancelled().await,
+                    None => std::future::pending().await,
+                }
+            };
+            agent_wait::observe(
+                deadline,
+                cancellation,
+                submission,
+                &mut known_id,
+                query,
+                agent_wait::output,
+            )
+            .await
+        })
+    })();
+    match result {
+        Ok(code) => code,
+        Err(error) => {
+            #[derive(serde::Serialize)]
+            struct Diagnostic<'a> {
+                event: &'static str,
+                category: ClientError,
+                request_id: Option<&'a str>,
+            }
+            // All fields are closed values or validated opaque IDs.
+            if let Ok(json) = serde_json::to_string(&Diagnostic {
+                event: "client_error",
+                category: error,
+                request_id: known_id.as_deref(),
+            }) {
+                agent_wait::diagnostic(format!("{json}\n").into_bytes());
+            }
+            error.exit_code()
+        }
     }
+}
+#[cfg(target_os = "linux")]
+fn run(args: Args) -> Result<(), String> {
     let state_root = args.state_root.ok_or("provider state root required")?;
     let (command, wait) = match args.command {
-        Command::Submit { .. } => return Err("invalid command".into()),
+        Command::Submit { .. } | Command::Poll { .. } | Command::Wait { .. } => {
+            return Err("invalid command".into());
+        }
         Command::Request {
             operation,
             revision,

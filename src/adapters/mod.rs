@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+pub mod agent_wait;
 pub mod desktop_launch;
 // Descriptor preparation is shared by contained helper supervision.
 #[cfg_attr(not(test), allow(dead_code))]

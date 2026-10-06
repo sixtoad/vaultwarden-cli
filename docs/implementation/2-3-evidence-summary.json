@@ -1,0 +1,1330 @@
+{
+  "environment": {
+    "worktree": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-poll-delegated-work",
+    "baseline": "6081c48764208c1adad03b9d5be31550ff850895",
+    "branch": "feature/poll-delegated-work-preserve-ownership",
+    "live_backend_configured": false,
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "msrv": "rustc 1.88.0 (6b00bc388 2025-06-23)",
+    "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "kernel": "Linux 6.18.7-76061807-generic x86_64 GNU/Linux"
+  },
+  "iteration": 1,
+  "initial": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 3.53,
+      "suites": []
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--all-features",
+        "--offline",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 15.93,
+      "suites": []
+    },
+    {
+      "name": "all-targets",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--all-targets",
+        "--offline",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 306.85,
+      "suites": [
+        [
+          "674",
+          "0",
+          "11"
+        ],
+        [
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "10",
+          "0",
+          "0"
+        ],
+        [
+          "34",
+          "0",
+          "0"
+        ],
+        [
+          "4",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "1"
+        ],
+        [
+          "21",
+          "0",
+          "0"
+        ],
+        [
+          "10",
+          "0",
+          "0"
+        ],
+        [
+          "31",
+          "0",
+          "0"
+        ],
+        [
+          "21",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "18",
+          "0",
+          "0"
+        ],
+        [
+          "22",
+          "0",
+          "0"
+        ],
+        [
+          "71",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "6",
+          "0",
+          "0"
+        ],
+        [
+          "23",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "2"
+        ],
+        [
+          "0",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "msrv-all-targets",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--all-targets",
+        "--offline",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 337.52,
+      "suites": [
+        [
+          "674",
+          "0",
+          "11"
+        ],
+        [
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "10",
+          "0",
+          "0"
+        ],
+        [
+          "34",
+          "0",
+          "0"
+        ],
+        [
+          "4",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "1"
+        ],
+        [
+          "21",
+          "0",
+          "0"
+        ],
+        [
+          "10",
+          "0",
+          "0"
+        ],
+        [
+          "31",
+          "0",
+          "0"
+        ],
+        [
+          "21",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "18",
+          "0",
+          "0"
+        ],
+        [
+          "22",
+          "0",
+          "0"
+        ],
+        [
+          "71",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "6",
+          "0",
+          "0"
+        ],
+        [
+          "23",
+          "0",
+          "0"
+        ],
+        [
+          "1",
+          "0",
+          "2"
+        ],
+        [
+          "0",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "protocol",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 0,
+      "seconds": 1.57,
+      "suites": [
+        [
+          "12",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "signed",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_"
+      ],
+      "exit": 0,
+      "seconds": 11.01,
+      "suites": [
+        [
+          "33",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "socket",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "unix_socket"
+      ],
+      "exit": 0,
+      "seconds": 5.98,
+      "suites": [
+        [
+          "17",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "cli-lifecycle",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "human_cli",
+        "--test",
+        "direct_request",
+        "--test",
+        "provider_session"
+      ],
+      "exit": 0,
+      "seconds": 15.98,
+      "suites": [
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "18",
+          "0",
+          "0"
+        ],
+        [
+          "6",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "real-peer",
+      "command": [
+        "env",
+        "VW_AGENT_NAMESPACE=1",
+        "unshare",
+        "--user",
+        "--map-auto",
+        "--map-root-user",
+        "--fork",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "agent_submission",
+        "real_linux_peer_matrix_and_noninteractive_cli",
+        "--",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 6.89,
+      "suites": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "systemd",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "./scripts/test-systemd-supervisor.sh"
+      ],
+      "exit": 0,
+      "seconds": 77.49,
+      "suites": [
+        [
+          "2",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.12,
+      "suites": []
+    }
+  ],
+  "post_mutation": [
+    {
+      "name": "build-bins",
+      "command": [
+        "cargo",
+        "build",
+        "--bins",
+        "--offline",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 12.26,
+      "suites": []
+    },
+    {
+      "name": "protocol",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 0,
+      "seconds": 75.16,
+      "suites": [
+        [
+          "12",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "signed",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_"
+      ],
+      "exit": 0,
+      "seconds": 12.32,
+      "suites": [
+        [
+          "33",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "socket",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "unix_socket"
+      ],
+      "exit": 0,
+      "seconds": 6.04,
+      "suites": [
+        [
+          "17",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "cli-lifecycle",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "human_cli",
+        "--test",
+        "direct_request",
+        "--test",
+        "provider_session"
+      ],
+      "exit": 0,
+      "seconds": 67.38,
+      "suites": [
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "18",
+          "0",
+          "0"
+        ],
+        [
+          "6",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "real-peer",
+      "command": [
+        "env",
+        "VW_AGENT_NAMESPACE=1",
+        "unshare",
+        "--user",
+        "--map-auto",
+        "--map-root-user",
+        "--fork",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "agent_submission",
+        "real_linux_peer_matrix_and_noninteractive_cli",
+        "--",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 9.8,
+      "suites": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "wait",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait"
+      ],
+      "exit": 0,
+      "seconds": 0.42,
+      "suites": [
+        [
+          "6",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.82,
+      "suites": []
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.12,
+      "suites": []
+    }
+  ],
+  "mutants": [
+    {
+      "name": "query-purpose-signing",
+      "path": "src/access/protocol.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 12.36,
+      "failing_tests": [
+        "access::protocol_tests::signed_query_canonical_vector_and_cross_purpose_separation",
+        "access::protocol_tests::signed_query_binds_every_field_and_uses_strict_verification"
+      ]
+    },
+    {
+      "name": "query-id-signing",
+      "path": "src/access/protocol.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 10.26,
+      "failing_tests": [
+        "access::protocol_tests::signed_query_canonical_vector_and_cross_purpose_separation",
+        "access::protocol_tests::signed_query_binds_every_field_and_uses_strict_verification"
+      ]
+    },
+    {
+      "name": "query-nonce-signing",
+      "path": "src/access/protocol.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 9.85,
+      "failing_tests": [
+        "access::protocol_tests::signed_query_canonical_vector_and_cross_purpose_separation",
+        "access::protocol_tests::signed_query_binds_every_field_and_uses_strict_verification"
+      ]
+    },
+    {
+      "name": "query-strict-verifier",
+      "path": "src/access/protocol.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 11.16,
+      "failing_tests": [
+        "access::protocol_tests::signed_query_binds_every_field_and_uses_strict_verification"
+      ]
+    },
+    {
+      "name": "query-signature-auth",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 18.9,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_inaccessible_ids_and_authority_rejections_have_no_effects"
+      ]
+    },
+    {
+      "name": "query-peer-auth",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 19.5,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_stored_enabled_pairing_is_independent_of_application_token",
+        "access::direct_request_tests::signed_status_inaccessible_ids_and_authority_rejections_have_no_effects"
+      ]
+    },
+    {
+      "name": "query-uid-auth",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 17.39,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_inaccessible_ids_and_authority_rejections_have_no_effects"
+      ]
+    },
+    {
+      "name": "query-group-auth",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 20.51,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_inaccessible_ids_and_authority_rejections_have_no_effects"
+      ]
+    },
+    {
+      "name": "query-enabled-auth",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 20.2,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_stored_enabled_pairing_is_independent_of_application_token"
+      ]
+    },
+    {
+      "name": "query-stored-owner",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 17.35,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_inaccessible_ids_and_authority_rejections_have_no_effects",
+        "access::direct_request_tests::signed_status_repairing_same_label_and_principal_never_transfers_ownership",
+        "access::direct_request_tests::signed_status_shared_nonce_replay_precedes_neither_authentication_nor_ownership"
+      ]
+    },
+    {
+      "name": "query-durable-marker",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 17.29,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_concurrent_identical_queries_consume_once",
+        "access::direct_request_tests::signed_status_projects_every_validated_state_without_mutating_terminal_records",
+        "access::direct_request_tests::signed_status_failed_persistence_never_discloses_and_retains_post_rename_nonce",
+        "access::direct_request_tests::signed_status_revocation_intent_is_published_during_blocked_query_write",
+        "access::direct_request_tests::signed_status_shared_nonce_replay_precedes_neither_authentication_nor_ownership"
+      ]
+    },
+    {
+      "name": "query-replay-lookup",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 18.59,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_concurrent_identical_queries_consume_once",
+        "access::direct_request_tests::signed_status_failed_persistence_never_discloses_and_retains_post_rename_nonce",
+        "access::direct_request_tests::signed_status_shared_nonce_replay_precedes_neither_authentication_nor_ownership"
+      ]
+    },
+    {
+      "name": "query-submission-replay-lookup",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 21.71,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_shared_nonce_replay_precedes_neither_authentication_nor_ownership"
+      ]
+    },
+    {
+      "name": "submission-query-replay-lookup",
+      "path": "src/access/provider.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 21.81,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_shared_nonce_replay_precedes_neither_authentication_nor_ownership"
+      ]
+    },
+    {
+      "name": "query-marker-format",
+      "path": "src/access/provider_store.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status_query_markers"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 11.92,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_query_markers_are_backward_compatible_canonical_unique_and_disjoint"
+      ]
+    },
+    {
+      "name": "query-marker-uniqueness",
+      "path": "src/access/provider_store.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status_query_markers"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 13.44,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_query_markers_are_backward_compatible_canonical_unique_and_disjoint"
+      ]
+    },
+    {
+      "name": "query-revocation-token",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 22.5,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_revocation_intent_during_authentication_prevents_marker_and_disclosure",
+        "access::direct_request_tests::signed_status_revocation_intent_is_published_during_blocked_query_write"
+      ]
+    },
+    {
+      "name": "query-running-projection",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 19.83,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_projects_every_validated_state_without_mutating_terminal_records",
+        "access::direct_request_tests::signed_status_running_remains_nonterminal_until_confirmed_cleanup"
+      ]
+    },
+    {
+      "name": "query-exit-projection",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 19.45,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_projects_every_validated_state_without_mutating_terminal_records"
+      ]
+    },
+    {
+      "name": "query-failure-projection",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 20.7,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_projects_every_validated_state_without_mutating_terminal_records"
+      ]
+    },
+    {
+      "name": "query-final-request-expiry",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 19.02,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_uses_provider_deadlines_even_when_storage_crosses_expiry"
+      ]
+    },
+    {
+      "name": "query-final-session-expiry",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 18.82,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_uses_provider_deadlines_even_when_storage_crosses_expiry"
+      ]
+    },
+    {
+      "name": "query-closed-projection",
+      "path": "src/access/protocol.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 18.0,
+      "failing_tests": [
+        "access::protocol_tests::signed_status_projection_is_closed_and_validates_every_lifecycle"
+      ]
+    },
+    {
+      "name": "wait-terminal-stop",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests::busy_then_running_then_terminal_and_backoff_cap"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 17.89,
+      "failing_tests": [
+        "adapters::agent_wait::tests::busy_then_running_then_terminal_and_backoff_cap"
+      ]
+    },
+    {
+      "name": "wait-backoff-cap",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 14.93,
+      "failing_tests": [
+        "adapters::agent_wait::tests::busy_then_running_then_terminal_and_backoff_cap"
+      ]
+    },
+    {
+      "name": "wait-busy-retry",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 14.57,
+      "failing_tests": [
+        "adapters::agent_wait::tests::busy_then_running_then_terminal_and_backoff_cap"
+      ]
+    },
+    {
+      "name": "wait-expiry-control-exit",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 15.52,
+      "failing_tests": [
+        "adapters::agent_wait::tests::every_terminal_and_rejection_stops_without_sleep_or_retry"
+      ]
+    },
+    {
+      "name": "wait-deadline-extension",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 14.62,
+      "failing_tests": [
+        "adapters::agent_wait::tests::deadline_clips_sleep_and_inflight_exchange",
+        "adapters::agent_wait::tests::submission_receipt_and_observation_share_one_deadline"
+      ]
+    },
+    {
+      "name": "wait-cancellation-priority",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 14.77,
+      "failing_tests": [
+        "adapters::agent_wait::tests::interruption_and_transport_uncertainty_never_become_lifecycle"
+      ]
+    },
+    {
+      "name": "wait-blocked-stdout-runtime",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "human_cli",
+        "agent_wait_full_stdout_and_stderr_preserve_timeout_and_signal_exits"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 31.7,
+      "failing_tests": [
+        "agent_wait_full_stdout_and_stderr_preserve_timeout_and_signal_exits"
+      ]
+    },
+    {
+      "name": "wait-blocked-diagnostic-exit",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "human_cli",
+        "agent_wait_full_stdout_and_stderr_preserve_timeout_and_signal_exits"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 30.21,
+      "failing_tests": [
+        "agent_wait_full_stdout_and_stderr_preserve_timeout_and_signal_exits"
+      ]
+    },
+    {
+      "name": "wait-reset-budget-after-ack",
+      "path": "src/adapters/agent_wait.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "agent_wait::tests::submission_receipt_and_observation_share_one_deadline"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 20.01,
+      "failing_tests": [
+        "adapters::agent_wait::tests::submission_receipt_and_observation_share_one_deadline"
+      ]
+    },
+    {
+      "name": "query-release-gate-held-during-storage",
+      "path": "src/access/application.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "signed_status_revocation_intent_is_published_during_blocked_query_write"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 25.06,
+      "failing_tests": [
+        "access::direct_request_tests::signed_status_revocation_intent_is_published_during_blocked_query_write"
+      ]
+    },
+    {
+      "name": "cli-request-id-redaction-guard",
+      "path": "src/bin/vw-access.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--test",
+        "human_cli",
+        "malformed_agent_selectors_are_usage_errors_before_key_access"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 12.17,
+      "failing_tests": [
+        "malformed_agent_selectors_are_usage_errors_before_key_access"
+      ]
+    },
+    {
+      "name": "exchange-response-deadline-renewed",
+      "path": "src/adapters/unix_socket.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "unix_socket"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 27.43,
+      "failing_tests": [
+        "adapters::unix_socket::tests::query_exchange_response_read_retains_the_original_exchange_deadline"
+      ]
+    },
+    {
+      "name": "query-response-duplicate-fields-collapsed",
+      "path": "src/access/protocol.rs",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "protocol_tests"
+      ],
+      "exit": 101,
+      "classification": "caught",
+      "seconds": 19.81,
+      "failing_tests": [
+        "access::protocol_tests::signed_status_projection_is_closed_and_validates_every_lifecycle"
+      ]
+    }
+  ],
+  "mutation_classifications": {
+    "caught": 36
+  },
+  "source_files_compared": 95,
+  "restored_copy_files": 97,
+  "all_target_reported_passes": 949,
+  "live_backend_early_returns": 71,
+  "other_reported_passes": 878,
+  "ignored_entries": 14,
+  "benchmark_smoke_checks": 13,
+  "real_manager_scenarios": 30,
+  "workflow_reviews": "all three completed; iteration-1 patches verified",
+  "publication_authorized": false
+}

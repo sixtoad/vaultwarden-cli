@@ -3,8 +3,8 @@ use crate::access::{
     application::ProviderApplication,
     ports::DirectReviewLauncher,
     protocol::{
-        AgentRejection, AgentResponse, MAX_REQUEST_FRAME_BYTES, MAX_RESPONSE_FRAME_BYTES,
-        SignedSubmission,
+        AgentEnvelope, AgentRejection, AgentResponse, MAX_REQUEST_FRAME_BYTES,
+        MAX_RESPONSE_FRAME_BYTES, SignedStatusQuery, SignedSubmission,
     },
 };
 use ed25519_dalek::SigningKey;
@@ -48,6 +48,16 @@ thread_local! { static CLIENT_CONNECTED_HOOK: ClientConnectedHook = std::cell::R
 type FrameChunkHook = std::cell::RefCell<Option<Box<dyn FnMut(&[u8])>>>;
 #[cfg(test)]
 thread_local! { static FRAME_CHUNK_HOOK: FrameChunkHook = std::cell::RefCell::new(None); }
+
+#[cfg(test)]
+type ClientResponseReadHook = std::cell::RefCell<
+    Option<(
+        tokio::sync::oneshot::Sender<()>,
+        tokio::sync::oneshot::Receiver<()>,
+    )>,
+>;
+#[cfg(test)]
+thread_local! { static CLIENT_RESPONSE_READ_HOOK: ClientResponseReadHook = const { std::cell::RefCell::new(None) }; }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AgentTransportError;
@@ -356,16 +366,27 @@ async fn serve_one(
     .await;
     let response = match eligibility {
         Ok(Ok(())) => match read_frame(&mut stream, MAX_REQUEST_FRAME_BYTES, deadline).await {
-            Ok(bytes) => match SignedSubmission::parse(&bytes) {
+            Ok(bytes) => match AgentEnvelope::parse(&bytes) {
                 Ok(input) => {
                     let retained = permit.clone();
                     match tokio::task::spawn_blocking(move || {
                         let _retained = retained;
-                        app.submit_signed(peer.uid, &peer.groups, input, launcher.as_ref())
+                        match input {
+                            AgentEnvelope::Submission(input) => app
+                                .submit_signed(peer.uid, &peer.groups, input, launcher.as_ref())
+                                .map(AgentResponse::pending),
+                            AgentEnvelope::Status(input) => app
+                                .signed_agent_status(peer.uid, &peer.groups, &input)
+                                .map(|state| AgentResponse::Status {
+                                    protocol_version: crate::access::PROTOCOL_VERSION,
+                                    request_id: input.request_id,
+                                    state,
+                                }),
+                        }
                     })
                     .await
                     {
-                        Ok(Ok(id)) => AgentResponse::pending(id),
+                        Ok(Ok(response)) => response,
                         Ok(Err(category)) => AgentResponse::rejected(category),
                         Err(_) => AgentResponse::rejected(AgentRejection::Unavailable),
                     }
@@ -509,6 +530,31 @@ pub async fn exchange(
     path: &Path,
     input: &SignedSubmission,
 ) -> Result<AgentResponse, AgentTransportError> {
+    let response = exchange_envelope(path, input).await?;
+    match response {
+        AgentResponse::Pending { .. } | AgentResponse::Rejected { .. } => Ok(response),
+        AgentResponse::Status { .. } => Err(AgentTransportError),
+    }
+}
+
+/// A fresh signature is required for each observation, including reconnects.
+pub async fn query_exchange(
+    path: &Path,
+    input: &SignedStatusQuery,
+) -> Result<AgentResponse, AgentTransportError> {
+    let response = exchange_envelope(path, input).await?;
+    match &response {
+        AgentResponse::Status { request_id, .. } if request_id == &input.request_id => Ok(response),
+        AgentResponse::Rejected { .. } => Ok(response),
+        _ => Err(AgentTransportError),
+    }
+}
+
+async fn exchange_envelope(
+    path: &Path,
+    input: &impl serde::Serialize,
+) -> Result<AgentResponse, AgentTransportError> {
+    let deadline = Instant::now() + IO_TIMEOUT;
     let mut bytes = serde_json::to_vec(input).map_err(|_error| AgentTransportError)?;
     bytes.push(b'\n');
     if bytes.len() > MAX_REQUEST_FRAME_BYTES {
@@ -518,7 +564,7 @@ pub async fn exchange(
     let owner = checked_directory(&directory, None, None)?;
     let pinned = descriptor_path(&directory, path.file_name().ok_or(AgentTransportError)?);
     let before = checked_socket(&pinned, &owner)?;
-    let mut stream = timeout(IO_TIMEOUT, UnixStream::connect(&pinned))
+    let mut stream = timeout_at(deadline, UnixStream::connect(&pinned))
         .await
         .map_err(|_error| AgentTransportError)?
         .map_err(|_error| AgentTransportError)?;
@@ -534,7 +580,7 @@ pub async fn exchange(
     {
         return Err(AgentTransportError);
     }
-    timeout(IO_TIMEOUT, async {
+    timeout_at(deadline, async {
         stream
             .write_all(&bytes)
             .await
@@ -546,12 +592,15 @@ pub async fn exchange(
     })
     .await
     .map_err(|_error| AgentTransportError)??;
-    let response = read_frame(
-        &mut stream,
-        MAX_RESPONSE_FRAME_BYTES,
-        Instant::now() + IO_TIMEOUT,
-    )
-    .await?;
+    #[cfg(test)]
+    {
+        let hook = CLIENT_RESPONSE_READ_HOOK.with(|hook| hook.borrow_mut().take());
+        if let Some((reached, resume)) = hook {
+            reached.send(()).expect("exchange test observer dropped");
+            resume.await.expect("exchange test controller dropped");
+        }
+    }
+    let response = read_frame(&mut stream, MAX_RESPONSE_FRAME_BYTES, deadline).await?;
     AgentResponse::parse(&response).map_err(|_error| AgentTransportError)
 }
 
