@@ -3,6 +3,8 @@
 #[path = "support/bounded_process.rs"]
 #[allow(dead_code)]
 mod bounded_process;
+#[path = "support/ssh_policy.rs"]
+mod ssh_policy;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bounded_process::BoundedChild;
 use ed25519_dalek::SigningKey;
@@ -48,6 +50,9 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    fn ssh_eligible(&mut self, _: &str) -> Result<bool, SessionError> {
+        Ok(true)
+    }
     fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
         Ok(true)
     }
@@ -244,6 +249,7 @@ fn real_linux_peer_matrix_and_noninteractive_cli() {
     std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
     let revision = app
         .activate_operation(OperationPolicyDraft {
+            ssh: None,
             id: "deploy".into(),
             description: "Deploy <script>sentinel</script>".into(),
             image_id: "test-image".into(),
@@ -957,6 +963,71 @@ sys.stdout.buffer.write(data)
     assert_eq!(snapshot(), before);
     assert_eq!(count(&root), 5);
     assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+    assert_eq!(resolutions.load(Ordering::SeqCst), 0);
+    let ssh_revision = app
+        .activate_operation(ssh_policy::draft("test-image"))
+        .unwrap();
+    let ssh_key = SigningKey::from_bytes(&[127; 32]);
+    let HumanResponse::AgentPaired { agent: ssh_agent } = exchange(
+        &root,
+        HumanCommand::AgentPair {
+            pairing: AgentPairing {
+                label: "SSH agent".into(),
+                public_key: URL_SAFE_NO_PAD.encode(ssh_key.verifying_key().to_bytes()),
+                uid: 8,
+                gid: 9,
+            },
+        },
+    )
+    .unwrap() else {
+        panic!("SSH test pairing failed")
+    };
+    for (nonce, args, revision, expected) in [
+        (
+            1,
+            vec!["--host=other".into()],
+            ssh_revision.clone(),
+            AgentRejection::InvalidArguments,
+        ),
+        (2, vec![], "0".repeat(64), AgentRejection::StaleRevision),
+    ] {
+        let input = SignedSubmission::sign(
+            ssh_agent.id.clone(),
+            [nonce; 32],
+            "ssh-backup".into(),
+            revision,
+            args,
+            &ssh_key,
+        )
+        .unwrap();
+        assert!(
+            matches!(peer(&path,8,9,vec![7],&format!("{}\n", serde_json::to_string(&input).unwrap()),false),AgentResponse::Rejected{category,..} if category==expected)
+        );
+        assert_eq!(count(&root), 5);
+        assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+    }
+    let input = SignedSubmission::sign(
+        ssh_agent.id,
+        [3; 32],
+        "ssh-backup".into(),
+        ssh_revision,
+        vec![],
+        &ssh_key,
+    )
+    .unwrap();
+    assert!(matches!(
+        peer(
+            &path,
+            8,
+            9,
+            vec![7],
+            &format!("{}\n", serde_json::to_string(&input).unwrap()),
+            false
+        ),
+        AgentResponse::Pending { .. }
+    ));
+    assert_eq!(count(&root), 6);
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
     assert_eq!(resolutions.load(Ordering::SeqCst), 0);
     stop.store(true, Ordering::Release);
     runtime.block_on(worker).unwrap().unwrap();

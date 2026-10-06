@@ -41,6 +41,8 @@ pub struct HistoryEvent {
     pub requester: RequesterSnapshot,
     pub policy_revision: String,
     pub credentials: Vec<ReviewCredential>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh: Option<super::policy::SshReview>,
     pub created_at_unix_seconds: u64,
     pub expires_at_unix_seconds: u64,
     pub at_unix_seconds: Option<u64>,
@@ -58,6 +60,8 @@ struct HistoryEventWire {
     requester: RequesterSnapshot,
     policy_revision: String,
     credentials: Vec<ReviewCredential>,
+    #[serde(default)]
+    ssh: Option<super::policy::SshReview>,
     created_at_unix_seconds: u64,
     expires_at_unix_seconds: u64,
     at_unix_seconds: Option<u64>,
@@ -75,6 +79,7 @@ impl TryFrom<HistoryEventWire> for HistoryEvent {
             requester: w.requester,
             policy_revision: w.policy_revision,
             credentials: w.credentials,
+            ssh: w.ssh,
             created_at_unix_seconds: w.created_at_unix_seconds,
             expires_at_unix_seconds: w.expires_at_unix_seconds,
             at_unix_seconds: w.at_unix_seconds,
@@ -113,6 +118,7 @@ impl HistoryEvent {
             },
             policy_revision: record.review.policy_digest.clone(),
             credentials: record.review.credentials.clone(),
+            ssh: record.review.ssh.clone(),
             created_at_unix_seconds: record.created_at_unix_seconds,
             expires_at_unix_seconds: record.review.expires_at_unix_seconds,
             at_unix_seconds: Some(now),
@@ -138,6 +144,7 @@ impl HistoryEvent {
             && self.credentials.len() <= 16
             && self.credentials.iter().all(|c| text(&c.label))
             && (self.at_unix_seconds.is_some() || self.outcome == HistoryOutcome::LegacyUnknown)
+            && self.ssh.as_ref().is_none_or(|ssh| ssh.valid())
             && self.consistent_outcome()
     }
     fn consistent_outcome(&self) -> bool {

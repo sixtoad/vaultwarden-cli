@@ -227,6 +227,10 @@ impl std::error::Error for ExecutionError {}
 /// backend.  It names an immutable backend item and standard login fields; it
 /// never transports an item object or a secret value.
 pub trait LoginEligibilityVerifier {
+    /// Metadata-only SSH eligibility. Unsupported adapters deny by default.
+    fn is_ssh_eligible(&self, _immutable_item_id: &str) -> Result<bool, LoginEligibilityError> {
+        Ok(false)
+    }
     /// Return `true` only when the exact immutable item has every requested
     /// field and an exact `vw-access=<operation-id>` custom-field marker.
     fn is_login_eligible(
@@ -304,6 +308,10 @@ pub struct CredentialBinding<'a> {
 }
 /// Only the provider application owns and invokes this capability.
 pub trait SecretBackend: ProviderSession {
+    /// Inspect exact immutable identity/type/SSH-body shape without decrypting keys.
+    fn ssh_eligible(&mut self, _immutable_item_id: &str) -> Result<bool, SessionError> {
+        Ok(false)
+    }
     fn eligible(&mut self, binding: &CredentialBinding<'_>) -> Result<bool, SessionError>;
     fn resolve(
         &mut self,
@@ -335,6 +343,24 @@ pub trait DirectReviewLauncher: Send + Sync {
 mod tests {
     use super::*;
 
+    #[test]
+    fn ssh_verifier_default_denies_eligibility() {
+        struct Unsupported;
+        impl LoginEligibilityVerifier for Unsupported {
+            fn is_login_eligible(
+                &self,
+                _: &str,
+                _: &[LoginField],
+                _: &str,
+            ) -> Result<bool, LoginEligibilityError> {
+                panic!("SSH eligibility must not fall through to login eligibility")
+            }
+        }
+        assert_eq!(
+            Unsupported.is_ssh_eligible("11111111-1111-1111-1111-111111111111"),
+            Ok(false)
+        );
+    }
     #[test]
     fn child_environment_is_explicit_redacted_and_rejects_unsafe_mappings() {
         let environment = ChildEnvironment::from_mappings([(

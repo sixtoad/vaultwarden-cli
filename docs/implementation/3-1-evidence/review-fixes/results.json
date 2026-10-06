@@ -1,0 +1,97 @@
+[
+  {
+    "name": "policy",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "access::policy",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 40.26,
+    "suites": [
+      [
+        "19",
+        "0",
+        "1"
+      ]
+    ]
+  },
+  {
+    "name": "direct-ssh",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "access::direct_request_tests::ssh_",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 3.38,
+    "suites": [
+      [
+        "7",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "backend",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::vaultwarden",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 4.23,
+    "suites": [
+      [
+        "16",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "name": "loopback",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--lib",
+      "adapters::loopback_ui",
+      "--offline",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 24.15,
+    "suites": [
+      [
+        "29",
+        "0",
+        "1"
+      ]
+    ]
+  },
+  {
+    "name": "browser",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit": 0,
+    "seconds": 67.68,
+    "suites": []
+  }
+]

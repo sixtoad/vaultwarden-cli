@@ -1,0 +1,28 @@
+{
+  "source": "/tmp/vw-story31-review-mutations/source",
+  "target": "/tmp/vw-story31-review-mutations/target",
+  "root": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-bind-ssh-key-fixed-operation",
+  "seed": "rsync -a excluding incremental, own package artifacts and fingerprints; no hardlinks",
+  "shared_target_used": false,
+  "independent_target_inode_pairs_verified": 6609,
+  "source_copy_command": [
+    "rsync",
+    "-a",
+    "--exclude=.git",
+    "--exclude=target",
+    "--exclude=node_modules",
+    "/home/sixtocantolla/sessions/day-to-day/vaultwarden-bind-ssh-key-fixed-operation/",
+    "/tmp/vw-story31-review-mutations/source/"
+  ],
+  "target_copy_command": [
+    "rsync",
+    "-a",
+    "--exclude=incremental",
+    "--exclude=*vaultwarden_cli*",
+    "--exclude=vaultwarden-cli-*",
+    "--exclude=vw-access*",
+    "--exclude=vw_access*",
+    "/home/sixtocantolla/sessions/day-to-day/vaultwarden-cli/target/",
+    "/tmp/vw-story31-review-mutations/target/"
+  ]
+}

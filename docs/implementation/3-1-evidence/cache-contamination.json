@@ -1,0 +1,15 @@
+{
+  "test_executable": {
+    "path": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-cli/target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483",
+    "sha256": "b8e9447d31d13be13533e15d2a8b6aee79b91cc41c5fdf4afe7d348633043c3b",
+    "correct_history_expression": 0,
+    "mutated_history_expression": 1
+  },
+  "worktree_source": {
+    "path": "/home/sixtocantolla/sessions/day-to-day/vaultwarden-bind-ssh-key-fixed-operation/src/adapters/loopback_ui.rs",
+    "sha256": "bdfe68b269a6146230f1aff9844b5e101d47f97bfbce1623e5aa35c76648f6e6",
+    "correct_history_expression": 1,
+    "mutated_history_expression": 0
+  },
+  "diagnosis": "The shared target cache retained the last history-only UI mutant in the lib-test executable, although restored worktree source contains the correct expression. Package artifacts will be cleaned before rerunning every final check."
+}

@@ -753,6 +753,7 @@ mod tests {
     fn history_frames_fail_closed_before_writing_oversized_output() {
         use crate::access::history::{HistoryEvent, HistoryOutcome, RequesterSnapshot};
         let event = HistoryEvent {
+            ssh: None,
             version: 1,
             request_id: "a".repeat(64),
             operation: "deploy".into(),

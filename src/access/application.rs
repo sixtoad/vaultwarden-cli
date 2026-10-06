@@ -1349,6 +1349,11 @@ impl ProviderApplication {
         // the strength of authority checked before that read.
         self.execution_live(authority, id)?;
         let candidate = candidate?;
+        // SSH execution belongs to Story 3.2. Guard the common authority path
+        // before preparation, credential resolution, or a zero-login launch.
+        if candidate.1.ssh().is_some() {
+            return Err(DirectRequestError::Unavailable);
+        }
         if candidate
             .0
             .agent_owner
@@ -1443,6 +1448,17 @@ impl ProviderApplication {
                 return Err(DirectRequestError::Unauthorized);
             }
             probe?;
+            if let Some(ssh) = policy.ssh() {
+                let eligible = authority.backend.ssh_eligible(&ssh.credential.item_id);
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
+                if !eligible.unwrap_or(false) {
+                    return Err(DirectRequestError::Unavailable);
+                }
+            }
             let marker = format!("vw-access={}", policy.id());
             for login in policy.login_bindings() {
                 let eligible = authority.backend.eligible(&CredentialBinding {
@@ -1527,6 +1543,20 @@ impl ProviderApplication {
             closing: &'a AtomicBool,
         }
         impl LoginEligibilityVerifier for Verifier<'_> {
+            fn is_ssh_eligible(&self, id: &str) -> Result<bool, LoginEligibilityError> {
+                if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
+                    return Err(LoginEligibilityError);
+                }
+                let result = self
+                    .backend
+                    .borrow_mut()
+                    .ssh_eligible(id)
+                    .map_err(|_error| LoginEligibilityError);
+                if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
+                    return Err(LoginEligibilityError);
+                }
+                result
+            }
             fn is_login_eligible(
                 &self,
                 id: &str,
@@ -1825,6 +1855,7 @@ mod tests {
             }
             let result = if operation == "activate_probe" {
                 app.activate_operation(super::super::policy::OperationPolicyDraft {
+                    ssh: None,
                     id: "deploy".into(),
                     description: "Deploy".into(),
                     image_id: "absent".into(),
@@ -1896,6 +1927,7 @@ mod tests {
                 serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
             std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
             let draft = OperationPolicyDraft {
+                ssh: None,
                 id: "deploy".into(),
                 description: "Deploy".into(),
                 image_id: "deploy-image".into(),
@@ -2259,6 +2291,7 @@ mod tests {
                 })
                 .collect();
             let draft = OperationPolicyDraft {
+                ssh: None,
                 id: "deploy".into(),
                 description: "Deploy".into(),
                 image_id: "deploy-image".into(),
@@ -2283,6 +2316,7 @@ mod tests {
         let observed = Arc::new(Observed::default());
         let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
         let draft = || OperationPolicyDraft {
+            ssh: None,
             id: "deploy".into(),
             description: "Deploy".into(),
             image_id: "deploy-image".into(),

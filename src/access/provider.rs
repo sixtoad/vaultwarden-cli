@@ -1017,6 +1017,13 @@ impl Provider {
         };
         let policy = OperationPolicy::from_draft(draft, image)
             .map_err(|_error| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+        if let Some(ssh) = policy.ssh()
+            && !verifier
+                .is_ssh_eligible(&ssh.credential.item_id)
+                .unwrap_or(false)
+        {
+            return Err(ProviderError::new(ProviderDiagnostic::CredentialIneligible));
+        }
         let marker = format!("vw-access={}", policy.id());
         for binding in policy.login_bindings() {
             if !verifier
@@ -1094,6 +1101,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            ssh: None,
             id: "deploy-homelab".into(),
             description: "Deploy".into(),
             image_id: "deploy-image".into(),

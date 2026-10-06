@@ -402,6 +402,7 @@ fn application_scenario(
     let marker = root.join("app-tree-ready").to_str().unwrap().to_owned();
     f.app
         .activate_operation(OperationPolicyDraft {
+            ssh: None,
             id: "deploy".into(),
             description: "Synthetic protected execution".into(),
             image_id: "deploy-image".into(),
