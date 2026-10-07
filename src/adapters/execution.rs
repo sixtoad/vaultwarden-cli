@@ -31,6 +31,8 @@ pub(crate) struct PreparedExecutable {
     #[cfg(target_os = "linux")]
     file: std::fs::File,
     argv: Vec<CString>,
+    #[cfg(target_os = "linux")]
+    cwd: Option<std::fs::File>,
 }
 impl fmt::Debug for PreparedExecutable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -40,6 +42,30 @@ impl fmt::Debug for PreparedExecutable {
 
 impl ProtectedExecution for LinuxExecutablePreparer {
     type Prepared = PreparedExecutable;
+    #[cfg(target_os = "linux")]
+    fn prepare_ssh(
+        &self,
+        prepared: &mut PreparedExecutable,
+        root: &std::path::Path,
+        ssh: &crate::access::policy::SshOperation,
+    ) -> Result<Box<dyn crate::access::ports::SshMaterial>, ExecutionError> {
+        use crate::access::ports::SshMaterial;
+        let (mut material, options, cwd) = super::ssh_material::prepare(root, ssh)?;
+        let mut argv = vec![prepared.argv[0].to_string_lossy().into_owned()];
+        argv.extend(options);
+        let result = checked_arguments(argv);
+        match result {
+            Ok(argv) => {
+                prepared.argv = argv;
+                prepared.cwd = Some(cwd);
+                Ok(Box::new(material))
+            }
+            Err(error) => {
+                material.finalize(crate::access::ports::CleanupEvidence::NotStarted)?;
+                Err(error)
+            }
+        }
+    }
     fn prepare(
         &self,
         image: ExecutionImage<'_>,
@@ -88,6 +114,12 @@ fn checked_arguments(argv: Vec<String>) -> Result<Vec<CString>, ExecutionError> 
 }
 
 impl PreparedExecutable {
+    #[cfg(target_os = "linux")]
+    pub(crate) fn working_directory(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+        use std::os::fd::AsFd;
+        self.cwd.as_ref().map(std::fs::File::as_fd)
+    }
+
     #[cfg(target_os = "linux")]
     pub(crate) fn descriptor_and_arguments(&self) -> (std::os::fd::BorrowedFd<'_>, &[CString]) {
         use std::os::fd::AsFd;
@@ -388,7 +420,11 @@ mod linux {
         validate_elf(&bytes)?;
         #[cfg(test)]
         hook(Boundary::Verified);
-        Ok(PreparedExecutable { file: sealed, argv })
+        Ok(PreparedExecutable {
+            file: sealed,
+            argv,
+            cwd: None,
+        })
     }
 
     fn seal_fd(fd: RawFd) -> Result<(), ExecutionError> {

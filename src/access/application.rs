@@ -1159,6 +1159,9 @@ impl ProviderApplication {
         );
         drop(authority);
         let preparation = candidate.and_then(|(_, policy, argv)| {
+            if policy.ssh().is_some() && supervisor.ssh_material_root().is_none() {
+                return Err(DirectRequestError::Unavailable);
+            }
             let prepared = preparer
                 .prepare(policy.execution_image(), argv)
                 .map_err(|_error| DirectRequestError::Unavailable)?;
@@ -1168,8 +1171,9 @@ impl ProviderApplication {
             .gate
             .lock()
             .map_err(|_error| DirectRequestError::Unavailable)?;
+        let mut material: Option<Box<dyn SshMaterial>> = None;
         let result = (|| {
-            let (policy, prepared) = preparation?;
+            let (policy, mut prepared) = preparation?;
             self.execution_authority_current(
                 &mut authority,
                 owner,
@@ -1177,8 +1181,50 @@ impl ProviderApplication {
                 Some(&binding),
                 revocation_epoch,
             )?;
+            if let Some(ssh) = policy.ssh() {
+                let root = supervisor
+                    .ssh_material_root()
+                    .ok_or(DirectRequestError::Unavailable)?;
+                material = Some(preparer.prepare_ssh(&mut prepared, root, ssh).map_err(
+                    |error| {
+                        if error == ExecutionError::CleanupUncertain {
+                            self.close_admission();
+                        }
+                        DirectRequestError::Unavailable
+                    },
+                )?);
+                self.execution_authority_current(
+                    &mut authority,
+                    owner,
+                    id,
+                    Some(&binding),
+                    revocation_epoch,
+                )?;
+            }
             authority.backend.probe_compatibility()?;
             self.execution_live_current(&mut authority, id, revocation_epoch)?;
+            if let Some(ssh) = policy.ssh() {
+                let key = authority.backend.resolve_ssh(&ssh.credential.item_id)?;
+                self.execution_authority_current(
+                    &mut authority,
+                    owner,
+                    id,
+                    Some(&binding),
+                    revocation_epoch,
+                )?;
+                material
+                    .as_mut()
+                    .ok_or(DirectRequestError::Unavailable)?
+                    .install_key(key)
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                self.execution_authority_current(
+                    &mut authority,
+                    owner,
+                    id,
+                    Some(&binding),
+                    revocation_epoch,
+                )?;
+            }
             let marker = format!("vw-access={}", policy.id());
             let mut mappings = Vec::new();
             for login in policy.login_bindings() {
@@ -1227,7 +1273,7 @@ impl ProviderApplication {
             cancel,
             agent_token,
         };
-        let report = match result {
+        let mut report = match result {
             Ok((prepared, environment)) => {
                 supervisor.supervise_controlled(prepared, environment, &control)
             }
@@ -1237,6 +1283,13 @@ impl ProviderApplication {
                 helper_reaped: false,
             },
         };
+        if let Some(material) = material.as_mut()
+            && material.finalize(report.cleanup).is_err()
+        {
+            report.outcome = Err(ExecutionError::CleanupUncertain);
+            self.cleanup_uncertain.store(true, Ordering::Release);
+            self.close_admission();
+        }
         let _helper_reaping_observed = report.helper_reaped;
         if report.outcome == Err(ExecutionError::ManagerUnavailable) {
             self.close_admission();
@@ -1311,6 +1364,9 @@ impl ProviderApplication {
             .lock()
             .map_err(|_error| DirectRequestError::Unavailable)?;
         let (binding, policy, argv) = self.execution_authority(&mut authority, owner, id, None)?;
+        if policy.ssh().is_some() {
+            return Err(DirectRequestError::Unavailable);
+        }
         let preparation = preparer.prepare(policy.execution_image(), argv);
         self.execution_authority(&mut authority, owner, id, Some(&binding))?;
         let prepared = preparation.map_err(|_error| DirectRequestError::Unavailable)?;
@@ -1349,11 +1405,6 @@ impl ProviderApplication {
         // the strength of authority checked before that read.
         self.execution_live(authority, id)?;
         let candidate = candidate?;
-        // SSH execution belongs to Story 3.2. Guard the common authority path
-        // before preparation, credential resolution, or a zero-login launch.
-        if candidate.1.ssh().is_some() {
-            return Err(DirectRequestError::Unavailable);
-        }
         if candidate
             .0
             .agent_owner

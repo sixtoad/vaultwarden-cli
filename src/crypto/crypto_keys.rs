@@ -14,7 +14,7 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use hmac::{Hmac, KeyInit, Mac};
 use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey};
 use sha2::Sha256;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::crypto::master_key::allow_insecure_mac;
 use crate::crypto::rsa_ops;
@@ -70,7 +70,7 @@ impl CryptoKeys {
     /// unsupported encryption type, invalid base64, or OAEP decryption failure)
     /// or if the decrypted key is not 64 bytes long.
     pub fn decrypt_org_key(encrypted_org_key: &str, private_key: &RsaPrivateKey) -> Result<Self> {
-        let decrypted = rsa_ops::decrypt_rsa(encrypted_org_key, private_key)?;
+        let decrypted = Zeroizing::new(rsa_ops::decrypt_rsa(encrypted_org_key, private_key)?);
         Self::from_symmetric_key(&decrypted)
     }
 
@@ -83,7 +83,7 @@ impl CryptoKeys {
     /// Returns an error if the symmetric decryption fails, or if the decrypted
     /// bytes cannot be parsed as a PKCS#8 DER RSA private key.
     pub fn decrypt_private_key(&self, encrypted_private_key: &str) -> Result<RsaPrivateKey> {
-        let decrypted_der = self.decrypt(encrypted_private_key)?;
+        let decrypted_der = Zeroizing::new(self.decrypt(encrypted_private_key)?);
         RsaPrivateKey::from_pkcs8_der(&decrypted_der)
             .map_err(|e| anyhow::anyhow!("Failed to parse RSA private key: {e}"))
     }

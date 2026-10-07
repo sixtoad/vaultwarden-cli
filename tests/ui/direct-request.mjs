@@ -378,7 +378,7 @@ try{
   await sshTab.goto(pathToFileURL(sshArtifact).href);
   await sshTab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
   const sshDetails=await sshTab.$$eval('#details dt',terms=>Object.fromEntries(terms.map(term=>[term.textContent,term.nextElementSibling.textContent])));
-  for(const [name,value] of Object.entries({'Target':'backup@backup.example.test:2222/srv/archive','SSH host':'backup.example.test','SSH port':'2222','SSH user':'backup','Resource path':'/srv/archive','Pinned host fingerprint':'SHA256:'+'A'.repeat(43),'Working directory':'/var/empty','Credentials and use types':'Backup SSH (ssh)','Policy digest':ready.ssh_revision,'One-time meaning':'Approval authorizes this request once only. Execution is not available yet.'}))assert.equal(sshDetails[name],value,name);
+  for(const [name,value] of Object.entries({'Target':'backup@backup.example.test:2222/srv/archive','SSH host':'backup.example.test','SSH port':'2222','SSH user':'backup','Resource path':'/srv/archive','Pinned host fingerprint':'SHA256:'+'A'.repeat(43),'Working directory':'/var/empty','Credentials and use types':'Backup SSH (ssh)','Policy digest':ready.ssh_revision,'One-time meaning':'Approval authorizes one protected execution. Lock or cancellation stops its descendants.'}))assert.equal(sshDetails[name],value,name);
   assert.deepEqual(await sshTab.$$eval('#arguments > li',items=>items.map(item=>item.textContent)),[]);
   const sshReview=await sshTab.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).json(),sshReceipt.id);
   assert.deepEqual(sshReview.credentials,[{label:'Backup SSH',use_type:'ssh'}]);
@@ -406,7 +406,7 @@ try{
   await sshTab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
   await sshTab.click('#begin-approval');await sshTab.type('#approval-password','synthetic-browser-password');
   await sshTab.click('#approve');
-  await sshTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: approved; approved once; SSH execution is unavailable');
+  await sshTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: approved; approved once; awaiting protected execution');
   assert.equal(run(['status',sshApproved.id]).state.status,'approved');
   await sshTab.close();
   const knownDiagnostics=errors.filter(e=>e.includes('Permission denied to access property \"__bidi_args\"')||e==='Error: Error: Permission denied to access property \"length\"'||(e.includes('Content-Security-Policy')&&e.includes('/favicon.ico')));
