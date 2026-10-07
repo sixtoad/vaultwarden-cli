@@ -1,0 +1,32 @@
+[
+  {
+    "original": "development-check.log",
+    "archived": "development-check.log.gz",
+    "sha256": "7826bed6b58f2d0a81d697c79cd2964eedbe1dee403fd38a08b20b6fff07c64c"
+  },
+  {
+    "original": "development-clippy-initial.log",
+    "archived": "development-clippy-initial.log.gz",
+    "sha256": "a4e94e1512be6d7885d6607889a6a4862039c84053624d380255aad96c167514"
+  },
+  {
+    "original": "development-clippy.log",
+    "archived": "development-clippy.log.gz",
+    "sha256": "b7b50826628b70bba246cc2ecb0a1eb39c049bac11dd8db6f46274f9a44a7d4f"
+  },
+  {
+    "original": "development-focused.log",
+    "archived": "development-focused.log.gz",
+    "sha256": "c0647c9f3a2b2915b488f9e6921bc078cab209940109cd8e500475ec95fdd03f"
+  },
+  {
+    "original": "development-real-ssh-exit.log",
+    "archived": "development-real-ssh-exit.log.gz",
+    "sha256": "0ce46b276df80f7843732b00c7fa33f4fa0a5738866876b3a47cda58db9384da"
+  },
+  {
+    "original": "development-sandbox-focused.log",
+    "archived": "development-sandbox-focused.log.gz",
+    "sha256": "427ca08e68ef2898a4f91f08489124783184c75db6f7b01eea30cce1848881cf"
+  }
+]

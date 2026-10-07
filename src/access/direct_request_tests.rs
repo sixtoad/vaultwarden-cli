@@ -28,7 +28,7 @@ impl SessionClock for Clock {
     }
 }
 type EligibilityAction = std::cell::RefCell<Option<Box<dyn FnMut() -> Result<bool, SessionError>>>>;
-type ResolutionAction =
+pub(crate) type ResolutionAction =
     std::cell::RefCell<Option<Box<dyn FnMut() -> Result<Vec<SensitiveString>, SessionError>>>>;
 thread_local! {
     static ELIGIBILITY_ACTION: EligibilityAction = std::cell::RefCell::new(None);
@@ -37,7 +37,7 @@ thread_local! {
     static EXECUTION_CLEAR_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_ELIGIBILITY_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_RESOLUTION_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    static RESOLUTION_ACTION: ResolutionAction = std::cell::RefCell::new(None);
+    pub(crate) static RESOLUTION_ACTION: ResolutionAction = std::cell::RefCell::new(None);
     static BACKEND_UNLOCKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 struct Backend;
@@ -63,6 +63,16 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    fn resolve_ssh(&mut self, _: &str) -> Result<SensitiveString, SessionError> {
+        EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(calls.get() + 1));
+        RESOLUTION_ACTION.with(|action| {
+            action.borrow_mut().as_mut().map_or_else(
+                || Ok(SensitiveString::new("ssh-private-key-sentinel".into())),
+                |callback| callback().map(|mut values| values.remove(0)),
+            )
+        })
+    }
+
     fn ssh_eligible(&mut self, id: &str) -> Result<bool, SessionError> {
         assert!(id.ends_with("111111111111") || id.ends_with("222222222222"));
         ELIGIBILITY_ACTION.with(|action| {
@@ -6774,4 +6784,323 @@ fn ssh_caller_selector_wire_members_and_values_are_independently_rejected() {
         );
         signed_assert_no_effects(&f, &launcher);
     }
+}
+
+#[test]
+fn ssh_application_supervises_before_finalization_and_persists_redacted_failures() {
+    use std::{cell::RefCell, rc::Rc};
+    type Events = Rc<RefCell<Vec<&'static str>>>;
+    struct Material {
+        events: Events,
+        fail: bool,
+        key_failure: bool,
+    }
+    impl SshMaterial for Material {
+        fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError> {
+            assert_eq!(key.expose(), "ssh-private-key-sentinel");
+            self.events.borrow_mut().push("key");
+            if self.key_failure {
+                Err(ExecutionError::UnsafePath)
+            } else {
+                Ok(())
+            }
+        }
+        fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError> {
+            if !self.events.borrow().contains(&"reap") {
+                assert_eq!(evidence, CleanupEvidence::NotStarted);
+            }
+            self.events
+                .borrow_mut()
+                .push(if evidence == CleanupEvidence::NotStarted {
+                    "finalize-not-started"
+                } else {
+                    "finalize"
+                });
+            if self.fail || evidence == CleanupEvidence::Uncertain {
+                Err(ExecutionError::CleanupUncertain)
+            } else {
+                Ok(())
+            }
+        }
+    }
+    struct Preparation {
+        events: Events,
+        fail: bool,
+        key_failure: bool,
+    }
+    impl ProtectedExecution for Preparation {
+        type Prepared = ();
+        fn prepare(&self, _: ExecutionImage<'_>, _: Vec<String>) -> Result<(), ExecutionError> {
+            self.events.borrow_mut().push("image");
+            Ok(())
+        }
+        fn prepare_ssh(
+            &self,
+            _: &mut (),
+            _: &std::path::Path,
+            _: &crate::access::policy::SshOperation,
+        ) -> Result<Box<dyn SshMaterial>, ExecutionError> {
+            self.events.borrow_mut().push("host-and-cwd");
+            Ok(Box::new(Material {
+                events: self.events.clone(),
+                fail: self.fail,
+                key_failure: self.key_failure,
+            }))
+        }
+    }
+    struct Supervisor {
+        events: Events,
+        evidence: CleanupEvidence,
+    }
+    impl ProcessSupervisor<Preparation> for Supervisor {
+        fn ssh_material_root(&self) -> Option<&std::path::Path> {
+            Some(std::path::Path::new("/provider-private"))
+        }
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: (),
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("controlled supervision required")
+        }
+        fn supervise_controlled(
+            &self,
+            _: (),
+            environment: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            assert_eq!(
+                environment.entries().len(),
+                2,
+                "SSH keys and sockets never enter environment"
+            );
+            control.release(&mut || Ok(())).unwrap();
+            control.started().unwrap();
+            self.events.borrow_mut().push("reap");
+            Supervision {
+                outcome: Ok(ExecutionOutcome::ExitedZero),
+                cleanup: self.evidence,
+                helper_reaped: true,
+            }
+        }
+    }
+    for (phase, failure, evidence) in [
+        ("launch", false, CleanupEvidence::Reaped),
+        ("launch", true, CleanupEvidence::Reaped),
+        ("launch", false, CleanupEvidence::Uncertain),
+        ("key", false, CleanupEvidence::Reaped),
+        ("key", true, CleanupEvidence::Reaped),
+        ("backend", false, CleanupEvidence::Reaped),
+        ("backend", true, CleanupEvidence::Reaped),
+        ("compatibility", false, CleanupEvidence::Reaped),
+        ("compatibility", true, CleanupEvidence::Reaped),
+    ] {
+        let f = fixture();
+        let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+        let owner = f.app.human_owner();
+        let id = f
+            .app
+            .submit_direct(
+                owner,
+                DirectSubmission {
+                    operation: "ssh-backup".into(),
+                    revision: Some(revision),
+                    values: vec![],
+                },
+                &Launcher::default(),
+            )
+            .unwrap()
+            .id;
+        f.app.commit_approval(approval(&f, &id)).unwrap();
+        if phase == "backend" {
+            RESOLUTION_ACTION.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(|| Err(SessionError::BackendUnavailable)))
+            });
+        }
+        if phase == "compatibility" {
+            PROBE_ACTION.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(|| Err(SessionError::Incompatible)))
+            });
+        }
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let preparer = Preparation {
+            events: events.clone(),
+            fail: failure,
+            key_failure: phase == "key",
+        };
+        let supervisor = Supervisor {
+            events: events.clone(),
+            evidence,
+        };
+        let result = f.app.run_execution(owner, &id, &preparer, &supervisor);
+        RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+        PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
+        let expected = match phase {
+            "launch" => vec!["image", "host-and-cwd", "key", "reap", "finalize"],
+            "key" => vec!["image", "host-and-cwd", "key", "finalize-not-started"],
+            _ => vec!["image", "host-and-cwd", "finalize-not-started"],
+        };
+        assert_eq!(
+            *events.borrow(),
+            expected,
+            "{phase}, cleanup failure={failure}"
+        );
+        if phase == "launch" && !failure && evidence == CleanupEvidence::Reaped {
+            assert_eq!(result, Ok(DirectStatus::Completed { exit_code: 0 }));
+        } else {
+            assert_eq!(result, Err(DirectRequestError::Unavailable));
+            assert_eq!(
+                f.app.admission_closed(),
+                failure || evidence == CleanupEvidence::Uncertain
+            );
+            if evidence != CleanupEvidence::Uncertain {
+                let record: DirectRecord =
+                    serde_json::from_value(records(&f)["requests"][0]["direct"].clone()).unwrap();
+                assert_eq!(
+                    record.review.status,
+                    DirectStatus::Failed {
+                        reason: DirectFailure::ExecutionUnavailable
+                    }
+                );
+            }
+        }
+        let surfaces = format!("{} {:?}", records(&f), result);
+        assert!(!surfaces.contains("ssh-private-key-sentinel"));
+        assert!(!surfaces.contains("SSH_AUTH_SOCK"));
+    }
+}
+
+#[test]
+fn ssh_lock_intent_during_key_resolution_cleans_material_without_launch() {
+    use crate::adapters::execution::{LinuxExecutablePreparer, PreparedExecutable};
+    struct WatchedPreparation(Arc<AtomicUsize>);
+    struct WatchedMaterial {
+        inner: Box<dyn SshMaterial>,
+        installed: Arc<AtomicUsize>,
+    }
+    impl SshMaterial for WatchedMaterial {
+        fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError> {
+            self.installed.fetch_add(1, Ordering::SeqCst);
+            self.inner.install_key(key)
+        }
+        fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError> {
+            assert_eq!(evidence, CleanupEvidence::NotStarted);
+            self.inner.finalize(evidence)
+        }
+    }
+    impl ProtectedExecution for WatchedPreparation {
+        type Prepared = PreparedExecutable;
+        fn prepare(
+            &self,
+            image: ExecutionImage<'_>,
+            argv: Vec<String>,
+        ) -> Result<PreparedExecutable, ExecutionError> {
+            LinuxExecutablePreparer.prepare(image, argv)
+        }
+        fn prepare_ssh(
+            &self,
+            prepared: &mut PreparedExecutable,
+            root: &std::path::Path,
+            ssh: &SshOperation,
+        ) -> Result<Box<dyn SshMaterial>, ExecutionError> {
+            Ok(Box::new(WatchedMaterial {
+                inner: LinuxExecutablePreparer.prepare_ssh(prepared, root, ssh)?,
+                installed: self.0.clone(),
+            }))
+        }
+    }
+    struct NoLaunch {
+        root: std::path::PathBuf,
+    }
+    impl ProcessSupervisor<WatchedPreparation> for NoLaunch {
+        fn ssh_material_root(&self) -> Option<&std::path::Path> {
+            Some(&self.root)
+        }
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: PreparedExecutable,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("revoked SSH resolution must never launch")
+        }
+    }
+    let f = fixture();
+    let (ssh, key) = crate::adapters::ssh_material::fixture(f.dir.path());
+    let mut draft = test_ssh_draft();
+    draft.ssh = Some(ssh);
+    let revision = f.app.activate_operation(draft).unwrap();
+    let owner = f.app.human_owner();
+    let id = f
+        .app
+        .submit_direct(
+            owner,
+            DirectSubmission {
+                operation: "ssh-backup".into(),
+                revision: Some(revision),
+                values: vec![],
+            },
+            &Launcher::default(),
+        )
+        .unwrap()
+        .id;
+    f.app.commit_approval(approval(&f, &id)).unwrap();
+    let app = f.app.clone();
+    let epoch = app.revocation_epoch_for_test();
+    let root = f.dir.path().join("ssh");
+    let observed = root.clone();
+    let (lock_tx, lock_rx) = std::sync::mpsc::channel();
+    EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(0));
+    RESOLUTION_ACTION.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || {
+            let requests: Vec<_> = std::fs::read_dir(observed.join("requests"))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert_eq!(requests.len(), 1);
+            assert!(requests[0].join("known_hosts").exists());
+            assert!(!requests[0].join("identity").exists());
+            let lock_app = app.clone();
+            let lock = std::thread::spawn(move || lock_app.lock());
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            while app.revocation_epoch_for_test() == epoch {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+            lock_tx.send(lock).unwrap();
+            Ok(vec![SensitiveString::new(key.clone())])
+        }))
+    });
+    let installed = Arc::new(AtomicUsize::new(0));
+    let result = f.app.run_execution(
+        owner,
+        &id,
+        &WatchedPreparation(installed.clone()),
+        &NoLaunch { root: root.clone() },
+    );
+    RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+    assert_eq!(result, Err(DirectRequestError::Unavailable));
+    assert_eq!(
+        installed.load(Ordering::SeqCst),
+        0,
+        "key returned after lock intent must never be installed"
+    );
+    lock_rx
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap()
+        .join()
+        .unwrap()
+        .unwrap();
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+    assert_eq!(
+        std::fs::read_dir(root.join("requests")).unwrap().count(),
+        0,
+        "NotStarted cleanup must remove the material prepared before blocked key resolution"
+    );
+    assert!(!records(&f).to_string().contains("PRIVATE KEY"));
 }

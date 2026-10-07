@@ -1,0 +1,28 @@
+Working directory: /home/sixtocantolla/sessions/day-to-day/vaultwarden-ssh-ephemeral-provider-material
+Normal development target: /tmp/vw-ssh-builder-target
+No mutations have run in this target.
+
+cargo fmt --all
+CARGO_TARGET_DIR=/tmp/vw-ssh-builder-target cargo check --locked --offline --all-targets
+Result: exit 0 (initial cold build, 11m50s).
+CARGO_TARGET_DIR=/tmp/vw-ssh-builder-target cargo check --locked --offline --all-targets > /tmp/vw-ssh-check.log 2>&1
+Result: exit 0 (waited for preceding build; development-check.log).
+
+CARGO_TARGET_DIR=/tmp/vw-ssh-builder-target scripts/with-secure-test-tmpdir.sh cargo test --locked --offline --lib ssh_
+Sandbox attempt: infrastructure failure, test wrapper rejected unmapped root ancestry. See development-sandbox-focused.log. No tests ran.
+Same command with sandbox escalation and real host ownership: exit 0; 33 passed, 0 failed, 1 ignored, 680 filtered out. See development-focused.log. Ignored test requires subordinate UID/GID mappings and is not counted as passed.
+
+CARGO_TARGET_DIR=/tmp/vw-ssh-builder-target cargo clippy --locked --offline --all-targets --all-features -- -D warnings
+Initial result: exit 101, collapsible-if in application finalization. See development-clippy-initial.log.
+After equivalent let-chain cleanup: exit 0. See development-clippy.log.
+
+cc -nostdlib -static -no-pie -fno-stack-protector -fno-builtin -O2 -Wl,--build-id=none -o /tmp/vw-ssh-native-check tests/fixtures/protected-tree.c
+Result: exit 0, native synthetic fixture compilation only; no unconstrained execution.
+
+git diff --check
+Result: exit 0.
+
+CARGO_TARGET_DIR=/tmp/vw-ssh-builder-target VW18_SCENARIO=ssh-exit scripts/with-secure-test-tmpdir.sh scripts/test-systemd-supervisor.sh
+Executed with sandbox escalation against the real user systemd manager.
+Result: exit 0; 1 passed, 0 failed (ssh-exit native descendant material/configuration smoke scenario). See development-real-ssh-exit.log.
+Other real-manager modes, mapped-principal execution, browser, toolchain matrix and semantic mutation campaign remain for final workflow verification.

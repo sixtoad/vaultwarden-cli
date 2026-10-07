@@ -18,6 +18,15 @@ pub(crate) struct ExecutionImage<'a> {
 /// The adapter chooses its opaque resource type, keeping OS handles out of core.
 pub(crate) trait ProtectedExecution {
     type Prepared;
+    /// Default deny: only adapters with private material and explicit finalization support SSH.
+    fn prepare_ssh(
+        &self,
+        _prepared: &mut Self::Prepared,
+        _root: &std::path::Path,
+        _ssh: &super::policy::SshOperation,
+    ) -> Result<Box<dyn SshMaterial>, ExecutionError> {
+        Err(ExecutionError::Unavailable)
+    }
     fn prepare(
         &self,
         image: ExecutionImage<'_>,
@@ -31,6 +40,12 @@ pub(crate) enum ExecutionOutcome {
     ExitedZero,
     ExitedNonZero,
     Signaled,
+}
+
+/// Material never cleans itself in Drop: only independent containment evidence authorizes removal.
+pub(crate) trait SshMaterial {
+    fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError>;
+    fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError>;
 }
 
 /// An explicit owned environment. It never reads or mutates the provider's
@@ -134,6 +149,9 @@ pub(crate) trait ExecutionControl {
     fn started(&self) -> Result<(), ExecutionError>;
 }
 pub(crate) trait ProcessSupervisor<P: ProtectedExecution> {
+    fn ssh_material_root(&self) -> Option<&std::path::Path> {
+        None
+    }
     fn available(&self) -> bool;
     #[cfg(test)]
     fn supervise(
@@ -308,6 +326,9 @@ pub struct CredentialBinding<'a> {
 }
 /// Only the provider application owns and invokes this capability.
 pub trait SecretBackend: ProviderSession {
+    fn resolve_ssh(&mut self, _immutable_item_id: &str) -> Result<SensitiveString, SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
     /// Inspect exact immutable identity/type/SSH-body shape without decrypting keys.
     fn ssh_eligible(&mut self, _immutable_item_id: &str) -> Result<bool, SessionError> {
         Ok(false)
@@ -343,6 +364,38 @@ pub trait DirectReviewLauncher: Send + Sync {
 mod tests {
     use super::*;
 
+    #[test]
+    fn ssh_resolution_defaults_to_denial_without_login_fallback() {
+        struct Unsupported;
+        impl ProviderSession for Unsupported {
+            fn probe_compatibility(&mut self) -> Result<(), SessionError> {
+                Ok(())
+            }
+            fn unlock(&mut self, _: SensitiveString) -> Result<std::time::Duration, SessionError> {
+                Err(SessionError::Locked)
+            }
+            fn clear(&mut self) -> Result<(), SessionError> {
+                Ok(())
+            }
+        }
+        impl SecretBackend for Unsupported {
+            fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
+                panic!("no login fallback")
+            }
+            fn resolve(
+                &mut self,
+                _: &CredentialBinding<'_>,
+            ) -> Result<Vec<SensitiveString>, SessionError> {
+                panic!("no login fallback")
+            }
+        }
+        assert_eq!(
+            Unsupported
+                .resolve_ssh("11111111-1111-1111-1111-111111111111")
+                .unwrap_err(),
+            SessionError::BackendUnavailable
+        );
+    }
     #[test]
     fn ssh_verifier_default_denies_eligibility() {
         struct Unsupported;

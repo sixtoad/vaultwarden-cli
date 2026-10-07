@@ -1,0 +1,49 @@
+{
+  "normal_checks": 20,
+  "all_checks_successful": true,
+  "source_matches_current": true,
+  "real_manager_scenarios": 39,
+  "live_backend_early_returns": 71,
+  "final_reported_all_target_counts": [
+    986,
+    0,
+    15
+  ],
+  "all_target_benchmark_successes": {
+    "all-targets": 13,
+    "msrv-all-targets": 13,
+    "all-features": 13,
+    "no-default-features": 13
+  },
+  "ignored_names": [
+    "access::policy::tests::preliminary_open_flags_child",
+    "adapters::desktop_launch::tests::isolated_system_launcher_child",
+    "adapters::execution::linux::tests::cleanup_child",
+    "adapters::execution::linux::tests::descriptor_zero_child",
+    "adapters::execution::linux::tests::execution_child",
+    "adapters::execution::linux::tests::native_oracle_child",
+    "adapters::execution::linux::tests::required_syscall_flag_child",
+    "adapters::execution::linux::tests::syscall_failure_child",
+    "adapters::human_socket::tests::isolated_descriptor_fixture",
+    "adapters::loopback_ui::tests::direct_request_browser_fixture",
+    "adapters::ssh_material::tests::distinct_agent_principals_cannot_read_live_provider_material",
+    "adapters::supervisor::real_tests::provider_harness",
+    "real_linux_peer_matrix_and_noninteractive_cli",
+    "assertion_unwind_reaps_exact_resources_and_preserves_unrelated",
+    "independent_descendants_provider_crash_and_recovery"
+  ],
+  "mutation_summary": {
+    "killed": 31,
+    "survived": 0,
+    "timeout": 0,
+    "unviable": 0,
+    "unclassified_failure": 0
+  },
+  "post_review_added_tests_observed_passing": [
+    "ssh_resolution_uses_personal_item_organization_and_organization_item_keys",
+    "ssh_resolution_rejects_invalid_utf8_with_redacted_error",
+    "ssh_post_mkdir_failures_report_uncertain_and_interlock_until_recovery",
+    "ssh_partial_writes_and_create_sync_failures_are_cleaned_or_interlocked",
+    "ssh_cleanup_failure_after_unlink_or_directory_removal_recovers_safely"
+  ]
+}

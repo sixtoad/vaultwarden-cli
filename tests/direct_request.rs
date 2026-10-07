@@ -506,9 +506,16 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         "backup@backup.example.test:2222/srv/archive"
     );
     assert_eq!(ssh_review.credentials[0].use_type, CredentialUse::Ssh);
+    assert_eq!(
+        ssh_review.one_time,
+        "Approval authorizes one protected execution. Lock or cancellation stops its descendants."
+    );
     let visible = serde_json::to_string(&ssh_review).unwrap();
     for forbidden in [
         "private-key-sentinel",
+        "SSH_AUTH_SOCK",
+        "known_hosts",
+        "IdentityFile",
         "item_id",
         "11111111",
         "field_mappings",

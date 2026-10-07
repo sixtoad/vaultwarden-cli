@@ -73,7 +73,7 @@ fn run(args: Args) -> Result<(), ()> {
     let mut supervisor = None;
     let mut provider = initialize_provider(&args.state_root, || {
         let contained = Arc::new(
-            SystemdProcessSupervisor::installed()
+            SystemdProcessSupervisor::installed(&args.state_root)
                 .map_err(|_error| vaultwarden_cli::access::ports::SessionError::CleanupFailed)?,
         );
         contained

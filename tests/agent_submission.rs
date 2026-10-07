@@ -1,3 +1,6 @@
+// Real SSH material access by distinct mapped principals is exercised by
+// adapters::ssh_material::tests::distinct_agent_principals_cannot_read_live_provider_material;
+// scripts/test-systemd-supervisor.sh invokes it after containment scenarios.
 //! Real distinct-UID/group and stdin-closed CLI evidence in an isolated user namespace.
 #![cfg(target_os = "linux")]
 #[path = "support/bounded_process.rs"]

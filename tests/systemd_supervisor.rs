@@ -56,7 +56,12 @@ fn journal(unit: &str, provider: &str, phase: &str) {
         Duration::from_secs(10),
     )
     .unwrap();
-    for sentinel in ["story18-synthetic-secret", "synthetic-password-sentinel"] {
+    for sentinel in [
+        "story18-synthetic-secret",
+        "synthetic-password-sentinel",
+        "ssh-raw-output-sentinel",
+        "ssh-private-key-sentinel",
+    ] {
         assert!(!text.contains(sentinel));
     }
 }
@@ -225,7 +230,14 @@ impl Drop for Cleanup {
 }
 fn until(root: &Path, mut ready: impl FnMut() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(40);
-    while !ready() {
+    loop {
+        assert!(
+            !root.join("ssh-output-unsafe").exists(),
+            "native SSH stdout/stderr must point to /dev/null"
+        );
+        if ready() {
+            break;
+        }
         assert!(
             Instant::now() < deadline,
             "real-manager barrier deadline; stage={:?}",
@@ -277,6 +289,8 @@ fn start(root: &Path, unit: &str, mode: &str) {
             "--property=StandardOutput=journal",
             "--property=StandardError=journal",
         ])
+        .arg("--setenv=SSH_AUTH_SOCK=/ssh-signing-socket-sentinel")
+        .arg("--setenv=GIT_SSH_COMMAND=ssh-command-override-sentinel")
         .arg(format!("--setenv=VW18_ROOT={}", root.display()))
         .arg(format!("--setenv=VW18_PROVIDER={unit}"))
         .arg(format!("--setenv=VW18_MODE={mode}"))
@@ -317,6 +331,15 @@ fn independent_descendants_provider_crash_and_recovery() {
         "app-revoke",
         "app-agent-revoke",
         "app-shutdown",
+        "app-ssh-nonzero",
+        "app-ssh-signal",
+        "app-ssh-lock",
+        "app-ssh-cancel",
+        "ssh-exit",
+        "ssh-cancel",
+        "ssh-crash",
+        "ssh-uncertain",
+        "ssh-cleanup-failure",
         "app-deadline",
         "app-persistence",
         "phase-job",
@@ -403,6 +426,7 @@ fn independent_descendants_provider_crash_and_recovery() {
             std::fs::write(root.path().join("scoped-observation-complete"), b"observed").unwrap();
             until(root.path(), || root.path().join("finished").exists());
         } else if mode.starts_with("app-")
+            || matches!(mode, "ssh-exit" | "ssh-uncertain" | "ssh-cleanup-failure")
             || mode.starts_with("fault-")
             || mode.starts_with("phase-")
             || matches!(
@@ -433,11 +457,27 @@ fn independent_descendants_provider_crash_and_recovery() {
             assert!(!empty(cgroup));
             let request_unit = lease["name"].as_str().unwrap();
             let properties = run(&["show", request_unit]);
-            assert!(!properties.contains("story18-synthetic-secret"));
+            for sentinel in [
+                "story18-synthetic-secret",
+                "ssh-signing-socket-sentinel",
+                "ssh-command-override-sentinel",
+            ] {
+                assert!(!properties.contains(sentinel));
+            }
             assert!(properties.lines().any(|line| line == "StandardOutput=null"));
             assert!(properties.lines().any(|line| line == "StandardError=null"));
             journal(request_unit, &unit, "started");
-            if mode == "crash" {
+            let ssh_material = if mode.starts_with("ssh-") {
+                let path = PathBuf::from(
+                    std::fs::read_to_string(root.path().join("material-path")).unwrap(),
+                );
+                assert!(path.join("identity").exists());
+                assert!(root.path().join("ssh-material-readable").exists());
+                Some(path)
+            } else {
+                None
+            };
+            if mode == "crash" || mode == "ssh-crash" {
                 run(&["kill", "--signal=SIGKILL", "--kill-whom=main", &unit]);
                 // No callbacks in the killed provider participate in this proof.
                 until(root.path(), || empty(cgroup));
@@ -472,12 +512,24 @@ fn independent_descendants_provider_crash_and_recovery() {
                 run(&["restart", &unit]);
                 until(root.path(), || root.path().join("finished").exists());
                 assert!(!lease_path.exists());
+                if let Some(path) = &ssh_material {
+                    assert!(
+                        !path.exists(),
+                        "restart must reap then remove SSH residuals"
+                    );
+                }
                 assert_eq!(run(&["is-active", &unrelated]).trim(), "active");
                 unrelated_cleanup.finish().unwrap();
             } else {
                 std::fs::write(root.path().join("cancel"), b"cancel").unwrap();
                 until(root.path(), || root.path().join("finished").exists());
                 assert!(empty(cgroup));
+                if let Some(path) = &ssh_material {
+                    assert!(
+                        !path.exists(),
+                        "SSH material must disappear after complete reap"
+                    );
+                }
             }
         }
         let created = identities(root.path());

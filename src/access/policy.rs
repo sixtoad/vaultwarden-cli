@@ -445,12 +445,7 @@ impl OperationPolicy {
             executable_digest: self.image.sha256.clone(),
             policy_digest: self.revision.clone(),
             expires_at_unix_seconds,
-            one_time: if self.ssh.is_some() {
-                super::direct_request::PREVIOUS_ONE_TIME
-            } else {
-                super::direct_request::ONE_TIME
-            }
-            .into(),
+            one_time: super::direct_request::ONE_TIME.into(),
             status: DirectStatus::Pending,
         }
     }
@@ -1031,10 +1026,7 @@ mod tests {
         }
         let review = baseline.direct_review("request".into(), vec![], 100);
         assert_eq!(review.target, "backup@backup.example.test:2222/srv/archive");
-        assert_eq!(
-            review.one_time,
-            super::super::direct_request::PREVIOUS_ONE_TIME
-        );
+        assert_eq!(review.one_time, super::super::direct_request::ONE_TIME);
         assert_eq!(
             review.ssh,
             Some(SshReview {

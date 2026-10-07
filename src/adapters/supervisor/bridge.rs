@@ -22,6 +22,7 @@ use zeroize::Zeroizing;
 
 const MAGIC: &[u8; 5] = b"VWEX\x01";
 const TRANSFER: u8 = 1;
+const TRANSFER_SSH: u8 = 10;
 const RELEASE: u8 = 2;
 const READY: u8 = 3;
 const EXEC: u8 = 4;
@@ -160,7 +161,12 @@ impl Bridge {
         validate_descriptor(fd.as_raw_fd())?;
         let mut bytes = Zeroizing::new(Vec::with_capacity(MAX_PACKET));
         bytes.extend_from_slice(MAGIC);
-        bytes.push(TRANSFER);
+        let cwd = prepared.working_directory();
+        bytes.push(if cwd.is_some() {
+            TRANSFER_SSH
+        } else {
+            TRANSFER
+        });
         bytes.extend_from_slice(&(arguments.len() as u16).to_le_bytes());
         bytes.extend_from_slice(&(environment.entries().len() as u16).to_le_bytes());
         for entry in arguments
@@ -174,7 +180,12 @@ impl Bridge {
         if bytes.len() > MAX_PACKET {
             return Err(BridgeError);
         }
-        send_packet(self.socket.as_raw_fd(), &bytes, Some(fd.as_raw_fd()))?;
+        let mut descriptors = vec![fd.as_raw_fd()];
+        if let Some(cwd) = cwd {
+            validate_directory(cwd.as_raw_fd())?;
+            descriptors.push(cwd.as_raw_fd());
+        }
+        send_descriptors(self.socket.as_raw_fd(), &bytes, &descriptors)?;
         self.state = State::Transferred;
         Ok(())
     }
@@ -368,6 +379,12 @@ fn send_code(fd: RawFd, code: u8) -> Result<(), BridgeError> {
     send_packet(fd, &bytes, None)
 }
 fn send_packet(fd: RawFd, bytes: &[u8], descriptor: Option<RawFd>) -> Result<(), BridgeError> {
+    send_descriptors(fd, bytes, &descriptor.into_iter().collect::<Vec<_>>())
+}
+fn send_descriptors(fd: RawFd, bytes: &[u8], descriptors: &[RawFd]) -> Result<(), BridgeError> {
+    if descriptors.len() > 2 {
+        return Err(BridgeError);
+    }
     let mut vector = libc::iovec {
         iov_base: bytes.as_ptr().cast_mut().cast(),
         iov_len: bytes.len(),
@@ -377,17 +394,23 @@ fn send_packet(fd: RawFd, bytes: &[u8], descriptor: Option<RawFd>) -> Result<(),
     let mut message: libc::msghdr = unsafe { mem::zeroed() };
     message.msg_iov = &mut vector;
     message.msg_iovlen = 1;
-    if let Some(descriptor) = descriptor {
+    if !descriptors.is_empty() {
         message.msg_control = control.as_mut_ptr().cast();
         // Ancillary lengths are u32 on musl and usize on glibc; these fixed
-        // single-descriptor lengths fit either ABI's destination fields.
-        message.msg_controllen = unsafe { libc::CMSG_SPACE(size_of::<RawFd>() as u32) } as _;
+        // bounded descriptor lengths fit either ABI's destination fields.
+        message.msg_controllen =
+            unsafe { libc::CMSG_SPACE(std::mem::size_of_val(descriptors) as u32) } as _;
         unsafe {
             let header = libc::CMSG_FIRSTHDR(&message);
             (*header).cmsg_level = libc::SOL_SOCKET;
             (*header).cmsg_type = libc::SCM_RIGHTS;
-            (*header).cmsg_len = libc::CMSG_LEN(size_of::<RawFd>() as u32) as _;
-            std::ptr::write_unaligned(libc::CMSG_DATA(header).cast::<RawFd>(), descriptor);
+            (*header).cmsg_len = libc::CMSG_LEN(std::mem::size_of_val(descriptors) as u32) as _;
+            for (index, descriptor) in descriptors.iter().enumerate() {
+                std::ptr::write_unaligned(
+                    libc::CMSG_DATA(header).cast::<RawFd>().add(index),
+                    *descriptor,
+                );
+            }
         }
     }
     // Nonblocking even at the release boundary: never wait while holding authority.
@@ -497,6 +520,18 @@ fn validate_descriptor(fd: RawFd) -> Result<(), BridgeError> {
     Ok(())
 }
 
+fn validate_directory(fd: RawFd) -> Result<(), BridgeError> {
+    let mut stat: libc::stat = unsafe { mem::zeroed() };
+    if unsafe { libc::fstat(fd, &mut stat) } != 0
+        || stat.st_mode & libc::S_IFMT != libc::S_IFDIR
+        || (stat.st_uid != 0 && stat.st_uid != unsafe { libc::geteuid() })
+        || stat.st_mode & 0o7022 != 0
+        || unsafe { libc::fcntl(fd, libc::F_GETFD) } & libc::FD_CLOEXEC == 0
+    {
+        return Err(BridgeError);
+    }
+    Ok(())
+}
 struct Launch {
     packet: Packet,
     arguments: Vec<usize>,
@@ -504,10 +539,17 @@ struct Launch {
 }
 impl Launch {
     fn parse(packet: Packet) -> Result<Self, BridgeError> {
-        if packet.code()? != TRANSFER || packet.bytes.len() < 10 || packet.fds.len() != 1 {
+        let ssh = packet.code()? == TRANSFER_SSH;
+        if (!ssh && packet.code()? != TRANSFER)
+            || packet.bytes.len() < 10
+            || packet.fds.len() != if ssh { 2 } else { 1 }
+        {
             return Err(BridgeError);
         }
         validate_descriptor(packet.fds[0].as_raw_fd())?;
+        if ssh {
+            validate_directory(packet.fds[1].as_raw_fd())?;
+        }
         let argc = u16::from_le_bytes([packet.bytes[6], packet.bytes[7]]) as usize;
         let envc = u16::from_le_bytes([packet.bytes[8], packet.bytes[9]]) as usize;
         if !(1..=128).contains(&argc) || !(2..=32).contains(&envc) {
@@ -747,6 +789,9 @@ fn helper_session(socket: RawFd) -> Result<(), BridgeError> {
             if libc::sigprocmask(libc::SIG_SETMASK, &previous, std::ptr::null_mut()) != 0 {
                 child_fail(write.as_raw_fd());
             }
+            if launch.packet.fds.len() == 2 && libc::fchdir(launch.packet.fds[1].as_raw_fd()) != 0 {
+                child_fail(write.as_raw_fd());
+            }
             for output in 0..=2 {
                 if libc::dup2(null.as_raw_fd(), output) < 0 {
                     child_fail(write.as_raw_fd());
@@ -940,6 +985,122 @@ mod tests {
         }
         bytes
     }
+    fn isolated_descriptor_test(name: &str) -> bool {
+        const CHILD: &str = "VW_BRIDGE_DESCRIPTOR_CHILD";
+        if std::env::var(CHILD).as_deref() == Ok(name) {
+            return true;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--test-threads=1", "--nocapture"])
+            .env(CHILD, name)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "isolated descriptor test failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        false
+    }
+    fn assert_closed(descriptors: &[RawFd]) {
+        for raw in descriptors {
+            assert_eq!(
+                unsafe { libc::fcntl(*raw, libc::F_GETFD) },
+                -1,
+                "received fd {raw} leaked"
+            );
+            assert_eq!(
+                std::io::Error::last_os_error().raw_os_error(),
+                Some(libc::EBADF)
+            );
+        }
+    }
+    #[test]
+    fn ssh_transfer_requires_checked_directory_and_closes_both_received_descriptors() {
+        if !isolated_descriptor_test(
+            "adapters::supervisor::bridge::tests::ssh_transfer_requires_checked_directory_and_closes_both_received_descriptors",
+        ) {
+            return;
+        }
+        // No other tests run in this subprocess: a reused fd cannot mask closure.
+        let root = tempfile::tempdir().unwrap();
+        let directory = crate::adapters::ssh_material::directory(root.path(), true).unwrap();
+        let mut bytes = transfer_bytes(&[b"fixture\0", b"LANG=C\0", b"LC_ALL=C\0"], 1);
+        bytes[5] = TRANSFER_SSH;
+        for case in [
+            "success",
+            "wrong-cwd",
+            "missing-cwd",
+            "extra-fd",
+            "trailing-byte",
+        ] {
+            let (sender, receiver) = pair();
+            let mut originals: Vec<OwnedFd> = vec![sealed(), directory.try_clone().unwrap().into()];
+            if case == "wrong-cwd" {
+                originals[1] = sealed();
+            } else if case == "missing-cwd" {
+                originals.pop();
+            } else if case == "extra-fd" {
+                originals.push(sealed());
+            }
+            let descriptors: Vec<_> = originals.iter().map(AsRawFd::as_raw_fd).collect();
+            if case == "extra-fd" {
+                // The production sender forbids extra descriptors; exercise hostile SCM_RIGHTS.
+                let mut vector = libc::iovec {
+                    iov_base: bytes.as_ptr().cast_mut().cast(),
+                    iov_len: bytes.len(),
+                };
+                let mut control = [0usize; 8];
+                let mut message: libc::msghdr = unsafe { mem::zeroed() };
+                message.msg_iov = &mut vector;
+                message.msg_iovlen = 1;
+                message.msg_control = control.as_mut_ptr().cast();
+                let length = std::mem::size_of_val(descriptors.as_slice()) as u32;
+                message.msg_controllen = unsafe { libc::CMSG_SPACE(length) } as _;
+                unsafe {
+                    let header = libc::CMSG_FIRSTHDR(&message);
+                    (*header).cmsg_level = libc::SOL_SOCKET;
+                    (*header).cmsg_type = libc::SCM_RIGHTS;
+                    (*header).cmsg_len = libc::CMSG_LEN(length) as _;
+                    for (index, raw) in descriptors.iter().enumerate() {
+                        std::ptr::write_unaligned(
+                            libc::CMSG_DATA(header).cast::<RawFd>().add(index),
+                            *raw,
+                        );
+                    }
+                    assert_eq!(
+                        libc::sendmsg(sender.as_raw_fd(), &message, libc::MSG_NOSIGNAL),
+                        bytes.len() as isize
+                    );
+                }
+            } else {
+                send_descriptors(sender.as_raw_fd(), &bytes, &descriptors).unwrap();
+            }
+            let mut received = receive_packet(receiver.as_raw_fd(), Duration::from_secs(1))
+                .unwrap()
+                .unwrap();
+            assert_eq!(received.fds.len(), originals.len(), "{case}");
+            let raw: Vec<_> = received.fds.iter().map(AsRawFd::as_raw_fd).collect();
+            if case == "trailing-byte" {
+                received.bytes.push(0);
+            }
+            if case == "success" {
+                let launch = Launch::parse(received).unwrap();
+                for fd in &raw {
+                    assert!(unsafe { libc::fcntl(*fd, libc::F_GETFD) } >= 0);
+                }
+                drop(launch);
+            } else {
+                assert!(Launch::parse(received).is_err(), "{case}");
+            }
+            assert_closed(&raw);
+            // Ownership of sender descriptors is independent from received copies.
+            for fd in &originals {
+                assert!(unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFD) } >= 0);
+            }
+        }
+    }
     fn packet(entries: &[&[u8]]) -> Packet {
         Packet {
             bytes: transfer_bytes(entries, 1),
@@ -988,6 +1149,11 @@ mod tests {
 
     #[test]
     fn received_descriptor_is_cloexec_and_resources_close_after_parse_failure() {
+        if !isolated_descriptor_test(
+            "adapters::supervisor::bridge::tests::received_descriptor_is_cloexec_and_resources_close_after_parse_failure",
+        ) {
+            return;
+        }
         let (sender, receiver) = pair();
         let descriptor = sealed();
         let bytes = transfer_bytes(&[b"fixture\0", b"LANG=C\0", b"LC_ALL=C\0"], 1);
@@ -999,7 +1165,7 @@ mod tests {
         validate_descriptor(raw).unwrap();
         received.bytes.push(0); // trailing bytes are never accepted
         assert!(Launch::parse(received).is_err());
-        assert_eq!(unsafe { libc::fcntl(raw, libc::F_GETFD) }, -1);
+        assert_closed(&[raw]);
     }
 
     #[test]
