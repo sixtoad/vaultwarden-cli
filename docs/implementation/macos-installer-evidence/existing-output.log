@@ -1,0 +1,7 @@
+Building for production...
+[1 / 4] CompanionCore
+Build complete! (0.30 secs)
+/tmp/companion-installer.TZ9sC4g9/output/.companion-package.MhRhKc/build/Approval Companion.app/Contents/Info.plist: OK
+/tmp/companion-installer.TZ9sC4g9/output/.companion-package.MhRhKc/build/Approval Companion.app: replacing existing signature
+Development bundle: /tmp/companion-installer.TZ9sC4g9/output/.companion-package.MhRhKc/build/Approval Companion.app
+Refusing to overwrite existing output: /tmp/companion-installer.TZ9sC4g9/output/Approval-Companion-0.1.0-1-arm64.dmg

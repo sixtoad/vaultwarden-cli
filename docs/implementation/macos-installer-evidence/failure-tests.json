@@ -1,0 +1,27 @@
+[
+  {
+    "case": "existing-output",
+    "exit_code": 1,
+    "staging_removed": true,
+    "existing_pair_unchanged": true
+  },
+  {
+    "case": "existing-dangling-symlink",
+    "exit_code": 1,
+    "staging_removed": true,
+    "existing_symlink_preserved": true
+  },
+  {
+    "case": "unsupported-hardlinks",
+    "exit_code": 1,
+    "staging_removed": true,
+    "rejected_before_build": true
+  },
+  {
+    "case": "partial-publication-race",
+    "exit_code": 1,
+    "staging_removed": true,
+    "own_partial_image_removed": true,
+    "competing_checksum_preserved": true
+  }
+]

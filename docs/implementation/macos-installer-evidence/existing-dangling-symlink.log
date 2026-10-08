@@ -1,0 +1,6 @@
+Building for production...
+Build complete! (0.23 secs)
+/tmp/companion-installer.TZ9sC4g9/symlink-output/.companion-package.zYOklh/build/Approval Companion.app/Contents/Info.plist: OK
+/tmp/companion-installer.TZ9sC4g9/symlink-output/.companion-package.zYOklh/build/Approval Companion.app: replacing existing signature
+Development bundle: /tmp/companion-installer.TZ9sC4g9/symlink-output/.companion-package.zYOklh/build/Approval Companion.app
+Refusing to overwrite existing output: /tmp/companion-installer.TZ9sC4g9/symlink-output/Approval-Companion-0.1.0-1-arm64.dmg.sha256
