@@ -1,0 +1,23 @@
+{
+  "platform": "darwin",
+  "python": "3.9.6 (default, Aug 25 2026, 21:26:21) \n[Clang 21.0.0 (clang-2100.3.34.2)]",
+  "results": [
+    {
+      "case": "portable-green",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ".\n----------------------------------------------------------------------\nRan 1 test in 0.004s\n\nOK\n"
+    },
+    {
+      "case": "old-bind-mutation",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "test_serve_binds_loopback_without_reverse_dns (test_tls_fixture.LoopbackBindTests) ... FAIL\n\n======================================================================\nFAIL: test_serve_binds_loopback_without_reverse_dns (test_tls_fixture.LoopbackBindTests)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Volumes/sixto_dev/.devcache/tmp/vw-companion-ci-dns-6lq6xsgp/test_tls_fixture.py\", line 55, in test_serve_binds_loopback_without_reverse_dns\n    tls_fixture.serve(root, \"normal\")\n  File \"/Volumes/sixto_dev/.devcache/tmp/vw-companion-ci-dns-6lq6xsgp/tls_fixture.py\", line 131, in serve\n    server = LoopbackHTTPServer((\"127.0.0.1\", 0), Handler)\n  File \"/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socketserver.py\", line 452, in __init__\n    self.server_bind()\n  File \"/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/server.py\", line 140, in server_bind\n    self.server_name = socket.getfqdn(host)\n  File \"/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py\", line 1093, in __call__\n    return self._mock_call(*args, **kwargs)\n  File \"/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py\", line 1097, in _mock_call\n    return self._execute_mock_call(*args, **kwargs)\n  File \"/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py\", line 1152, in _execute_mock_call\n    raise effect\nAssertionError: fixture startup attempted reverse DNS\n\n----------------------------------------------------------------------\nRan 1 test in 0.005s\n\nFAILED (failures=1)\n"
+    }
+  ],
+  "source_hashes": {
+    "tls_fixture.py": "d0a740b8cf52d28ce805ee7cbacaae2df9c1f638bfbca2a6f6529f73c3f39816",
+    "test_tls_fixture.py": "415bbcf17ac3a547337776384e2f36fe1ea3de8dc4010e24cf4221c818dc3c68"
+  },
+  "installed_app_and_keychain_untouched": true
+}

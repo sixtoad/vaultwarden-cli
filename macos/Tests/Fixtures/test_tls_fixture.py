@@ -25,7 +25,14 @@ class LoopbackBindTests(unittest.TestCase):
                 self.assertEqual(server.server_address, (address, port))
                 self.assertEqual(server.server_port, port)
                 self.assertEqual(server.socket.family, socket.AF_INET)
-                self.assertEqual(server.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN), 1)
+                server.socket.settimeout(1)
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+                    client.settimeout(1)
+                    client.connect((address, port))
+                    accepted, peer = server.socket.accept()
+                    with accepted:
+                        self.assertEqual(peer, client.getsockname())
+                        self.assertEqual(accepted.getsockname(), (address, port))
                 started.append(port)
             finally:
                 server.server_close()
