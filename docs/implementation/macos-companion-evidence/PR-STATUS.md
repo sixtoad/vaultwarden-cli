@@ -19,7 +19,7 @@ Three review layers ran. Accepted corrections cover visible review text, closed 
 
 - Complete correct-password approval with exactly one protected Linux execution and redacted signed-agent result on the final installed build; explicitly reconfirm notification → full review. This is not established by earlier-build acceptance or Linux-only checks.
 - Finish BMAD review closure and human-review handoff after that result.
-- Hosted CI is not yet verified for this draft. The feature remains based on the approved baseline; subsequent main-branch SSH changes have not been integrated or edited.
+- Hosted CI is not yet verified for this draft. Main commit `d1efb1034fcf500c8dd21ebf485a07d928a07059` is now integrated; its SSH tests and execution changes are preserved. [Merge verification](merge-main/README.md) passed: 932 exercised default-profile tests, strict Clippy, native fixture checks and three explicit systemd/SSH-isolation tests. The approved feature baseline remains the provenance anchor.
 
 Live-backend credentials were unavailable: 71 early-return tests per Linux profile are excluded from the exercised counts; 15 ignored tests per profile are not claimed passed. The native campaign has no skipped tests or surviving mutations. The current synthetic Mac/Linux certificates expire at 2026-10-08 11:47:41 UTC; a later acceptance run requires properly renewed trusted provisioning, never a validation bypass. The app is ad-hoc signed, not notarized. Its explicitly approved app-wide ATS exception relies on the sole production transport enforcing HTTPS, TLS 1.2+, CA/hostname/expiry validation, exact leaf pin and client authentication.
 

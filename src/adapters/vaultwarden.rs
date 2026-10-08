@@ -24,6 +24,70 @@ struct ProviderCipher {
     cipher: Cipher,
 }
 
+// Unlike the legacy CLI decoder this wire view accepts only real type 5 SSH
+// items. Encrypted values are consumed by a shape visitor, never retained.
+#[derive(serde::Deserialize)]
+struct SshMetadata {
+    #[serde(alias = "Id")]
+    id: String,
+    #[serde(rename = "type", alias = "Type")]
+    kind: u8,
+    #[serde(default, rename = "deletedDate", alias = "DeletedDate")]
+    deleted: Option<serde::de::IgnoredAny>,
+    #[serde(rename = "sshKey", alias = "SshKey")]
+    ssh: SshBodyShape,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SshBodyShape {
+    #[serde(rename = "privateKey", alias = "PrivateKey")]
+    _private: NonemptyEncryptedShape,
+    #[serde(rename = "publicKey", alias = "PublicKey")]
+    _public: NonemptyEncryptedShape,
+    #[serde(rename = "keyFingerprint", alias = "KeyFingerprint")]
+    _fingerprint: NonemptyEncryptedShape,
+}
+struct NonemptyEncryptedShape;
+impl<'de> serde::Deserialize<'de> for NonemptyEncryptedShape {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Shape;
+        impl serde::de::Visitor<'_> for Shape {
+            type Value = NonemptyEncryptedShape;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("encrypted field")
+            }
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                if value.is_empty() || !value.bytes().all(|b| b.is_ascii_graphic()) {
+                    return Err(E::custom("invalid encrypted field"));
+                }
+                Ok(NonemptyEncryptedShape)
+            }
+        }
+        deserializer.deserialize_str(Shape)
+    }
+}
+fn eligible_ssh_metadata(bytes: &[u8], expected_id: &str) -> Result<bool, SessionError> {
+    let item: SshMetadata =
+        serde_json::from_slice(bytes).map_err(|_error| SessionError::BackendUnavailable)?;
+    let _shape = item.ssh;
+    Ok(item.id == expected_id && item.kind == 5 && item.deleted.is_none())
+}
+
+#[derive(serde::Deserialize)]
+struct SshSecret {
+    #[serde(rename = "sshKey", alias = "SshKey")]
+    ssh: SshSecretBody,
+    #[serde(default, rename = "key", alias = "Key")]
+    item_key: Option<String>,
+    #[serde(default, rename = "organizationId", alias = "OrganizationId")]
+    organization: Option<String>,
+}
+#[derive(serde::Deserialize)]
+struct SshSecretBody {
+    #[serde(rename = "privateKey", alias = "PrivateKey")]
+    private: String,
+}
+
 pub struct VaultwardenBackend {
     config: Config,
     client: Client,
@@ -33,6 +97,30 @@ pub struct VaultwardenBackend {
     compatible: bool,
 }
 impl VaultwardenBackend {
+    fn ssh_response(&self, immutable_item_id: &str) -> Result<Zeroizing<Vec<u8>>, SessionError> {
+        let (token, _) = self.session.as_ref().ok_or(SessionError::Locked)?;
+        if !self.compatible {
+            return Err(SessionError::Incompatible);
+        }
+        if immutable_item_id.len() != 36
+            || !immutable_item_id.bytes().enumerate().all(|(i, b)| {
+                if [8, 13, 18, 23].contains(&i) {
+                    b == b'-'
+                } else {
+                    b.is_ascii_digit() || (b'a'..=b'f').contains(&b)
+                }
+            })
+        {
+            return Err(SessionError::InvalidRequest);
+        }
+        let response = self
+            .client
+            .get(self.url(&format!("api/ciphers/{immutable_item_id}"))?)
+            .bearer_auth(token.expose())
+            .send()
+            .map_err(|_error| SessionError::BackendUnavailable)?;
+        Self::body(response)
+    }
     /// Approval verifies the identical immutable setup snapshot used by this backend.
     pub fn approval_authenticator(&self) -> super::session::PasswordApprovalAuthenticator {
         super::session::PasswordApprovalAuthenticator::new(self.config.clone())
@@ -319,6 +407,79 @@ impl ProviderSession for VaultwardenBackend {
     }
 }
 impl SecretBackend for VaultwardenBackend {
+    fn resolve_ssh(&mut self, immutable_item_id: &str) -> Result<SensitiveString, SessionError> {
+        // Recheck exact metadata on the same response that supplies the selected encrypted key.
+        let bytes = self.ssh_response(immutable_item_id)?;
+        let (_, keys) = self.session.as_ref().ok_or(SessionError::Locked)?;
+        if !eligible_ssh_metadata(&bytes, immutable_item_id)? {
+            return Err(SessionError::BackendUnavailable);
+        }
+        let item: SshSecret =
+            serde_json::from_slice(&bytes).map_err(|_error| SessionError::BackendUnavailable)?;
+        let organization_keys = if let Some(id) = &item.organization {
+            let encrypted_private = self
+                .config
+                .encrypted_private_key
+                .as_deref()
+                .ok_or(SessionError::BackendUnavailable)?;
+            if !encrypted_private.starts_with("2.") || encrypted_private.split('|').count() != 3 {
+                return Err(SessionError::BackendUnavailable);
+            }
+            let private = keys
+                .decrypt_private_key(encrypted_private)
+                .map_err(|_error| SessionError::BackendUnavailable)?;
+            let encrypted = self
+                .config
+                .org_keys
+                .get(id)
+                .ok_or(SessionError::BackendUnavailable)?;
+            Some(
+                CryptoKeys::decrypt_org_key(encrypted, &private)
+                    .map_err(|_error| SessionError::BackendUnavailable)?,
+            )
+        } else {
+            None
+        };
+        let parent = organization_keys.as_ref().unwrap_or(keys);
+        let item_keys = item
+            .item_key
+            .as_deref()
+            .map(|encrypted| {
+                if !encrypted.starts_with("2.") || encrypted.split('|').count() != 3 {
+                    return Err(SessionError::BackendUnavailable);
+                }
+                let bytes = Zeroizing::new(
+                    parent
+                        .decrypt(encrypted)
+                        .map_err(|_error| SessionError::BackendUnavailable)?,
+                );
+                CryptoKeys::from_symmetric_key(&bytes)
+                    .map_err(|_error| SessionError::BackendUnavailable)
+            })
+            .transpose()?;
+        let keys = item_keys.as_ref().unwrap_or(parent);
+        if !item.ssh.private.starts_with("2.") || item.ssh.private.split('|').count() != 3 {
+            return Err(SessionError::BackendUnavailable);
+        }
+        let decrypted = Zeroizing::new(
+            keys.decrypt(&item.ssh.private)
+                .map_err(|_error| SessionError::BackendUnavailable)?,
+        );
+        let value =
+            std::str::from_utf8(&decrypted).map_err(|_error| SessionError::BackendUnavailable)?;
+        let value = SensitiveString::new(value.to_owned());
+        if value.expose().is_empty()
+            || value.expose().len() > 64 * 1024
+            || value.expose().contains('\0')
+        {
+            return Err(SessionError::BackendUnavailable);
+        }
+        Ok(value)
+    }
+
+    fn ssh_eligible(&mut self, immutable_item_id: &str) -> Result<bool, SessionError> {
+        eligible_ssh_metadata(&self.ssh_response(immutable_item_id)?, immutable_item_id)
+    }
     fn eligible(&mut self, binding: &CredentialBinding<'_>) -> Result<bool, SessionError> {
         self.selected(binding).map(|_| true)
     }
@@ -341,6 +502,484 @@ mod tests {
         Mock, MockServer, ResponseTemplate,
         matchers::{method, path},
     };
+
+    #[test]
+    fn ssh_metadata_checks_identity_actual_type_body_and_duplicates_without_decryption() {
+        let baseline = serde_json::json!({"id":ITEM,"type":5,"deletedDate":null,"sshKey":{"privateKey":"private-key-sentinel","publicKey":"public-key-sentinel","keyFingerprint":"fingerprint-sentinel"}});
+        assert_eq!(
+            eligible_ssh_metadata(&serde_json::to_vec(&baseline).unwrap(), ITEM),
+            Ok(true)
+        );
+        for (pointer, value) in [
+            (
+                "/id",
+                serde_json::json!("22222222-2222-2222-2222-222222222222"),
+            ),
+            ("/id", serde_json::Value::Null),
+            ("/type", serde_json::json!(1)),
+            ("/type", serde_json::json!(6)),
+            ("/type", serde_json::json!("5")),
+            ("/type", serde_json::json!(5.0)),
+            ("/deletedDate", serde_json::json!("2026-10-01")),
+            ("/sshKey", serde_json::Value::Null),
+            ("/sshKey", serde_json::json!({})),
+            ("/sshKey/privateKey", serde_json::json!("")),
+            ("/sshKey/privateKey", serde_json::json!(123)),
+            ("/sshKey/publicKey", serde_json::Value::Null),
+            ("/sshKey/keyFingerprint", serde_json::json!("")),
+        ] {
+            let mut bad = baseline.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            let result = eligible_ssh_metadata(&serde_json::to_vec(&bad).unwrap(), ITEM);
+            assert!(!result.unwrap_or(false), "{pointer}");
+        }
+        for pointer in [
+            "/id",
+            "/type",
+            "/sshKey",
+            "/sshKey/privateKey",
+            "/sshKey/publicKey",
+            "/sshKey/keyFingerprint",
+        ] {
+            let (parent, field) = pointer.rsplit_once('/').unwrap();
+            let mut bad = baseline.clone();
+            bad.pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(
+                eligible_ssh_metadata(&serde_json::to_vec(&bad).unwrap(), ITEM).is_err(),
+                "{pointer}"
+            );
+        }
+        let encoded = serde_json::to_string(&baseline).unwrap();
+        // Repeated identical spelling must be rejected before a Value could
+        // collapse it, even when both copies carry the same eligible value.
+        for (container, field) in [
+            ("", "id"),
+            ("", "type"),
+            ("", "deletedDate"),
+            ("", "sshKey"),
+            ("sshKey", "privateKey"),
+            ("sshKey", "publicKey"),
+            ("sshKey", "keyFingerprint"),
+        ] {
+            let object = if container.is_empty() {
+                &baseline
+            } else {
+                &baseline[container]
+            };
+            let member = format!(
+                "{}:{}",
+                serde_json::to_string(field).unwrap(),
+                serde_json::to_string(&object[field]).unwrap()
+            );
+            let duplicate = encoded.replacen(&member, &format!("{member},{member}"), 1);
+            assert_ne!(duplicate, encoded, "fixture replacement {field}");
+            assert_eq!(
+                eligible_ssh_metadata(duplicate.as_bytes(), ITEM),
+                Err(SessionError::BackendUnavailable),
+                "duplicate {field}"
+            );
+        }
+        for (old, new) in [
+            ("\"type\":5", "\"type\":5,\"type\":5"),
+            (
+                "\"privateKey\":\"private-key-sentinel\"",
+                "\"privateKey\":\"private-key-sentinel\",\"privateKey\":\"other\"",
+            ),
+            ("\"type\":5", "\"type\":5,\"Type\":5"),
+            (
+                "\"privateKey\":\"private-key-sentinel\"",
+                "\"privateKey\":\"private-key-sentinel\",\"PrivateKey\":\"other\"",
+            ),
+        ] {
+            let error =
+                eligible_ssh_metadata(encoded.replace(old, new).as_bytes(), ITEM).unwrap_err();
+            assert_eq!(error.to_string(), "backend unavailable");
+            assert!(!format!("{error:?}").contains("sentinel"));
+        }
+    }
+    #[test]
+    fn ssh_backend_fetches_only_exact_metadata_without_key_decryption() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let server = rt.block_on(MockServer::start());
+        let body = serde_json::json!({"id":ITEM,"type":5,"sshKey":{"privateKey":"private-key-sentinel","publicKey":"public-key-sentinel","keyFingerprint":"fingerprint-sentinel"}});
+        rt.block_on(async {
+            Mock::given(path(format!("/api/ciphers/{ITEM}")))
+                .and(method("GET"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(&server)
+                .await;
+        });
+        let mut backend = VaultwardenBackend::new(setup(server.uri()), true).unwrap();
+        assert_eq!(backend.ssh_eligible(ITEM), Err(SessionError::Locked));
+        backend.session = Some((
+            SensitiveString::new("capability-sentinel".into()),
+            CryptoKeys::from_key_bytes([42; 32], [42; 32]),
+        ));
+        assert_eq!(backend.ssh_eligible(ITEM), Err(SessionError::Incompatible));
+        backend.compatible = true;
+        for invalid in [
+            "private-key-sentinel",
+            "11111111-1111-1111-1111-11111111111g",
+            "../ciphers",
+        ] {
+            assert_eq!(
+                backend.ssh_eligible(invalid),
+                Err(SessionError::InvalidRequest)
+            );
+        }
+        assert!(rt.block_on(server.received_requests()).unwrap().is_empty());
+        assert_eq!(backend.ssh_eligible(ITEM), Ok(true));
+        let requests = rt.block_on(server.received_requests()).unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].url.path(), format!("/api/ciphers/{ITEM}"));
+        assert!(requests[0].body.is_empty());
+    }
+    #[test]
+    fn ssh_resolution_rechecks_response_and_decrypts_only_selected_private_key() {
+        for change in [
+            None,
+            Some(("/type", serde_json::json!(1))),
+            Some((
+                "/id",
+                serde_json::json!("22222222-2222-2222-2222-222222222222"),
+            )),
+            Some(("/deletedDate", serde_json::json!("2026-01-01"))),
+            Some(("/sshKey", serde_json::Value::Null)),
+            Some(("/sshKey/privateKey", serde_json::json!({}))),
+            Some(("/sshKey/publicKey", serde_json::json!(""))),
+            Some(("/sshKey/keyFingerprint", serde_json::json!([]))),
+        ] {
+            let changed = change.is_some();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let server = rt.block_on(MockServer::start());
+            let mut body = ssh_http_body();
+            body["sshKey"]["privateKey"] =
+                serde_json::json!(encrypt(b"ssh-private-key-sentinel", &[42; 32], &[42; 32]));
+            // Public key and fingerprint are deliberately undecryptable: not selected secrets.
+            let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let observed = calls.clone();
+            rt.block_on(async {
+                Mock::given(path(format!("/api/ciphers/{ITEM}")))
+                    .and(method("GET"))
+                    .respond_with(move |_: &wiremock::Request| {
+                        let n = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        let mut response = body.clone();
+                        if n > 0
+                            && let Some((pointer, value)) = &change
+                        {
+                            *response.pointer_mut(pointer).unwrap() = value.clone();
+                        }
+                        ResponseTemplate::new(200).set_body_json(response)
+                    })
+                    .mount(&server)
+                    .await;
+            });
+            let mut backend = ssh_unlocked_backend(server.uri());
+            assert_eq!(backend.ssh_eligible(ITEM), Ok(true));
+            let result = backend.resolve_ssh(ITEM);
+            if changed {
+                assert_ssh_error_redacted(result.unwrap_err());
+            } else {
+                let value = result.unwrap();
+                assert_eq!(value.expose(), "ssh-private-key-sentinel");
+                assert_eq!(format!("{value:?}"), "[REDACTED]");
+            }
+            assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+        }
+    }
+    #[test]
+    fn ssh_resolution_rejects_invalid_utf8_with_redacted_error() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let server = rt.block_on(MockServer::start());
+        let mut body = ssh_http_body();
+        body["sshKey"]["privateKey"] = serde_json::json!(encrypt(
+            b"ssh-private-key-sentinel\xff",
+            &[42; 32],
+            &[42; 32]
+        ));
+        rt.block_on(
+            Mock::given(path(format!("/api/ciphers/{ITEM}")))
+                .and(method("GET"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(&server),
+        );
+        let mut backend = ssh_unlocked_backend(server.uri());
+        assert_eq!(backend.ssh_eligible(ITEM), Ok(true));
+        assert_ssh_error_redacted(backend.resolve_ssh(ITEM).unwrap_err());
+    }
+    #[test]
+    fn ssh_resolution_uses_personal_item_organization_and_organization_item_keys() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        use rsa::{Oaep, RsaPrivateKey, RsaPublicKey, pkcs8::EncodePrivateKey};
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let server = rt.block_on(MockServer::start());
+        let mut rng = rand::rng();
+        let private = RsaPrivateKey::new(&mut rng, 1024).unwrap();
+        let other_private = RsaPrivateKey::new(&mut rng, 1024).unwrap();
+        let der = private.to_pkcs8_der().unwrap();
+        let org = "22222222-2222-2222-2222-222222222222";
+        let wrap_org = |key: &RsaPrivateKey, bytes: &[u8]| {
+            let encrypted = RsaPublicKey::from(key)
+                .encrypt(&mut rand::rng(), Oaep::<sha1::Sha1>::new(), bytes)
+                .unwrap();
+            format!("4.{}", STANDARD.encode(encrypted))
+        };
+        for (organization, item) in [(false, true), (true, false), (true, true)] {
+            let mut config = setup(server.uri());
+            let mut body = ssh_http_body();
+            if organization {
+                body["organizationId"] = serde_json::json!(org);
+                config.encrypted_private_key = Some(encrypt(der.as_bytes(), &[42; 32], &[42; 32]));
+                config.org_keys.insert(
+                    crate::models::OrgId::new(org).unwrap(),
+                    wrap_org(&private, &[43; 64]),
+                );
+            }
+            let parent = if organization { 43 } else { 42 };
+            let selected = if item { 44 } else { parent };
+            if item {
+                body["key"] = serde_json::json!(encrypt(&[44; 64], &[parent; 32], &[parent; 32]));
+            }
+            body["sshKey"]["privateKey"] = serde_json::json!(encrypt(
+                b"ssh-private-key-sentinel",
+                &[selected; 32],
+                &[selected; 32]
+            ));
+            // Unselected fields deliberately remain undecryptable throughout this matrix.
+            let mut cases = vec![("valid", config.clone(), body.clone(), true)];
+            if item {
+                let mut missing = body.clone();
+                missing.as_object_mut().unwrap().remove("key");
+                cases.push(("missing-item-key", config.clone(), missing, false));
+                for (label, key) in [
+                    ("malformed-item-key", "2.invalid|invalid|invalid".to_owned()),
+                    (
+                        "wrong-item-wrapper",
+                        encrypt(&[44; 64], &[45; 32], &[45; 32]),
+                    ),
+                    (
+                        "short-item-key",
+                        encrypt(&[44; 63], &[parent; 32], &[parent; 32]),
+                    ),
+                    (
+                        "missing-item-mac",
+                        encrypt(&[44; 64], &[parent; 32], &[parent; 32])
+                            .rsplit_once('|')
+                            .unwrap()
+                            .0
+                            .to_owned(),
+                    ),
+                ] {
+                    let mut invalid = body.clone();
+                    invalid["key"] = serde_json::json!(key);
+                    // Reject the invalid present wrapper instead of falling back to the parent.
+                    invalid["sshKey"]["privateKey"] = serde_json::json!(encrypt(
+                        b"ssh-private-key-sentinel",
+                        &[parent; 32],
+                        &[parent; 32]
+                    ));
+                    cases.push((label, config.clone(), invalid, false));
+                }
+            }
+            if organization {
+                for (label, encrypted) in [
+                    ("missing-private-key", None),
+                    (
+                        "malformed-private-key",
+                        Some("2.invalid|invalid|invalid".into()),
+                    ),
+                    (
+                        "wrong-private-wrapper",
+                        Some(encrypt(der.as_bytes(), &[45; 32], &[45; 32])),
+                    ),
+                    (
+                        "invalid-private-der",
+                        Some(encrypt(
+                            b"invalid-private-key-sentinel",
+                            &[42; 32],
+                            &[42; 32],
+                        )),
+                    ),
+                ] {
+                    let mut invalid = config.clone();
+                    invalid.encrypted_private_key = encrypted;
+                    cases.push((label, invalid, body.clone(), false));
+                }
+                for (label, encrypted) in [
+                    ("missing-org-key", None),
+                    ("malformed-org-key", Some("4.invalid".into())),
+                    (
+                        "wrong-org-wrapper",
+                        Some(wrap_org(&other_private, &[43; 64])),
+                    ),
+                    ("short-org-key", Some(wrap_org(&private, &[43; 63]))),
+                ] {
+                    let mut invalid = config.clone();
+                    invalid.org_keys.clear();
+                    if let Some(encrypted) = encrypted {
+                        invalid
+                            .org_keys
+                            .insert(crate::models::OrgId::new(org).unwrap(), encrypted);
+                    }
+                    cases.push((label, invalid, body.clone(), false));
+                }
+            }
+            for (label, config, body, valid) in cases {
+                rt.block_on(server.reset());
+                rt.block_on(
+                    Mock::given(path(format!("/api/ciphers/{ITEM}")))
+                        .and(method("GET"))
+                        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                        .mount(&server),
+                );
+                let mut backend = ssh_unlocked_backend(server.uri());
+                backend.config = config;
+                assert_eq!(backend.ssh_eligible(ITEM), Ok(true), "{label}");
+                let result = backend.resolve_ssh(ITEM);
+                if valid {
+                    let value = result.unwrap_or_else(|error| panic!("{label}: {error:?}"));
+                    assert_eq!(value.expose(), "ssh-private-key-sentinel");
+                    assert_eq!(format!("{value:?}"), "[REDACTED]");
+                } else {
+                    assert!(
+                        result.is_err(),
+                        "organization={organization} item={item} {label}"
+                    );
+                    assert_ssh_error_redacted(result.unwrap_err());
+                }
+                let requests = rt.block_on(server.received_requests()).unwrap();
+                assert_eq!(requests.len(), 2, "{label}");
+                assert!(requests.iter().all(|request| request.url.path()
+                    == format!("/api/ciphers/{ITEM}")
+                    && request.body.is_empty()));
+            }
+        }
+    }
+    fn ssh_unlocked_backend(server: String) -> VaultwardenBackend {
+        let mut backend = VaultwardenBackend::new(setup(server), true).unwrap();
+        backend.session = Some((
+            SensitiveString::new("capability-sentinel".into()),
+            CryptoKeys::from_key_bytes([42; 32], [42; 32]),
+        ));
+        backend.compatible = true;
+        backend
+    }
+    fn ssh_http_body() -> serde_json::Value {
+        serde_json::json!({"id":ITEM,"type":5,"deletedDate":null,"sshKey":{"privateKey":"private-key-sentinel","publicKey":"public-key-sentinel","keyFingerprint":"fingerprint-sentinel"}})
+    }
+    fn assert_ssh_error_redacted(error: SessionError) {
+        assert_eq!(error, SessionError::BackendUnavailable);
+        let diagnostic = format!("{error} {error:?}");
+        for secret in [
+            "private-key-sentinel",
+            "public-key-sentinel",
+            "fingerprint-sentinel",
+            "capability-sentinel",
+            ITEM,
+        ] {
+            assert!(!diagnostic.contains(secret));
+        }
+    }
+    #[test]
+    fn ssh_backend_rejects_each_ineligible_http_metadata_response() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        for (pointer, value, expected) in [
+            (
+                "/id",
+                serde_json::json!("22222222-2222-2222-2222-222222222222"),
+                Ok(false),
+            ),
+            ("/type", serde_json::json!(1), Ok(false)),
+            ("/deletedDate", serde_json::json!("2026-10-01"), Ok(false)),
+            (
+                "/sshKey/privateKey",
+                serde_json::json!(123),
+                Err(SessionError::BackendUnavailable),
+            ),
+        ] {
+            let server = rt.block_on(MockServer::start());
+            let mut body = ssh_http_body();
+            *body.pointer_mut(pointer).unwrap() = value;
+            rt.block_on(async {
+                Mock::given(method("GET"))
+                    .and(path(format!("/api/ciphers/{ITEM}")))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                    .mount(&server)
+                    .await;
+            });
+            let result = ssh_unlocked_backend(server.uri()).ssh_eligible(ITEM);
+            assert_eq!(result, expected, "{pointer}");
+            if let Err(error) = result {
+                assert_ssh_error_redacted(error);
+            }
+            assert_eq!(rt.block_on(server.received_requests()).unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn ssh_backend_rejects_http_errors_oversized_and_malformed_responses() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let valid = serde_json::to_vec(&ssh_http_body()).unwrap();
+        let mut oversized = valid.clone();
+        oversized.resize(1_048_577, b' ');
+        for (status, body) in [
+            (403, valid),
+            (200, oversized),
+            (200, b"{private-key-sentinel malformed JSON".to_vec()),
+        ] {
+            let server = rt.block_on(MockServer::start());
+            rt.block_on(async {
+                Mock::given(method("GET"))
+                    .and(path(format!("/api/ciphers/{ITEM}")))
+                    .respond_with(ResponseTemplate::new(status).set_body_bytes(body))
+                    .mount(&server)
+                    .await;
+            });
+            assert_ssh_error_redacted(
+                ssh_unlocked_backend(server.uri())
+                    .ssh_eligible(ITEM)
+                    .unwrap_err(),
+            );
+            assert_eq!(rt.block_on(server.received_requests()).unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn ssh_backend_rejects_truncated_http_body_even_when_received_json_is_valid() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0; 1];
+            while !request.ends_with(b"\r\n\r\n") {
+                stream.read_exact(&mut byte).unwrap();
+                request.push(byte[0]);
+                assert!(request.len() < 8192);
+            }
+            assert!(
+                String::from_utf8(request)
+                    .unwrap()
+                    .starts_with(&format!("GET /api/ciphers/{ITEM} HTTP/1.1"))
+            );
+            let body = serde_json::to_string(&ssh_http_body()).unwrap();
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len() + 10
+            )
+            .unwrap();
+        });
+        let result = ssh_unlocked_backend(format!("http://{address}/")).ssh_eligible(ITEM);
+        server.join().unwrap();
+        assert_ssh_error_redacted(result.unwrap_err());
+    }
     const ITEM: &str = "11111111-1111-1111-1111-111111111111";
     fn binding() -> CredentialBinding<'static> {
         CredentialBinding {
@@ -711,6 +1350,7 @@ mod tests {
                 .collect(),
         };
         app.activate_operation(OperationPolicyDraft {
+            ssh: None,
             id: "deploy-contract".into(),
             description: "Credential contract fixture".into(),
             image_id: "contract-image".into(),

@@ -423,3 +423,14 @@ fn join_ui(worker: std::thread::JoinHandle<Result<(), SessionError>>) -> Result<
         .recv_timeout(Duration::from_secs(8))
         .expect("UI failed to stop within its cleanup deadline")
 }
+
+#[test]
+fn unsupported_session_backend_denies_ssh_metadata_without_resolving() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut backend = Backend(calls.clone());
+    assert_eq!(
+        backend.ssh_eligible("11111111-1111-1111-1111-111111111111"),
+        Ok(false)
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}

@@ -29,3 +29,9 @@ if [[ -n "${VW18_SCENARIO:-}" ]]; then
     VW18_FILTER=(independent_descendants_provider_crash_and_recovery)
 fi
 timeout --signal=TERM --kill-after=15s 900s cargo test --offline --locked --test systemd_supervisor -- "${VW18_FILTER[@]}" --ignored --nocapture
+
+# Story 3.2: provider material is created outside the child user namespace.
+# Distinct mapped agent UIDs must be unable to read either live file.
+if [[ -z "${VW18_SCENARIO:-}" ]]; then
+    timeout --signal=TERM --kill-after=15s 900s cargo test --offline --locked --lib -- --ignored --exact adapters::ssh_material::tests::distinct_agent_principals_cannot_read_live_provider_material --nocapture
+fi

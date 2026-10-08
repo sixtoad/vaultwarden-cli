@@ -203,6 +203,7 @@ fn companion_acceptance_fixture() {
             .unwrap();
         let revision = app
             .activate_operation(OperationPolicyDraft {
+                ssh: None,
                 id: "synthetic-deploy".into(),
                 description: "Run synthetic protected Linux execution once".into(),
                 image_id: "synthetic-image".into(),

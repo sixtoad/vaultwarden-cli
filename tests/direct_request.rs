@@ -1,5 +1,7 @@
 //! Real Unix + trusted HTTPS boundaries with a synthetic backend; no real account.
 #![cfg(target_os = "linux")]
+#[path = "support/ssh_policy.rs"]
+mod ssh_policy;
 
 use std::{
     os::unix::fs::PermissionsExt,
@@ -41,6 +43,9 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    fn ssh_eligible(&mut self, _: &str) -> Result<bool, SessionError> {
+        Ok(true)
+    }
     fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
         Ok(true)
     }
@@ -105,6 +110,7 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
     std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
     let revision = app
         .activate_operation(OperationPolicyDraft {
+            ssh: None,
             id: "deploy".into(),
             description: "Deploy <script>sentinel</script>".into(),
             image_id: "test-image".into(),
@@ -440,6 +446,82 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
     assert!(waiting.wait().unwrap().success());
     reader.join().unwrap();
     assert_eq!(launcher.0.load(Ordering::SeqCst), 3);
+    let ssh_revision = app
+        .activate_operation(ssh_policy::draft("test-image"))
+        .unwrap();
+    for values in [
+        vec!["--host=other".into()],
+        vec!["--key=/tmp/private-key-sentinel".into()],
+    ] {
+        let response = exchange(
+            &root,
+            HumanCommand::Request {
+                submission: DirectSubmission {
+                    operation: "ssh-backup".into(),
+                    revision: Some(ssh_revision.clone()),
+                    values,
+                },
+            },
+        )
+        .unwrap();
+        assert!(matches!(
+            response,
+            HumanResponse::Rejected {
+                reason: DirectRequestError::InvalidRequest
+            }
+        ));
+        assert_eq!(launcher.0.load(Ordering::SeqCst), 3);
+    }
+    let response = exchange(
+        &root,
+        HumanCommand::Request {
+            submission: DirectSubmission {
+                operation: "ssh-backup".into(),
+                revision: Some(ssh_revision),
+                values: vec![],
+            },
+        },
+    )
+    .unwrap();
+    let HumanResponse::Submitted {
+        receipt: ssh_receipt,
+    } = response
+    else {
+        panic!("SSH fixed policy should admit")
+    };
+    let stored: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&state_path).unwrap()).unwrap();
+    let ssh_review: DirectReview = serde_json::from_value(
+        stored["requests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == ssh_receipt.id)
+            .unwrap()["direct"]["review"]
+            .clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        ssh_review.target,
+        "backup@backup.example.test:2222/srv/archive"
+    );
+    assert_eq!(ssh_review.credentials[0].use_type, CredentialUse::Ssh);
+    assert_eq!(
+        ssh_review.one_time,
+        "Approval authorizes one protected execution. Lock or cancellation stops its descendants."
+    );
+    let visible = serde_json::to_string(&ssh_review).unwrap();
+    for forbidden in [
+        "private-key-sentinel",
+        "SSH_AUTH_SOCK",
+        "known_hosts",
+        "IdentityFile",
+        "item_id",
+        "11111111",
+        "field_mappings",
+    ] {
+        assert!(!visible.contains(forbidden));
+    }
     app.lock().unwrap();
     let r: DirectReview = review().json().unwrap();
     assert_eq!(r.status, DirectStatus::Expired);

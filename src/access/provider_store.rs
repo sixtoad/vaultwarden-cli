@@ -648,6 +648,7 @@ mod tests {
     fn operation(image: &ApprovedImage, target: &str) -> OperationPolicy {
         OperationPolicy::from_draft(
             OperationPolicyDraft {
+                ssh: None,
                 id: "deploy-homelab".into(),
                 description: "Deploy homelab".into(),
                 image_id: image.id().into(),

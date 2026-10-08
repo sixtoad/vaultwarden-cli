@@ -28,7 +28,7 @@ impl SessionClock for Clock {
     }
 }
 type EligibilityAction = std::cell::RefCell<Option<Box<dyn FnMut() -> Result<bool, SessionError>>>>;
-type ResolutionAction =
+pub(crate) type ResolutionAction =
     std::cell::RefCell<Option<Box<dyn FnMut() -> Result<Vec<SensitiveString>, SessionError>>>>;
 thread_local! {
     static ELIGIBILITY_ACTION: EligibilityAction = std::cell::RefCell::new(None);
@@ -37,7 +37,7 @@ thread_local! {
     static EXECUTION_CLEAR_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_ELIGIBILITY_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_RESOLUTION_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    static RESOLUTION_ACTION: ResolutionAction = std::cell::RefCell::new(None);
+    pub(crate) static RESOLUTION_ACTION: ResolutionAction = std::cell::RefCell::new(None);
     static BACKEND_UNLOCKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 struct Backend;
@@ -63,6 +63,25 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    fn resolve_ssh(&mut self, _: &str) -> Result<SensitiveString, SessionError> {
+        EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(calls.get() + 1));
+        RESOLUTION_ACTION.with(|action| {
+            action.borrow_mut().as_mut().map_or_else(
+                || Ok(SensitiveString::new("ssh-private-key-sentinel".into())),
+                |callback| callback().map(|mut values| values.remove(0)),
+            )
+        })
+    }
+
+    fn ssh_eligible(&mut self, id: &str) -> Result<bool, SessionError> {
+        assert!(id.ends_with("111111111111") || id.ends_with("222222222222"));
+        ELIGIBILITY_ACTION.with(|action| {
+            action
+                .borrow_mut()
+                .as_mut()
+                .map_or(Ok(true), |callback| callback())
+        })
+    }
     fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
         EXECUTION_ELIGIBILITY_CALLS.with(|calls| calls.set(calls.get() + 1));
         ELIGIBILITY_ACTION.with(|action| {
@@ -134,6 +153,7 @@ fn fixture_with_lifetime(lifetime: Duration) -> Fixture {
 }
 pub(crate) fn operation_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        ssh: None,
         id: "deploy".into(),
         description: "Deploy <img src=x onerror=alert(1)>".into(),
         image_id: "deploy-image".into(),
@@ -6298,6 +6318,791 @@ fn signed_status_stored_enabled_pairing_is_independent_of_application_token() {
         provider.authenticate_status_query(agent.uid, &[agent.gid], &query),
         Err(AgentRejection::Unauthorized)
     );
+}
+
+#[test]
+fn ssh_approval_review_history_and_execution_are_secret_free_and_unavailable() {
+    let f = fixture();
+    let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+    let owner = f.app.human_owner();
+    let launcher = Launcher::default();
+    let input = || DirectSubmission {
+        operation: "ssh-backup".into(),
+        revision: Some(revision.clone()),
+        values: vec![],
+    };
+    for value in [
+        "",
+        "--host=other",
+        "-i/key",
+        "command",
+        "-oStrictHostKeyChecking=no",
+    ] {
+        let mut bad = input();
+        bad.values = vec![value.into()];
+        let before = records(&f);
+        assert_eq!(
+            f.app.submit_direct(owner, bad, &launcher),
+            Err(DirectRequestError::InvalidRequest)
+        );
+        assert_eq!(records(&f), before);
+    }
+    assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+    let receipt = f.app.submit_direct(owner, input(), &launcher).unwrap();
+    let review = f.app.review_direct(owner, &receipt.id).unwrap();
+    assert_eq!(review.target, "backup@backup.example.test:2222/srv/archive");
+    assert_eq!(review.credentials[0].use_type, CredentialUse::Ssh);
+    assert_eq!(
+        f.app.commit_approval(approval(&f, &receipt.id)),
+        Ok(DirectStatus::Approved)
+    );
+    let preparer = ExecutionPreparation::default();
+    let supervisor = RecordingSupervisor::default();
+    assert!(matches!(
+        f.app.prepare_execution(owner, &receipt.id, &preparer),
+        Err(DirectRequestError::Unavailable)
+    ));
+    assert_eq!(
+        f.app
+            .run_execution(owner, &receipt.id, &preparer, &supervisor),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert_eq!(
+        f.app.direct_status(owner, &receipt.id),
+        Ok(DirectStatus::Failed {
+            reason: DirectFailure::ExecutionUnavailable
+        })
+    );
+    assert_eq!(preparer.calls.get(), 0);
+    assert_eq!(supervisor.launches.get(), 0);
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 0));
+    let history = f.app.history(owner, None).unwrap();
+    assert!(history.iter().all(|e| e.ssh == review.ssh));
+    assert_eq!(history[0].outcome, HistoryOutcome::ExecutionUnavailable);
+    let surfaces = format!(
+        "{} {} {:?}",
+        serde_json::to_string(&history).unwrap(),
+        records(&f),
+        review
+    );
+    for sentinel in [
+        "synthetic-password-sentinel",
+        "approval-password-sentinel",
+        "private-key-sentinel",
+        "capability-sentinel",
+        "privateKey",
+        "known_hosts",
+    ] {
+        assert!(!surfaces.contains(sentinel), "{sentinel}");
+    }
+    let root = f.dir.path().join("provider");
+    drop(f.app);
+    let restarted = Provider::start(root).unwrap();
+    assert_eq!(restarted.history(owner, None).unwrap(), history);
+}
+#[test]
+fn ssh_each_authority_change_rejects_stale_requests_and_approvals() {
+    for field in [
+        "item",
+        "directory",
+        "host",
+        "port",
+        "user",
+        "resource",
+        "fingerprint",
+        "image",
+    ] {
+        let f = fixture();
+        let mut draft = test_ssh_draft();
+        let old = f.app.activate_operation(draft.clone()).unwrap();
+        let owner = f.app.human_owner();
+        let input = || DirectSubmission {
+            operation: "ssh-backup".into(),
+            revision: Some(old.clone()),
+            values: vec![],
+        };
+        let receipt = f
+            .app
+            .submit_direct(owner, input(), &Launcher::default())
+            .unwrap();
+        let approval = approval(&f, &receipt.id);
+        let ssh = draft.ssh.as_mut().unwrap();
+        match field {
+            "item" => ssh.credential.item_id = "22222222-2222-2222-2222-222222222222".into(),
+            "directory" => ssh.working_directory = "/srv".into(),
+            "host" => ssh.destination.host = "changed.example.test".into(),
+            "port" => ssh.destination.port = 22,
+            "user" => ssh.destination.user = "changed".into(),
+            "resource" => ssh.destination.resource_path = "/changed".into(),
+            "fingerprint" => {
+                ssh.destination.host_fingerprint = format!(
+                    "SHA256:{}",
+                    base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD_NO_PAD,
+                        [1; 32]
+                    )
+                )
+            }
+            _ => {}
+        }
+        if field == "image" {
+            use sha2::Digest;
+            let image_path = f.dir.path().join("replacement-image");
+            let mut bytes = std::fs::read(f.dir.path().join("approved-image")).unwrap();
+            bytes.push(0);
+            std::fs::write(&image_path, &bytes).unwrap();
+            std::fs::set_permissions(&image_path, std::fs::Permissions::from_mode(0o500)).unwrap();
+            let digest = sha2::Sha256::digest(&bytes)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            let image = ApprovedImage::new(
+                "replacement-image".into(),
+                f.dir.path().to_str().unwrap().into(),
+                image_path.to_str().unwrap().into(),
+                digest,
+                ExecutionProfile::ReviewedSelfContainedElf64V1,
+            )
+            .unwrap();
+            let mut state = records(&f);
+            state["approved_images"]
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::to_value(image).unwrap());
+            std::fs::write(
+                f.dir.path().join("provider/provider-state.json"),
+                serde_json::to_vec(&state).unwrap(),
+            )
+            .unwrap();
+            draft.image_id = "replacement-image".into();
+        }
+        let new = f
+            .app
+            .activate_operation(draft)
+            .unwrap_or_else(|error| panic!("{field}: {error}"));
+        assert_ne!(old, new, "{field}");
+        assert_eq!(
+            f.app.submit_direct(owner, input(), &Launcher::default()),
+            Err(DirectRequestError::StaleRevision),
+            "{field}"
+        );
+        assert!(f.app.commit_approval(approval).is_err(), "{field}");
+    }
+}
+#[test]
+fn ssh_activation_and_approval_recheck_eligibility_without_publication_or_secrets() {
+    let f = fixture();
+    let before = records(&f);
+    ELIGIBILITY_ACTION.with(|action| *action.borrow_mut() = Some(Box::new(|| Ok(false))));
+    assert_eq!(
+        f.app.activate_operation(test_ssh_draft()),
+        Err(SessionError::InvalidRequest)
+    );
+    assert_eq!(records(&f), before);
+    ELIGIBILITY_ACTION.with(|action| *action.borrow_mut() = None);
+    let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+    let owner = f.app.human_owner();
+    let receipt = f
+        .app
+        .submit_direct(
+            owner,
+            DirectSubmission {
+                operation: "ssh-backup".into(),
+                revision: Some(revision),
+                values: vec![],
+            },
+            &Launcher::default(),
+        )
+        .unwrap();
+    let approval = approval(&f, &receipt.id);
+    ELIGIBILITY_ACTION.with(|action| *action.borrow_mut() = Some(Box::new(|| Ok(false))));
+    assert_eq!(
+        f.app.commit_approval(approval),
+        Err(DirectRequestError::Unavailable)
+    );
+    ELIGIBILITY_ACTION.with(|action| *action.borrow_mut() = None);
+    assert_eq!(
+        f.app.direct_status(owner, &receipt.id),
+        Ok(DirectStatus::Pending)
+    );
+}
+#[test]
+fn ssh_activation_rechecks_session_and_closing_after_eligibility() {
+    for cause in ["session", "closing"] {
+        let f = fixture();
+        let operations = records(&f)["operations"].clone();
+        let clock = f.monotonic.clone();
+        let app = Arc::downgrade(&f.app);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = calls.clone();
+        ELIGIBILITY_ACTION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                observed.fetch_add(1, Ordering::SeqCst);
+                if cause == "session" {
+                    clock.store(910, Ordering::SeqCst);
+                } else {
+                    app.upgrade().unwrap().close_admission();
+                }
+                Ok(true)
+            }));
+        });
+        let result = f.app.activate_operation(test_ssh_draft());
+        ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = None);
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "{cause}");
+        assert_eq!(result, Err(SessionError::Locked), "{cause}");
+        assert_eq!(records(&f)["operations"], operations, "{cause}");
+    }
+}
+
+#[test]
+fn ssh_approval_rechecks_independent_authority_loss_after_eligibility() {
+    for cause in ["request", "session", "closing", "agent"] {
+        // Keep the request live in the session case so expiry guards cannot mask each other.
+        let f = if cause == "session" {
+            fixture_with_lifetime(Duration::from_secs(3600))
+        } else {
+            fixture()
+        };
+        let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+        let input = DirectSubmission {
+            operation: "ssh-backup".into(),
+            revision: Some(revision),
+            values: vec![],
+        };
+        let binding = (cause == "agent").then(|| agent_pair(&f, "SSH revocation", 134));
+        let receipt = match &binding {
+            Some(agent) => f.app.submit_agent_for_test(
+                &agent.id,
+                agent.uid,
+                &[agent.gid],
+                input,
+                &Launcher::default(),
+            ),
+            None => f
+                .app
+                .submit_direct(f.app.human_owner(), input, &Launcher::default()),
+        }
+        .unwrap();
+        let authenticated = approval(&f, &receipt.id);
+        let clock = f.monotonic.clone();
+        let app = f.app.clone();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = calls.clone();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        let mut resume_rx = Some(resume_rx);
+        let revoker = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let callback_revoker = revoker.clone();
+        ELIGIBILITY_ACTION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                observed.fetch_add(1, Ordering::SeqCst);
+                match cause {
+                    "request" => clock.store(310, Ordering::SeqCst),
+                    "session" => clock.store(910, Ordering::SeqCst),
+                    "closing" => app.close_admission(),
+                    "agent" => {
+                        let (intent_tx, intent_rx) = std::sync::mpsc::channel();
+                        let app = app.clone();
+                        let id = binding.as_ref().unwrap().id.clone();
+                        let resume = resume_rx.take().unwrap();
+                        *callback_revoker.borrow_mut() = Some(std::thread::spawn(move || {
+                            super::application::AGENT_REVOKE_HOOK.with(|hook| {
+                                *hook.borrow_mut() = Some(Box::new(move || {
+                                    intent_tx.send(()).unwrap();
+                                    resume.recv_timeout(Duration::from_secs(10)).unwrap();
+                                }));
+                            });
+                            app.revoke_agent(app.human_owner(), &id)
+                        }));
+                        intent_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
+                    _ => panic!("unknown SSH authority-loss cause"),
+                }
+                Ok(true)
+            }));
+        });
+        let result = f.app.commit_approval(authenticated);
+        ELIGIBILITY_ACTION.with(|hook| *hook.borrow_mut() = None);
+        let state = records(&f);
+        if cause == "agent" {
+            // Durable revocation is held back, isolating the post-backend token check.
+            assert_eq!(state["pairings"][0]["status"], "enabled");
+            resume_tx.send(()).unwrap();
+            revoker
+                .borrow_mut()
+                .take()
+                .unwrap()
+                .join()
+                .unwrap()
+                .unwrap();
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "{cause}");
+        assert_eq!(
+            result,
+            Err(match cause {
+                "request" => DirectRequestError::AlreadyDecided,
+                "agent" => DirectRequestError::Unauthorized,
+                _ => DirectRequestError::Locked,
+            }),
+            "{cause}"
+        );
+        assert!(
+            state["requests"][0]["direct"]["approval"].is_null(),
+            "{cause}"
+        );
+        assert_ne!(state["requests"][0]["status"], "approved", "{cause}");
+        assert!(
+            !serde_json::to_string(&state["requests"][0])
+                .unwrap()
+                .contains("\"approved\""),
+            "{cause}"
+        );
+    }
+}
+
+#[test]
+fn ssh_signed_admission_rejects_arguments_and_stale_revision_before_review() {
+    let f = fixture();
+    let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+    let agent = agent_pair(&f, "ssh agent", 126);
+    let launcher = Launcher::default();
+    for (nonce, args, rev, expected) in [
+        (
+            1,
+            vec!["--host=other".into()],
+            revision.clone(),
+            super::protocol::AgentRejection::InvalidArguments,
+        ),
+        (
+            2,
+            vec![],
+            "0".repeat(64),
+            super::protocol::AgentRejection::StaleRevision,
+        ),
+    ] {
+        let message = super::protocol::SignedSubmission::sign(
+            agent.id.clone(),
+            [nonce; 32],
+            "ssh-backup".into(),
+            rev,
+            args,
+            &ed25519_dalek::SigningKey::from_bytes(&[126; 32]),
+        )
+        .unwrap();
+        assert_eq!(
+            f.app
+                .submit_signed(agent.uid, &[agent.gid], message, &launcher),
+            Err(expected)
+        );
+        signed_assert_no_effects(&f, &launcher);
+    }
+    let message = super::protocol::SignedSubmission::sign(
+        agent.id.clone(),
+        [3; 32],
+        "ssh-backup".into(),
+        revision,
+        vec![],
+        &ed25519_dalek::SigningKey::from_bytes(&[126; 32]),
+    )
+    .unwrap();
+    let receipt = f
+        .app
+        .submit_signed(agent.uid, &[agent.gid], message, &launcher)
+        .unwrap();
+    let review = f.app.review_direct(f.app.human_owner(), &receipt).unwrap();
+    assert_eq!(
+        review.ssh.as_ref().unwrap().destination.host,
+        "backup.example.test"
+    );
+    assert_eq!(review.credentials[0].use_type, CredentialUse::Ssh);
+}
+
+#[test]
+fn ssh_caller_selector_wire_members_and_values_are_independently_rejected() {
+    let f = fixture();
+    let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+    let agent = agent_pair(&f, "SSH selectors", 127);
+    let launcher = Launcher::default();
+    let direct = DirectSubmission {
+        operation: "ssh-backup".into(),
+        revision: Some(revision.clone()),
+        values: vec![],
+    };
+    for (index, field) in [
+        "remote",
+        "host",
+        "command",
+        "key_path",
+        "ssh_options",
+        "working_directory",
+        "arguments",
+        "targets",
+        "trust_override",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let mut raw = serde_json::to_value(&direct).unwrap();
+        raw[*field] = serde_json::json!("selector-sentinel");
+        assert!(
+            serde_json::from_value::<DirectSubmission>(raw).is_err(),
+            "human {field}"
+        );
+        let signed = super::protocol::SignedSubmission::sign(
+            agent.id.clone(),
+            [index as u8; 32],
+            "ssh-backup".into(),
+            revision.clone(),
+            vec![],
+            &ed25519_dalek::SigningKey::from_bytes(&[127; 32]),
+        )
+        .unwrap();
+        let mut raw = serde_json::to_value(&signed).unwrap();
+        raw[*field] = serde_json::json!("selector-sentinel");
+        assert!(
+            super::protocol::SignedSubmission::parse(&serde_json::to_vec(&raw).unwrap()).is_err(),
+            "agent {field}"
+        );
+        let mut bad = direct.clone();
+        bad.values = vec![format!("--{field}=selector-sentinel")];
+        assert_eq!(
+            f.app.submit_direct(f.app.human_owner(), bad, &launcher),
+            Err(DirectRequestError::InvalidRequest)
+        );
+        let signed = super::protocol::SignedSubmission::sign(
+            agent.id.clone(),
+            [index as u8; 32],
+            "ssh-backup".into(),
+            revision.clone(),
+            vec![format!("--{field}=selector-sentinel")],
+            &ed25519_dalek::SigningKey::from_bytes(&[127; 32]),
+        )
+        .unwrap();
+        assert_eq!(
+            f.app
+                .submit_signed(agent.uid, &[agent.gid], signed, &launcher),
+            Err(super::protocol::AgentRejection::InvalidArguments)
+        );
+        signed_assert_no_effects(&f, &launcher);
+    }
+}
+
+#[test]
+fn ssh_application_supervises_before_finalization_and_persists_redacted_failures() {
+    use std::{cell::RefCell, rc::Rc};
+    type Events = Rc<RefCell<Vec<&'static str>>>;
+    struct Material {
+        events: Events,
+        fail: bool,
+        key_failure: bool,
+    }
+    impl SshMaterial for Material {
+        fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError> {
+            assert_eq!(key.expose(), "ssh-private-key-sentinel");
+            self.events.borrow_mut().push("key");
+            if self.key_failure {
+                Err(ExecutionError::UnsafePath)
+            } else {
+                Ok(())
+            }
+        }
+        fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError> {
+            if !self.events.borrow().contains(&"reap") {
+                assert_eq!(evidence, CleanupEvidence::NotStarted);
+            }
+            self.events
+                .borrow_mut()
+                .push(if evidence == CleanupEvidence::NotStarted {
+                    "finalize-not-started"
+                } else {
+                    "finalize"
+                });
+            if self.fail || evidence == CleanupEvidence::Uncertain {
+                Err(ExecutionError::CleanupUncertain)
+            } else {
+                Ok(())
+            }
+        }
+    }
+    struct Preparation {
+        events: Events,
+        fail: bool,
+        key_failure: bool,
+    }
+    impl ProtectedExecution for Preparation {
+        type Prepared = ();
+        fn prepare(&self, _: ExecutionImage<'_>, _: Vec<String>) -> Result<(), ExecutionError> {
+            self.events.borrow_mut().push("image");
+            Ok(())
+        }
+        fn prepare_ssh(
+            &self,
+            _: &mut (),
+            _: &std::path::Path,
+            _: &crate::access::policy::SshOperation,
+        ) -> Result<Box<dyn SshMaterial>, ExecutionError> {
+            self.events.borrow_mut().push("host-and-cwd");
+            Ok(Box::new(Material {
+                events: self.events.clone(),
+                fail: self.fail,
+                key_failure: self.key_failure,
+            }))
+        }
+    }
+    struct Supervisor {
+        events: Events,
+        evidence: CleanupEvidence,
+    }
+    impl ProcessSupervisor<Preparation> for Supervisor {
+        fn ssh_material_root(&self) -> Option<&std::path::Path> {
+            Some(std::path::Path::new("/provider-private"))
+        }
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: (),
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("controlled supervision required")
+        }
+        fn supervise_controlled(
+            &self,
+            _: (),
+            environment: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            assert_eq!(
+                environment.entries().len(),
+                2,
+                "SSH keys and sockets never enter environment"
+            );
+            control.release(&mut || Ok(())).unwrap();
+            control.started().unwrap();
+            self.events.borrow_mut().push("reap");
+            Supervision {
+                outcome: Ok(ExecutionOutcome::ExitedZero),
+                cleanup: self.evidence,
+                helper_reaped: true,
+            }
+        }
+    }
+    for (phase, failure, evidence) in [
+        ("launch", false, CleanupEvidence::Reaped),
+        ("launch", true, CleanupEvidence::Reaped),
+        ("launch", false, CleanupEvidence::Uncertain),
+        ("key", false, CleanupEvidence::Reaped),
+        ("key", true, CleanupEvidence::Reaped),
+        ("backend", false, CleanupEvidence::Reaped),
+        ("backend", true, CleanupEvidence::Reaped),
+        ("compatibility", false, CleanupEvidence::Reaped),
+        ("compatibility", true, CleanupEvidence::Reaped),
+    ] {
+        let f = fixture();
+        let revision = f.app.activate_operation(test_ssh_draft()).unwrap();
+        let owner = f.app.human_owner();
+        let id = f
+            .app
+            .submit_direct(
+                owner,
+                DirectSubmission {
+                    operation: "ssh-backup".into(),
+                    revision: Some(revision),
+                    values: vec![],
+                },
+                &Launcher::default(),
+            )
+            .unwrap()
+            .id;
+        f.app.commit_approval(approval(&f, &id)).unwrap();
+        if phase == "backend" {
+            RESOLUTION_ACTION.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(|| Err(SessionError::BackendUnavailable)))
+            });
+        }
+        if phase == "compatibility" {
+            PROBE_ACTION.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(|| Err(SessionError::Incompatible)))
+            });
+        }
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let preparer = Preparation {
+            events: events.clone(),
+            fail: failure,
+            key_failure: phase == "key",
+        };
+        let supervisor = Supervisor {
+            events: events.clone(),
+            evidence,
+        };
+        let result = f.app.run_execution(owner, &id, &preparer, &supervisor);
+        RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+        PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
+        let expected = match phase {
+            "launch" => vec!["image", "host-and-cwd", "key", "reap", "finalize"],
+            "key" => vec!["image", "host-and-cwd", "key", "finalize-not-started"],
+            _ => vec!["image", "host-and-cwd", "finalize-not-started"],
+        };
+        assert_eq!(
+            *events.borrow(),
+            expected,
+            "{phase}, cleanup failure={failure}"
+        );
+        if phase == "launch" && !failure && evidence == CleanupEvidence::Reaped {
+            assert_eq!(result, Ok(DirectStatus::Completed { exit_code: 0 }));
+        } else {
+            assert_eq!(result, Err(DirectRequestError::Unavailable));
+            assert_eq!(
+                f.app.admission_closed(),
+                failure || evidence == CleanupEvidence::Uncertain
+            );
+            if evidence != CleanupEvidence::Uncertain {
+                let record: DirectRecord =
+                    serde_json::from_value(records(&f)["requests"][0]["direct"].clone()).unwrap();
+                assert_eq!(
+                    record.review.status,
+                    DirectStatus::Failed {
+                        reason: DirectFailure::ExecutionUnavailable
+                    }
+                );
+            }
+        }
+        let surfaces = format!("{} {:?}", records(&f), result);
+        assert!(!surfaces.contains("ssh-private-key-sentinel"));
+        assert!(!surfaces.contains("SSH_AUTH_SOCK"));
+    }
+}
+
+#[test]
+fn ssh_lock_intent_during_key_resolution_cleans_material_without_launch() {
+    use crate::adapters::execution::{LinuxExecutablePreparer, PreparedExecutable};
+    struct WatchedPreparation(Arc<AtomicUsize>);
+    struct WatchedMaterial {
+        inner: Box<dyn SshMaterial>,
+        installed: Arc<AtomicUsize>,
+    }
+    impl SshMaterial for WatchedMaterial {
+        fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError> {
+            self.installed.fetch_add(1, Ordering::SeqCst);
+            self.inner.install_key(key)
+        }
+        fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError> {
+            assert_eq!(evidence, CleanupEvidence::NotStarted);
+            self.inner.finalize(evidence)
+        }
+    }
+    impl ProtectedExecution for WatchedPreparation {
+        type Prepared = PreparedExecutable;
+        fn prepare(
+            &self,
+            image: ExecutionImage<'_>,
+            argv: Vec<String>,
+        ) -> Result<PreparedExecutable, ExecutionError> {
+            LinuxExecutablePreparer.prepare(image, argv)
+        }
+        fn prepare_ssh(
+            &self,
+            prepared: &mut PreparedExecutable,
+            root: &std::path::Path,
+            ssh: &SshOperation,
+        ) -> Result<Box<dyn SshMaterial>, ExecutionError> {
+            Ok(Box::new(WatchedMaterial {
+                inner: LinuxExecutablePreparer.prepare_ssh(prepared, root, ssh)?,
+                installed: self.0.clone(),
+            }))
+        }
+    }
+    struct NoLaunch {
+        root: std::path::PathBuf,
+    }
+    impl ProcessSupervisor<WatchedPreparation> for NoLaunch {
+        fn ssh_material_root(&self) -> Option<&std::path::Path> {
+            Some(&self.root)
+        }
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: PreparedExecutable,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("revoked SSH resolution must never launch")
+        }
+    }
+    let f = fixture();
+    let (ssh, key) = crate::adapters::ssh_material::fixture(f.dir.path());
+    let mut draft = test_ssh_draft();
+    draft.ssh = Some(ssh);
+    let revision = f.app.activate_operation(draft).unwrap();
+    let owner = f.app.human_owner();
+    let id = f
+        .app
+        .submit_direct(
+            owner,
+            DirectSubmission {
+                operation: "ssh-backup".into(),
+                revision: Some(revision),
+                values: vec![],
+            },
+            &Launcher::default(),
+        )
+        .unwrap()
+        .id;
+    f.app.commit_approval(approval(&f, &id)).unwrap();
+    let app = f.app.clone();
+    let epoch = app.revocation_epoch_for_test();
+    let root = f.dir.path().join("ssh");
+    let observed = root.clone();
+    let (lock_tx, lock_rx) = std::sync::mpsc::channel();
+    EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(0));
+    RESOLUTION_ACTION.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || {
+            let requests: Vec<_> = std::fs::read_dir(observed.join("requests"))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert_eq!(requests.len(), 1);
+            assert!(requests[0].join("known_hosts").exists());
+            assert!(!requests[0].join("identity").exists());
+            let lock_app = app.clone();
+            let lock = std::thread::spawn(move || lock_app.lock());
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            while app.revocation_epoch_for_test() == epoch {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+            lock_tx.send(lock).unwrap();
+            Ok(vec![SensitiveString::new(key.clone())])
+        }))
+    });
+    let installed = Arc::new(AtomicUsize::new(0));
+    let result = f.app.run_execution(
+        owner,
+        &id,
+        &WatchedPreparation(installed.clone()),
+        &NoLaunch { root: root.clone() },
+    );
+    RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+    assert_eq!(result, Err(DirectRequestError::Unavailable));
+    assert_eq!(
+        installed.load(Ordering::SeqCst),
+        0,
+        "key returned after lock intent must never be installed"
+    );
+    lock_rx
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap()
+        .join()
+        .unwrap()
+        .unwrap();
+    EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+    assert_eq!(
+        std::fs::read_dir(root.join("requests")).unwrap().count(),
+        0,
+        "NotStarted cleanup must remove the material prepared before blocked key resolution"
+    );
+    assert!(!records(&f).to_string().contains("PRIVATE KEY"));
 }
 
 #[test]

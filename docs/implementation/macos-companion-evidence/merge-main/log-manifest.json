@@ -1,0 +1,32 @@
+{
+  "all-targets.log": {
+    "bytes": 95837,
+    "sha256": "84d837e96c2dc5749fe151ad9a727dfb009d62b22eb075975b48cee8cc257b44",
+    "archive": "all-targets.log.gz",
+    "archive_sha256": "b83e2583ddfedacd7fd37ac243ef2f3fb3b63f874f23c43ac46634b8997c0c04"
+  },
+  "clippy.log": {
+    "bytes": 188,
+    "sha256": "fe337921851623294bd6d06eacc9ad0eb97571192bd4d3a936e2341596334af9",
+    "archive": "clippy.log.gz",
+    "archive_sha256": "322bac3e80c4fc81d5dc0e3f44993b8c808ef1df608a5cda36d5cf7369edf16e"
+  },
+  "fmt.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "archive": "fmt.log.gz",
+    "archive_sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+  },
+  "native-fixtures.log": {
+    "bytes": 130,
+    "sha256": "3124c8e9b1cf1f89bb410a7624c07d921cbb59755a3df4abb3dc64f7e0c45961",
+    "archive": "native-fixtures.log.gz",
+    "archive_sha256": "2a13dc34726b07b1929ce3ed892950396222e90c296e63224d206248a24269d2"
+  },
+  "systemd.log": {
+    "bytes": 5278,
+    "sha256": "16ddcb40ccdc5d790f429fd9d3b52cc4e174985865879f96e87d3da273b876c1",
+    "archive": "systemd.log.gz",
+    "archive_sha256": "45803d88582fb3bf69e42d771cd19ac28e41450c98e5a4cf9fd5b23a8d45181f"
+  }
+}

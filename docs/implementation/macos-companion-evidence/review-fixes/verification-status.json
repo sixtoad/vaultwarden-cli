@@ -54,5 +54,11 @@
     "mode": "draft",
     "acceptance_gate_waived": false,
     "merge_or_production_deployment_authorized": false
+  },
+  "main_integration": {
+    "main_commit": "d1efb1034fcf500c8dd21ebf485a07d928a07059",
+    "evidence": "../merge-main/results.json",
+    "checks": "passed",
+    "native_inputs_unchanged": 15
   }
 }

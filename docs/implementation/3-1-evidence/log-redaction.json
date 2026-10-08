@@ -1,0 +1,316 @@
+{
+  "sentinels": [
+    "private-key-sentinel",
+    "public-key-sentinel",
+    "fingerprint-sentinel",
+    "capability-sentinel",
+    "synthetic-password-sentinel",
+    "approval-password-sentinel",
+    "selector-sentinel",
+    "ssh-key-sentinel",
+    "synthetic-private-key-sentinel",
+    "synthetic-ssh-agent-capability-sentinel"
+  ],
+  "scans": [
+    {
+      "log": "baseline/all-targets.log.gz",
+      "sha256": "396037a37bdab7bc9788adb8fd2aad5b2e4c16259b1d8a8170ed83b24fe4e5f3",
+      "matches": []
+    },
+    {
+      "log": "baseline/backend.log.gz",
+      "sha256": "9b18375a7fbbeeaad468139e29009daec051d81fe8d164c608d4b3c6dfa9a4b3",
+      "matches": []
+    },
+    {
+      "log": "baseline/browser.log.gz",
+      "sha256": "1aec88f61367ff6fade53e12c6b6e3e24223fd36baa1231b8a9deb588245677e",
+      "matches": []
+    },
+    {
+      "log": "baseline/build-cli.log.gz",
+      "sha256": "21ff5010e86bb89f0bdba34f894302696065625b44007bdb37b0910aa1b35cfb",
+      "matches": []
+    },
+    {
+      "log": "baseline/clippy.log.gz",
+      "sha256": "544287d23e546b9ae5bb7d8e84efd3700e2e3dbe287ebf89e012b476ea4ece39",
+      "matches": []
+    },
+    {
+      "log": "baseline/diff-check.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": []
+    },
+    {
+      "log": "baseline/fmt.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": []
+    },
+    {
+      "log": "baseline/integration.log.gz",
+      "sha256": "1ca22082d11e1c44999a4638186bdab6772e0e4ee2eab092eeb6ecd30091c700",
+      "matches": []
+    },
+    {
+      "log": "baseline/policy.log.gz",
+      "sha256": "95ace6592a6b2440adabbe737bb14aa139a9777b98146dd851893aa6fadf4c64",
+      "matches": []
+    },
+    {
+      "log": "baseline/ssh.log.gz",
+      "sha256": "eb757bd23ae0d7e9808141591153bccf8aefe59470c030bb1903a847fc37459e",
+      "matches": []
+    },
+    {
+      "log": "baseline/store.log.gz",
+      "sha256": "7b2af801109f46875ff14effdaee393fbd54b69e86fd8c5b1ba698e423398d4b",
+      "matches": []
+    },
+    {
+      "log": "transport-doc/doc.log.gz",
+      "sha256": "2c4135fffce21d9f426667797275d09a657e2a4d48cd4378da6d1758c81a2df8",
+      "matches": []
+    },
+    {
+      "log": "transport-doc/real-peer.log.gz",
+      "sha256": "235db3fa7d86ce9deba3d4d9bd08cbbc9a7f680bc336304d72a09b612e0f1967",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/all-features.log.gz",
+      "sha256": "439b40a8b7b8c455b085f28841d3857b19f523d2aaed1a01d7b5ed3f73c56f0a",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/all-targets.log.gz",
+      "sha256": "6f2e0e37c244e0b7fe946ba0dc8f8de94d5aafed85f1b9fecf52c693c8569a5b",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/backend.log.gz",
+      "sha256": "373c92298aa47840208b88adfc4bd7c41b017cd1004eaac03f0c9e46b269c61b",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/browser.log.gz",
+      "sha256": "1aec88f61367ff6fade53e12c6b6e3e24223fd36baa1231b8a9deb588245677e",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/build-cli.log.gz",
+      "sha256": "08dc0449f0fdb54b92fb4404805b9d886ee0a5f56f2823dd28a96e342f21af79",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/clippy.log.gz",
+      "sha256": "8a6e389b19305ca0e7fde2ceddec5c31eb6fd2d5e7e4467884b7c56168872b6c",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/diff-check.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/doc-all-features.log.gz",
+      "sha256": "d6ea4f9f60113fe5bef091491e1eebbdc5b68ae52424c4be870b8100bc508c8a",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/doc-no-default-features.log.gz",
+      "sha256": "f6430ce803c0ec3a84570b8f149bff5d22a869774d6d6a0cdcf724421ffcdb35",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/doc.log.gz",
+      "sha256": "59e37185abbf4008bdb1ab5c6677ef45eff677be901de492ecafda64940010d4",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/fmt.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/integration.log.gz",
+      "sha256": "22fe77b0df854ad48a89320c83be79ab2e14252b1a211e97c4262ca98fa39d28",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/msrv-all-targets.log.gz",
+      "sha256": "4a8f6696c95bde7b485f645a0e421c09cb0ef3a3f703abf9e21423c27f862ca6",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/native-fixtures.log.gz",
+      "sha256": "3124c8e9b1cf1f89bb410a7624c07d921cbb59755a3df4abb3dc64f7e0c45961",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/no-default-features.log.gz",
+      "sha256": "48f88281dc3299c560adc13eda454c0fc026cd932cd23e976c73922e8739351b",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/policy.log.gz",
+      "sha256": "ab62ca64cd55772d387fc01a606b620687d455a94e7f5ebacd14b83799fb89f0",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/real-peer.log.gz",
+      "sha256": "73a74b79d4c3f36b43fac9773302152d202e16103153946e57fa6362c988c83d",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/ssh.log.gz",
+      "sha256": "724bc2b59afb2bae3586dab7ce74bc79356fddb449dff03cb6ed40d808fc6759",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/store.log.gz",
+      "sha256": "b13b36e6da6704fe0a725b74b2fd21c6612857b5ef1d6e8eac3c3fdda19bad75",
+      "matches": []
+    },
+    {
+      "log": "final-after-fixture/systemd.log.gz",
+      "sha256": "a871e8f1e44d0b1891b8d7f26b528fbb1cae87074875de098d498bc593cecf56",
+      "matches": []
+    },
+    {
+      "log": "fixture-clock-browser/browser-1.log.gz",
+      "sha256": "1aec88f61367ff6fade53e12c6b6e3e24223fd36baa1231b8a9deb588245677e",
+      "matches": []
+    },
+    {
+      "log": "fixture-clock-browser/browser-2.log.gz",
+      "sha256": "1aec88f61367ff6fade53e12c6b6e3e24223fd36baa1231b8a9deb588245677e",
+      "matches": []
+    },
+    {
+      "log": "review-fixes/policy.log.gz",
+      "sha256": "957f032957bf15b58bfcb89bff7c978d962d78a1640c991aee29790fadc65d90",
+      "matches": []
+    },
+    {
+      "log": "review-fixes/direct-ssh.log.gz",
+      "sha256": "ce09bc663e6b597fa6b9d47b2aaebc55e591fa7138f209a1fc3c0caa36f13c55",
+      "matches": []
+    },
+    {
+      "log": "review-fixes/backend.log.gz",
+      "sha256": "343ca5a0d9af6d405b358df70d595c93e550c6745ceacd2e2f281a4236294614",
+      "matches": []
+    },
+    {
+      "log": "review-fixes/loopback.log.gz",
+      "sha256": "42dc696c7b6da358a949a109b8abf9bd23877e851088e5a5a16af8efa5b11bb8",
+      "matches": []
+    },
+    {
+      "log": "review-fixes/browser.log.gz",
+      "sha256": "a796d62ff637129cf5fb5a6bd1408e946237fc3b4eef1fdc495d75b332b2d578",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/fmt.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/clippy.log.gz",
+      "sha256": "8e5db377fae29932d7d22da5855ef5d9c10dcd20a26c5850dcb185de14f01585",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/all-targets.log.gz",
+      "sha256": "6a6cfd1ab90f4860fce735631863c2e4b747db1d64d02580da07dca9112a4167",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/ssh.log.gz",
+      "sha256": "788ed36f03af1c6bdf2e56d67cf6d921e4395afbaf5ff40c2818717968c61dd6",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/policy.log.gz",
+      "sha256": "4e34323aa23888f0d444bfdead0e7c0e714ac5936ce3e9e771563b3dd01faff7",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/store.log.gz",
+      "sha256": "3f94dc6ac92aa76e69fe841b476f3ddbec15efe988ca3b553c7ce7d55b590297",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/backend.log.gz",
+      "sha256": "193eb504f29dc358d64f0fe5d495d76cf70a8ba9b37de45e9bae3363511c9909",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/integration.log.gz",
+      "sha256": "8abd0d52a07c22501bd784ead0280a0d6dfa5892fece7826c2291dd0c4b65734",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/build-cli.log.gz",
+      "sha256": "3c0f753366348451717f6fedee713377b15c07d6ff51ff7224e0528ef4e53cb5",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/browser.log.gz",
+      "sha256": "a796d62ff637129cf5fb5a6bd1408e946237fc3b4eef1fdc495d75b332b2d578",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/diff-check.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/real-peer.log.gz",
+      "sha256": "6fa0e096b3013443592a3ca57fcd10b39dcbafbd46608ca471e3a4c21bd94f44",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/doc.log.gz",
+      "sha256": "e5e503d75680f92e87d426145a96c5b67e7fe265dffab07351a35011b5257bd4",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/msrv-all-targets.log.gz",
+      "sha256": "7b15c326f41a67c87a57f5c433c12be46fbf15b6d8a25ee87ec10d46fd900dec",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/systemd.log.gz",
+      "sha256": "27a3f7f55320fcf52a2aaba5e11b2d01986718b485f7c908ae4f584260513da7",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/native-fixtures.log.gz",
+      "sha256": "3124c8e9b1cf1f89bb410a7624c07d921cbb59755a3df4abb3dc64f7e0c45961",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/all-features.log.gz",
+      "sha256": "e31a97bbd3e24f377c96512c57e4641536249582225750367b1657003e29b481",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/doc-all-features.log.gz",
+      "sha256": "9074857ca487dce05f6b4f0dee6cb887e2052ca7bf0d20a2e9b78c78b7e717e6",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/no-default-features.log.gz",
+      "sha256": "054090af3627838a23bd6f550d18d9c8b7d67264f3be73bf5f34d47999f33075",
+      "matches": []
+    },
+    {
+      "log": "post-review-clean/doc-no-default-features.log.gz",
+      "sha256": "69836ca59fa5b846bfec8424fd6cc3823d35e870355faf782c055bb2f1a7de8f",
+      "matches": []
+    }
+  ]
+}

@@ -363,10 +363,56 @@ try{
   await signedTab.click('#deny');await signedTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: denied; no operation will run');
   assert.equal(JSON.parse(fs.readFileSync(path.join(ready.root,'provider-state.json'),'utf8')).requests.find(request=>request.id===signedResponse.request_id).direct.review.status.status,'denied');
   await signedTab.close();
+  // A real SSH policy and human admission render the exact fixed authority.
+  // The fixture has no private-key resolver or SSH executor.
+  const submitSsh=async()=>{for(let attempt=0;;attempt++){
+    try{return run(['request','ssh-backup','--revision',ready.ssh_revision,'--no-wait']).receipt;}
+    catch(error){if(attempt>=9||error.status!==1||error.signal!==null||error.stdout!==''||error.stderr!=='vw-access: provider unavailable\n')throw error;await sleep(50);}
+  }
+  };
+  const sshReceipt=await submitSsh();
+  const sshArtifact=path.join(ready.root,`review-${sshReceipt.id}.html`);
+  const sshLink=fs.readFileSync(sshArtifact,'utf8').match(/href="([^"]+)"/)[1];
+  const sshCapability=new URL(sshLink).hash.slice(1).split(':')[0];
+  const sshTab=await browser.newPage();sshTab.on('pageerror',e=>errors.push(String(e)));
+  await sshTab.goto(pathToFileURL(sshArtifact).href);
+  await sshTab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+  const sshDetails=await sshTab.$$eval('#details dt',terms=>Object.fromEntries(terms.map(term=>[term.textContent,term.nextElementSibling.textContent])));
+  for(const [name,value] of Object.entries({'Target':'backup@backup.example.test:2222/srv/archive','SSH host':'backup.example.test','SSH port':'2222','SSH user':'backup','Resource path':'/srv/archive','Pinned host fingerprint':'SHA256:'+'A'.repeat(43),'Working directory':'/var/empty','Credentials and use types':'Backup SSH (ssh)','Policy digest':ready.ssh_revision,'One-time meaning':'Approval authorizes one protected execution. Lock or cancellation stops its descendants.'}))assert.equal(sshDetails[name],value,name);
+  assert.deepEqual(await sshTab.$$eval('#arguments > li',items=>items.map(item=>item.textContent)),[]);
+  const sshReview=await sshTab.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).json(),sshReceipt.id);
+  assert.deepEqual(sshReview.credentials,[{label:'Backup SSH',use_type:'ssh'}]);
+  assert.equal(sshReview.ssh.destination.port,2222);assert.equal(sshReview.ssh.working_directory,'/var/empty');
+  await sshTab.addScriptTag({content:axe});
+  assert.deepEqual(await sshTab.evaluate(async()=>(await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>v.id)),[]);
+  const sshVisible=await sshTab.$eval('body',element=>element.innerText);
+  for(const excluded of ['synthetic-private-key-sentinel','synthetic-ssh-agent-capability-sentinel','BEGIN OPENSSH PRIVATE KEY',sshCapability]){
+    assert(!sshVisible.includes(excluded));assert(!JSON.stringify(sshReview).includes(excluded));
+    assert(!JSON.stringify(sshReceipt).includes(excluded));
+    assert(!fs.readFileSync(path.join(ready.root,'provider-state.json'),'utf8').includes(excluded));
+  }
+  assert(!JSON.stringify(sshReceipt).includes('Backup SSH'));
+  await sshTab.focus('#deny');await sshTab.keyboard.press('Enter');
+  await sshTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: denied; no operation will run');
+  await sshTab.click('#history-refresh');
+  await sshTab.waitForFunction(id=>[...document.querySelectorAll('#history-events > li')].some(row=>row.textContent.includes(id)&&row.textContent.includes('denied')),{},sshReceipt.id);
+  const sshHistory=await sshTab.$$eval('#history-events > li',(rows,id)=>rows.filter(row=>row.textContent.includes(id)).map(row=>row.textContent),sshReceipt.id);
+  for(const row of sshHistory)for(const field of ['Backup SSH (ssh)','backup.example.test','2222','/srv/archive','/var/empty','SHA256:'+'A'.repeat(43)])assert(row.includes(field),field);
+  const sshApproved=await submitSsh();
+  const sshApprovalArtifact=path.join(ready.root,`review-${sshApproved.id}.html`);
+  const sshApprovalLink=fs.readFileSync(sshApprovalArtifact,'utf8').match(/href="([^"]+)"/)[1];
+  const sshApprovalCapability=new URL(sshApprovalLink).hash.slice(1).split(':')[0];
+  await sshTab.goto(pathToFileURL(sshApprovalArtifact).href);
+  await sshTab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+  await sshTab.click('#begin-approval');await sshTab.type('#approval-password','synthetic-browser-password');
+  await sshTab.click('#approve');
+  await sshTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: approved; approved once; awaiting protected execution');
+  assert.equal(run(['status',sshApproved.id]).state.status,'approved');
+  await sshTab.close();
   const knownDiagnostics=errors.filter(e=>e.includes('Permission denied to access property \"__bidi_args\"')||e==='Error: Error: Permission denied to access property \"length\"'||(e.includes('Content-Security-Policy')&&e.includes('/favicon.ico')));
   assert.deepEqual(errors.filter(e=>!knownDiagnostics.includes(e)),[]);
-  for(const error of errors)for(const secret of ['synthetic-browser-password','cancelled-password-sentinel','wrong-password-sentinel','retired-password-sentinel',capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
+  for(const error of errors)for(const secret of ['synthetic-browser-password','cancelled-password-sentinel','wrong-password-sentinel','retired-password-sentinel','synthetic-private-key-sentinel','synthetic-ssh-agent-capability-sentinel','BEGIN OPENSSH PRIVATE KEY',sshCapability,sshApprovalCapability,capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
   const diagnosticCategories=[...new Set(knownDiagnostics.map(e=>e.replace(/https:\/\/127\.0\.0\.1:\d+/g,'https://127.0.0.1:<port>')))];
-  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,signedAgentAdmission:true,signedAgentCompleteReview:true,signedAgentCapabilityIsolation:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
+  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,sshFixedTargetReview:true,sshReviewRedaction:true,sshHistoryProjection:true,sshKeyboardDenial:true,signedAgentAdmission:true,signedAgentCompleteReview:true,signedAgentCapabilityIsolation:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
   fs.writeFileSync(path.join(control,'stop'),'stop');assert.equal(await closed,0,childOutput);
 }finally{fs.writeFileSync(path.join(control,'stop'),'stop');await browser?.close();if(child.exitCode===null)child.kill('SIGTERM');}

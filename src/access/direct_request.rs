@@ -146,6 +146,8 @@ pub struct DirectReview {
     pub operation: String,
     pub effect: String,
     pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh: Option<super::policy::SshReview>,
     pub arguments: Vec<String>,
     pub credentials: Vec<ReviewCredential>,
     pub executable_digest: String,
@@ -592,7 +594,12 @@ impl DirectRecord {
             }
             && valid_operation_id(&r.operation)
             && text(&r.effect)
-            && text(&r.target)
+            && (if r.ssh.is_some() {
+                r.ssh.as_ref().is_some_and(|ssh| r.target == ssh.target())
+            } else {
+                text(&r.target)
+            })
+            && r.ssh.as_ref().is_none_or(|ssh| ssh.valid())
             && r.arguments.len() <= 32
             && r.arguments.iter().all(|v| text(v))
             && !r.credentials.is_empty()

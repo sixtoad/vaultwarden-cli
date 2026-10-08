@@ -27,6 +27,20 @@ pub(super) fn apply_environment_fixture(
     properties: &mut manager::PropertiesList,
     values: &[String],
 ) {
+    if let Some(root) = std::env::var_os("VW18_ROOT") {
+        use std::os::unix::fs::DirBuilderExt;
+        // A bypassed SSH fchdir must leave markers inside disposable fixture storage.
+        let ambient = PathBuf::from(root).join("ambient-working-directory");
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&ambient)
+            .unwrap();
+        properties.push((
+            "WorkingDirectory".into(),
+            dbus::arg::Variant(Box::new(ambient.to_str().unwrap().to_owned())),
+        ));
+    }
     if !values.is_empty() {
         properties.push((
             "Environment".into(),
@@ -122,6 +136,14 @@ fn provider_harness() {
     let supervisor = SystemdProcessSupervisor {
         config,
         healthy: AtomicBool::new(true),
+        material_root: if mode.starts_with("ssh-")
+            || mode.starts_with("app-ssh-")
+            || root.join("ssh").exists()
+        {
+            Some(crate::adapters::ssh_material::initialize(&root).unwrap())
+        } else {
+            None
+        },
     };
     // This observer is itself the manager-recognized MainPID, never an arbitrary shell child.
     Manager::connect()
@@ -133,6 +155,10 @@ fn provider_harness() {
     stage("recovered");
     if mode == "recover" {
         finish(&root, b"recovered");
+        return;
+    }
+    if mode.starts_with("ssh-") {
+        ssh_scenario(&root, &mode, &supervisor);
         return;
     }
     if mode == "failed-launch-recovery" {
@@ -185,6 +211,10 @@ fn provider_harness() {
         manager.stop_reap(&supervisor.config, &lease).unwrap();
         supervisor.config.forget(&lease).unwrap();
         finish(&root, b"collision-refused-and-reaped");
+        return;
+    }
+    if mode.starts_with("app-ssh-") {
+        ssh_application_scenario(&root, &mode, Arc::new(supervisor));
         return;
     }
     if mode.starts_with("app-") {
@@ -402,6 +432,7 @@ fn application_scenario(
     let marker = root.join("app-tree-ready").to_str().unwrap().to_owned();
     f.app
         .activate_operation(OperationPolicyDraft {
+            ssh: None,
             id: "deploy".into(),
             description: "Synthetic protected execution".into(),
             image_id: "deploy-image".into(),
@@ -870,4 +901,304 @@ fn journal_barrier(phase: &str) {
 fn finish(root: &std::path::Path, value: &[u8]) {
     journal_barrier("finished");
     std::fs::write(root.join("finished"), value).unwrap();
+}
+
+fn ssh_scenario(root: &std::path::Path, mode: &str, supervisor: &SystemdProcessSupervisor) {
+    let (mut ssh, key) = crate::adapters::ssh_material::fixture(root);
+    ssh.destination.resource_path = format!("/srv/{mode}");
+    let image = root.join("image");
+    let digest = Sha256::digest(std::fs::read(&image).unwrap())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
+    let mut prepared = LinuxExecutablePreparer
+        .prepare(
+            ExecutionImage {
+                root,
+                path: &image,
+                sha256: &digest,
+                profile: ExecutionProfile::ReviewedSelfContainedElf64V1,
+            },
+            vec!["fixture".into()],
+        )
+        .unwrap();
+    let mut material = LinuxExecutablePreparer
+        .prepare_ssh(&mut prepared, &root.join("ssh"), &ssh)
+        .unwrap();
+    material.install_key(SensitiveString::new(key)).unwrap();
+    let request = std::fs::read_dir(root.join("ssh/requests"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::write(
+        root.join("material-path"),
+        request.as_os_str().as_encoded_bytes(),
+    )
+    .unwrap();
+    if mode == "ssh-uncertain" {
+        PHASE_HOOK.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(|phase| {
+                if phase == LaunchPhase::NaturalExit {
+                    manager::FAULT.with(|f| f.set(manager::Fault::Stop));
+                }
+            }));
+        });
+    }
+    let report = supervisor.supervise_controlled(
+        prepared,
+        ChildEnvironment::from_mappings([]).unwrap(),
+        &Control { root: root.into() },
+    );
+    assert!(
+        root.join("ssh-output-sinks-verified").exists(),
+        "native child must verify stdout and stderr both resolve to /dev/null"
+    );
+    assert!(
+        root.join("ssh-material-readable").exists(),
+        "native descendant must read both request files"
+    );
+    if mode == "ssh-uncertain" {
+        assert_eq!(report.cleanup, CleanupEvidence::Uncertain);
+        assert!(material.finalize(report.cleanup).is_err());
+        assert!(request.join("identity").exists());
+        assert!(crate::adapters::ssh_material::prepare(&root.join("ssh"), &ssh).is_err());
+        let leases = supervisor.config.leases().unwrap();
+        assert_eq!(leases.len(), 1);
+        assert!(
+            !manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap(),
+            "failed reap must leave real containment alive for this recovery-order oracle"
+        );
+        let identity = std::fs::read(request.join("identity")).unwrap();
+        let pin = std::fs::read(request.join("known_hosts")).unwrap();
+        // A fresh composition follows the actual provider startup writer-lock path.
+        let restarted = SystemdProcessSupervisor {
+            config: supervisor.config.clone(),
+            healthy: AtomicBool::new(true),
+            material_root: Some(root.join("ssh")),
+        };
+        let recovery_state = root.join("recovery-provider");
+        let failed = crate::access::provider::Provider::start_with_cleanup(&recovery_state, || {
+            restarted.recover().map_err(|_error| ())
+        });
+        assert!(
+            failed.is_err(),
+            "startup cannot admit while containment recovery fails"
+        );
+        assert!(!manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap());
+        assert_eq!(
+            std::fs::read(request.join("identity")).unwrap(),
+            identity,
+            "failed startup must not remove live descendants' identity"
+        );
+        assert_eq!(
+            std::fs::read(request.join("known_hosts")).unwrap(),
+            pin,
+            "failed startup must retain connection-time pin"
+        );
+        assert_eq!(restarted.config.leases().unwrap().len(), 1);
+        manager::FAULT.with(|f| f.set(manager::Fault::None));
+        let recovered =
+            crate::access::provider::Provider::start_with_cleanup(&recovery_state, || {
+                restarted.recover().map_err(|_error| ())
+            })
+            .unwrap();
+        assert!(manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap());
+        assert!(!request.exists());
+        drop(recovered);
+    } else if mode == "ssh-cleanup-failure" {
+        assert_eq!(report.cleanup, CleanupEvidence::Reaped);
+        crate::adapters::ssh_material::TEST_FAIL_REMOVE.with(|fail| fail.set(true));
+        assert!(material.finalize(report.cleanup).is_err());
+        assert!(request.join("identity").exists());
+        assert!(crate::adapters::ssh_material::prepare(&root.join("ssh"), &ssh).is_err());
+        assert!(supervisor.recover().is_err());
+        assert!(request.join("identity").exists());
+        crate::adapters::ssh_material::TEST_FAIL_REMOVE.with(|fail| fail.set(false));
+        supervisor.recover().unwrap();
+        assert!(!request.exists());
+    } else {
+        assert_eq!(report.cleanup, CleanupEvidence::Reaped);
+        material.finalize(report.cleanup).unwrap();
+        assert!(!request.exists());
+        if mode == "ssh-exit" {
+            assert_eq!(
+                report.outcome,
+                Ok(crate::access::ports::ExecutionOutcome::ExitedZero)
+            );
+        } else {
+            assert_eq!(report.outcome, Err(ExecutionError::Cancelled));
+        }
+    }
+    finish(root, b"ssh-contained-material-reaped");
+}
+
+fn ssh_application_scenario(
+    root: &std::path::Path,
+    mode: &str,
+    supervisor: Arc<SystemdProcessSupervisor>,
+) {
+    use crate::access::{
+        direct_request::*,
+        direct_request_tests::{Launcher, RESOLUTION_ACTION, fixture},
+        policy::*,
+        ports::*,
+    };
+    use std::os::unix::fs::PermissionsExt;
+    struct Permit;
+    impl ApprovalAuthenticator for Permit {
+        fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+            Ok(())
+        }
+    }
+    let f = fixture();
+    let image_path = f.dir.path().join("approved-image");
+    std::fs::set_permissions(&image_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    std::fs::copy(root.join("image"), &image_path).unwrap();
+    std::fs::set_permissions(&image_path, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let digest = Sha256::digest(std::fs::read(&image_path).unwrap())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
+    let image = ApprovedImage::new(
+        "deploy-image".into(),
+        f.dir.path().to_str().unwrap().into(),
+        image_path.to_str().unwrap().into(),
+        digest,
+        ExecutionProfile::ReviewedSelfContainedElf64V1,
+    )
+    .unwrap();
+    let state_path = f.dir.path().join("provider/provider-state.json");
+    let mut state: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&state_path).unwrap()).unwrap();
+    state["approved_images"] = serde_json::json!([image]);
+    state["operations"] = serde_json::json!([]);
+    std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
+    let (mut ssh, key) = crate::adapters::ssh_material::fixture(root);
+    ssh.destination.resource_path = format!("/srv/{}", mode.strip_prefix("app-").unwrap());
+    let mut draft = test_ssh_draft();
+    draft.ssh = Some(ssh);
+    let revision = f.app.activate_operation(draft).unwrap();
+    let owner = f.app.human_owner();
+    let id = f
+        .app
+        .submit_direct(
+            owner,
+            DirectSubmission {
+                operation: "ssh-backup".into(),
+                revision: Some(revision),
+                values: vec![],
+            },
+            &Launcher::default(),
+        )
+        .unwrap()
+        .id;
+    let approval = f
+        .app
+        .prepare_approval(owner, &id)
+        .unwrap()
+        .authenticate(SensitiveString::new("synthetic".into()), &Permit)
+        .unwrap();
+    f.app.commit_approval(approval).unwrap();
+    let app = f.app.clone();
+    let execution_id = id.clone();
+    let runner = supervisor.clone();
+    let backend_key = key.clone();
+    let work = std::thread::spawn(move || {
+        RESOLUTION_ACTION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                Ok(vec![SensitiveString::new(backend_key.clone())])
+            }))
+        });
+        let result = app.run_execution(
+            owner,
+            &execution_id,
+            &LinuxExecutablePreparer,
+            runner.as_ref(),
+        );
+        RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
+        result
+    });
+    if matches!(mode, "app-ssh-lock" | "app-ssh-cancel") {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !root.join("ssh-material-readable").exists()
+            || f.app.direct_status(owner, &id).unwrap() != DirectStatus::Running
+        {
+            assert!(
+                Instant::now() < deadline,
+                "SSH application must reach a live material-reading descendant"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let leases = supervisor.config.leases().unwrap();
+        assert_eq!(leases.len(), 1);
+        assert!(!manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap());
+        let material = std::fs::read_dir(root.join("ssh/requests"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert!(material.join("identity").exists());
+        if mode == "app-ssh-lock" {
+            f.app.lock().unwrap();
+        } else {
+            f.app.cancel_execution(owner, &id).unwrap();
+        }
+        assert!(
+            manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap(),
+            "authority-loss acknowledgment must wait for all descendants"
+        );
+        assert!(
+            !material.exists(),
+            "authority-loss acknowledgment must wait for private material cleanup"
+        );
+    }
+    assert_eq!(work.join().unwrap(), Err(DirectRequestError::Unavailable));
+    assert!(
+        root.join("ssh-output-sinks-verified").exists(),
+        "native child must verify stdout and stderr both resolve to /dev/null"
+    );
+    assert!(root.join("ssh-material-readable").exists());
+    assert_eq!(
+        std::fs::read_dir(root.join("ssh/requests"))
+            .unwrap()
+            .count(),
+        0
+    );
+    let status = f.app.direct_status(owner, &id).unwrap();
+    match mode {
+        "app-ssh-nonzero" => assert_eq!(
+            status,
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionNonzero
+            }
+        ),
+        "app-ssh-signal" => assert_eq!(
+            status,
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionSignaled
+            }
+        ),
+        _ => assert!(status.is_terminal()),
+    }
+    let text = std::fs::read_to_string(&state_path).unwrap();
+    let state: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let persisted: DirectStatus =
+        serde_json::from_value(state["requests"][0]["direct"]["review"]["status"].clone()).unwrap();
+    assert_eq!(persisted, status);
+    assert!(!text.contains(&key));
+    assert!(!text.contains("BEGIN OPENSSH PRIVATE KEY"));
+    let encoded_key_payload = key
+        .lines()
+        .find(|line| !line.is_empty() && !line.starts_with("-----"))
+        .unwrap();
+    assert!(
+        !text.contains(encoded_key_payload),
+        "JSON escaping must not hide persisted private-key payloads from the disclosure oracle"
+    );
+    assert!(!text.contains("ssh-raw-output-sentinel"));
+    assert!(!text.contains("SSH_AUTH_SOCK"));
+    finish(root, b"ssh-application-lifecycle-verified");
 }

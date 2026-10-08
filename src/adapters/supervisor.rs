@@ -46,10 +46,11 @@ fn phase(phase: LaunchPhase) {
 pub struct SystemdProcessSupervisor {
     config: Config,
     healthy: AtomicBool,
+    material_root: Option<std::path::PathBuf>,
 }
 impl SystemdProcessSupervisor {
     /// Fixed production provider identity; test namespaces are never configurable by clients.
-    pub fn installed() -> Result<Self, ExecutionError> {
+    pub fn installed(state_root: &std::path::Path) -> Result<Self, ExecutionError> {
         let helper = std::env::current_exe()
             .map_err(|_error| ExecutionError::Unavailable)?
             .parent()
@@ -62,6 +63,7 @@ impl SystemdProcessSupervisor {
         Ok(Self {
             config,
             healthy: AtomicBool::new(true),
+            material_root: Some(super::ssh_material::initialize(state_root)?),
         })
     }
     /// Isolated systemd namespace for the explicitly invoked companion acceptance test.
@@ -76,12 +78,17 @@ impl SystemdProcessSupervisor {
         Ok(Self {
             config,
             healthy: AtomicBool::new(true),
+            material_root: None,
         })
     }
     /// Must run under the provider writer lock, before durable validation or admission.
     pub fn recover(&self) -> Result<(), ExecutionError> {
         let manager = Manager::connect()?;
-        manager.recover(&self.config)
+        manager.recover(&self.config)?;
+        if let Some(root) = &self.material_root {
+            super::ssh_material::recover(root)?;
+        }
+        Ok(())
     }
     fn execute(
         &self,
@@ -252,6 +259,9 @@ impl SystemdProcessSupervisor {
     }
 }
 impl ProcessSupervisor<LinuxExecutablePreparer> for SystemdProcessSupervisor {
+    fn ssh_material_root(&self) -> Option<&std::path::Path> {
+        self.material_root.as_deref()
+    }
     fn available(&self) -> bool {
         self.healthy.load(Ordering::Acquire)
             && Manager::connect()

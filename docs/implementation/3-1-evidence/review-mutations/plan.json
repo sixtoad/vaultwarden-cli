@@ -1,0 +1,26 @@
+[
+  {
+    "name": "http-forwarding-all-true",
+    "file": "src/adapters/vaultwarden.rs",
+    "old": "eligible_ssh_metadata(&Self::body(response)?, immutable_item_id)",
+    "new": "eligible_ssh_metadata(&Self::body(response)?, immutable_item_id).map(|_| true)",
+    "kind": "unit",
+    "expected": "adapters::vaultwarden::tests::ssh_backend_rejects_each_ineligible_http_metadata_response"
+  },
+  {
+    "name": "ssh-pending-promises-execution",
+    "file": "src/access/policy.rs",
+    "old": "            one_time: if self.ssh.is_some() {\n                super::direct_request::PREVIOUS_ONE_TIME",
+    "new": "            one_time: if self.ssh.is_some() {\n                super::direct_request::ONE_TIME",
+    "kind": "browser",
+    "expected": "One-time meaning"
+  },
+  {
+    "name": "ssh-approved-promises-execution",
+    "file": "src/adapters/loopback_ui.rs",
+    "old": "value.ssh?'; approved once; SSH execution is unavailable':'; approved once; awaiting protected execution'",
+    "new": "value.ssh?'; approved once; awaiting protected execution':'; approved once; awaiting protected execution'",
+    "kind": "browser",
+    "expected": "Request status: approved; approved once; SSH execution is unavailable"
+  }
+]

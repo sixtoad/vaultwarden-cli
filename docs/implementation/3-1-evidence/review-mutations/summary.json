@@ -1,0 +1,9 @@
+{
+  "mutants": 3,
+  "killed": 3,
+  "survivors": 0,
+  "unexpected_failures": 0,
+  "baseline_passed": true,
+  "source_restored": true,
+  "isolated_target": "/tmp/vw-story31-review-mutations/target"
+}

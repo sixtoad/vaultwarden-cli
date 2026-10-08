@@ -1,0 +1,27 @@
+[
+  {
+    "name": "http-forwarding-all-true",
+    "exit": 101,
+    "classification": "killed",
+    "expected": "adapters::vaultwarden::tests::ssh_backend_rejects_each_ineligible_http_metadata_response",
+    "proof": "named HTTP negative test fails at isolated /id response: Ok(true) vs Ok(false)"
+  },
+  {
+    "name": "ssh-pending-promises-execution",
+    "exit": 1,
+    "classification": "killed",
+    "expected": "One-time meaning",
+    "proof": "exact One-time meaning browser assertion reports ordinary execution promise"
+  },
+  {
+    "name": "ssh-approved-promises-execution",
+    "exit": 1,
+    "classification": "killed",
+    "expected": "Request status: approved; approved once; SSH execution is unavailable",
+    "proof": {
+      "browser_assertion_line": 409,
+      "condition": "  await sshTab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: approved; approved once; SSH execution is unavailable');",
+      "stack_matches_condition": true
+    }
+  }
+]
