@@ -1,0 +1,3 @@
+Injected unsupported hard links
+Choose an output directory on a filesystem supporting hard links (APFS or HFS+).
+You can copy the completed DMG and checksum elsewhere afterward.

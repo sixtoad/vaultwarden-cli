@@ -1,0 +1,1 @@
+error: 'macos': Source files for target CompanionCoreTests should be located under 'Tests/CompanionCoreTests', or a custom sources path can be set with the 'path' property in Package.swift

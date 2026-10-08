@@ -1,0 +1,28 @@
+{
+  "verified_at_utc": "2026-10-08T14:50:54.210615+00:00",
+  "image": "Approval-Companion-0.1.0-1-arm64.dmg",
+  "image_sha256": "63d661827435a214272cd6596a72b0fcfe770c9a4547f37445ea352b5f240beb",
+  "image_bytes": 258049,
+  "format": "UDZO",
+  "mounted_read_only": true,
+  "volume_entries": [
+    "Applications",
+    "Approval Companion.app",
+    "README.txt"
+  ],
+  "architecture": "arm64",
+  "version": "0.1.0",
+  "minimum_macos": "13.0",
+  "strict_signature_verified": true,
+  "copied_app_matches_every_file": true,
+  "system_dependencies_only": true,
+  "app_file_hashes": {
+    "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a",
+    "Contents/_CodeSignature/CodeResources": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b",
+    "Contents/MacOS/ApprovalCompanion": "62e686fbd32b5cbcd8c251a458fc94ea3cb7b0fe1159fe8d480dab0fdc46c87f"
+  },
+  "installed_app_or_preferences_changed": false,
+  "app_launched": false,
+  "notarized": false,
+  "detached": true
+}

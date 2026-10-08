@@ -11,6 +11,39 @@ credential, and systemd user manager. These services must be available without
 a desktop prompt; the Mac unlock action unlocks the provider vault session.
 It does not provision or unlock the Linux operating-system keyring.
 
+## Install or upgrade from the disk image
+
+The local development download is for **Apple Silicon, macOS 13 or newer**.
+It contains Approval Companion, an Applications shortcut, and a plain-text
+installation README. Connection settings, client identities and passwords are
+not included. Existing installations keep their saved setup and Keychain identity;
+new installations need the trusted provisioning steps below.
+
+1. Keep the `.dmg` and matching `.dmg.sha256` file together. To check the download,
+   open Terminal in that folder and run `shasum -a 256 -c` followed by the checksum
+   filename. Continue only if the image reports `OK`. The checksum checks the
+   transferred bytes; obtain both files from your trusted source.
+2. Open the disk image and drag **Approval Companion.app** to its **Applications**
+   shortcut. For an upgrade, quit the running app before replacing it. If the
+   existing app is in `~/Applications`, replace it in that same folder instead:
+   the disk image's shortcut points to `/Applications`.
+3. Eject the disk image and open the installed copy. Approval Companion appears
+   in the menu bar. Enable **Start at login** only from that installed copy.
+
+If relocating an existing app, turn **Start at login** off in the old copy first,
+then turn it on from the new installed copy. Avoid keeping two installed copies.
+If startup stops working after an upgrade, toggle it off and on in the installed
+app and check System Settings → General → Login Items. Do not erase preferences
+or Keychain entries to perform an upgrade. macOS may request Keychain access again
+after the app is replaced.
+
+This download is signed ad hoc for local development. It has no verified publisher
+identity and is not notarized by Apple. If macOS blocks opening it and you trust
+the source, try opening it once, then use **System Settings → Privacy & Security →
+Open Anyway**, if offered, following [Apple's instructions](https://support.apple.com/en-gb/102445).
+Do not disable Gatekeeper or remove quarantine attributes. A damaged or modified
+app warning calls for a fresh verified copy, rather than forcing it open.
+
 ## Native build and repeatable evidence
 
 From this checkout on the Mac, install/select Xcode command-line tools and ensure
@@ -37,12 +70,37 @@ For a build alone:
 ./scripts/build-macos-companion.sh
 ```
 
-The result is `macos/dist/Approval Companion.app`, signed ad hoc for local
-use. Copy it into `/Applications` or `~/Applications` and open that installed
-copy before enabling login startup. It is not notarized. Keychain ACLs,
-notification permission and login registration need a logged-in Mac; a CI build
-cannot establish that these operator flows work. Rebuilding an ad-hoc-signed app
-may prompt again for Keychain access or require login registration to be refreshed.
+The result is `macos/dist/Approval Companion.app`, signed ad hoc for local use.
+Follow the install and upgrade guidance above when copying it to `/Applications`
+or `~/Applications`. Keychain ACLs, notification permission and login registration
+need a logged-in Mac; a CI build cannot establish that these operator flows work.
+
+To build a local drag-to-Applications download on the Apple Silicon Mac:
+
+```sh
+./scripts/package-macos-companion.sh
+```
+
+An optional first argument selects the output directory. The script calls the
+existing app builder in fresh private staging, checks the built app's version,
+build number, arm64 architecture and signature, and creates a compressed read-only
+disk image. It verifies the image and writes its SHA256 checksum before publishing
+the outputs. For version `0.1.0`, build `1`, these are:
+
+```text
+macos/dist/Approval-Companion-0.1.0-1-arm64.dmg
+macos/dist/Approval-Companion-0.1.0-1-arm64.dmg.sha256
+```
+
+Packaging refuses existing output filenames, including symlinks; choose a new
+output directory to rebuild the same version. The output filesystem must support
+hard links, such as APFS or HFS+; this is checked before building. To use an exFAT
+drive, build on the Mac's local disk and copy the completed DMG and checksum pair
+to that drive afterward. Temporary staging is removed when the script exits;
+on failure, any partial outputs still belonging to that invocation are removed.
+Packaging neither installs nor launches the app, registers login
+startup, nor copies an operator's configuration. This is a local development
+artifact, not a public release or a Developer ID/notarization workflow.
 
 ## Private CA and packaged app policy
 

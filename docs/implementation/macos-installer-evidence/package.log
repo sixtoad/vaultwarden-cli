@@ -1,0 +1,52 @@
+Building for production...
+[Planning deferred tasks]
+[22 / 34]
+[23 / 35] CompanionCore
+[33 / 73]
+[34 / 73]
+[39 / 73]
+[43 / 73]
+[44 / 73]
+[48 / 73]
+[50 / 73]
+[51 / 73]
+[54 / 73]
+[57 / 73]
+[59 / 73]
+[60 / 73]
+[62 / 73] CompanionCore
+[69 / 74] ApprovalCompanion-product
+[80 / 107]
+[88 / 107]
+[89 / 107]
+[94 / 107]
+[98 / 107]
+[100 / 107]
+[101 / 107]
+[103 / 107] ApprovalCompanion-product
+[105 / 107] ApprovalCompanion-product
+[106 / 107] ApprovalCompanion-product
+Build complete! (10.50 secs)
+/tmp/companion-installer.TZ9sC4g9/output/.companion-package.FyRyTl/build/Approval Companion.app/Contents/Info.plist: OK
+/tmp/companion-installer.TZ9sC4g9/output/.companion-package.FyRyTl/build/Approval Companion.app: replacing existing signature
+Development bundle: /tmp/companion-installer.TZ9sC4g9/output/.companion-package.FyRyTl/build/Approval Companion.app
+Checksumming Protective Master Boot Record (MBR : 0)…
+Protective Master Boot Record (MBR :: verified   CRC32 $BCD2DB75
+Checksumming GPT Header (Primary GPT Header : 1)…
+ GPT Header (Primary GPT Header : 1): verified   CRC32 $F2424BDB
+Checksumming GPT Partition Data (Primary GPT Table : 2)…
+GPT Partition Data (Primary GPT Tabl: verified   CRC32 $4AF4B210
+Checksumming  (Apple_Free : 3)…
+                    (Apple_Free : 3): verified   CRC32 $00000000
+Checksumming disk image (Apple_HFS : 4)…
+          disk image (Apple_HFS : 4): verified   CRC32 $E6371444
+Checksumming  (Apple_Free : 5)…
+                    (Apple_Free : 5): verified   CRC32 $00000000
+Checksumming GPT Partition Data (Backup GPT Table : 6)…
+GPT Partition Data (Backup GPT Table: verified   CRC32 $4AF4B210
+Checksumming GPT Header (Backup GPT Header : 7)…
+  GPT Header (Backup GPT Header : 7): verified   CRC32 $C0261C42
+verified   CRC32 $220E9BC0
+hdiutil: verify: checksum of "/tmp/companion-installer.TZ9sC4g9/output/.companion-package.FyRyTl/Approval-Companion-0.1.0-1-arm64.dmg" is VALID
+Development disk image: /tmp/companion-installer.TZ9sC4g9/output/Approval-Companion-0.1.0-1-arm64.dmg
+SHA256 file: /tmp/companion-installer.TZ9sC4g9/output/Approval-Companion-0.1.0-1-arm64.dmg.sha256
