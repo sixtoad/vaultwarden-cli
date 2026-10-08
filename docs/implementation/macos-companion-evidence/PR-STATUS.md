@@ -32,3 +32,7 @@ Live-backend credentials were unavailable: 71 early-return tests per Linux profi
 - [Linux verification](password-rejection-fix/README.md)
 
 Dated records saying publication was unauthorized or had not occurred describe their original verification snapshots; this document records the subsequent explicit publication authorization.
+
+## Native CI fixture correction
+
+The first merged native CI job hit its20-minute budget after23Swift tests and17/20bundle cases passed. A synthetic HTTP-server reverse-DNS lookup added about35seconds per fixture start. The fixture now binds directly to its numeric loopback address; the timeout, production code and full security matrix are unchanged. The original behavior fails the focused startup regression, the fix passes, and reverting it is caught at runtime. Hosted validation of this test-only change is recorded in [PR checks](https://github.com/sixtoad/vaultwarden-cli/pull/33/checks); see [diagnosis and local evidence](ci-fixture-startup/README.md). This does not close the separate manual approval gate.

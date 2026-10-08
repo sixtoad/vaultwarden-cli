@@ -24,6 +24,7 @@ report="$(cd "$report" && pwd)"
     printf '%s\n' 'Source snapshot without Git metadata or source-manifest.json.'
   fi
 } > "$report/environment.txt"
+python3 "$root/macos/Tests/Fixtures/test_tls_fixture.py" 2>&1 | tee "$report/fixture-startup-tests.log"
 swift test --package-path "$root/macos" --filter ProtocolTests 2>&1 | tee "$report/protocol-tests.log"
 swift test --package-path "$root/macos" --filter AppModelTests 2>&1 | tee "$report/app-model-tests.log"
 swift test --package-path "$root/macos" --filter TLSTests 2>&1 | tee "$report/real-urlsession-tls.log"
