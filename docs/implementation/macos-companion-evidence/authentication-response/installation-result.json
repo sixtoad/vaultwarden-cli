@@ -1,0 +1,25 @@
+{
+  "user_authorization": [
+    "do it",
+    "resume"
+  ],
+  "installed_at_utc": "2026-10-07T10:28:12Z",
+  "destination": "/Users/sixtocantolla/Applications/Approval Companion.app",
+  "source": "/tmp/vw-companion-native.reIOJJ/auth-error-repro/corrected-final-evidence/bundle/Approval Companion.app",
+  "executable_sha256": "d750c8ff625c2da5ce380727abfd5aad8f4f5ee1f73682d4197f5813419c1273",
+  "info_plist_sha256": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a",
+  "source_and_destination_hashes_verified": true,
+  "strict_signature_verified": true,
+  "overwrote_existing_installation": false,
+  "old_temporary_process_terminated": 60645,
+  "installed_app_pid": 235,
+  "saved_configuration_preserved": true,
+  "login_registration_requested": false,
+  "os_permission_changes_performed": false,
+  "logged_in_acceptance_complete": false,
+  "operator_notification_permission": "Notifications enabled",
+  "installed_process_path_verified": true,
+  "actual_installed_app_http200": "2026-10-07 11:28:42 through 11:29:03 Dublin; repeated authenticated reads",
+  "notification_delivery_click_acceptance": "User confirmed delivery and click opened app; existing Setup tab remained selected, routing fix required",
+  "wrong_password_acceptance": "User confirmed explicit authentication_failed; provider audit submitted to expired, no execution"
+}

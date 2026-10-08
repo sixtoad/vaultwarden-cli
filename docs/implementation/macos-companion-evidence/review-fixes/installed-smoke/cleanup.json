@@ -1,0 +1,17 @@
+{
+  "at_utc": "2026-10-08T11:24:20.359783+00:00",
+  "unit": "vw-companion-acceptance-mttxnfa5.service",
+  "MainPID": "0",
+  "Result": "success",
+  "ActiveState": "inactive",
+  "finished": {
+    "observed_requests": 1,
+    "shutdown": "complete"
+  },
+  "source_sha256": {
+    "src/adapters/companion.rs": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3",
+    "src/adapters/companion_acceptance_tests.rs": "35504d2226a02ec38a5cafdda10305de40435398e11cd5a4deb105d6f5ec39b9",
+    "tests/companion-acceptance.py": "244df78e11094b615456ba39285348bb0e36dedbe08722de616e5aba2fefd469",
+    "tests/companion-stale-acceptance.py": "348fc159214bc858e4b3d1bc1b1e4a06c37e5a6674e2b9ff35658f3668cd74c1"
+  }
+}

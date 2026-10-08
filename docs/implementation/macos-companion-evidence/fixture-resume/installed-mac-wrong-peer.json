@@ -1,0 +1,52 @@
+{
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+  "steps": [
+    {
+      "step": "original_stopped",
+      "at_utc": "2026-10-07T15:53:59.888160+00:00"
+    }
+  ],
+  "original_pair_sha256": {
+    "server.pem": "93b75b50cff7fbd40d036e8df407e0e390716cf8385046cfe883db9550680289",
+    "server-key.pem": "aca4d085467a02fed26c0438d963976d7c9f3d876c82886cc26cdc17f8a86c55"
+  },
+  "unchanged_client_material_sha256": {
+    "ca.pem": "2ac16774f6b9b4ca4ab78897e6a9b3e3843f4cdb7e2c69ea50aa180ea12a2f03",
+    "client.pem": "a348cc48bf75dc46d827d070180cfca9a8fd73f8ae39a1c7cb278fc215973c47",
+    "client-key.pem": "4210266aff3a6173ac0ea8d9901f89ed4d3c6e1b52f90964c77895037fbe8b95",
+    "client.p12": "809bd9d0aad91f5c9bcfa851ac954230eec1ee6df42bca8e60a31d3393886f5c"
+  },
+  "registry_before_sha256": "f18f47e026d6cc03e8e587a3b4832fee5667d385efda4784137e7ba774a56df6",
+  "foreign_ready_at_utc": "2026-10-07T15:54:00.153498+00:00",
+  "foreign_server_pin": "74b4daf31d331a4672eadfdbe344ef1ef965245fdff16e837661ee2d94f94bd0",
+  "client_revoked": false,
+  "foreign_window_status": "finished",
+  "foreign_transport": {
+    "counts": {},
+    "decision_status_sequence": [],
+    "drop_next_successful_approval": true,
+    "dropped_approval_replies": 0,
+    "sequence_truncated": false
+  },
+  "same_state_preserved": true,
+  "restored_at_utc": "2026-10-07T15:55:29.987150+00:00",
+  "original_pair_exactly_restored": true,
+  "client_material_and_enrollment_unchanged": true,
+  "postrestore_session": {
+    "generation": 1,
+    "state": "locked",
+    "version": 1
+  },
+  "postrestore_list_http_status": 200,
+  "postrestore_verified_at_utc": "2026-10-07T15:56:09.869256+00:00",
+  "native_witness": {
+    "pid": 69135,
+    "behavior": "cancelAuthenticationChallenge disposition2 then URLSession -999; no HTTP response",
+    "at_utc": [
+      "2026-10-07T15:54:01.813Z",
+      "2026-10-07T15:54:12.335Z",
+      "2026-10-07T15:54:33.352Z"
+    ],
+    "ui_confirmation": false
+  }
+}

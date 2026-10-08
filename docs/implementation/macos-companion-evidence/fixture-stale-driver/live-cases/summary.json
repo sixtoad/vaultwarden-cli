@@ -1,0 +1,36 @@
+{
+  "passed": 3,
+  "failed": 0,
+  "retries": 0,
+  "protected_executions": 0,
+  "native_ui_coverage": false,
+  "cases": [
+    {
+      "case": "lock",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-6czg3kox",
+      "endpoint": "https://127.0.0.1:55389",
+      "request_id": "HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo",
+      "passed": true,
+      "submission_attempts": 1,
+      "final_unit_state": "inactive"
+    },
+    {
+      "case": "revoke-agent",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-wyva2ry3",
+      "endpoint": "https://127.0.0.1:45131",
+      "request_id": "8oJcBR2y5zQsLOSZubA5spzPecsr4Lh_Zp-LnWYafbY",
+      "passed": true,
+      "submission_attempts": 1,
+      "final_unit_state": "inactive"
+    },
+    {
+      "case": "replay-deny",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cfs42p3r",
+      "endpoint": "https://127.0.0.1:49897",
+      "request_id": "FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI",
+      "passed": true,
+      "submission_attempts": 1,
+      "final_unit_state": "inactive"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "exit_code": 1,
+  "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI\",\"state\":{\"status\":\"pending\"}}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI\",\"state\":{\"status\":\"denied\"}}\n",
+  "stderr": "",
+  "synthetic_secret_markers_present": false,
+  "non_tty": true,
+  "distinct_agent_uid": 100007
+}

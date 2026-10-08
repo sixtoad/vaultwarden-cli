@@ -1,0 +1,18 @@
+{
+  "check.log": {
+    "sha256": "fc55698a3555e0e99343302c4b7b9729f048898c25615050b7c8a935f35ad8e4",
+    "bytes": 188
+  },
+  "fmt.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "focused.log": {
+    "sha256": "ed9c8d01fa55071f15333866001521f13dc32f89e190e761b9f9902a0d75cf3c",
+    "bytes": 2186
+  },
+  "results.json": {
+    "sha256": "6f0971012eb7e4ab636b719c2d6df6e7e19ea493be5a5902b5caf59c806715a4",
+    "bytes": 1461
+  }
+}

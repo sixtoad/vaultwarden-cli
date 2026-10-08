@@ -1,0 +1,17 @@
+{
+  "operator_report": "Restarted the machine; shield is in menu bar",
+  "observed_at_utc": "2026-10-07T11:54:03.834120+00:00",
+  "boot_unix_seconds": 1791373769,
+  "boot_time_utc": "2026-10-07T11:49:29Z",
+  "installed_process_pid": 1352,
+  "process_started_at_local": "2026-10-07 12:51:08 Europe/Dublin",
+  "executable": "/Users/sixtocantolla/Applications/Approval Companion.app/Contents/MacOS/ApprovalCompanion",
+  "executable_sha256": "12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853",
+  "console_user": "sixtocantolla",
+  "agent_launched_app_after_reboot": false,
+  "automatic_launch_observed": true,
+  "inbox_and_provider_reconnect_acceptance": "Passed: user unlocked from automatically started installed app; authoritative unlocked generation 4, fresh signed request admitted and operator denied, no execution",
+  "probe": "Read-only ps/stat/sysctl and binary digest; no UI automation or OS permission changes",
+  "ac3_passed": true,
+  "fresh_request_id": "lcN8pXjEpxFHBPxlygX09RLDCqe-831zWmls2G3glag"
+}

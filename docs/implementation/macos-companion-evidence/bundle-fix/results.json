@@ -1,0 +1,139 @@
+{
+  "approval": {
+    "initial_auto_review": "Rejected app-wide ATS change without explicit user authorization",
+    "user_response": "Approve the app-level ATS exception",
+    "applied": true
+  },
+  "policy": {
+    "NSAllowsArbitraryLoads": true,
+    "scope": "Development app; sole production network transport retains HTTPS, TLS1.2+, CA-only/hostname/validity trust, exact leaf pin, mTLS and no redirects/decision retries",
+    "system_trust_changed": false,
+    "production_transport_source_changed": false
+  },
+  "swift_test": {
+    "tests": 9,
+    "failed": 0,
+    "skipped": 0
+  },
+  "bundled_tls": {
+    "cases": 13,
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "strict_ats_regression_reproduced": true,
+    "tls11_fixture_viability": "Separate trusted mTLS handshake negotiated TLSv1.1",
+    "cases_list": [
+      "strict_ats_private_ca_rejected",
+      "configured_private_ca_accepted",
+      "wrong_ca_rejected",
+      "wrong_pin_rejected",
+      "wrong_hostname_rejected",
+      "expired_leaf_rejected",
+      "foreign_client_rejected",
+      "revoked_client_rejected",
+      "http_configuration_rejected",
+      "tls11_rejected",
+      "redirect_rejected",
+      "oversized_response_rejected",
+      "lost_decision_not_retried"
+    ]
+  },
+  "bundle_mutations": {
+    "total": 7,
+    "caught_runtime": 7,
+    "survivors": 0,
+    "skipped": 0,
+    "restored_baseline_passed": true,
+    "source_bytes_restored": true,
+    "results": [
+      {
+        "name": "remove_leaf_pin",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "wrong_pin_rejected"
+        ],
+        "seconds": 3.42
+      },
+      {
+        "name": "skip_trust_evaluation",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "wrong_ca_rejected"
+        ],
+        "seconds": 3.55
+      },
+      {
+        "name": "skip_hostname_validation",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "wrong_hostname_rejected"
+        ],
+        "seconds": 3.82
+      },
+      {
+        "name": "allow_http_configuration",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "http_configuration_rejected"
+        ],
+        "seconds": 4.63
+      },
+      {
+        "name": "allow_tls11",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "tls11_rejected"
+        ],
+        "seconds": 4.94
+      },
+      {
+        "name": "retry_lost_decision",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "lost_decision_not_retried"
+        ],
+        "seconds": 5.34
+      },
+      {
+        "name": "remove_response_bounds",
+        "exit_code": 1,
+        "runtime_assertion_failures": [
+          "oversized_response_rejected"
+        ],
+        "seconds": 5.42
+      }
+    ]
+  },
+  "source_match": {
+    "checked_files": 13,
+    "matched_files": 13,
+    "mismatches": []
+  },
+  "bundle": {
+    "built": true,
+    "plist_lint": "passed",
+    "codesign_verify_strict": "passed",
+    "reopened": true,
+    "bundle": "/tmp/vw-companion-native.reIOJJ/final-evidence/bundle/Approval Companion.app",
+    "info_plist_sha256": "e0c68562c23a2a85952744d6c64a8f6602f6797b473d8ec12e0c880e5457c10a",
+    "executable_sha256": "ff10cd2937a7b7e571c945f90ee6d280618ac06f7d498815ec8bcaf90f08f13c",
+    "preferences_preserved": true,
+    "open_exit_code": 0
+  },
+  "keychain_cleanup": "Verified for Swift fixture and every bundled case; no production identity or system trust changes",
+  "manual_acceptance": "Tracked separately by parent in interactive-acceptance.json; automated checks do not establish UI/login/execution completion",
+  "evidence": {
+    "archive": "bundle-fix-evidence.tar.gz",
+    "sha256": "f07d9fa44c4036552faddc93220e8ae43161cbc2c70f375da989d1c58e409e66",
+    "original_files": 240,
+    "every_original_byte_verified_before_removal": true,
+    "prior_archive_unchanged": "../native-evidence.tar.gz"
+  },
+  "actual_gui_connection": {
+    "user_confirmed": "Connected Provider unlocked",
+    "app_pid": 18791,
+    "root_observed_transport": "HTTP 200 after fix",
+    "keychain_prompt_reported": false,
+    "full_manual_acceptance_complete": false
+  }
+}

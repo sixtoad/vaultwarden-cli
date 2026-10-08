@@ -1,0 +1,1086 @@
+{
+  "scenario": "logged-in Mac/Linux synthetic acceptance continuation",
+  "status": "Paused: final patched-native wrong-password rejection passed, correct-password smoke request expired before operator decision; synthetic provider cleanly stopped",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+  "endpoint": "https://pop-os.int.cantolla.casa:40701",
+  "provider_unit": "vw-companion-acceptance-mttxnfa5.service",
+  "started_at_utc": "2026-10-08T11:16:05.046884+00:00",
+  "bounded_lifetime_seconds": 1200,
+  "expected_fixture_end_utc": "2026-10-08T11:36:05.046884+00:00",
+  "identity": {
+    "provider_leaf_sha256": "de65b1614d912e3ba7cc5036536a4d0fbf993d7c3dc9eeac432d557ec85bf33e",
+    "server_certificate_not_before_utc": "2026-10-06T11:47:41Z",
+    "server_certificate_not_after_utc": "2026-10-08T11:47:41Z",
+    "agent_uid": 100007,
+    "agent_gid": 1000,
+    "agent_binding_id": "90U6wd0Eqp12mg9BmbKDB7U0ERB2xWU63CqtciUfc9I",
+    "client_leaf_sha256": "1abbb4e498a008bacea6d920ba59eb64dbafdfa46f52eddeb6362a77bd658310"
+  },
+  "latest_fixture_report_sha256": "b5b269475126e4e958f3de4594fcd7773da15d7755b382732bf7d71c0f823e6e",
+  "current_fixture_signed_submissions": 1,
+  "current_fixture_submission_attempts": 1,
+  "current_fixture_state": {
+    "session": "stopped",
+    "generation": 2,
+    "requests": [
+      {
+        "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+        "status": "expired"
+      }
+    ],
+    "service": "inactive"
+  },
+  "last_signed_request": {
+    "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+    "admitted_at_utc": "2026-10-08T11:17:36Z",
+    "expires_at_utc": "2026-10-08T11:22:36Z",
+    "status": "expired"
+  },
+  "fixture_observation_cadence": {
+    "before_ms": 100,
+    "after_ms": 1000,
+    "scope": "Only src/adapters/companion_acceptance_tests.rs observer sleep and explanation",
+    "reason": "Reduce redundant gated full-state reads from manual test observer; earlier competing lock holder remains unproven",
+    "verification": "fixture-observation-cadence/results.json",
+    "focused_passed": 15,
+    "focused_ignored": 1,
+    "production_changes": false
+  },
+  "history_archive": {
+    "path": "interactive-continuation-history-2026-10-07T1207Z.tar.gz",
+    "sha256": "fca538284460a97122902cca8767a051ed6b1468a10ca02ced568f7385ce41aa",
+    "original_bytes": 67842,
+    "original_sha256": "513de48323800fd9fcb2b0a307b8c066987ed3e23a612b85d67a4bcbd1cf7d72",
+    "byte_for_byte_extraction_verified": true,
+    "contains": "Every prior observation, user report, fixture lifecycle, signed CLI output, initial failures, busy rejections and diagnostic limitations through terminal post-login denial"
+  },
+  "totals_through_archive": {
+    "signed_cli_attempts": 11,
+    "durably_admitted_requests": 6,
+    "expired": 3,
+    "denied": 2,
+    "completed": 1,
+    "busy_rejections_without_admission": 4,
+    "locked_rejections_without_admission": 1,
+    "protected_executions": 1,
+    "synthetic_secret_marker_leaks": 0
+  },
+  "verified_acceptance": {
+    "approval": "Installed Mac notification opened full review from Setup; fresh correct password produced exactly one protected Linux execution; distinctUID100007 nonTTY signed CLI returned redacted completed/exit0. Request fy_NI7FeSUlBG8xjgLDoj8o9c0hLcjofFSL2YLIsNMQ.",
+    "wrong_password": "Operator confirmed explicit authentication_failed; no execution, request subsequently expired.",
+    "deny": "Two native denials verified by durable submitted\u2192denied audit and redacted CLI exit1 with no execution.",
+    "locked_submission": "Signed CLI rejected locked, no durable request/execution, on1s-observer fixture _3k532cp.",
+    "native_unlock_fresh_work": "Post-reboot native unlock changed locked/gen3 to unlocked/gen4; zero old requests; first fresh signed request lcN8pXjEpxFHBPxlygX09RLDCqe-831zWmls2G3glag admitted then denied12:06:52UTC.",
+    "login_startup": "User reports Macrestart and shieldmenuicon after Startatlogin enabled; parentverified boot11:49:29UTC and exactinstalled appPID1352start11:51:08UTC without agentlaunch; user openedinbox and nativeunlock succeeded. See login-startup.json.",
+    "expiry": "Prior unanswered requests expired with no execution.",
+    "lost_reply": "Passed: operatorconfirmedexplicitapproval; provider droppedexactlyone successfulreply afterrealcommit/dispatch; installedMac sent decisiononce thenstatusonce; durableworkercompletedonce and redactedCLIexit0. Operator didnot separatelyquote uncertaintytext.",
+    "quit_reopen": "Passed: userconfirmedappclosed and parentverifiedprocessabsence before NoJ7M6AU admission; authenticatedcommandcounts remainedzero through expiry/noexecution; signedCLIexit4 wait_timeout. Originalidentity/config restored afternegativeidentityprobe; session/listreadsresumed and userconfirmednopending afterreopen15:38:08UTC.",
+    "missing_identity": "Scopedproof: actualinstalledapp withinvalidopaqueidentityreference sent zeroauthenticatedcommands; exactoriginalidentity/config restored and readsresumed. NegativeUIerror text notoperatorconfirmed; detailednative evidenceparent-owned.",
+    "integrated_stale_authority": "Real TLS synthetic cases lock, revoked agent binding, consumed denial replay, same-state restart and offline device revocation passed; old decisions rejected409 stale or403 unauthorized, no execution. See fixture-stale-driver/live-cases and fixture-resume.",
+    "revoked_device": "Passed on installed Mac PID69135: same durable provider stopped, exact client revoked offline, resumed; session/list/review403 and native URLSession403/-1206 pairs at15:48:58 and15:50:01UTC. Real stopped-provider re-enrollment restored same exact client; same-root resume locked/gen1, old request expired/noexecution. Negative UI text not separately confirmed.",
+    "wrong_peer": "Installed Mac PID69135 canceled foreign-CA same-host server trust challenges (disposition2, URLSession-999); no HTTP response, fixture authenticated commandcounts empty. Exact original certificate/key bytes restored, client material and enrollment unchanged, same durable state preserved; session/list200 locked verified. Native postrestore reads separately captured by parent/native lane.",
+    "sleep_recovery": "Accepted: actual powerlog and operator confirm sleep during request admission, wake/reconnect and automatic inbox refresh; ordinary expiry/noexecution and separate verified quit-through-expiry together cover frozen unavailable-Mac requirement. Wake37seconds before expiry is retained; no asleep-at-expiry claim."
+  },
+  "retained_limitations": [
+    "Scope note, not an open completion gate: actual Mac wake preceded request expiry by37seconds. Sleep/recovery and ordinary expiry passed, combined with separate quit-through-expiry evidence for frozen unavailable-Mac behavior; expiry while asleep itself is not claimed.",
+    "Integrated real-TLS stale lock/restart/binding revocation/consumed-ticket cases and installed Mac revoked-device network rejection passed. Native app does not intentionally send invalidated review tickets; negative UI text not separately confirmed.",
+    "Earlier busy admission was proven authority-gate contention; exact competing holder not established. Reducing test-only observer cadence100ms\u21921s reduced redundant gated reads. Later locked and postunlock submissions succeeded firstattempt; this does not establish unique causation.",
+    "Historical wrong-password403/ATS/notification routing failures and initial user missedfield confusion preserved in archive; corrected behavior subsequently verified.",
+    "External livebackend credentials unavailable; native/Linux automated exclusions recorded in respective evidence ledgers.",
+    "Sleep-test CLIobserver exited143 before terminal output was retained; durable expiry/noexecution independentlyverified, CLI timeout not claimed."
+  ],
+  "signed_agent_submissions": 17,
+  "protected_executions": 2,
+  "observations": [
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-hiavsow6",
+      "provider_unit": "vw-companion-acceptance-hiavsow6.service",
+      "started_at_utc": "2026-10-07T11:53:46Z",
+      "ended_early_after_postlogin_denial": true,
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "lcN8pXjEpxFHBPxlygX09RLDCqe-831zWmls2G3glag",
+            "status": {
+              "status": "denied"
+            }
+          }
+        ],
+        "session": "unlocked"
+      },
+      "protected_executions": 0,
+      "kind": "post_login_acceptance_fixture_shutdown",
+      "at_utc": "2026-10-07T12:08:51.669146+00:00",
+      "operator_denial_confirmed": true
+    },
+    {
+      "at_utc": "2026-10-07T13:48:14.507816+00:00",
+      "kind": "actual_mac_sleep_expiry_request_pending",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+      "fixture_binary_sha256": "374c5cfbfa0147af8a1dcb4184f99ba448ea85c963fe624e54cbb0ab024f4bc1",
+      "test_fixture_source_sha256": "bc41651d9f5933bd64513d4a237577ea0058270cc93c5863a28ff6b286ee1823",
+      "production_hashes_unchanged": 10,
+      "client_revoked": false,
+      "operator_ready_for_sleep": true,
+      "actual_sleep_verified": false,
+      "execution_claimed": false,
+      "no_decision_authorized": true
+    },
+    {
+      "at_utc": "2026-10-07T13:52:05.202181+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "requests": [
+        {
+          "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+          "status": {
+            "status": "pending"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "r6_UOjmQ7-hzS_EtMjW0aET3zmW5c62nxv1GHfGw55o",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "sleep_check_before_expiry"
+    },
+    {
+      "at_utc": "2026-10-07T13:52:25.301068+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "requests": [
+        {
+          "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+          "status": {
+            "status": "expired"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "r6_UOjmQ7-hzS_EtMjW0aET3zmW5c62nxv1GHfGw55o",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "expired",
+              "status": {
+                "status": "expired"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "actual_sleep_request_expiry"
+    },
+    {
+      "at_utc": "2026-10-07T13:52:57.058961+00:00",
+      "kind": "sleep_cli_observer_interrupted",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+      "observer_tool_exit_code": 143,
+      "cli_terminal_output_retained": false,
+      "cause": "unestablished",
+      "cli_timeout_claimed": false,
+      "resubmitted": false
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "provider_unit": "vw-companion-acceptance-s9k0gm1l.service",
+      "started_at_utc": "2026-10-07T13:47:08Z",
+      "ended_before_bound_awaiting_operator_wake": true,
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+            "status": {
+              "status": "expired"
+            }
+          }
+        ],
+        "session": "locked"
+      },
+      "protected_executions": 0,
+      "kind": "sleep_fixture_clean_shutdown",
+      "at_utc": "2026-10-07T14:06:22.434991+00:00"
+    },
+    {
+      "at_utc": "2026-10-07T14:21:18.950494+00:00",
+      "kind": "provider_restored_after_operator_wake_return",
+      "previous_fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "operator_report": "Disconnected after wake",
+      "confirmed_endpoint_cause": "Previousprovider intentionally stoppedcleanly14:05UTC before operatorreturned14:19UTC",
+      "mac_defect_inferred": false,
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "fixture_binary_sha256": "de9f7687645abc91b1e6dbdf9ec23a3830055124b4c4338e94ad4e78b24c1666",
+      "drop_approval_reply": true,
+      "client_revoked": false,
+      "session": {
+        "state": "unlocked",
+        "generation": 2
+      },
+      "pending_requests": 0,
+      "signed_submissions": 0
+    },
+    {
+      "at_utc": "2026-10-07T14:31:10.376899+00:00",
+      "kind": "lost_reply_test_pending",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+      "operator_reconnected_unlocked": true,
+      "old_expired_request_revived": false,
+      "sleep_across_deadline_confirmed": false,
+      "counter_baseline": {
+        "session": 100,
+        "list": 100,
+        "decision": 0,
+        "status": 0,
+        "dropped_approval_replies": 0
+      },
+      "submission_retry": false
+    },
+    {
+      "at_utc": "2026-10-07T14:33:14.526968+00:00",
+      "kind": "installed_app_lost_reply_transport_and_execution_verified",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+      "transport": {
+        "counts": {
+          "decision": 1,
+          "list": 132,
+          "review": 1,
+          "session": 132,
+          "status": 1
+        },
+        "decision_status_sequence": [
+          "decision",
+          "status"
+        ],
+        "drop_next_successful_approval": false,
+        "dropped_approval_replies": 1,
+        "sequence_truncated": false
+      },
+      "execution_started_events": 1,
+      "cli_exit_code": 0,
+      "synthetic_secret_markers_absent": true
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "provider_unit": "vw-companion-acceptance-v08cxvy0.service",
+      "started_at_utc": "2026-10-07T14:20:37Z",
+      "ended_after_successful_lostreply_acceptance": true,
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+            "status": {
+              "exit_code": 0,
+              "status": "completed"
+            }
+          }
+        ],
+        "session": "unlocked"
+      },
+      "protected_executions": 1,
+      "kind": "lost_reply_fixture_clean_shutdown",
+      "at_utc": "2026-10-07T14:34:12.997426+00:00",
+      "operator_approved": true
+    },
+    {
+      "at_utc": "2026-10-07T15:14:58.723716+00:00",
+      "kind": "actual_mac_quit_expiry_pending",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-ifv1xp7a",
+      "request_id": "ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44",
+      "counter_baseline": {
+        "counts": {
+          "list": 1,
+          "session": 1
+        },
+        "decision_status_sequence": [],
+        "drop_next_successful_approval": true,
+        "dropped_approval_replies": 0,
+        "sequence_truncated": false
+      },
+      "approval_intended": false,
+      "operator_ready": true
+    },
+    {
+      "at_utc": "2026-10-07T15:19:23.355444+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-ifv1xp7a",
+      "requests": [
+        {
+          "request_id": "ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44",
+          "status": {
+            "status": "expired"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "LKlD49W0zvhrSwZ36EQCoqV4Rx2lbDl0O3IzjmWjEAY",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "expired",
+              "status": {
+                "status": "expired"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "quit_check_near_deadline"
+    },
+    {
+      "at_utc": "2026-10-07T15:19:48.832237+00:00",
+      "kind": "quit_check_gap",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-ifv1xp7a",
+      "request_id": "ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44",
+      "provider_read_counts_at_151638utc": {
+        "session": 19,
+        "list": 19
+      },
+      "provider_read_counts_at_151755utc": {
+        "session": 34,
+        "list": 34
+      },
+      "actual_quit_verified": false,
+      "resubmission": false
+    },
+    {
+      "at_utc": "2026-10-07T15:26:14.101904+00:00",
+      "kind": "verified_app_quit_before_fresh_request",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+      "request_id": "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo",
+      "operator_closed_confirmation_utc": "2026-10-07T15:24:45Z",
+      "parent_process_absence_verified": true,
+      "counter_baseline": {},
+      "verified_fixture_binary_sha256": "de9f7687645abc91b1e6dbdf9ec23a3830055124b4c4338e94ad4e78b24c1666"
+    },
+    {
+      "at_utc": "2026-10-07T15:30:24.249929+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+      "requests": [
+        {
+          "request_id": "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo",
+          "status": {
+            "status": "pending"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "90U6wd0Eqp12mg9BmbKDB7U0ERB2xWU63CqtciUfc9I",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "verified_quit_expiry"
+    },
+    {
+      "at_utc": "2026-10-07T15:30:46.399440+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+      "requests": [
+        {
+          "request_id": "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo",
+          "status": {
+            "status": "expired"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "90U6wd0Eqp12mg9BmbKDB7U0ERB2xWU63CqtciUfc9I",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "expired",
+              "status": {
+                "status": "expired"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "verified_quit_after_deadline"
+    },
+    {
+      "at_utc": "2026-10-07T15:31:00.580459+00:00",
+      "kind": "confirmed_quit_no_fallback_expiry",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+      "request_id": "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo",
+      "transport": {
+        "counts": {},
+        "decision_status_sequence": [],
+        "drop_next_successful_approval": true,
+        "dropped_approval_replies": 0,
+        "sequence_truncated": false
+      },
+      "cli_exit_code": 4,
+      "synthetic_secret_markers_absent": true
+    },
+    {
+      "at_utc": "2026-10-07T15:44:07.332634+00:00",
+      "kind": "operator_confirmed_quit_recovery_and_emptyinbox",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+      "request_id": "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo",
+      "operator_no_pending_confirmation_utc": "2026-10-07T15:38:08Z",
+      "parent_verified_identity_config_restore": true,
+      "authenticated_reads_resumed": true
+    },
+    {
+      "at_utc": "2026-10-07T15:49:56.024342+00:00",
+      "kind": "actual_mac_endpoint_same_root_offline_revocation",
+      "evidence": "fixture-resume/installed-mac-revocation.json",
+      "ready_at_utc": "2026-10-07T15:48:53.009528+00:00",
+      "binding_policy_requests_preserved": true,
+      "exact_client_read_commands_http403": [
+        "session",
+        "list",
+        "review"
+      ],
+      "execution_started_events": 0,
+      "approval_review_timeout": "First transition automatic approval review timed out without execution; one permitted retry succeeded after original fixture had naturally completed."
+    },
+    {
+      "kind": "same_root_revoked_device_native_witness_and_restore",
+      "at_utc": "2026-10-07T15:52:20.432949+00:00",
+      "native_pid": 69135,
+      "native_http403_urlsession_minus1206_utc": [
+        "2026-10-07T15:48:58.397Z",
+        "2026-10-07T15:50:01.419Z"
+      ],
+      "restoration_evidence": "fixture-resume/installed-mac-restoration.json",
+      "original_state_preserved": true,
+      "negative_ui_confirmation": false
+    },
+    {
+      "kind": "actual_installed_mac_wrong_peer_then_exact_restore",
+      "at_utc": "2026-10-07T15:56:09.869256+00:00",
+      "evidence": "fixture-resume/installed-mac-wrong-peer.json",
+      "foreign_authenticated_command_counts": {},
+      "native_challenge_cancelled": true,
+      "original_pair_exactly_restored": true,
+      "same_state_preserved": true,
+      "postrestore_session": {
+        "generation": 1,
+        "state": "locked",
+        "version": 1
+      }
+    },
+    {
+      "kind": "actual_sleep_fixture_ready",
+      "at_utc": "2026-10-08T09:35:29.792319+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "source_hashes_unchanged": true,
+      "binary_sha256": "598411a59b83da44a6f062a2a2fa107c611c5e194bcca2822e0f8e092f019f8a",
+      "prior_fixture_inactive_and_cleanup_complete": true,
+      "session": "unlocked",
+      "generation": 2,
+      "request_count": 0,
+      "certificate_expiry_utc": "2026-10-08T11:47:41Z"
+    },
+    {
+      "kind": "coordinated_actual_sleep_single_submission",
+      "at_utc": "2026-10-08T09:41:07.412901+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "request_id": "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI",
+      "expires_at_utc": "2026-10-08T09:45:30+00:00",
+      "operator_wake_instruction_dublin": "2026-10-08T10:46:00+01:00",
+      "execution_claimed": false,
+      "mac_contact_during_window": false
+    },
+    {
+      "at_utc": "2026-10-08T09:45:56.738169+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "requests": [
+        {
+          "request_id": "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI",
+          "status": {
+            "status": "expired"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "7g5D1VW5OrNoF6TzSAPGe9RHH4mz7-vZCNTS8sqO0po",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "expired",
+              "status": {
+                "status": "expired"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "actual_sleep_request_expired_after_wake"
+    },
+    {
+      "kind": "operator_and_powerlog_confirm_sleep_recovery_but_early_wake",
+      "at_utc": "2026-10-08T09:47:53.324651+00:00",
+      "operator_report": "I left it open, when I woke up the mac I caould see the pending request, it refreshed itself after few seconds and disappeared",
+      "powerlog_utc": {
+        "sleep": "2026-10-08T09:36:33Z",
+        "dark_wake": "2026-10-08T09:37:05Z",
+        "sleep_again": "2026-10-08T09:37:26Z",
+        "wake": "2026-10-08T09:44:53Z"
+      },
+      "wake_before_request_expiry_seconds": 37,
+      "verified_scope": "Actual sleep, wake/reconnect and automatic inbox refresh removing ordinarily expired request; no execution. Expiry while asleep not established."
+    },
+    {
+      "kind": "final_fixture_cleanup_complete",
+      "at_utc": "2026-10-08T09:49:37.821822+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "shutdown": "complete",
+      "unit_state": "inactive",
+      "main_pid": 0,
+      "execution_started_events": 0
+    },
+    {
+      "kind": "final_patched_native_smoke_provider_ready",
+      "at_utc": "2026-10-08T11:16:43.176939+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+      "session": "unlocked",
+      "generation": 2,
+      "request_count": 0,
+      "certificate_expiry_utc": "2026-10-08T11:47:41Z"
+    },
+    {
+      "kind": "final_patched_native_single_submission",
+      "at_utc": "2026-10-08T11:18:02.936143+00:00",
+      "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+      "expires_at_utc": "2026-10-08T11:22:36Z",
+      "normal_fixture_has_command_counters": false,
+      "installed_native_pid_parent_verified": 72015,
+      "installed_binary_hash_prefix_parent_verified": "97c1c9"
+    },
+    {
+      "at_utc": "2026-10-08T11:18:20.172530+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+      "requests": [
+        {
+          "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+          "status": {
+            "status": "pending"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "RgkXoqZh_q9o6YfysKBLjKHHRGgpExQ1Zm9aF8WWreg",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "final_native_wrong_password_rejected_pending_noexecution"
+    },
+    {
+      "at_utc": "2026-10-08T11:23:00.979532+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+      "requests": [
+        {
+          "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+          "status": {
+            "status": "expired"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "RgkXoqZh_q9o6YfysKBLjKHHRGgpExQ1Zm9aF8WWreg",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "expired",
+              "status": {
+                "status": "expired"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0,
+      "kind": "final_native_smoke_wrongpassword_then_expiry"
+    },
+    {
+      "kind": "final_native_smoke_provider_cleanup",
+      "at_utc": "2026-10-08T11:24:20.359783+00:00",
+      "unit_state": "inactive",
+      "main_pid": 0,
+      "shutdown": "complete",
+      "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+      "status": "expired",
+      "execution_started_events": 0
+    }
+  ],
+  "signed_cli_cases": [
+    {
+      "kind": "signed_agent_cli_observer_interrupted",
+      "case": "actual-mac-sleep-expiry-no-decision",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+      "cli_exit_code": null,
+      "observer_tool_exit_code": 143,
+      "terminal_output_retained": false,
+      "observation": {
+        "at_utc": "2026-10-07T13:52:25.301068+00:00",
+        "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+        "requests": [
+          {
+            "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+            "status": {
+              "status": "expired"
+            },
+            "execution_claimed": false,
+            "owner_binding_id": "r6_UOjmQ7-hzS_EtMjW0aET3zmW5c62nxv1GHfGw55o",
+            "audit": [
+              {
+                "ordinal": 0,
+                "outcome": "submitted",
+                "status": {
+                  "status": "pending"
+                }
+              },
+              {
+                "ordinal": 1,
+                "outcome": "expired",
+                "status": {
+                  "status": "expired"
+                }
+              }
+            ]
+          }
+        ],
+        "execution_started_events": 0,
+        "kind": "actual_sleep_request_expiry"
+      },
+      "expected_scenario_verified": false,
+      "limitation": "Durableexpiryverified; CLIterminaloutcomeunknown; actualMacsleep/wake userconfirmationpending"
+    },
+    {
+      "kind": "signed_agent_cli_result",
+      "case": "installed-app-lost-approval-reply",
+      "started_at_utc": "2026-10-07T14:30:34.557739+00:00",
+      "at_utc": "2026-10-07T14:32:28.174899+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "cli_exit_code": 0,
+      "elapsed_seconds": 113.617,
+      "synthetic_secret_markers_absent": true,
+      "observation": {
+        "at_utc": "2026-10-07T14:32:28.175175+00:00",
+        "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+        "requests": [
+          {
+            "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+            "status": {
+              "status": "completed",
+              "exit_code": 0
+            },
+            "execution_claimed": true,
+            "owner_binding_id": "AIFyVRYbQvrd9vmVWz10_Si03XSLYoaPpYz-QBeiyt0",
+            "audit": [
+              {
+                "ordinal": 0,
+                "outcome": "submitted",
+                "status": {
+                  "status": "pending"
+                }
+              },
+              {
+                "ordinal": 1,
+                "outcome": "approved",
+                "status": {
+                  "status": "approved"
+                }
+              },
+              {
+                "ordinal": 2,
+                "outcome": "execution_started",
+                "status": {
+                  "status": "running"
+                }
+              },
+              {
+                "ordinal": 3,
+                "outcome": "succeeded",
+                "status": {
+                  "status": "completed",
+                  "exit_code": 0
+                }
+              }
+            ]
+          }
+        ],
+        "execution_started_events": 1
+      },
+      "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w\",\"state\":{\"status\":\"pending\"}}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w\",\"state\":{\"status\":\"completed\",\"exit_code\":0}}\n",
+      "stderr": "",
+      "transport_recovery_verified": true,
+      "protected_execution_verified": true,
+      "expected_scenario_verified": true,
+      "operator_visible_recovery_confirmation": "Operator confirmsapproved; actualstatusrecovery independentlyprovedbytransportcounter",
+      "operator_approval_confirmed": true
+    },
+    {
+      "kind": "signed_agent_cli_result",
+      "case": "actual-mac-quit-expiry-no-decision",
+      "started_at_utc": "2026-10-07T15:14:20.679740+00:00",
+      "at_utc": "2026-10-07T15:19:20.770164+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-ifv1xp7a",
+      "cli_exit_code": 4,
+      "elapsed_seconds": 300.09,
+      "synthetic_secret_markers_absent": true,
+      "observation": {
+        "at_utc": "2026-10-07T15:19:20.770431+00:00",
+        "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-ifv1xp7a",
+        "requests": [
+          {
+            "request_id": "ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44",
+            "status": {
+              "status": "pending"
+            },
+            "execution_claimed": false,
+            "owner_binding_id": "LKlD49W0zvhrSwZ36EQCoqV4Rx2lbDl0O3IzjmWjEAY",
+            "audit": [
+              {
+                "ordinal": 0,
+                "outcome": "submitted",
+                "status": {
+                  "status": "pending"
+                }
+              }
+            ]
+          }
+        ],
+        "execution_started_events": 0
+      },
+      "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44\",\"state\":{\"status\":\"pending\"}}\n",
+      "stderr": "{\"event\":\"client_error\",\"category\":\"wait_timeout\",\"request_id\":\"ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44\"}\n",
+      "expected_scenario_verified": false,
+      "expiry_without_execution_verified": true,
+      "actual_mac_quit_verified": false,
+      "provider_followup": {
+        "status": "expired",
+        "execution_claimed": false,
+        "execution_started_events": 0
+      }
+    },
+    {
+      "kind": "signed_agent_cli_result",
+      "case": "verified-quit-before-submission-expiry",
+      "started_at_utc": "2026-10-07T15:25:37.041457+00:00",
+      "at_utc": "2026-10-07T15:30:37.129510+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+      "cli_exit_code": 4,
+      "elapsed_seconds": 300.088,
+      "synthetic_secret_markers_absent": true,
+      "observation": {
+        "at_utc": "2026-10-07T15:30:37.129898+00:00",
+        "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+        "requests": [
+          {
+            "request_id": "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo",
+            "status": {
+              "status": "pending"
+            },
+            "execution_claimed": false,
+            "owner_binding_id": "90U6wd0Eqp12mg9BmbKDB7U0ERB2xWU63CqtciUfc9I",
+            "audit": [
+              {
+                "ordinal": 0,
+                "outcome": "submitted",
+                "status": {
+                  "status": "pending"
+                }
+              }
+            ]
+          }
+        ],
+        "execution_started_events": 0
+      },
+      "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo\",\"state\":{\"status\":\"pending\"}}\n",
+      "stderr": "{\"event\":\"client_error\",\"category\":\"wait_timeout\",\"request_id\":\"NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo\"}\n",
+      "expected_scenario_verified": true,
+      "quit_expiry_verified": true,
+      "reopen_verified": true,
+      "provider_followup": {
+        "status": "expired",
+        "execution_claimed": false,
+        "execution_started_events": 0
+      }
+    },
+    {
+      "kind": "signed_agent_cli_result",
+      "case": "actual-mac-sleep-expiry-oct8",
+      "started_at_utc": "2026-10-08T09:40:30.018935+00:00",
+      "at_utc": "2026-10-08T09:45:30.126314+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "cli_exit_code": 4,
+      "elapsed_seconds": 300.107,
+      "synthetic_secret_markers_absent": true,
+      "observation": {
+        "at_utc": "2026-10-08T09:45:30.126569+00:00",
+        "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+        "requests": [
+          {
+            "request_id": "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI",
+            "status": {
+              "status": "pending"
+            },
+            "execution_claimed": false,
+            "owner_binding_id": "7g5D1VW5OrNoF6TzSAPGe9RHH4mz7-vZCNTS8sqO0po",
+            "audit": [
+              {
+                "ordinal": 0,
+                "outcome": "submitted",
+                "status": {
+                  "status": "pending"
+                }
+              }
+            ]
+          }
+        ],
+        "execution_started_events": 0
+      },
+      "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI\",\"state\":{\"status\":\"pending\"}}\n",
+      "stderr": "{\"event\":\"client_error\",\"category\":\"wait_timeout\",\"request_id\":\"BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI\"}\n"
+    },
+    {
+      "kind": "signed_agent_cli_result",
+      "case": "final-patched-native-wrong-then-correct",
+      "started_at_utc": "2026-10-08T11:17:36.773989+00:00",
+      "at_utc": "2026-10-08T11:22:36.871260+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+      "cli_exit_code": 4,
+      "elapsed_seconds": 300.097,
+      "synthetic_secret_markers_absent": true,
+      "observation": {
+        "at_utc": "2026-10-08T11:22:36.871582+00:00",
+        "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+        "requests": [
+          {
+            "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+            "status": {
+              "status": "pending"
+            },
+            "execution_claimed": false,
+            "owner_binding_id": "RgkXoqZh_q9o6YfysKBLjKHHRGgpExQ1Zm9aF8WWreg",
+            "audit": [
+              {
+                "ordinal": 0,
+                "outcome": "submitted",
+                "status": {
+                  "status": "pending"
+                }
+              }
+            ]
+          }
+        ],
+        "execution_started_events": 0
+      },
+      "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA\",\"state\":{\"status\":\"pending\"}}\n",
+      "stderr": "{\"event\":\"client_error\",\"category\":\"wait_timeout\",\"request_id\":\"H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA\"}\n"
+    }
+  ],
+  "completed_fixture_runs": [
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-hiavsow6",
+      "provider_unit": "vw-companion-acceptance-hiavsow6.service",
+      "started_at_utc": "2026-10-07T11:53:46Z",
+      "ended_early_after_postlogin_denial": true,
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "lcN8pXjEpxFHBPxlygX09RLDCqe-831zWmls2G3glag",
+            "status": {
+              "status": "denied"
+            }
+          }
+        ],
+        "session": "unlocked"
+      },
+      "protected_executions": 0
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-s9k0gm1l",
+      "provider_unit": "vw-companion-acceptance-s9k0gm1l.service",
+      "started_at_utc": "2026-10-07T13:47:08Z",
+      "ended_before_bound_awaiting_operator_wake": true,
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+            "status": {
+              "status": "expired"
+            }
+          }
+        ],
+        "session": "locked"
+      },
+      "protected_executions": 0
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "provider_unit": "vw-companion-acceptance-v08cxvy0.service",
+      "started_at_utc": "2026-10-07T14:20:37Z",
+      "ended_after_successful_lostreply_acceptance": true,
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+            "status": {
+              "exit_code": 0,
+              "status": "completed"
+            }
+          }
+        ],
+        "session": "unlocked"
+      },
+      "protected_executions": 1
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-ifv1xp7a",
+      "finished": {
+        "observed_requests": 1,
+        "shutdown": "complete"
+      },
+      "last_observed": {
+        "requests": [
+          {
+            "request_id": "ArZJHmEkfg0e9ESd6v4fspSjsMoO6qMoy8KEqnp6_44",
+            "status": {
+              "status": "expired"
+            }
+          }
+        ],
+        "session": "unlocked"
+      },
+      "reason": "Usermissedquitwindow; replacedafteractualclosedconfirmation",
+      "protected_executions": 0
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "cleanup_at_utc": "2026-10-08T09:49:37.821822+00:00",
+      "shutdown": "complete",
+      "unit_state": "inactive",
+      "request_ids": [
+        "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI"
+      ],
+      "terminal_states": [
+        "expired"
+      ],
+      "execution_started_events": 0
+    },
+    {
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+      "cleanup_at_utc": "2026-10-08T11:24:20.359783+00:00",
+      "shutdown": "complete",
+      "unit_state": "inactive",
+      "request_ids": [
+        "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA"
+      ],
+      "terminal_states": [
+        "expired"
+      ],
+      "execution_started_events": 0
+    }
+  ],
+  "compacted_at_utc": "2026-10-07T12:07:58.596097+00:00",
+  "prepared_next_fixture": null,
+  "fixture_revoked_client_mode": {
+    "enabled_only_by": "tests/companion-acceptance.py start-revoked ROOT",
+    "offline_path": "real identity::enroll then identity::revoke then assert registryempty, before Provider::start",
+    "default_behavior": "unchanged; normal preparedsleepfixture remainsunstarted",
+    "verification": "fixture-revoked-client/results.json",
+    "focused_passed": 15,
+    "focused_ignored": 1,
+    "runtime_acceptance": "pending operatorcoordinated run",
+    "production_changes": false
+  },
+  "fixture_lost_reply_mode": {
+    "enabled_only_by": "tests/companion-acceptance.py start-lost-reply ROOT",
+    "scope": "cfg(test) optionalone-shot drops firstsuccessfulapprovalreply afterrealcommit/dispatch; onlystaticboundedcommandcounts/sequence logged",
+    "verification": "fixture-lost-reply/results.json",
+    "focused_passed": 16,
+    "focused_ignored": 1,
+    "scoped_mutations_killed": 2,
+    "runtime_acceptance": "pending explicitcoordinated invocation"
+  },
+  "fixture_same_state_resume": {
+    "actions": [
+      "resume",
+      "resume-revoked"
+    ],
+    "scope": "Sameproviderauthorityroot, TLS, agentbinding, policyrevision andrequestIDs; noautomaticunlock/re-enrollment; offlineactualdevice revoke optional",
+    "verification": "fixture-resume/results.json",
+    "isolated_runtime_cases_passed": 3,
+    "mac_runtime_case": "passed same-root revoked-device rejection and same-root real enrollment restoration"
+  }
+}

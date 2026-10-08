@@ -1,0 +1,58 @@
+{
+  "status": "native_verified_installed_correct_password_smoke_awaiting_operator",
+  "native_tests_executed_for_patched_tree": true,
+  "native_mutations_planned": 21,
+  "native_mutations_executed": 21,
+  "native_mutation_survivors": 0,
+  "native_build_executed_for_patched_tree": true,
+  "installed_app_updated": true,
+  "blocker": null,
+  "local_checks": "15 input hashes, Python syntax, bash syntax, git diff --check passed; parent read completepatchdiff plus finalboundswitness delta",
+  "mac_scratch": "/tmp/vw-companion-review-fixes.hIhmnk",
+  "required_next": [
+    "Complete final installed notification/password smoke against real Linux signed-agent execution",
+    "Reconcile evidence and final diff; finish BMAD step04 then step05"
+  ],
+  "license_resolution": {
+    "operator_confirmed": true,
+    "parent_swift_check_exit_code": 0,
+    "swift": "6.4 swiftlang-6.4.0.34.1",
+    "target": "arm64-apple-macosx27.0.0",
+    "at_utc": "2026-10-08T11:06:24Z"
+  },
+  "focused_xctest": {
+    "passed": 23,
+    "failed": 0,
+    "protocol": 13,
+    "tls": 2,
+    "app_model": 8,
+    "source": "Parent independently read raw logs and verified archive SHA256"
+  },
+  "host": {
+    "macos": "27.0.1",
+    "xcode": "27",
+    "swift": "6.4"
+  },
+  "native_full_baselines": {
+    "runs": 2,
+    "xctest_passed_per_run": 23,
+    "bundled_tls_passed_per_run": 20,
+    "failures": 0,
+    "skips": 0
+  },
+  "native_mutation_invalids": 0,
+  "source_hashes_restored": 15,
+  "installed_smoke": {
+    "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+    "wrong_password": "operator reported explicit authentication_failed; Linux snapshot pending/noexecution before expiry",
+    "correct_password": "not observed; request expired11:22:36UTC with zeroexecution and CLI4wait_timeout",
+    "notification_route": "awaiting explicit operator confirmation",
+    "next": "Fresh request only after operator readiness"
+  },
+  "publication": {
+    "authorized": "User explicitly requested open PR on2026-10-08",
+    "mode": "draft",
+    "acceptance_gate_waived": false,
+    "merge_or_production_deployment_authorized": false
+  }
+}

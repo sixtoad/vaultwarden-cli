@@ -1,0 +1,14 @@
+{
+  "mac-power-events.json": {
+    "sha256": "0e423bc85e149a2a0086b3ffae1a76e16da86d2f7c04ce6def4430abdea96829",
+    "bytes": 1503
+  },
+  "result.json": {
+    "sha256": "a0b1b4128d073bba014e3dde6a7685df3dd728820eb4f929fd636e6b1b01326b",
+    "bytes": 2016
+  },
+  "cleanup.json": {
+    "sha256": "e99252a1ed3f3c8efa29357bed6a043677b6c33ac074c4f23558dae139cb59fe",
+    "bytes": 251
+  }
+}

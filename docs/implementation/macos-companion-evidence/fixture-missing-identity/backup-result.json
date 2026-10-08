@@ -1,0 +1,15 @@
+{
+  "at_utc": "2026-10-07T15:25:36.450626+00:00",
+  "exit_code": 0,
+  "source_and_binary_hashes_matched": true,
+  "mode": "backup",
+  "app_lifecycle_changed": false,
+  "preferences_modified": false,
+  "identity_substituted": false,
+  "result": {
+    "app_stopped": true,
+    "backup_sha256": "c6122d912fce32c412e975c9b713b197bb6a8edc2c61824af535179e3da78a33",
+    "backup_verified": true,
+    "mode": "backup"
+  }
+}

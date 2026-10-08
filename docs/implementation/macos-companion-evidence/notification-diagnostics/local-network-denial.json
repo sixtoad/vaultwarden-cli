@@ -1,0 +1,16 @@
+{
+  "app_pid": 21950,
+  "timestamp": "2026-10-06 17:28:19.833093+0100",
+  "subsystem": "com.apple.network",
+  "observed_marker": "waiting path (unsatisfied (Local network prohibited), interface: en0, ipv4, ipv6)",
+  "host_tcp_check": {
+    "hostname": "pop-os.int.cantolla.casa",
+    "resolved_ipv4": "192.168.1.235",
+    "port": 40701,
+    "connected": true,
+    "seconds": 0.002
+  },
+  "diagnosis": "macOS local-network privacy prohibited this app process while host connectivity was healthy",
+  "privacy_permissions_changed": false,
+  "signing_identity_changed": false
+}

@@ -1,0 +1,22 @@
+{
+  "result.json": {
+    "sha256": "ef85f69415e986d1bb5516cfcdd81d1936165557cbcc98dbb8b7a33c3ae58e31",
+    "bytes": 1081
+  },
+  "driver.json": {
+    "sha256": "08815f377dc95c14436277bb2fbd5300ff74f6a6e4f8cbb17477794370bcf596",
+    "bytes": 1019
+  },
+  "signed-cli.json": {
+    "sha256": "273b9b42770067e0e56496e529a9fe4cd5828d32361b978e9a51d2f9d73cc04d",
+    "bytes": 553
+  },
+  "finished.json": {
+    "sha256": "4e93282fca3f926753f2043e6ccadb60515879f7512e62f97fbcbb8f0bab8335",
+    "bytes": 55
+  },
+  "durable-audit.json": {
+    "sha256": "428de320baaf091282cf649f1384e26ef6f5814c9fe8f606f42a88f84a3cff2a",
+    "bytes": 201
+  }
+}

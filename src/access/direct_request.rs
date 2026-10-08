@@ -405,6 +405,7 @@ impl TryFrom<DirectRecordWire> for DirectRecord {
 pub(crate) struct PreparedApproval {
     pub(crate) binding: ApprovalBinding,
     pub(crate) generation: u64,
+    pub(crate) companion_deadline: Option<std::time::Duration>,
 }
 pub(crate) struct AuthenticatedApproval(PreparedApproval);
 impl PreparedApproval {

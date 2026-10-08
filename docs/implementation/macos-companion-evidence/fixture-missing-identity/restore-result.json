@@ -1,0 +1,30 @@
+{
+  "at_utc": "2026-10-07T15:33:31.091644+00:00",
+  "invalid_identity_launch_at_utc": "2026-10-07T15:31:54.910432+00:00",
+  "invalid_identity_stop_signal_at_utc": "2026-10-07T15:33:29.544575+00:00",
+  "terminated_exact_pid": 68740,
+  "app_absent_before_restore": true,
+  "source_binary_and_installed_hashes_matched": true,
+  "restore_result": {
+    "app_stopped": true,
+    "current_sha256": "c6122d912fce32c412e975c9b713b197bb6a8edc2c61824af535179e3da78a33",
+    "exact_original_bytes": true,
+    "mode": "restore",
+    "semantic_original_configuration": true
+  },
+  "reopened_process_pid": 69135,
+  "installed_app_sha256": "12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853",
+  "after_launch_check": {
+    "backup_sha256": "c6122d912fce32c412e975c9b713b197bb6a8edc2c61824af535179e3da78a33",
+    "current_sha256": "23d88f63a211e20731267dc84c5b231f4546c00449c7cadb8cd88fe02a92a97c",
+    "exact_original_bytes": false,
+    "identity_reference_matches_original": true,
+    "mode": "check",
+    "semantic_original_configuration": true,
+    "semantic_test_substitution": false
+  },
+  "keychain_modified": false,
+  "permissions_modified": false,
+  "ui_automation_used": false,
+  "operator_invalid_state_observation": "not yet reported"
+}

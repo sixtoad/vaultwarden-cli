@@ -1,0 +1,27 @@
+{
+  "archive_sha256": "0b7705d1f1c27acf5e804ad965c43c6e0e6f61291d5c63a7209aba8121becb4e",
+  "original_files": 157,
+  "original_bytes": 319246,
+  "compressed_bytes": 50334,
+  "byte_for_byte_verified": true,
+  "campaign_status": "passed",
+  "mutation_counts": {
+    "invalid_compile_or_launch": 0,
+    "killed_runtime": 21,
+    "no_tests_executed": 0,
+    "survived": 0,
+    "timeout": 0,
+    "unintended_runtime_failure": 0
+  },
+  "unexecuted_mutations": 0,
+  "bundle_verification": {
+    "source_hashes_matched": 15,
+    "installed_or_opened": false,
+    "bundle": "/private/tmp/vw-companion-review-fixes.hIhmnk/review-verification/restored-baseline/bundle/Approval Companion.app",
+    "codesign_verify_strict_exit_code": 0,
+    "bundle_hashes": {
+      "Contents/MacOS/ApprovalCompanion": "97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113",
+      "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a"
+    }
+  }
+}

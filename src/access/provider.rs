@@ -604,6 +604,24 @@ impl Provider {
         self.state = state;
         Ok(())
     }
+    pub(crate) fn pending_direct_ids(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+    ) -> Result<Vec<String>, super::direct_request::DirectRequestError> {
+        use super::direct_request::DirectStatus;
+        Ok(self
+            .store
+            .read_state()?
+            .requests
+            .iter()
+            .filter_map(|r| r.direct.as_ref())
+            .filter(|d| {
+                d.human_visible(owner, self.owner_uid()) && d.review.status == DirectStatus::Pending
+            })
+            .take(256)
+            .map(|d| d.review.id.clone())
+            .collect())
+    }
     pub(crate) fn direct_review(
         &self,
         owner: super::direct_request::AuthenticatedHuman,

@@ -64,6 +64,20 @@ impl SystemdProcessSupervisor {
             healthy: AtomicBool::new(true),
         })
     }
+    /// Isolated systemd namespace for the explicitly invoked companion acceptance test.
+    #[cfg(test)]
+    pub(crate) fn companion_fixture(
+        provider: String,
+        helper: std::path::PathBuf,
+    ) -> Result<Self, ExecutionError> {
+        let runtime = std::path::PathBuf::from(format!("/run/user/{}", unsafe { libc::geteuid() }));
+        let config = Config::new(provider, helper, &runtime)?;
+        Manager::connect()?.provider(&config)?;
+        Ok(Self {
+            config,
+            healthy: AtomicBool::new(true),
+        })
+    }
     /// Must run under the provider writer lock, before durable validation or admission.
     pub fn recover(&self) -> Result<(), ExecutionError> {
         let manager = Manager::connect()?;

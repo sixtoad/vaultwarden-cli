@@ -1,0 +1,6 @@
+{
+  "baseline_commit": "0c5c1d9a2780132db0c4b313934dbe66716e0851",
+  "branch": "feature/macos-approval-companion",
+  "frozen_intent_sha256": "f199bbc1e405889b9ed9af3e4f84ce73552b8d792975016d4bde53db769601ef",
+  "completion_gate": "Native macOS build/tests and logged-in Mac/Linux acceptance required; Linux-only results cannot mark this work review-ready."
+}

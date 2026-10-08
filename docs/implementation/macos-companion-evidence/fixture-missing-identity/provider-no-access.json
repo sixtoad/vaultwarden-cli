@@ -1,0 +1,14 @@
+{
+  "at_utc": "2026-10-07T15:33:07.821509+00:00",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+  "installed_app_pid": 68740,
+  "invalid_reference_verified_by_helper": true,
+  "transport": {
+    "counts": {},
+    "decision_status_sequence": [],
+    "drop_next_successful_approval": true,
+    "dropped_approval_replies": 0,
+    "sequence_truncated": false
+  },
+  "scope": "Installed unchanged app running with non-resolving identity reference; zero valid authenticated companion commands during bounded observation. UI observation pending; does not claim absence of all network packets."
+}

@@ -1,0 +1,377 @@
+{
+  "finalized": true,
+  "execution_requires_parent_go": true,
+  "source_manifest_sha256": "bc1ef4e4c888af2b33d282f5fb0e5e8166d4b58ff242eb5433a8649b34ea6340",
+  "source_input_count": 15,
+  "required_guards": [
+    "default_ignorable_display",
+    "closed_response_keys",
+    "http_status_body_mapping",
+    "ambiguous_application_error",
+    "switching_unresolved_request",
+    "unlock_lifecycle_epoch",
+    "notification_lifecycle_epoch",
+    "polling_invalidation",
+    "unlock_password_context"
+  ],
+  "full_timeout_seconds": 900,
+  "mutation_timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "omit_default_ignorable_escape",
+      "guard": "default_ignorable_display",
+      "filter": "ProtocolTests",
+      "expected_runtime_failures": [
+        "testReviewTextExposesInvisibleAndDirectionalScalars"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Protocol.swift",
+          "before": "if scalar.properties.isDefaultIgnorableCodePoint {",
+          "after": "if false {",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "accept_extra_response_keys",
+      "guard": "closed_response_keys",
+      "filter": "ProtocolTests",
+      "expected_runtime_failures": [
+        "testClosedV1ResponseAndNestedReviewKeys"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Protocol.swift",
+          "before": "guard Set(container.allKeys.map(\\.stringValue)) == expected else { throw CompanionError.invalidResponse }",
+          "after": "guard true else { throw CompanionError.invalidResponse }",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "ignore_http_body_status_mapping",
+      "guard": "http_status_body_mapping",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionRejectsHTTPBodyStatusMismatch"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "                if httpStatus == 200 {\n                    guard object[\"error\"] == nil else { throw CompanionError.invalidResponse }\n                } else {\n                    let envelope = try JSONDecoder().decode(ErrorResponse.self, from: bytes)\n                    guard ErrorResponse.httpStatus[envelope.error] == httpStatus else { throw CompanionError.invalidResponse }\n                }\n",
+          "after": "                // Mutation: bypass HTTP/body status mapping.\n",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "label_ambiguous_errors_rejected",
+      "guard": "ambiguous_application_error",
+      "filter": "ProtocolTests",
+      "expected_runtime_failures": [
+        "testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/DecisionController.swift",
+          "before": "[\"invalid_request\", \"unauthorized\", \"authentication_failed\", \"rate_limited\"].contains(code)",
+          "after": "[\"invalid_request\", \"unauthorized\", \"authentication_failed\", \"rate_limited\", \"stale\", \"unavailable\"].contains(code)",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "replace_unresolved_request",
+      "guard": "switching_unresolved_request",
+      "filter": "ProtocolTests",
+      "expected_runtime_failures": [
+        "testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/DecisionController.swift",
+          "before": "if let unresolvedID, unresolvedID != id {",
+          "after": "if let unresolvedID, unresolvedID != id && false {",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "apply_late_unlock_result",
+      "guard": "unlock_lifecycle_epoch",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testLateUnlockCannotMutateReplacementOrClearItsBusyFlag",
+        "testLateUnlockCannotUndoSleepOrRefresh"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "_ = try await client.unlock(password)\n            guard epoch == lifecycle else { return }",
+          "after": "_ = try await client.unlock(password)",
+          "count": 1
+        },
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "guard epoch == lifecycle else { return }\n            connection = \"Unlock failed",
+          "after": "connection = \"Unlock failed",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "clear_replacement_unlock_busy",
+      "guard": "unlock_lifecycle_epoch",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testLateUnlockCannotMutateReplacementOrClearItsBusyFlag"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "defer { if epoch == lifecycle { unlockBusy = false } }",
+          "after": "defer { unlockBusy = false }",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "apply_late_notification_result",
+      "guard": "notification_lifecycle_epoch",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testLateNotificationSessionOrListCannotUndoLifecycleChange"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "    func openNotificationReview() async {\n        guard let client, let controller else { return }\n        invalidateContext()\n        let epoch = lifecycle\n        do {\n            let state = try await client.session()\n            guard epoch == lifecycle else { return }\n            let ids = state.state == \"unlocked\" ? try await client.list() : []\n            guard epoch == lifecycle else { return }\n            apply(state, ids: ids)\n            // load also captures the controller's review epoch: sleep/refresh while\n            // this final request is in flight cannot restore a visible ticket.\n            if let id = ids.first { await controller.load(id) }\n        } catch {\n            guard epoch == lifecycle else { return }\n            connection = \"Review unavailable. Refresh the inbox when connected.\"\n        }\n    }\n",
+          "after": "    func openNotificationReview() async {\n        guard let client, let controller else { return }\n        invalidateContext()\n        let epoch = lifecycle\n        do {\n            let state = try await client.session()\n            let ids = state.state == \"unlocked\" ? try await client.list() : []\n            apply(state, ids: ids)\n            // load also captures the controller's review epoch: sleep/refresh while\n            // this final request is in flight cannot restore a visible ticket.\n            if let id = ids.first { await controller.load(id) }\n        } catch {\n            connection = \"Review unavailable. Refresh the inbox when connected.\"\n        }\n    }\n",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "restore_late_review_result",
+      "guard": "notification_lifecycle_epoch",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testSleepDuringNotificationReviewLoadingCannotRestoreReview"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/DecisionController.swift",
+          "before": "            guard epoch == reviewEpoch else { return }\n",
+          "after": "",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "apply_late_poll_result",
+      "guard": "polling_invalidation",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testLatePollCannotMutateReplacementOrSleepingState"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "guard epoch == lifecycle, !Task.isCancelled else { return false }",
+          "after": "guard !Task.isCancelled else { return false }",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "retain_review_on_generation_change",
+      "guard": "polling_invalidation",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "if generation != state.generation || sessionState != state.state {\n            invalidateContext()",
+          "after": "if generation != state.generation || sessionState != state.state {\n            // Mutation: retain review after authority changes.",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "retain_review_on_disconnect",
+      "guard": "polling_invalidation",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "            invalidateContext()\n            sessionState = \"unavailable\"; pending = []",
+          "after": "            sessionState = \"unavailable\"; pending = []",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "retain_unlock_password_on_context_change",
+      "guard": "unlock_password_context",
+      "filter": "AppModelTests",
+      "expected_runtime_failures": [
+        "testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/ApprovalCompanion/App.swift",
+          "before": "unlockPassword = \"\"; unlockBusy = false",
+          "after": "unlockBusy = false",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "remove_leaf_pin",
+      "guard": "retained_leaf_pin",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "KeychainIdentity.fingerprintDER(SecCertificateCopyData(leaf) as Data) == configuration.leafSHA256",
+          "after": "true",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "skip_ca_trust_evaluation",
+      "guard": "retained_ca_trust",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "SecTrustEvaluateWithError(trust, nil)",
+          "after": "true",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "skip_hostname_validation",
+      "guard": "retained_hostname",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "SecPolicyCreateSSL(true, configuration.endpoint.host! as CFString)",
+          "after": "SecPolicyCreateSSL(true, nil)",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "retain_consumed_review_ticket",
+      "guard": "retained_ticket_consumption",
+      "filter": "ProtocolTests",
+      "expected_runtime_failures": [
+        "testWrongPasswordConsumesVisibleTicket"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/DecisionController.swift",
+          "before": "busy = true; invalidate()\n        defer { busy = false }\n        do {\n            let status",
+          "after": "busy = true\n        defer { busy = false }\n        do {\n            let status",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "retry_failed_posts",
+      "guard": "retained_no_retry",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Protocol.swift",
+          "before": "let response = try await transport.send(data)",
+          "after": "let response: Data\n        do { response = try await transport.send(data) }\n        catch { response = try await transport.send(data) }",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "remove_response_bounds",
+      "guard": "retained_response_bounds",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "response.expectedContentLength <= 1_048_576",
+          "after": "true",
+          "count": 1
+        },
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "bytes.count <= 1_048_576 - data.count",
+          "after": "true",
+          "count": 1
+        },
+        {
+          "path": "macos/Sources/CompanionCore/Protocol.swift",
+          "before": "response.count <= 1_048_576",
+          "after": "true",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "render_raw_review_text",
+      "guard": "retained_quoted_review_display",
+      "filter": "ProtocolTests",
+      "expected_runtime_failures": [
+        "testReviewTextExposesInvisibleAndDirectionalScalars"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Protocol.swift",
+          "before": "    var result = \"\\\"\"\n    for scalar in value.unicodeScalars {",
+          "after": "    return value\n    var result = \"\\\"\"\n    for scalar in value.unicodeScalars {",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "reject_http422_error_envelopes",
+      "guard": "retained_http422",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testRealURLSessionRejectsHTTPBodyStatusMismatch"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "[200, 400, 403, 409, 422, 429, 503]",
+          "after": "[200, 400, 403, 409, 429, 503]",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "scope_note": "Thirteen independent reversion mutations across nine accepted review guard areas, plus eight retained security guards in edited files. HTTP-only and TLS-minimum guards themselves are unchanged and remain covered by current full bundle baseline plus retained prior runtime mutation evidence."
+}

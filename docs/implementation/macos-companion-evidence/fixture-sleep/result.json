@@ -1,0 +1,39 @@
+{
+  "case": "actual-mac-sleep-expiry-oct8",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+  "request_id": "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI",
+  "admitted_at_utc": "2026-10-08T09:40:30Z",
+  "expires_at_utc": "2026-10-08T09:45:30Z",
+  "durable_expired_verified_at_utc": "2026-10-08T09:45:56.738169+00:00",
+  "audit_outcomes": [
+    "submitted",
+    "expired"
+  ],
+  "execution_claimed": false,
+  "execution_started_events": 0,
+  "cli_exit_code": 4,
+  "cli_category": "wait_timeout",
+  "cli_elapsed_seconds": 300.107,
+  "synthetic_secret_markers_absent": true,
+  "operator_actual_sleep_and_recovery_confirmation": {
+    "operator_report": "I left it open, when I woke up the mac I caould see the pending request, it refreshed itself after few seconds and disappeared",
+    "powerlog_utc": {
+      "sleep": "2026-10-08T09:36:33Z",
+      "dark_wake": "2026-10-08T09:37:05Z",
+      "sleep_again": "2026-10-08T09:37:26Z",
+      "wake": "2026-10-08T09:44:53Z"
+    },
+    "wake_before_request_expiry_seconds": 37,
+    "verified_scope": "Actual sleep, wake/reconnect and automatic inbox refresh removing ordinarily expired request; no execution. Expiry while asleep not established."
+  },
+  "provider_end_utc": "2026-10-08T09:54:41.600078Z",
+  "native_contacts_during_sleep": false,
+  "traffic_observation": "Normal fixture mode; no command-counter instrumentation. Native recovery observations belong to parent/native lane.",
+  "detailed_evidence": "../actual-mac-sleep-expiry-oct8.json",
+  "detailed_evidence_sha256": "514537e9d4bbcbda0f8a9d3db592946851512e30e5ae6e7fbf06293cf289e62e",
+  "expiry_while_asleep_verified": false,
+  "actual_sleep_recovery_verified": true,
+  "acceptance": "Accepted cumulatively with separate quit-through-expiry evidence: unavailable-Mac behavior preserves approval requirements, expires pending work, and recovers inbox. Sleep at exact expiry is not claimed or required by frozen intent.",
+  "completion_gate_open": false,
+  "cleanup": "cleanup.json"
+}

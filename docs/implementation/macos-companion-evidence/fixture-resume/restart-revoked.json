@@ -1,0 +1,53 @@
+{
+  "case": "restart-revoked",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-55ow4jxv",
+  "at_utc": "2026-10-07T15:35:10.354575+00:00",
+  "before": {
+    "request_id": "MNiYdGZKaZ_bexxvTWa055hPBQYqt4H1V4QjhZWLNuM",
+    "status": {
+      "status": "pending"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted"
+    ]
+  },
+  "after": {
+    "request_id": "MNiYdGZKaZ_bexxvTWa055hPBQYqt4H1V4QjhZWLNuM",
+    "status": {
+      "status": "expired"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted",
+      "invalidated"
+    ]
+  },
+  "commands": [
+    "session",
+    "review",
+    "session",
+    "decision"
+  ],
+  "decision_responses": [
+    {
+      "http_status": 403,
+      "error": "unauthorized",
+      "status": null
+    }
+  ],
+  "passed": true,
+  "tls": "selected CA, hostname, TLS1.2+, exact leaf pin and enrolled client identity",
+  "operator_ui_observation": "separate; this driver does not automate the Mac",
+  "restart": {
+    "same_durable_root": true,
+    "binding_preserved": true,
+    "policy_preserved": true,
+    "request_ids_preserved": true,
+    "client_revoked_offline": true
+  },
+  "signed_cli_exit_code": 3,
+  "synthetic_secret_markers_absent": true,
+  "signed_cli_stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"MNiYdGZKaZ_bexxvTWa055hPBQYqt4H1V4QjhZWLNuM\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"MNiYdGZKaZ_bexxvTWa055hPBQYqt4H1V4QjhZWLNuM\",\"state\":{\"status\":\"pending\"}}\n",
+  "signed_cli_stderr": "{\"event\":\"client_error\",\"category\":\"transport_uncertain\",\"request_id\":\"MNiYdGZKaZ_bexxvTWa055hPBQYqt4H1V4QjhZWLNuM\"}\n"
+}

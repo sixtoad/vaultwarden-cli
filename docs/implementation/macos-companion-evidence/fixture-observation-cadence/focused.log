@@ -1,0 +1,24 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-macos-approval-companion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.81s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 16 tests
+test adapters::companion::acceptance_tests::companion_acceptance_fixture ... ignored, manual real-Mac acceptance: isolated systemd service and explicit VW_COMPANION_* fixture settings required
+test adapters::companion::tests::companion_closed_json_http_and_password_limits ... ok
+test adapters::companion::tests::companion_missing_dispatcher_never_commits_approval ... ok
+test access::direct_request_tests::companion_inbox_expires_and_locked_submission_never_creates_work ... ok
+test adapters::companion::tests::companion_real_mtls_requires_ca_and_exact_enrolled_leaf ... ok
+test adapters::companion::tests::companion_review_replaces_ticket_and_deny_needs_no_password ... ok
+test adapters::companion::tests::companion_decision_is_device_bound_single_use_and_lost_reply_is_read_only ... ok
+test adapters::companion_identity::tests::companion_identity_rejects_symlink_hardlink_and_public_file ... ok
+test adapters::companion_identity::tests::companion_identity_rejects_unsafe_ancestors_fifo_and_duplicate_entries ... ok
+test adapters::companion_identity::tests::companion_identity_enrollment_requires_valid_client_chain_and_stopped_provider ... ok
+test adapters::companion_identity::tests::companion_identity_private_atomic_closed_store_and_revocation ... ok
+test adapters::companion::tests::companion_ticket_capacity_is_bounded_and_existing_review_reuses_slot ... ok
+test adapters::companion::tests::companion_unlock_is_separate_and_authentication_is_serialized ... ok
+test adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device ... ok
+test access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit ... ok
+test adapters::companion::tests::companion_rejects_changed_review_generation_expiry_and_revocation ... ok
+
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 685 filtered out; finished in 1.65s
+

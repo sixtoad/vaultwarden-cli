@@ -1,0 +1,28 @@
+[
+  {
+    "name": "real-agent",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-auto",
+      "--map-root-user",
+      "--fork",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "agent_submission",
+      "real_linux_peer_matrix_and_noninteractive_cli",
+      "--",
+      "--ignored",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 31.78,
+    "log": "real-agent-initial.log",
+    "failure": "existing held-query synchronization expected admitted line but received EOF at tests/agent_submission.rs:860",
+    "cause": "not established; isolated prebuilt rerun authorized without source changes"
+  }
+]

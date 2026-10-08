@@ -1,0 +1,85 @@
+[
+  {
+    "name": "focused",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "companion"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 15.705,
+    "log": "focused.log"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.973,
+    "log": "fmt.log"
+  },
+  {
+    "name": "check-production",
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--lib",
+      "--bins"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.859,
+    "log": "check-production.log"
+  },
+  {
+    "name": "check-tests",
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--tests"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 19.62,
+    "log": "check-tests.log"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--lib",
+      "--tests",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 20.13,
+    "log": "clippy.log"
+  },
+  {
+    "name": "python-compile",
+    "command": [
+      "python3",
+      "-c",
+      "from pathlib import Path; p=Path('tests/companion-acceptance.py'); compile(p.read_text(),str(p),'exec'); print('Python compile passed without bytecode')"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.135,
+    "log": "python-compile.log"
+  }
+]

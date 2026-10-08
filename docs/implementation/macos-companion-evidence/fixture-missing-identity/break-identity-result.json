@@ -1,0 +1,15 @@
+{
+  "at_utc": "2026-10-07T15:26:54.026626+00:00",
+  "exit_code": 0,
+  "source_and_binary_hashes_matched": true,
+  "mode": "break-identity",
+  "app_lifecycle_changed": false,
+  "keychain_modified": false,
+  "result": {
+    "app_stopped": true,
+    "backup_sha256": "c6122d912fce32c412e975c9b713b197bb6a8edc2c61824af535179e3da78a33",
+    "current_sha256": "d6685101c582cb3fa93ae190b0978336a679393e0b70bdb3be9ee7be5d5f4fc0",
+    "mode": "break-identity",
+    "only_identity_reference_changed": true
+  }
+}

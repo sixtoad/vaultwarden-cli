@@ -1,0 +1,117 @@
+{
+  "at_utc": "2026-10-07T13:57:08.872882+00:00",
+  "commands": [
+    {
+      "name": "focused",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "companion"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.705,
+      "log": "focused.log"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.973,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check-production",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--lib",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.859,
+      "log": "check-production.log"
+    },
+    {
+      "name": "check-tests",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--tests"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 19.62,
+      "log": "check-tests.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--lib",
+        "--tests",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 20.13,
+      "log": "clippy.log"
+    },
+    {
+      "name": "python-compile",
+      "command": [
+        "python3",
+        "-c",
+        "from pathlib import Path; p=Path('tests/companion-acceptance.py'); compile(p.read_text(),str(p),'exec'); print('Python compile passed without bytecode')"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.135,
+      "log": "python-compile.log"
+    }
+  ],
+  "restored_focused": {
+    "passed": 16,
+    "failed": 0,
+    "ignored": 1,
+    "log": "restored-focused.log"
+  },
+  "scoped_mutations": {
+    "compiled_and_runtime_killed": 2,
+    "survivors": 0,
+    "invalids": 0,
+    "skipped": 0,
+    "source_restored_sha256": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3"
+  },
+  "source_hash_delta": {
+    "src/adapters/companion.rs": {
+      "before": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+      "after": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3"
+    },
+    "src/adapters/companion_acceptance_tests.rs": {
+      "before": "882256ca9fbc420de0d0171bd58c5a9568aa4e814daee735799e823feb31aff8",
+      "after": "37391f7bb676dcadea321d6890387700c92a9ca034b47dca28375896abcfc5dd"
+    }
+  },
+  "unchanged_prior_manifest_files": 9,
+  "launcher_sha256": "127425b0b5d62f646a11e3a2198ebf66add042759ca1493f8fd62a7dcd51170d",
+  "production_scope": "All observerfield/type/record/drop hooks cfg(test), defaultNone; real authorization, approvalcommit and dispatch unchanged; explicitstart-lost-reply exists only in manualtestlauncher",
+  "initial_failure": "Newtest sent forbidden password:null forDeny; existingclosedparser rejected; correctedtest toomitfield, productionparserunchanged. focused-initial.log retained.",
+  "mutation_matcher_note": "Secondfailurewitness wrappedline; normalized-whitespace checkconfirmed intended assertion. Both actualmutantscompiled and runtimefailed.",
+  "runtime_acceptance": "InstalledMac actual lostreply not yet run; sleepfixture usesprevious copiedbinary unaffected"
+}

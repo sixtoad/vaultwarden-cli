@@ -1,0 +1,24 @@
+{
+  "mutation": "remove HTTP422 from allowed response statuses",
+  "exit_code": 1,
+  "runtime_killed": true,
+  "witness": {
+    "case": "wrong_password_explicitly_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider returned an invalid response.",
+      "success": false
+    },
+    "commands": [
+      "decision"
+    ],
+    "passed": false
+  },
+  "original_sha256": "b1b0e3569a37cdf3f53331494339de6629d5975f94d08acffc3b6fe9f5c9a471",
+  "restored_sha256": "b1b0e3569a37cdf3f53331494339de6629d5975f94d08acffc3b6fe9f5c9a471"
+}

@@ -1,0 +1,9 @@
+{
+  "source_hashes_matched": 13,
+  "bundle": "/tmp/vw-companion-native.reIOJJ/auth-error-repro/corrected-final-evidence/bundle/Approval Companion.app",
+  "bundle_hashes": {
+    "Contents/MacOS/ApprovalCompanion": "d750c8ff625c2da5ce380727abfd5aad8f4f5ee1f73682d4197f5813419c1273",
+    "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a"
+  },
+  "codesign_verify_exit_code": 0
+}

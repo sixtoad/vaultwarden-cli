@@ -1,0 +1,67 @@
+{
+  "at_utc": "2026-10-07T12:13:23.240308+00:00",
+  "commands": [
+    {
+      "name": "focused",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "companion"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.872,
+      "log": "focused.log"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.815,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--tests"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.097,
+      "log": "check.log"
+    },
+    {
+      "name": "python-compile",
+      "command": [
+        "python3",
+        "-c",
+        "from pathlib import Path; p=Path('tests/companion-acceptance.py'); compile(p.read_text(),str(p),'exec'); print('Python source compiled without writing bytecode')"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.031,
+      "log": "python-compile.log"
+    }
+  ],
+  "source_hash_delta": {
+    "src/adapters/companion_acceptance_tests.rs": {
+      "before": "882256ca9fbc420de0d0171bd58c5a9568aa4e814daee735799e823feb31aff8",
+      "after": "bc41651d9f5933bd64513d4a237577ea0058270cc93c5863a28ff6b286ee1823"
+    }
+  },
+  "unchanged_production_hash_count": 10,
+  "launcher_sha256": "61533f1b6499ce032b588935d88776aa8acdd881c43ba38a3b445311b3371db2",
+  "scope": "Test-only optional start-revoked mode; actual stopped-provider enrollment then revoke before Provider starts; default unchanged. Previous fullprofiles and12securitymutants retained for unchanged production code.",
+  "runtime_acceptance": "Not run yet; await coordinated operator lifecycle completion"
+}

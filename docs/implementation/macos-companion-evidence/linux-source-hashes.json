@@ -1,0 +1,12 @@
+{
+  "src/access/application.rs": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+  "src/access/direct_request.rs": "4646c5e7f9f243cd27ffe2265cb82695d622b9ca27e0b06f071595bf4d29fad5",
+  "src/access/direct_request_tests.rs": "ff1353f8506125c5168c7645d57aa44c31df014fbf5c9a9f6236a0ed0ca0aa49",
+  "src/access/provider.rs": "962fba949355332a910e4fe0fb2418b4a4bf5c494c25f135120d620bfad2a808",
+  "src/adapters/mod.rs": "190ec3d5ea6da48fe4b91d5620ce56cbe4914528045a9ca2d9a0e4491076a932",
+  "src/adapters/companion.rs": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+  "src/adapters/companion_identity.rs": "15c86e90e2c0c07fb195af8aa57da41cff9343b90d4736d4b079b9dd1ea544cf",
+  "src/adapters/companion_acceptance_tests.rs": "882256ca9fbc420de0d0171bd58c5a9568aa4e814daee735799e823feb31aff8",
+  "src/adapters/supervisor.rs": "61dfa165d00dfc6f9a59314f0990fe0da442e08992d406be1579c4924fcbadef",
+  "src/bin/vaultwarden-accessd.rs": "ab2bfb336143888e3b928061b454bccb97899f5024b12034f007bd43f4529999"
+}

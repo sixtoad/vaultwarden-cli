@@ -1,0 +1,21 @@
+{
+  "scenario": "bounded logged-in Mac/Linux synthetic fixture",
+  "endpoint": "https://pop-os.int.cantolla.casa:40701",
+  "provider_service": "isolated transient user systemd unit",
+  "native_client_lan_reads": "passed",
+  "operator_setup_confirmation": "not received",
+  "signed_agent_submissions": 0,
+  "protected_executions": 0,
+  "finished": {
+    "observed_requests": 0,
+    "shutdown": "complete"
+  },
+  "last_observed": {
+    "requests": [],
+    "session": "locked"
+  },
+  "continuation_root": "/home/sixtocantolla/.vw-companion-acceptance-3yhltuaf",
+  "continuation_started": false,
+  "ui_automation_trusted": false,
+  "status": "required interactive acceptance incomplete"
+}

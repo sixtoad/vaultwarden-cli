@@ -1,0 +1,130 @@
+{
+  "kernel": {
+    "command": [
+      "uname",
+      "-srm"
+    ],
+    "exit_code": 0,
+    "stdout": "Linux 6.18.7-76061807-generic x86_64\n",
+    "stderr": ""
+  },
+  "cargo": {
+    "command": [
+      "cargo",
+      "-V"
+    ],
+    "exit_code": 0,
+    "stdout": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n",
+    "stderr": ""
+  },
+  "rustc": {
+    "command": [
+      "rustc",
+      "-V"
+    ],
+    "exit_code": 0,
+    "stdout": "rustc 1.98.1 (48a229cea 2026-09-01)\n",
+    "stderr": ""
+  },
+  "mutants": {
+    "command": [
+      "cargo",
+      "mutants",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "cargo-mutants 27.1.0\n",
+    "stderr": ""
+  },
+  "firefox": {
+    "command": [
+      "firefox",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "Mozilla Firefox 151.0.2\n",
+    "stderr": ""
+  },
+  "browser-lock": {
+    "command": [
+      "cmp",
+      "tests/ui/package-lock.json",
+      "/tmp/vw-story21-ui/package-lock.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "native_tools": {
+    "swift": null,
+    "xcodebuild": null
+  },
+  "systemd_namespace_preflight": {
+    "command": "systemctl --user show-environment >/dev/null && unshare --user --map-auto --map-root-user --fork /usr/bin/true",
+    "exit_code": 0,
+    "execution": "escalated local run; no environment values printed"
+  },
+  "native_fixture_check": {
+    "command": "PATH=\"/usr/lib/llvm-18/bin:$PATH\" ./scripts/check-native-fixtures.sh",
+    "exit_code": 0,
+    "verified": [
+      "protected-exit/x86_64",
+      "protected-output/x86_64",
+      "protected-exit/aarch64",
+      "protected-output/aarch64"
+    ]
+  },
+  "mac_acceptance": {
+    "status": "connected_transport_operator_acceptance_pending",
+    "reason": "Actual bundled app connection confirmed by operator after authorized ATS exception. First signed request expired with zero execution while operator reported empty inbox. Notifications returned an authorization error; login startup, approval, unlock and other logged-in checks remain incomplete. Native automated build/tests/mutations passed; see supplementary bundle evidence and interactive-continuation.json.",
+    "current_app_network_block": {
+      "pid": 21950,
+      "observed_marker": "unsatisfied (Local network prohibited)",
+      "host_tcp_40701": "reachable",
+      "operator_action": "Check app-specific Local Network switch in System Settings; answer pending",
+      "automatic_permission_changes": false
+    },
+    "latest_connection": {
+      "at_local": "2026-10-07T09:40:26+01:00",
+      "pid": 60645,
+      "fixture": "tekhv3dh",
+      "app_http_responses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "unchanged_bundle_reopened": true,
+      "preferences_or_permissions_changed": false,
+      "operator_current_ui_confirmed": false,
+      "signed_submissions_this_fixture": 0
+    }
+  },
+  "user_reported_mac_preflight": {
+    "source": "user pasted local Mac Terminal output",
+    "macos": "26.5.2",
+    "build": "25F84",
+    "developer_directory": "/Applications/Xcode.app/Contents/Developer",
+    "swift_driver": "1.148.6",
+    "swift": "6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)",
+    "target": "arm64-apple-macosx26.0"
+  },
+  "ssh_mac_preflight": {
+    "status": "passed",
+    "destination": "sixtocantolla@mac-mini.int.cantolla.casa",
+    "host_verification": "StrictHostKeyChecking=yes",
+    "exit_code": 0,
+    "macos": "26.5.2",
+    "build": "25F84",
+    "swift": "6.3.3",
+    "console_user": "sixtocantolla",
+    "note": "Remote shell initialization emits missing runpodctl warning; commands completed successfully."
+  },
+  "mac_ui_automation": {
+    "AXIsProcessTrusted": false,
+    "permissions_requested_or_changed": false,
+    "implication": "Remote SSH cannot automate logged-in UI acceptance with existing permissions; operator setup/observations remain required."
+  }
+}
