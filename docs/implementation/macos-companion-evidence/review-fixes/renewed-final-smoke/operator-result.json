@@ -1,0 +1,13 @@
+{
+  "at_utc": "2026-10-08T13:49:49.281676+00:00",
+  "installed_executable_sha256": "ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf",
+  "request_id": "WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk",
+  "ready_report": "Ready \u2014 connected and in background",
+  "first_attempt_report": "I used the wrong password",
+  "final_report": "Approved; notification opened the full review",
+  "notification_opened_full_review": true,
+  "correct_password_approval_reported": true,
+  "linux_exactly_once_result": "provider-result.json",
+  "cleanup": "final-cleanup.json",
+  "acceptance_gate": "passed"
+}

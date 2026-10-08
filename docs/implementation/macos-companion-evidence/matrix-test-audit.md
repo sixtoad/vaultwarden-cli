@@ -1,6 +1,12 @@
 # Frozen matrix automated witness audit
 
-## Current review-fix native audit — 2026-10-08
+## Current identity-renewal audit — 2026-10-08
+
+The current installed executable is `ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf`. It passed25XCTest methods (13protocol,8AppModel,4real TLS/identity),20signed-bundle cases, the fixture-startup regression and release/signature checks. The new `testSameSubjectRenewalReturnsExactImportedIdentity` verifies renewal, repeat import and old-reference preservation; `testIssuerSerialCollisionNeverSubstitutesExistingIdentity` rejects silent substitution. Restoring the old import implementation failed that exact collision assertion at runtime. Both restored identity tests passed, and all16input hashes were restored. There are no surviving or unexecuted mutations in the completed scoped campaign. The earlier21guard mutations below retain their unchanged-source scope; they were not unnecessarily repeated.
+
+The initial combined TLS run stalled while reaping a fixture process. That interrupted attempt, stack and cleanup evidence are preserved; a bounded rerun of individual TLS tests passed. It is not relabeled as a successful original run. Parent independently verified all74archive members, raw mutation assertion and source hashes in [identity-import evidence](identity-import-fix/README.md). Final installed notification/full-review acceptance passed with operator confirmation; Linux recorded exactly one protected execution and the signed CLI returned redacted exit0. See [operator result](review-fixes/renewed-final-smoke/operator-result.json) and [durable provider result](review-fixes/renewed-final-smoke/provider-result.json).
+
+## Previous review-fix native audit — 2026-10-08
 
 The current native snapshot passed **23 XCTest methods and 20 signed-bundle
 cases**, both before mutation and after exact restoration. The 23 methods comprise
@@ -32,7 +38,7 @@ HTTPS-scheme and TLS-minimum guards retain their earlier mutation witnesses and
 passed the current bundle baseline. This does not claim exhaustive mutation coverage.
 Prepared executable SHA256 is
 `97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113`.
-**Refreshed installed-app smoke is pending**; earlier live acceptance belongs to
+**At this dated snapshot, refreshed installed-app smoke was pending**; earlier live acceptance belongs to
 the preceding navigation build. The dated audits below retain their original
 Linux/native snapshot scope and are not claims that old manifests match changed
 review-fix sources.

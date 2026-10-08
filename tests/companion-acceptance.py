@@ -18,6 +18,7 @@ import base64
 import json
 import os
 from pathlib import Path
+import secrets
 import shutil
 import socket
 import stat
@@ -117,12 +118,18 @@ def prepare(hostname, prior=None):
                 shutil.copy2(prior / "tls" / name, tls / name)
         else:
             openssl("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", tls / "ca-key.pem", "-out", tls / "ca.pem", "-days", "2", "-subj", "/CN=Synthetic companion acceptance CA", "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign")
+            issued_serials = set()
             for name, purpose in [("server", "serverAuth"), ("client", "clientAuth")]:
+                # Keychain identifies certificates by issuer/serial across fixture renewals.
+                serial = 0
+                while serial == 0 or serial in issued_serials:
+                    serial = secrets.randbits(159)
+                issued_serials.add(serial)
                 openssl("req", "-newkey", "rsa:2048", "-nodes", "-keyout", tls / f"{name}-key.pem", "-out", tls / f"{name}.csr", "-subj", f"/CN=Synthetic companion {name}")
                 extensions = f"basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage={purpose}\n"
                 if name == "server": extensions += f"subjectAltName=DNS:{hostname},IP:127.0.0.1\n"
                 (tls / f"{name}.ext").write_text(extensions)
-                openssl("x509", "-req", "-in", tls / f"{name}.csr", "-CA", tls / "ca.pem", "-CAkey", tls / "ca-key.pem", "-set_serial", "2" if name == "server" else "3", "-out", tls / f"{name}.pem", "-days", "2", "-extfile", tls / f"{name}.ext")
+                openssl("x509", "-req", "-in", tls / f"{name}.csr", "-CA", tls / "ca.pem", "-CAkey", tls / "ca-key.pem", "-set_serial", str(serial), "-out", tls / f"{name}.pem", "-days", "2", "-extfile", tls / f"{name}.ext")
             openssl("x509", "-in", tls / "ca.pem", "-outform", "DER", "-out", tls / "ca.der")
             openssl("pkcs12", "-export", "-keypbe", "PBE-SHA1-3DES", "-certpbe", "PBE-SHA1-3DES", "-macalg", "sha1", "-inkey", tls / "client-key.pem", "-in", tls / "client.pem", "-certfile", tls / "ca.pem", "-name", "Synthetic Companion Acceptance", "-out", tls / "client.p12", "-passout", "pass:" + P12_PASSWORD)
         run(["cc", "-nostdlib", "-static", "-no-pie", "-fno-stack-protector", "-fno-builtin", "-O2", "-Wl,--build-id=none", "-o", binaries / "protected-image", REPO / "tests/fixtures/protected-tree.c"], stdout=log, stderr=log)

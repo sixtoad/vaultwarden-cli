@@ -7,6 +7,36 @@ import XCTest
 /// These tests use real URLSession, Security.framework, Keychain, and a localhost
 /// TLS server requiring a client certificate. They are mandatory, not skipped.
 final class TLSTests: XCTestCase {
+    func testSameSubjectRenewalReturnsExactImportedIdentity() throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        let oldReference = try XCTUnwrap(fixture.references["client"])
+        let oldFingerprint = try KeychainIdentity.fingerprint(oldReference)
+        let renewed = try fixture.renewedClient(collision: false)
+        XCTAssertNotEqual(renewed.fingerprint, oldFingerprint)
+        let reference = try KeychainIdentity.importPKCS12(renewed.package, passphrase: "synthetic-only", keychain: fixture.keychain)
+        XCTAssertEqual(try KeychainIdentity.fingerprint(reference), renewed.fingerprint)
+        XCTAssertEqual(try KeychainIdentity.fingerprint(oldReference), oldFingerprint, "Renewal must preserve the original identity")
+        let repeated = try KeychainIdentity.importPKCS12(renewed.package, passphrase: "synthetic-only", keychain: fixture.keychain)
+        XCTAssertEqual(try KeychainIdentity.fingerprint(repeated), renewed.fingerprint)
+    }
+
+    func testIssuerSerialCollisionNeverSubstitutesExistingIdentity() throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        let oldReference = try XCTUnwrap(fixture.references["client"])
+        let oldFingerprint = try KeychainIdentity.fingerprint(oldReference)
+        let renewed = try fixture.renewedClient(collision: true)
+        XCTAssertNotEqual(renewed.fingerprint, oldFingerprint)
+        do {
+            let reference = try KeychainIdentity.importPKCS12(renewed.package, passphrase: "synthetic-only", keychain: fixture.keychain)
+            XCTAssertEqual(try KeychainIdentity.fingerprint(reference), renewed.fingerprint, "A colliding import must never substitute the older identity")
+        } catch {
+            XCTAssertEqual(error as? CompanionError, .configuration, "A Keychain issuer/serial collision must fail closed")
+        }
+        XCTAssertEqual(try KeychainIdentity.fingerprint(oldReference), oldFingerprint)
+    }
+
     func testRealURLSessionRejectsHTTPBodyStatusMismatch() async throws {
         let fixture = try TLSFixture()
         defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
@@ -118,6 +148,38 @@ private final class TLSFixture {
         }
         guard let value = String(data: line, encoding: .utf8), let port = Int(value) else { throw CompanionError.configuration }
         self.port = port
+    }
+    func renewedClient(collision: Bool) throws -> (package: Data, fingerprint: String) {
+        // Same subjects and default PKCS12 labels, but fresh CA/client keys.
+        // Unlike ordinary TLS fixtures, both generations coexist in one Keychain.
+        let renewed = directory.appendingPathComponent("renewal", isDirectory: true)
+        func run(_ arguments: [String], at workingDirectory: URL) throws -> String {
+            let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = arguments; process.currentDirectoryURL = workingDirectory
+            let output = Pipe(); process.standardOutput = output; process.standardError = FileHandle.nullDevice
+            try process.run(); let data = output.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+            guard process.terminationStatus == 0 else { throw CompanionError.configuration }
+            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        _ = try run(["python3", script.path, "provision", renewed.path], at: directory)
+        let openssl = ProcessInfo.processInfo.environment["OPENSSL"] ?? "openssl"
+        let originalSerial = try run([openssl, "x509", "-in", "client.pem", "-noout", "-serial"], at: directory)
+        let prefix = "serial="
+        guard originalSerial.hasPrefix(prefix) else { throw CompanionError.configuration }
+        let serial = String(originalSerial.dropFirst(prefix.count))
+        guard !serial.isEmpty, serial.allSatisfy({ $0.isHexDigit }) else { throw CompanionError.configuration }
+        if collision {
+            _ = try run([openssl, "x509", "-req", "-in", "client.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-set_serial", "0x" + serial, "-days", "2", "-extfile", "client.ext", "-out", "client.pem"], at: renewed)
+            _ = try run([openssl, "x509", "-in", "client.pem", "-outform", "DER", "-out", "client.der"], at: renewed)
+            _ = try run([openssl, "pkcs12", "-export", "-inkey", "client.key", "-in", "client.pem", "-certfile", "ca.pem", "-passout", "pass:synthetic-only", "-keypbe", "PBE-SHA1-3DES", "-certpbe", "PBE-SHA1-3DES", "-macalg", "sha1", "-out", "client.p12"], at: renewed)
+        }
+        let renewedSerial = try run([openssl, "x509", "-in", "client.pem", "-noout", "-serial"], at: renewed)
+        guard (renewedSerial == originalSerial) == collision else { throw CompanionError.configuration }
+        let originalSubject = try run([openssl, "x509", "-in", "client.pem", "-noout", "-subject", "-issuer"], at: directory)
+        let renewedSubject = try run([openssl, "x509", "-in", "client.pem", "-noout", "-subject", "-issuer"], at: renewed)
+        guard originalSubject == renewedSubject else { throw CompanionError.configuration }
+        let der = try Data(contentsOf: renewed.appendingPathComponent("client.der"))
+        return (try Data(contentsOf: renewed.appendingPathComponent("client.p12")), KeychainIdentity.fingerprintDER(der))
     }
     func client(variant: String = "valid", serverCertificate: String = "server") throws -> CompanionClient {
         CompanionClient(transport: try transport(variant: variant, serverCertificate: serverCertificate))

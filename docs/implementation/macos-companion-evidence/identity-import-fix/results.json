@@ -1,0 +1,176 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "name": "testIssuerSerialCollisionNeverSubstitutesExistingIdentity",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 6.92,
+      "build_completed": true,
+      "started_tests": [
+        "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "runtime_failures": []
+    },
+    {
+      "name": "testSameSubjectRenewalReturnsExactImportedIdentity",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testSameSubjectRenewalReturnsExactImportedIdentity"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 4.156,
+      "build_completed": true,
+      "started_tests": [
+        "testSameSubjectRenewalReturnsExactImportedIdentity"
+      ],
+      "runtime_failures": []
+    },
+    {
+      "name": "testRealURLSessionAuthenticationAndSingleTransmission",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 3.89,
+      "build_completed": true,
+      "started_tests": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ],
+      "runtime_failures": []
+    },
+    {
+      "name": "testRealURLSessionRejectsHTTPBodyStatusMismatch",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testRealURLSessionRejectsHTTPBodyStatusMismatch"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 3.367,
+      "build_completed": true,
+      "started_tests": [
+        "testRealURLSessionRejectsHTTPBodyStatusMismatch"
+      ],
+      "runtime_failures": []
+    },
+    {
+      "name": "bundle-tls",
+      "command": [
+        "python3",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos/Tests/Fixtures/bundle_tls.py",
+        "--report",
+        "/private/tmp/vw-companion-review-identity.TO7am0/bounded-verification/bundle-tls"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 14.992,
+      "build_completed": false,
+      "started_tests": [],
+      "runtime_failures": []
+    },
+    {
+      "name": "release-build",
+      "command": [
+        "/bin/bash",
+        "/private/tmp/vw-companion-review-identity.TO7am0/scripts/build-macos-companion.sh",
+        "/private/tmp/vw-companion-review-identity.TO7am0/bounded-verification/bundle"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 10.438,
+      "build_completed": true,
+      "started_tests": [],
+      "runtime_failures": []
+    },
+    {
+      "name": "legacy-import-mutation",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 6.336,
+      "build_completed": true,
+      "started_tests": [
+        "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "runtime_failures": [
+        "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ]
+    },
+    {
+      "name": "restored-testIssuerSerialCollisionNeverSubstitutesExistingIdentity",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 5.206,
+      "build_completed": true,
+      "started_tests": [
+        "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "runtime_failures": []
+    },
+    {
+      "name": "restored-testSameSubjectRenewalReturnsExactImportedIdentity",
+      "command": [
+        "/usr/bin/swift",
+        "test",
+        "--package-path",
+        "/private/tmp/vw-companion-review-identity.TO7am0/macos",
+        "--filter",
+        "TLSTests.testSameSubjectRenewalReturnsExactImportedIdentity"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 4.018,
+      "build_completed": true,
+      "started_tests": [
+        "testSameSubjectRenewalReturnsExactImportedIdentity"
+      ],
+      "runtime_failures": []
+    }
+  ],
+  "source_restored": true,
+  "baseline_completed": true,
+  "mutation": {
+    "name": "restore_legacy_identity_import",
+    "verdict": "killed_runtime",
+    "intended_witness": "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+  }
+}

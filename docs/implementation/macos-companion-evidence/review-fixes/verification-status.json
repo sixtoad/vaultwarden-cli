@@ -1,5 +1,5 @@
 {
-  "status": "native_verified_installed_correct_password_smoke_awaiting_operator",
+  "status": "verification_and_logged_in_acceptance_complete",
   "native_tests_executed_for_patched_tree": true,
   "native_mutations_planned": 21,
   "native_mutations_executed": 21,
@@ -9,10 +9,7 @@
   "blocker": null,
   "local_checks": "15 input hashes, Python syntax, bash syntax, git diff --check passed; parent read completepatchdiff plus finalboundswitness delta",
   "mac_scratch": "/tmp/vw-companion-review-fixes.hIhmnk",
-  "required_next": [
-    "Complete final installed notification/password smoke against real Linux signed-agent execution",
-    "Reconcile evidence and final diff; finish BMAD step04 then step05"
-  ],
+  "required_next": [],
   "license_resolution": {
     "operator_confirmed": true,
     "parent_swift_check_exit_code": 0,
@@ -47,11 +44,12 @@
     "wrong_password": "operator reported explicit authentication_failed; Linux snapshot pending/noexecution before expiry",
     "correct_password": "not observed; request expired11:22:36UTC with zeroexecution and CLI4wait_timeout",
     "notification_route": "awaiting explicit operator confirmation",
-    "next": "Fresh request only after operator readiness"
+    "next": "Superseded by final_installed_smoke",
+    "historical_snapshot": true
   },
   "publication": {
     "authorized": "User explicitly requested open PR on2026-10-08",
-    "mode": "draft",
+    "mode": "ready_for_human_review",
     "acceptance_gate_waived": false,
     "merge_or_production_deployment_authorized": false
   },
@@ -60,5 +58,21 @@
     "evidence": "../merge-main/results.json",
     "checks": "passed",
     "native_inputs_unchanged": 15
+  },
+  "current_native_evidence": "../identity-import-fix/identity-summary.json",
+  "current_native_xctest_passed": 25,
+  "current_bundle_cases_passed": 20,
+  "current_identity_mutations_executed": 1,
+  "current_identity_mutation_survivors": 0,
+  "current_native_source_hashes": 16,
+  "final_installed_smoke": {
+    "status": "passed",
+    "executable_sha256": "ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf",
+    "request_id": "WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk",
+    "operator_evidence": "renewed-final-smoke/operator-result.json",
+    "provider_evidence": "renewed-final-smoke/provider-result.json",
+    "executions": 1,
+    "signed_cli_exit": 0,
+    "cleanup": "renewed-final-smoke/final-cleanup.json"
   }
 }

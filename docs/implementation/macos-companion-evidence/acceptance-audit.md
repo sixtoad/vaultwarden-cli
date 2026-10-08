@@ -1,15 +1,10 @@
 # Acceptance audit
 
-Status: **review fixes and native verification passed; refreshed installed-app
-smoke acceptance pending**. The earlier navigation build has passing evidence
-for the three acceptance criteria and integrated security checks, including actual
-sleep/wake. Those live observations predate the review fixes and belong to
-executable `12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853`.
-The reviewed build’s verified executable, installed at 11:16:29 UTC as PID 72015, is
-`97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113`.
-Saved configuration and Keychain were preserved; see [installation](review-fixes/installation.json).
-Its automated verification passes; installed smoke and BMAD review closure remain
-open before the human-review handoff. The frozen intent is unchanged.
+Status: **verification and final logged-in acceptance passed; ready for human review**. The final installed executable is `ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf`. The operator confirmed “Approved; notification opened the full review.” Request `WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk` completed at13:47:53UTC: submitted → approved → execution_started → succeeded, exactly one protected Linux execution, redacted signed CLI exit0. A prior wrong-password attempt left it pending with zero execution; no exact GUI rejection text is inferred. The provider stopped cleanly at13:48:57UTC, inactive/MainPID0. See [operator result](review-fixes/renewed-final-smoke/operator-result.json), [provider result](review-fixes/renewed-final-smoke/provider-result.json), and [cleanup](review-fixes/renewed-final-smoke/final-cleanup.json).
+
+Certificate renewal exposed and corrected exact Keychain identity selection. The app now rejects substitution of an older certificate; unique synthetic leaf serials avoid test-fixture collisions. Native verification passed25XCTest,20bundle cases and the startup regression; the new old-import mutation failed its intended assertion. Earlier21mutation witnesses retain their unchanged-guard scope. The initial native fixture-reaping stall was preserved and cleaned; one bounded run of individual TLS tests passed. All16input hashes were verified. [Current native evidence](identity-import-fix/README.md).
+
+Earlier reboot/login startup, sleep/reconnect, denial, unlock, lost reply and stale-authority observations below retain their dated build scopes. The final focused smoke reconfirms the changed executable's notification and protected approval flow; it does not relabel all historical observations as runs on the latest binary. Frozen intent is unchanged.
 
 Prior operator/provider evidence is in [the continuation ledger](interactive-continuation.json).
 Current native tests and mutation witnesses are in
@@ -51,9 +46,9 @@ the dropped reply. See [the continuation ledger](interactive-continuation.json).
 Successful reconnection to renewed fixture authority does not establish rejection
 of stale review tickets across a restart of the same persisted provider state.
 
-## Verification and limitations
+## Earlier verification and current limitations
 
-Current native evidence: **23 XCTest tests and 20 signed-bundle cases passed**
+Earlier review-fix native evidence: **23 XCTest tests and 20 signed-bundle cases passed**
 in both full baselines, with no failures/skips, on macOS 27.0.1 / Xcode 27.0 /
 Swift 6.4. All **21 scoped mutants** were killed by intended runtime assertions;
 zero survivors, invalids, timeouts or unexecuted cases. Release build, strict
@@ -61,7 +56,7 @@ signature, cleanup and all 15 restored input hashes passed. The reviewed native
 changes cover closed response/status validation, review rendering, ambiguous
 outcomes, unresolved selections and lifecycle/polling/password context. These
 results supersede the earlier 9-test/15-bundle counts for the navigation build.
-Refreshed installed-app smoke remains pending. See
+The final smoke is now complete as recorded above. See
 [native verification](native-verification.md).
 
 The HTTP422 provider correction passed all three Linux feature profiles, each
@@ -95,7 +90,7 @@ attempt; this does not prove the observer was the unique cause. See
 Earlier ATS, HTTP403, notification-routing and admission failures are retained.
 The app-level ATS exception and development installation were explicitly approved;
 HTTPS, TLS minimum, CA/hostname/expiry, pin, mTLS and no-retry guarantees remain.
-No commit, push, PR or production provider deployment has occurred. BMAD review closure and refreshed installed smoke remain required before the human-review handoff.
+PR33 was published after explicit user authorization. BMAD verification and review closure are complete; no PR merge or production deployment occurred.
 
 The complete previous audit and three related documents are preserved in the
 [verified document archive](acceptance-document-history-2026-10-07.tar.gz)

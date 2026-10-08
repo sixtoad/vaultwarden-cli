@@ -1,0 +1,29 @@
+{
+  "prepared_at_utc": "2026-10-08T13:13:33.751673+00:00",
+  "root": "/home/sixtocantolla/.vw-companion-acceptance-yfuo3ig1",
+  "endpoint": "https://pop-os.int.cantolla.casa:34665",
+  "status": "prepared only; service not started; no requests",
+  "server_pin": "2dfcf456b1df84d2d7c0630c6871e31161428ae8c96e140e65a61378ce573c5c",
+  "client_fingerprint": "e2efd5f5247d2762bf09a408e292b7e76aac330cbb21d8904f88ea5dc6be527c",
+  "ca_fingerprint": "b84a749488d559bcba1d49568840ae49b1035efa8430720032e3f803f433eb0a",
+  "certificate_dates": {
+    "ca.pem": [
+      "notBefore=Oct  8 13:13:12 2026 GMT",
+      "notAfter=Oct 10 13:13:12 2026 GMT"
+    ],
+    "server.pem": [
+      "notBefore=Oct  8 13:13:12 2026 GMT",
+      "notAfter=Oct 10 13:13:12 2026 GMT"
+    ],
+    "client.pem": [
+      "notBefore=Oct  8 13:13:12 2026 GMT",
+      "notAfter=Oct 10 13:13:12 2026 GMT"
+    ]
+  },
+  "fixture_binary_path": "target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483",
+  "fixture_binary_sha256": "9319c47c2046278b0b5f5bcfc87c0deeee69475adc41321e652193c9b2f977e3",
+  "helper_sha256": "642dbc59356d2cc28505c5eea28af578e99e4ad9c6772e14b6ef73921f323452",
+  "cli_sha256": "deb57c554fd0ec0b8c8e8a49d872c9beef064262eaa2dc702b1feb8a1eceb2ec",
+  "ca_der_sha256": "b84a749488d559bcba1d49568840ae49b1035efa8430720032e3f803f433eb0a",
+  "client_pkcs12_sha256": "8cca1b13498fb7e28dd851bca8639c923611e7520162bf05a8eabc811f953326"
+}

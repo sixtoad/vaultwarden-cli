@@ -35,10 +35,20 @@ public enum KeychainIdentity {
         let identity = identityValue as! SecIdentity
         var reference: CFTypeRef?
         let query: [String: Any] = [kSecClass as String: kSecClassIdentity,
-                                   kSecValueRef as String: identity,
+                                   kSecMatchItemList as String: [identity],
                                    kSecReturnPersistentRef as String: true]
         guard SecItemCopyMatching(query as CFDictionary, &reference) == errSecSuccess,
               let reference = reference as? Data else { throw CompanionError.configuration }
+        // Keychain certificate uniqueness can reject a renewed certificate that
+        // collides with an older issuer/serial. Never return that older identity.
+        var importedCertificate: SecCertificate?
+        var persistedCertificate: SecCertificate?
+        let persistedIdentity = try resolve(reference)
+        guard SecIdentityCopyCertificate(identity, &importedCertificate) == errSecSuccess,
+              SecIdentityCopyCertificate(persistedIdentity, &persistedCertificate) == errSecSuccess,
+              let importedCertificate, let persistedCertificate,
+              SecCertificateCopyData(importedCertificate) as Data == SecCertificateCopyData(persistedCertificate) as Data
+        else { throw CompanionError.configuration }
         return reference
     }
     public static func resolve(_ reference: Data) throws -> SecIdentity {

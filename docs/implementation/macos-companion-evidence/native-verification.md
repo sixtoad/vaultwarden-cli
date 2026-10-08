@@ -1,25 +1,56 @@
 # Native verification
 
-The review-fix build passed **23 XCTest tests and 20 signed app-bundle cases**
-in both the initial and restored full baselines on **2026-10-08**, using macOS
-27.0.1 (26A434), Xcode 27.0 (27A266a), and Swift 6.4 on arm64. All **21 scoped
-mutations** were killed by their intended runtime assertions. There were zero
-failures/skips in either baseline and zero mutation survivors, timeouts,
-compile/launch failures or unexecuted cases. All 15 input hashes were restored
-and match the repository. Release build and strict ad-hoc signature verification
-passed; test Keychain cleanup and temporary probe-registration absence were verified.
+The exact identity-import build passed **25 XCTest methods, 20 signed app-bundle
+cases and one Python fixture-startup check** on **2026-10-08**, using macOS 27.0.1
+(26A434), Xcode 27.0 (27A266a), and Swift 6.4 on arm64. Release build, strict
+ad-hoc signature, temporary Keychain cleanup and probe-registration cleanup passed.
+All 16 input hashes match the repository. [Current summary](identity-import-fix/identity-summary.json),
+[source hashes](identity-import-fix/source-hashes.json),
+[results](identity-import-fix/results.json) and
+[raw archive](identity-import-fix/identity-verification.tar.gz) preserve the evidence.
+Archive SHA256: `5c7b69b46781711a756a7855cbb6ed5aab566a1d3dff678d27edc9f06d854341`.
 
-Current evidence: [full native summary](review-fixes/full-native-summary.json),
-[exact mutation plan](review-fixes/native-mutation-plan.json),
-[source hashes](review-fixes/source-hashes.json), and
-[raw archive](review-fixes/review-verification.tar.gz).
-Archive SHA256: `0b7705d1f1c27acf5e804ad965c43c6e0e6f61291d5c63a7209aba8121becb4e`.
+The new same-subject renewal and issuer/serial collision tests prove exact
+certificate selection and preservation of the older identity. Restoring the old
+import implementation failed the collision test at its intended runtime assertion:
+**one new runtime mutation kill**, zero survivors or invalid runs. Both identity
+tests passed after exact source restoration. The earlier **21 runtime mutation
+kills** remain applicable to their unchanged guards; that campaign was not rerun.
+A separate DER-guard removal is not claimed killed, because exact-item selection
+already rejects the demonstrated collision. These are scoped campaigns, not
+exhaustive coverage.
+
+The initial native-script attempt passed startup, 13 protocol and eight AppModel
+tests, then stalled in the existing TLS fixture's server-reaping wait. Its sample,
+interruption and verified cleanup are retained. A single bounded rerun passed all
+four TLS/identity methods in separate processes, then all bundle cases and release
+build. No test is counted passed from the stalled filter. The reaping race's exact
+underlying cause is unproven; no production harness workaround was added.
+
 Verified installed executable SHA256:
-`97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113`.
-The parent installed this exact bundle at 11:16:29 UTC as PID 72015, preserving
-saved configuration and Keychain; see [installation](review-fixes/installation.json).
-**Refreshed installed-app smoke acceptance remains pending.** Native automation
-alone does not establish acceptance of this changed build or finish the BMAD handoff.
+`ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf`.
+The [installation](identity-renewal/installation.json) preserved configuration and
+Keychain at 13:43:34 UTC. Subsequent approved trusted reprovision preserved the
+existing identity, backed up the prior configuration, verified the new certificate
+fingerprint `1e13dcda84664b622abcc600d21a31445fd194374ab256d363b2cf8f79a22856`,
+and verified exact saved preference bytes; see
+[provision result](identity-renewal/provision-local-result.json) and
+[readback](identity-renewal/provision-local-check.json).
+**Final logged-in acceptance passed on this exact build.** The operator confirmed
+“Approved; notification opened the full review.” Request
+`WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk`, admitted at 13:44:42 UTC,
+completed at 13:47:53.559 UTC with durable submitted → approved → execution_started
+→ succeeded, exactly one protected execution and redacted signed-CLI exit 0.
+See [final provider result](review-fixes/renewed-final-smoke/provider-result.json).
+The prior wrong-password attempt left the request pending with zero executions;
+exact GUI error text was not separately reported for this build. Human review
+remains a separate handoff.
+
+The preceding review-fix build `97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113`
+passed 23 XCTest methods and 20 bundle cases in both full baselines, plus the
+21-mutant campaign. Its [summary](review-fixes/full-native-summary.json) and
+[archive](review-fixes/review-verification.tar.gz) are retained. The exact-import
+correction supersedes that build; its unchanged guards retain their earlier evidence.
 
 The current suite exercises recursive closed response keys, visible rendering of
 invisible characters, HTTP/body status agreement, status-only recovery from
@@ -78,7 +109,7 @@ request admission and wake 37 seconds before expiry. The operator observed the
 pending item and its automatic removal after expiry; Linux recorded no execution.
 This is sleep/recovery evidence, not expiry while asleep. The separate quit test
 covers app absence through expiry. See [power events](fixture-sleep/mac-power-events.json)
-and [request result](fixture-sleep/result.json). Review-fix verification and the pending refreshed installed smoke are recorded above.
+and [request result](fixture-sleep/result.json). Current verification and passing refreshed installed smoke are recorded above.
 
 Earlier evidence is preserved: [original native archive](native-evidence.tar.gz),
 [ATS/bundle correction](bundle-fix/README.md),

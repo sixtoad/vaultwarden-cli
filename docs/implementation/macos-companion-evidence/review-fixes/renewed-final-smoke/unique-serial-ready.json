@@ -1,0 +1,20 @@
+{
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+  "unit": "vw-companion-acceptance-5jic_t74.service",
+  "ready_at_utc": "2026-10-08T13:42:54.106860+00:00",
+  "session_auto_lock_utc": "2026-10-08T13:57:54.106860+00:00",
+  "bounded_end_utc": "2026-10-08T14:02:54.106860+00:00",
+  "endpoint": "https://pop-os.int.cantolla.casa:42155",
+  "server_pin": "e06a55185b1d17ea0e0808074e4fe4b1c138b86e00b544acb342b2d6d4a90497",
+  "enrolled_client_fingerprint": "1e13dcda84664b622abcc600d21a31445fd194374ab256d363b2cf8f79a22856",
+  "exactly_one_enrolled_identity": true,
+  "certificate_expiry_utc": "2026-10-10T13:30:37Z",
+  "session": {
+    "generation": 2,
+    "state": "unlocked",
+    "version": 1
+  },
+  "pending_requests": [],
+  "fixture_binary_sha256": "9319c47c2046278b0b5f5bcfc87c0deeee69475adc41321e652193c9b2f977e3",
+  "ready_json_sha256": "4b883a3587be0f74217f6dbbfb5cd8d396dd901cde9020dcb79e4f156d3248d3"
+}

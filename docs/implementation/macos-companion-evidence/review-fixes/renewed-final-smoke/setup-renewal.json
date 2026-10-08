@@ -1,0 +1,17 @@
+{
+  "at_utc": "2026-10-08T13:28:31.407681+00:00",
+  "status": "blocked_before_preference_update",
+  "installed_app_sha256": "97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113",
+  "helper_source_sha256": "54f6cbb55442e3176b047ae73abe41362b5eb8ba77594a1a82f0eb0634eabdb0",
+  "attempts": [
+    "SSH helper failed dynamic library load before execution; corrected working directory",
+    "SSH helper refused locked login Keychain before import/preferences; operator unlocked locally; SSH view still locked",
+    "Launched same audited helper in logged-in Terminal; synthetic import succeeded but exact certificate fingerprint guard failed before preference update"
+  ],
+  "original_preference_preserved": true,
+  "existing_identities_preserved": true,
+  "new_synthetic_identity_imported": true,
+  "keychain_acl_or_system_trust_modified": false,
+  "requests_submitted": 0,
+  "next": "Diagnose imported SecIdentity versus resolved persistent reference using public fingerprints only"
+}
