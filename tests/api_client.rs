@@ -501,16 +501,11 @@ async fn api_client_check_server_reports_transport_errors() {
 async fn api_client_sends_client_identification_headers() {
     let mock_server = MockServer::start().await;
 
-    // The mock only matches when the request carries both client-identification
-    // headers, so `.expect(1)` fails at teardown if either is missing. The
-    // expected values come from crate metadata, matching how `ApiClient` builds
-    // them (`CARGO_PKG_VERSION` / `CARGO_PKG_NAME`) rather than hardcoded strings.
+    // Compatibility follows Bitwarden's protocol version; application identity
+    // follows our package metadata. Neither may replace the other.
     Mock::given(method("GET"))
         .and(path("/alive"))
-        .and(header(
-            "bitwarden-client-version",
-            env!("CARGO_PKG_VERSION"),
-        ))
+        .and(header("bitwarden-client-version", "2024.12.0"))
         .and(header(
             "user-agent",
             concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")),

@@ -2,9 +2,9 @@
 #![allow(dead_code)]
 
 use crate::live_env::{
-    FIXTURE_LOGIN_FIELD_API_KEY_VALUE, FIXTURE_LOGIN_NAME, FIXTURE_LOGIN_PASSWORD,
-    FIXTURE_LOGIN_USERNAME, FIXTURE_LOGIN2_NAME, FIXTURE_LOGIN2_PASSWORD, FIXTURE_LOGIN2_USERNAME,
-    LiveTestEnv,
+    FIXTURE_LOGIN_FIELD_API_KEY_VALUE, FIXTURE_LOGIN_FIELD_SECRET_VALUE, FIXTURE_LOGIN_NAME,
+    FIXTURE_LOGIN_PASSWORD, FIXTURE_LOGIN_USERNAME, FIXTURE_LOGIN2_NAME, FIXTURE_LOGIN2_PASSWORD,
+    FIXTURE_LOGIN2_USERNAME, LiveTestEnv,
 };
 use predicates::prelude::*;
 
@@ -15,6 +15,89 @@ use predicates::prelude::*;
 
 const LIVE_TEST_LOGIN_PREFIX: &str = "LIVE_TEST_LOGIN";
 const LIVE_TEST_LOGIN2_PREFIX: &str = "LIVE_TEST_LOGIN_2";
+
+#[tokio::test]
+async fn selected_fields_reach_children_by_name_id_and_uri_and_info_redacts() {
+    let Some(env) = LiveTestEnv::maybe_create().await else {
+        return;
+    };
+    for (command, selector) in [
+        ("run", FIXTURE_LOGIN_NAME),
+        ("run", env.login_item_id.as_str()),
+        ("run-uri", "live-test.example.com"),
+    ] {
+        let output = env
+            .binary()
+            .args([command, selector, "--", "env"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for (suffix, value) in [
+            ("API_KEY", FIXTURE_LOGIN_FIELD_API_KEY_VALUE),
+            ("SECRET", FIXTURE_LOGIN_FIELD_SECRET_VALUE),
+        ] {
+            let name = format!("{LIVE_TEST_LOGIN_PREFIX}_{suffix}");
+            let values: Vec<_> = stdout
+                .lines()
+                .filter_map(|line| line.split_once('='))
+                .filter_map(|(key, value)| (key == name).then_some(value))
+                .collect();
+            assert_eq!(values, vec![value], "exact injected value for {name}");
+        }
+        let output = env
+            .binary()
+            .args([command, "--info", selector, "--", "true"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("LIVE_TEST_LOGIN_SECRET"));
+        for value in [
+            FIXTURE_LOGIN_PASSWORD,
+            FIXTURE_LOGIN_FIELD_API_KEY_VALUE,
+            FIXTURE_LOGIN_FIELD_SECRET_VALUE,
+        ] {
+            assert!(!stdout.contains(value));
+            assert!(!String::from_utf8_lossy(&output.stderr).contains(value));
+        }
+    }
+}
+
+#[tokio::test]
+async fn malformed_selected_fields_fail_before_child_launch() {
+    let Some(env) = LiveTestEnv::maybe_create().await else {
+        return;
+    };
+    let marker = env.home_dir.join("child-was-launched");
+    for malformed_name in [false, true] {
+        let id = env.malformed_field_fixture(malformed_name).await;
+        let name = if malformed_name {
+            "Malformed-Name"
+        } else {
+            "Malformed-Value"
+        };
+        for (command, selector) in [("run", name), ("run", id.as_str()), ("run-uri", name)] {
+            env.binary()
+                .args([command, selector, "--", "touch", marker.to_str().unwrap()])
+                .assert()
+                .failure()
+                .stderr(predicate::str::contains(if malformed_name {
+                    "failed to decrypt custom field name at index 0"
+                } else {
+                    "failed to decrypt custom field 'secret' value"
+                }));
+            assert!(
+                !marker.exists(),
+                "child launched with malformed selected field"
+            );
+        }
+    }
+}
 
 // ── run single item by positional name ────────────────────────────────────
 

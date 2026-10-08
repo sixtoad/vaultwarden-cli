@@ -99,19 +99,13 @@ impl ApiClient {
             );
         }
 
-        // Identify this client to the server. Some Bitwarden-compatible servers
-        // (e.g. Vaultwarden) expect a `Bitwarden-Client-Version` header and log an
-        // error for every request that omits it; the request still succeeds, but the
-        // server's error log fills up. Send our crate version (a valid semver, which
-        // such servers parse) plus a User-Agent — both sourced from Cargo.toml so they
-        // track the crate with no hardcoded strings.
+        // This is protocol compatibility, not this application's version.
+        // Vaultwarden filters SSH ciphers for clients older than 2024.12.0.
+        // Keep application identity in User-Agent below.
         let mut default_headers = reqwest::header::HeaderMap::new();
         default_headers.insert(
             reqwest::header::HeaderName::from_static("bitwarden-client-version"),
-            // `from_str` (not `from_static`) so a malformed version fails gracefully
-            // through this constructor's `Result` instead of panicking at runtime.
-            reqwest::header::HeaderValue::from_str(env!("CARGO_PKG_VERSION"))
-                .context("CARGO_PKG_VERSION is not a valid HTTP header value")?,
+            reqwest::header::HeaderValue::from_static("2024.12.0"),
         );
 
         let client = Client::builder()

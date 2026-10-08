@@ -334,15 +334,17 @@ pub async fn unlock(
     })
 }
 
-/// Lock the currently unlocked vault session.
+/// Lock a logged-in vault session, including an already locked session.
 ///
 /// # Errors
 ///
-/// Returns an error if no session can be loaded or it is not unlocked.
+/// Returns an error if not logged in or saved keys cannot be deleted.
 pub fn lock() -> Result<Session<LoggedInLocked>> {
-    let session = Config::load_session()?;
-    let unlocked = session.require_unlocked()?;
-    unlocked.lock()
+    let mut session = Config::load_session()?.require_logged_in()?;
+    lock_loaded_config(&session.config)?;
+    session.config.crypto_keys = None;
+    session.config.org_crypto_keys.clear();
+    Ok(session)
 }
 
 /// Log out of the current session, clearing stored credentials and config.
@@ -715,9 +717,10 @@ fn find_cipher_output_by_name_or_id(
         let Ok(keys) = get_cipher_keys(config, cipher) else {
             continue;
         };
-        if let Ok(output) =
-            decrypt_cipher_with_profile(cipher, keys, CipherDecryptionProfile::list_env_names())
-            && output.name.to_lowercase() == name_lower
+        if cipher
+            .get_name()
+            .and_then(|name| keys.decrypt_to_string(name).ok())
+            .is_some_and(|name| name.to_lowercase() == name_lower)
         {
             matching_ciphers.push(cipher);
         }
@@ -879,8 +882,8 @@ impl CipherDecryptionProfile {
             password: true,
             uri: true,
             notes: false,
-            field_names: false,
-            field_values: false,
+            field_names: true,
+            field_values: true,
             ssh_public_key: true,
             ssh_private_key: true,
             ssh_fingerprint: true,

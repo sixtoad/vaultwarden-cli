@@ -341,6 +341,52 @@ cargo build --release
 
 - Arch Linux
 
+### Ordinary test prerequisites (Linux)
+
+Ordinary `cargo test` runs server-independent private-keyring isolation tests,
+even when live-server variables are unset. Install `dbus-daemon`,
+`gnome-keyring-daemon`, `gdbus`, and `secret-tool` first. On Debian/Ubuntu:
+
+```bash
+sudo apt-get install dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools
+./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --locked
+```
+
+These tests start disposable private services; they do not need a desktop session
+or Docker. Their process-ownership checks require Linux pidfds (kernel 5.3+).
+
+### Disposable live regression suite (Linux)
+
+Run `./scripts/test-live.sh` to provision Vaultwarden **1.36.0** on an ephemeral
+loopback port, execute the live tests, and remove that run's Compose project.
+An accessible local Docker default engine at `/var/run/docker.sock` and either a
+system-installed `docker compose` plugin or standalone `docker-compose` on the
+runner's PATH (`~/.cargo/bin:/usr/local/bin:/usr/bin:/bin`) are required, along with
+`dbus-daemon`, `gnome-keyring-daemon`, `gdbus`, and `secret-tool`.
+The live runner also requires `curl` and GNU `timeout` (from coreutils).
+The secure temporary-directory wrapper requires safe, non-writable directory
+ancestry under your home; do not relax shared-directory permissions to run it.
+Nondefault Docker contexts, remote/rootless engines, and user-local Compose
+plugins are unsupported. The runner rejects a selected nondefault engine/context
+before clearing the environment, then explicitly selects the local socket. It
+uses private HOME/Docker configuration, so user plugin settings, registry logins,
+and context configuration are not inherited.
+
+The runner clears inherited environment variables. Each fixture starts its own
+private D-Bus and synthetic unlocked keyring, proves that it can save and read a
+sentinel before provisioning, and gives CLI children private HOME/XDG paths.
+It never requires your desktop vault or credentials. Successful unlock is
+verified through a subsequent command using the private keyring; plaintext key
+fallback is not enabled. A server-independent sentinel/fake-desktop-bus test
+runs before the disposable server starts.
+
+Optional arguments filter the test harness, for example
+`./scripts/test-live.sh session::`. Only an unfiltered invocation verifies the
+complete live suite. Ordinary `cargo test` without both live configuration
+variables reports live cases as successful early returns; those are not live
+executions. See [repair verification](docs/implementation/live-test-repair-verification.md)
+for execution accounting and cleanup limits.
+
 ## Disclaimer
 
 This project was written with the assistance of AI (Claude). While it has been tested and works, please review the code and use at your own risk. Contributions and bug reports are welcome.
