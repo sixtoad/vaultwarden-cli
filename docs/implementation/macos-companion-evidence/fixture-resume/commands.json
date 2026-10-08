@@ -1,0 +1,50 @@
+[
+  {
+    "name": "focused",
+    "exit_code": 0,
+    "elapsed_seconds": 8.996,
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "companion"
+    ]
+  },
+  {
+    "name": "fmt",
+    "exit_code": 0,
+    "elapsed_seconds": 0.851,
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ]
+  },
+  {
+    "name": "check",
+    "exit_code": 0,
+    "elapsed_seconds": 4.009,
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--tests"
+    ]
+  },
+  {
+    "name": "python-compile",
+    "exit_code": 0,
+    "elapsed_seconds": 0.159,
+    "command": [
+      "python3",
+      "-c",
+      "from pathlib import Path; [compile(p.read_text(),str(p),'exec') for p in [Path('tests/companion-acceptance.py'),Path('tests/companion-stale-acceptance.py')]]; print('compiled without bytecode')"
+    ]
+  }
+]

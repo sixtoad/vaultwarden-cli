@@ -1,0 +1,12 @@
+--- a/scripts/build-macos-companion.sh
++++ b/scripts/build-macos-companion.sh
+@@ -34,6 +34,9 @@
+ <key>LSMinimumSystemVersion</key><string>13.0</string>
+ <key>LSUIElement</key><true/>
+ <key>NSHighResolutionCapable</key><true/>
++<key>NSAppTransportSecurity</key><dict>
++<key>NSAllowsArbitraryLoads</key><true/>
++</dict>
+ </dict></plist>
+ PLIST
+ plutil -lint "$bundle/Contents/Info.plist"

@@ -1,0 +1,96 @@
+{
+  "status": "passed",
+  "feature_parent": "a25c642b874af76dadfb18fc62bd178fdd1fb9e0",
+  "main_parent": "d1efb1034fcf500c8dd21ebf485a07d928a07059",
+  "commands": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.695,
+      "log": "fmt.log"
+    },
+    {
+      "name": "all-targets",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 301.732,
+      "log": "all-targets.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 28.155,
+      "log": "clippy.log"
+    },
+    {
+      "name": "native-fixtures",
+      "command": [
+        "./scripts/check-native-fixtures.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.846,
+      "log": "native-fixtures.log"
+    },
+    {
+      "name": "systemd",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "./scripts/test-systemd-supervisor.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 110.646,
+      "log": "systemd.log"
+    }
+  ],
+  "default_all_targets": {
+    "reported_passed": 1003,
+    "live_backend_early_returns_excluded": 71,
+    "exercised_passed": 932,
+    "failed": 0,
+    "ignored": 16,
+    "benchmark_smokes": 13
+  },
+  "additional_real_systemd": {
+    "passed": 2,
+    "failed": 0
+  },
+  "additional_mapped_principal_ssh_material": {
+    "passed": 1,
+    "failed": 0
+  },
+  "native_input_hashes_unchanged": 15,
+  "native_reexecution": "Not rerun for merge; all15verified inputs unchanged. Earlier native verification and manual-acceptance limits retained.",
+  "mutation_reexecution": "Not repeated for this merge: both parent guard implementations preserved; only two non-SSH test constructors adjusted. Existing scoped results remain dated parent evidence.",
+  "limitations": [
+    "No live backend credentials;71early-return tests excluded",
+    "16default-suite ignored tests are not claimed passed;3explicit real-systemd/mapped-principal checks separately passed",
+    "All/no-default execution profiles not repeated for merge; strictall-featureall-targetClippy passed, hostedCI pending",
+    "Final installed Mac correct-password/notification acceptance remains pending"
+  ]
+}

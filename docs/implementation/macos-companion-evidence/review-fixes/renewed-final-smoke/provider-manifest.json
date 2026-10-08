@@ -1,0 +1,50 @@
+{
+  "ready.json": {
+    "sha256": "1179ab003295a6ff1dd3cb56a821aae33990a8edf3675f0c0d95c832045a02c4",
+    "bytes": 844
+  },
+  "build-0.log": {
+    "sha256": "1b6b5ec681dd9f3e51501ca8695c4081ae36351aa6bab4c212dad1f25aad4e4b",
+    "bytes": 160
+  },
+  "provider-result.json": {
+    "sha256": "d2b907153e022fbf8e10a902de24ff5a8e6aed8e872e14403b6d069d03c173a9",
+    "bytes": 3830
+  },
+  "unique-serial-prepared.json": {
+    "sha256": "1bb42f3951a732c4f4a8dcbb1c1089f28583ee346d5bab46b866c5c372de3e87",
+    "bytes": 1762
+  },
+  "setup-pause-cleanup.json": {
+    "sha256": "7e9f8438c4a56cebd6a3bcefbe3c77435128e2a88afc1d6e04b6debcca3ab865",
+    "bytes": 504
+  },
+  "setup-renewal.json": {
+    "sha256": "d8979fc102651ea1859178e1a7241092820b51edc637dac4da4cb5ab51a708e8",
+    "bytes": 994
+  },
+  "prepared.json": {
+    "sha256": "4d0665c29c356836cf5270b82d19f838f6e042c8d230c28f6225511f8065b67e",
+    "bytes": 1400
+  },
+  "unique-serial-ready.json": {
+    "sha256": "d3e582ceb0e9b8d2569c30c2c10dd4bd2cbe09ba36f4ed70414480439a3640ac",
+    "bytes": 935
+  },
+  "build-results.json": {
+    "sha256": "12e8f62af598b01d1f8b952b60544ddbb2918dbd774cfca2da7f7dd71fc22376",
+    "bytes": 818
+  },
+  "final-cleanup.json": {
+    "sha256": "840654908c2da8103b4f2f2e84e10fc29e8153b77b22edb8029cbbd7516956e1",
+    "bytes": 811
+  },
+  "hosted-ci.json": {
+    "sha256": "4091c40d4a09e7fc9c35389ecec16d2571c4b6b52e252001cd02df9705c00dfe",
+    "bytes": 11398
+  },
+  "build-1.log": {
+    "sha256": "44b0c90d54fce1c1e33d73227b3b877b935edcaedd32f1f9e473fc5b342702b6",
+    "bytes": 187
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case": "lock",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-6czg3kox",
+  "at_utc": "2026-10-07T15:47:21.726602+00:00",
+  "before": {
+    "request_id": "HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo",
+    "status": {
+      "status": "pending"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted"
+    ]
+  },
+  "after": {
+    "request_id": "HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo",
+    "status": {
+      "status": "expired"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted",
+      "invalidated"
+    ]
+  },
+  "commands": [
+    "session",
+    "review",
+    "session",
+    "session",
+    "session",
+    "decision"
+  ],
+  "decision_responses": [
+    {
+      "http_status": 409,
+      "error": "stale",
+      "status": null
+    }
+  ],
+  "passed": true,
+  "tls": "selected CA, hostname, TLS1.2+, exact leaf pin and enrolled client identity",
+  "operator_ui_observation": "separate; this driver does not automate the Mac",
+  "restart": null
+}

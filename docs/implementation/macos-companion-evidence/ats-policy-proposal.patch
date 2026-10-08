@@ -1,0 +1,13 @@
+--- a/scripts/build-macos-companion.sh
++++ b/scripts/build-macos-companion.sh
+@@ -27,6 +27,10 @@
+ <key>LSMinimumSystemVersion</key><string>13.0</string>
+ <key>LSUIElement</key><true/>
+ <key>NSHighResolutionCapable</key><true/>
++<key>NSAppTransportSecurity</key><dict>
++<!-- PinnedTransport requires HTTPS, TLS 1.2+, explicit CA/hostname/validity
++     validation, exact leaf pin and client identity for every connection. -->
++<key>NSAllowsArbitraryLoads</key><true/></dict>
+ </dict></plist>
+ PLIST
+ plutil -lint "$bundle/Contents/Info.plist"

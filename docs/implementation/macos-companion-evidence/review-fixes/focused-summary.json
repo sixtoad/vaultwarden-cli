@@ -1,0 +1,62 @@
+{
+  "scope": "Only ProtocolTests, AppModelTests, TLSTests and six selected bundle cases; no broad verification or installation",
+  "environment": {
+    "macOS": "27.0.1",
+    "macOS_build": "26A434",
+    "Xcode": "27.0",
+    "Xcode_build": "27A266a",
+    "Swift": "6.4",
+    "target": "arm64-apple-macosx27.0.0"
+  },
+  "swift": {
+    "exit_code": 0,
+    "ProtocolTests": 13,
+    "AppModelTests": 8,
+    "TLSTests": 2,
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0
+  },
+  "bundle": {
+    "exit_code": 0,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      "wrong_password_explicitly_rejected",
+      "success_body_under_503_rejected",
+      "error_body_under_200_rejected",
+      "error_code_status_mismatch_rejected",
+      "unknown_error_code_rejected",
+      "extra_error_field_rejected"
+    ]
+  },
+  "source_hashes": {
+    "docs/companion-setup.md": "81eccb0144f85b8a79f7f497135e2a30eccb949f158cf3cfe5dc294e70ff81f8",
+    "macos/Package.swift": "cbe09e7570e5ddd8ba7e248254d697025a264d9805cbfdcbbd358518dff5d253",
+    "macos/Sources/ApprovalCompanion/App.swift": "ff5e3f3f3966a09986316e21f35620852d142b60dc1585376cfc483ebeabe801",
+    "macos/Sources/CompanionCore/DecisionController.swift": "4f7cdfbbb567a4e7975d811744e8cc3522b7ce22261d83bc7d57ac5f2268cc9e",
+    "macos/Sources/CompanionCore/Protocol.swift": "565111357cbc363ce2c5c8ee8fe065bc700f702ec811d456036a1d272f1fb282",
+    "macos/Sources/CompanionCore/Trust.swift": "0898463f420a9283e8ced81a0306c2579cf65ee45dad3b10348e0c654a5bea59",
+    "macos/Tests/ApprovalCompanionTests/AppModelTests.swift": "23541bcc0f149ca2e6df441ef231fd21bf25b38d3271ae9221083485201fef52",
+    "macos/Tests/CompanionCoreTests/ProtocolTests.swift": "11565deeb0de20dde1c4ea4295cb7f3316662f57d713c3bbdd4d436a7da42a98",
+    "macos/Tests/CompanionCoreTests/TLSTests.swift": "1a008d965017b7baddd4199e0fe39803452b1f42025d1d79a9881e0ea6e1b829",
+    "macos/Tests/Fixtures/BundleProbe.swift": "fe6889c2a0e75004d40b1eefc68bc6a1b61aefcdea76c87c988019bd1ebcf539",
+    "macos/Tests/Fixtures/bundle_tls.py": "f662be2560c81379f9534ce7e1acbbbaf0f1788c2393d66ca161adcabc024448",
+    "macos/Tests/Fixtures/tls_fixture.py": "fbfcb5ac45ae53e4c4e442fa986133dc4df36c95a18a71a628e9b74197c5819f",
+    "scripts/build-macos-companion.sh": "aaf6c703bc6e1a184d4e9fc84d90dc382b90c760c8aa99e0733487555d7cae5f",
+    "scripts/test-macos-companion.sh": "2d842e2104a73dd900262a9540973530629894da89e54c1a90c7bf632a8252c1",
+    "tests/fixtures/companion/review.json": "561f32fe6f17bfaad504746479bca877aa15644e5c1b6ccd2a50c90e9247910b"
+  },
+  "source_hashes_matched_before_and_after": 15,
+  "cleanup": {
+    "temporary_Keychain_and_search_list_verified": true,
+    "temporary_bundle_registration_absence_verified": true,
+    "installed_app_changed": false
+  },
+  "earlier_attempt": "Xcode license exit69 before tests; preserved in targeted-tests-blocked.log; user resolved license before this run",
+  "archive": {
+    "path": "focused-evidence.tar.gz",
+    "sha256": "c798aa4b43b917ae43af4eddf63c2db6c41d74e7ccf2560bb1e389c65460a728"
+  }
+}

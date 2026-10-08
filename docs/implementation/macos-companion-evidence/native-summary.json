@@ -1,0 +1,294 @@
+{
+  "status": "Native verification, BMAD review and logged-in acceptance complete; ready for human review",
+  "host": {
+    "hostname": "mac-mini.int.cantolla.casa",
+    "macos": "27.0.1",
+    "macos_build": "26A434",
+    "xcode": "27.0",
+    "xcode_build": "27A266a",
+    "swift": "6.4",
+    "architecture": "arm64"
+  },
+  "current_build": {
+    "evidence": "identity-import-fix/identity-summary.json",
+    "executable_sha256": "ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf",
+    "info_plist_sha256": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a",
+    "native_source_matches_verified_manifest": true,
+    "refreshed_installed_smoke": "passed",
+    "installation": "identity-renewal/installation.json",
+    "installed_at_utc": "2026-10-08T13:43:34.049322+00:00",
+    "provision": "identity-renewal/provision-local-result.json",
+    "provision_exact_readback": "identity-renewal/provision-local-check.json",
+    "provisioned_client_certificate_sha256": "1e13dcda84664b622abcc600d21a31445fd194374ab256d363b2cf8f79a22856",
+    "existing_identity_preserved": true,
+    "refreshed_installed_smoke_evidence": "review-fixes/renewed-final-smoke/provider-result.json"
+  },
+  "swift_test": {
+    "runner": "scripts/test-macos-companion.sh, then bounded individual TLSTests processes",
+    "xctest_passed": 25,
+    "failed": 0,
+    "skipped": 0,
+    "protocol": 13,
+    "app_model": 8,
+    "tls_and_identity": 4,
+    "restored_identity_tests_passed": 2,
+    "execution_scope": "Startup/Protocol/AppModel passed in first attempt; stalled aggregate TLSTests process interrupted and cleaned; all four TLS/identity methods passed in one bounded rerun as separate processes."
+  },
+  "bundled_tls": {
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      "strict_ats_private_ca_rejected",
+      "configured_private_ca_accepted",
+      "wrong_ca_rejected",
+      "wrong_pin_rejected",
+      "wrong_hostname_rejected",
+      "expired_leaf_rejected",
+      "foreign_client_rejected",
+      "revoked_client_rejected",
+      "http_configuration_rejected",
+      "tls11_rejected",
+      "redirect_rejected",
+      "oversized_response_rejected",
+      "wrong_password_explicitly_rejected",
+      "wrong_unlock_explicitly_rejected",
+      "lost_decision_not_retried",
+      "success_body_under_503_rejected",
+      "error_body_under_200_rejected",
+      "error_code_status_mismatch_rejected",
+      "unknown_error_code_rejected",
+      "extra_error_field_rejected"
+    ],
+    "results": "identity-import-fix/identity-verification.tar.gz:bounded-verification/bundle-tls/results.json"
+  },
+  "bundle_checks": {
+    "release_build": "passed",
+    "plist": "passed",
+    "codesign_verify_strict": "passed",
+    "keychain_cleanup": "Original search list restored; temporary Keychain/certificates deleted",
+    "probe_registration_cleanup": "Task-specific unique identity and path absence verified"
+  },
+  "source_match": {
+    "checked_files": 16,
+    "matched_files": 16,
+    "mismatches": [],
+    "hash_file": "identity-import-fix/source-hashes.json"
+  },
+  "native_mutations": {
+    "scope": "One newly executed exact-import mutation plus earlier21 unchanged-guard mutations; scoped campaigns, not an exhaustive or all-rerun claim",
+    "runtime_killed": 22,
+    "newly_executed": 1,
+    "retained_unchanged_guard_kills": 21,
+    "survivors": 0,
+    "invalid_compile_or_launch": 0,
+    "timeouts": 0,
+    "unexecuted_in_completed_campaigns": 0,
+    "campaigns": [
+      {
+        "runtime_killed": 1,
+        "evidence": "identity-import-fix/results.json",
+        "witness": "testIssuerSerialCollisionNeverSubstitutesExistingIdentity",
+        "restored_identity_tests_passed": 2
+      },
+      {
+        "runtime_killed": 21,
+        "evidence": "review-fixes/full-native-summary.json",
+        "guards_unchanged": true,
+        "reexecuted_for_import_fix": false
+      }
+    ],
+    "source_restored": true,
+    "standalone_der_comparison_mutant": "Not counted; exact-item lookup already rejects the demonstrated collision, so a separate removal does not independently exercise the regression.",
+    "retained_unchanged_guard_evidence": "HTTPS-scheme and TLS-minimum guards also retain older mutation evidence and passed the current bundle baseline."
+  },
+  "manual_acceptance": {
+    "authoritative_record": "interactive-continuation.json",
+    "startup_metadata": "login-startup.json",
+    "complete": true,
+    "completion_not_inferred_from_automated_checks": true,
+    "acceptance_criteria": {
+      "AC1": "passed: native full-review approval, exactly one protected Linux execution and redacted signed-agent result",
+      "AC2": "passed automated companion-disabled regressions; external live-backend exclusions retained",
+      "AC3": "passed: actual reboot, automatic exact-binary launch, operator inbox and native unlock/fresh request"
+    },
+    "verified": [
+      "trusted saved setup and Keychain identity across restart/reboot",
+      "wrong-password explicit rejection without execution",
+      "native denial without execution",
+      "generic notification from Setup opens Approvals/full review",
+      "separate native unlock followed by first-attempt fresh admission and denial",
+      "unanswered request expiry without execution",
+      "installed-app lost successful decision reply recovered by one status lookup, without decision resend or duplicate execution",
+      "operator confirmed connected/unlocked after synthetic fixture restart; renewed authority, not same-state stale-ticket rejection",
+      "confirmed app quit before fresh request; zero companion commands through expiry; restored app reconnect and operator-confirmed empty inbox"
+    ],
+    "remaining": [],
+    "sleep_check_observation": {
+      "as_of_utc": "2026-10-07T13:58:14Z",
+      "request_id": "onF0G3Pu5OURikb2tivNSB4PO3YHfiegMkJcRSBbF90",
+      "provider_result": "Durable submitted \u2192 expired, zero execution",
+      "operator_sleep_wake_refresh_confirmed": false,
+      "cli_terminal_result": "Not retained; observer exited 143, cause unestablished. No CLI timeout/result claimed.",
+      "later_reconnect": "Operator reported connected/unlocked after fixture restart. Actual sleep across the deadline and wake/authoritative refresh remain unconfirmed; this reconnect does not establish same-state restart rejection.",
+      "scope": "Historical October 7 proposed check; superseded for sleep/wake by actual_sleep_oct8, without erasing its limitations."
+    },
+    "lost_reply_observation": {
+      "at_utc": "2026-10-07T14:32:28Z",
+      "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+      "passed": true,
+      "operator_report": "approved",
+      "decision_count": 1,
+      "status_count": 1,
+      "dropped_reply_count": 1,
+      "decision_status_sequence": [
+        "decision",
+        "status"
+      ],
+      "execution_started_events": 1,
+      "protected_execution_exit_code": 0,
+      "signed_cli_exit_code": 0,
+      "signed_cli_result": "Redacted completed result; empty stderr; no synthetic secret markers",
+      "native_build_unchanged": true,
+      "fault_scope": "Synthetic Linux fixture cfg(test) drop after successful commit/dispatch"
+    },
+    "sleep_history_clarification": "Operator confirmed no actual sleep during the earlier October 7 check; ordinary expiry only. Actual October 8 sleep/wake later passed on the prior navigation build; expiry occurred after wake.",
+    "integrated_security": {
+      "stale_authority": "Real-TLS lock, binding revocation, replay and same-state restart/revocation cases passed with zero execution; API driver, no GUI replay claim.",
+      "installed_missing_identity": "Invalid reference verified, zero authenticated commands, exact/semantic configuration restoration and read recovery verified.",
+      "installed_revoked_identity": "Same-state offline revoke/restart, actual PID69135 HTTP403\u2192URLSession -1206; original enrollment restored.",
+      "installed_wrong_server": "Foreign-CA same-host leaf, actual PID69135 cancels authentication challenge then -999; zero authenticated commands; original certificate restored.",
+      "negative_gui_observations": "Not collected; process/network/provider evidence is recorded separately from operator reports."
+    },
+    "actual_sleep_oct8": {
+      "result": "passed sleep/wake recovery; expiry occurred37seconds afterwake; noexecution",
+      "evidence": "fixture-sleep/result.json",
+      "expiry_while_asleep": false
+    },
+    "verified_build_sha256": "12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853",
+    "latest_build_acceptance": {
+      "executable_sha256": "ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf",
+      "request_id": "WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk",
+      "operator_report": "Approved; notification opened the full review",
+      "admitted_at_utc": "2026-10-08T13:44:42Z",
+      "completed_at_utc": "2026-10-08T13:47:53.559445Z",
+      "durable_sequence": [
+        "submitted",
+        "approved",
+        "execution_started",
+        "succeeded"
+      ],
+      "execution_started_events": 1,
+      "signed_cli_exit_code": 0,
+      "signed_cli_redacted": true,
+      "wrong_password_scope": "User reported using wrong password; durable pending/no-execution snapshot captured. Exact GUI error text was not separately reported for this build.",
+      "evidence": "review-fixes/renewed-final-smoke/provider-result.json",
+      "prior_build_matrix_evidence_retained": true
+    }
+  },
+  "limitations": {
+    "live_backend_credentials": "Unavailable; Linux ledger explicitly excludes 71 early-return tests per feature profile",
+    "earlier_busy_admission": "Authority-gate contention observed; exact competing holder unproven. Test-only observer changed 100ms to1s; later first-attempt success is not proof of unique causation.",
+    "fixture_only_change": "Test infrastructure changes: observer cadence 100 ms \u2192 1 s; optional offline revoked-client startup; default-disabled cfg(test) hook drops one successful approval reply after dispatch. Restored lost-reply tests: 16 passed, one manual fixture ignored; formatting, production/test checks, strict library/test Clippy and Python compilation passed. Two fixture mutants killed at runtime; zero survivors/invalids/skips. Nine prior Linux manifest entries and all 13 native hashes unchanged at that pre-review snapshot; adapter/fixture/launcher hashes matched fixture-lost-reply/results.json at that snapshot. Adapter/fixture/launcher/stale-driver hashes at that snapshot match fixture-resume/results.json. See matrix-test-audit.md. Installed-app lost-reply acceptance passed at 14:32:28 UTC; revoked-device acceptance subsequently passed as recorded in integrated_security. Same-state fixture resume and bounded stale driver subsequently passed focused 16 tests, formatting/check/strict Clippy plus actual isolated runtime cases; see fixture-resume/results.json.",
+    "review_fix_scope": "Native production/test sources changed after historical matrix acceptance. Current25/20 counts supersede old builds. Final notification/full-review approval and exactly-once signed Linux execution were refreshed and passed on ad6413; other dated scenarios retain their stated prior-build scope.",
+    "interrupted_native_attempt": {
+      "status": "preserved",
+      "cause_observed": "XCTest stack waiting in TLSFixture.stopServer Process.waitUntilExit after server child absent",
+      "mutations_applied": false,
+      "source_restored": true,
+      "orphan_xctest_terminated_by_SIGTERM": 57003,
+      "exact_temporary_keychain_and_directory_cleanup_verified": true,
+      "recovery": "Single bounded rerun using separate TLSTests processes; startup/Protocol/AppModel checks retained from first attempt"
+    }
+  },
+  "current_archive": {
+    "path": "identity-import-fix/identity-verification.tar.gz",
+    "sha256": "5c7b69b46781711a756a7855cbb6ed5aab566a1d3dff678d27edc9f06d854341",
+    "member_files": 74,
+    "byte_for_byte_verified": true
+  },
+  "historical_evidence": [
+    "native-evidence.tar.gz",
+    "bundle-fix/bundle-fix-evidence.tar.gz",
+    "notification-diagnostics/notification-diagnostics-evidence.tar.gz",
+    "authentication-response/evidence.tar.gz",
+    "acceptance-document-history-2026-10-07.tar.gz",
+    "notification-navigation/evidence.tar.gz",
+    "review-fixes/review-verification.tar.gz"
+  ],
+  "historical_snapshot_note": "Earlier pending fields in startup and installation snapshots are superseded by the current continuation ledger; every pre-consolidation document byte is archived with a verified manifest.",
+  "automated_matrix_audit": "matrix-test-audit.md",
+  "historical_navigation_build": {
+    "host": {
+      "hostname": "mac-mini.int.cantolla.casa",
+      "macos": "26.5.2",
+      "swift": "6.3.3"
+    },
+    "build": {
+      "evidence": "notification-navigation/README.md",
+      "installation": "notification-navigation/installation-result.json",
+      "executable_sha256": "12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853",
+      "native_source_unchanged_since_verification": true
+    },
+    "swift_test": {
+      "runner": "scripts/test-macos-companion.sh",
+      "xctest_passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    "bundled_tls": {
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "results": "notification-navigation/bundle-results.json"
+    },
+    "native_mutations": {
+      "scope": "Scoped semantic campaigns, not exhaustive coverage; unchanged current transport and decision guards",
+      "campaigns": [
+        {
+          "evidence": "bundle-fix/results.json",
+          "runtime_killed": 7,
+          "survivors": 0,
+          "skipped": 0
+        },
+        {
+          "evidence": "authentication-response/mutation-results.json",
+          "runtime_killed": 1,
+          "survivors": 0,
+          "invalid": 0
+        }
+      ],
+      "source_restored_and_final_baseline_passed": true
+    },
+    "live_acceptance_scope": "All observations in manual_acceptance predate the review-fix build unless explicitly identified otherwise."
+  },
+  "historical_review_fix_build": {
+    "build": {
+      "evidence": "review-fixes/full-native-summary.json",
+      "executable_sha256": "97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113",
+      "info_plist_sha256": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a",
+      "native_source_matches_verified_manifest": true,
+      "refreshed_installed_smoke": "pending",
+      "installation_authority": "review-fixes/verification-status.json",
+      "installation": "review-fixes/installation.json",
+      "installed_at_utc": "2026-10-08T11:16:29Z",
+      "installed_pid": 72015
+    },
+    "xctest_passed": 23,
+    "bundled_tls_passed": 20,
+    "full_baselines_passed": 2,
+    "runtime_mutants_killed": 21,
+    "evidence": "review-fixes/full-native-summary.json",
+    "archive": {
+      "path": "review-fixes/review-verification.tar.gz",
+      "sha256": "0b7705d1f1c27acf5e804ad965c43c6e0e6f61291d5c63a7209aba8121becb4e",
+      "member_files": 157,
+      "byte_for_byte_verified": true
+    }
+  },
+  "python_fixture_startup": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  }
+}

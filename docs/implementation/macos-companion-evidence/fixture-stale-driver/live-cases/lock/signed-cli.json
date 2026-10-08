@@ -1,0 +1,8 @@
+{
+  "exit_code": 1,
+  "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo\",\"state\":{\"status\":\"pending\"}}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo\",\"state\":{\"status\":\"expired\"}}\n",
+  "stderr": "",
+  "synthetic_secret_markers_present": false,
+  "non_tty": true,
+  "distinct_agent_uid": 100007
+}

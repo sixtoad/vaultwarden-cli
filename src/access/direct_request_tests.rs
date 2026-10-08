@@ -7104,3 +7104,71 @@ fn ssh_lock_intent_during_key_resolution_cleans_material_without_launch() {
     );
     assert!(!records(&f).to_string().contains("PRIVATE KEY"));
 }
+
+#[test]
+fn companion_snapshot_generation_review_and_deadline_are_bound_at_commit() {
+    for alteration in ["generation", "review", "deadline", "slow_commit", "lock"] {
+        let f = fixture();
+        let receipt = f
+            .app
+            .submit_direct(f.app.human_owner(), input(), &Launcher::default())
+            .unwrap();
+        assert_eq!(f.app.companion_pending().unwrap(), vec![receipt.id.clone()]);
+        let (mut review, mut generation) = f.app.companion_review(&receipt.id).unwrap();
+        if alteration == "generation" {
+            generation += 1;
+        }
+        if alteration == "review" {
+            review.target.push_str(" altered");
+        }
+        let prepared =
+            f.app
+                .companion_prepare(&receipt.id, &review, generation, Duration::from_secs(70));
+        if matches!(alteration, "generation" | "review") {
+            assert!(matches!(prepared, Err(DirectRequestError::StaleRevision)));
+            continue;
+        }
+        let prepared = prepared.unwrap();
+        if alteration == "deadline" {
+            f.monotonic.store(70, Ordering::SeqCst);
+        }
+        if alteration == "lock" {
+            f.app.lock().unwrap();
+        }
+        if alteration == "slow_commit" {
+            let clock = f.monotonic.clone();
+            *f.on_wall_read.lock().unwrap() = Some(Box::new(move || {
+                clock.store(70, Ordering::SeqCst);
+            }));
+        }
+        assert!(f.app.companion_deny(prepared).is_err(), "{alteration}");
+        assert_ne!(
+            f.app
+                .direct_status(f.app.human_owner(), &receipt.id)
+                .unwrap(),
+            DirectStatus::Denied
+        );
+    }
+}
+
+#[test]
+fn companion_inbox_expires_and_locked_submission_never_creates_work() {
+    let f = fixture();
+    let receipt = f
+        .app
+        .submit_direct(f.app.human_owner(), input(), &Launcher::default())
+        .unwrap();
+    f.monotonic.store(310, Ordering::SeqCst);
+    assert!(f.app.companion_pending().unwrap().is_empty());
+    assert_eq!(
+        f.app.companion_review(&receipt.id).unwrap().0.status,
+        DirectStatus::Expired
+    );
+    f.app.lock().unwrap();
+    assert!(matches!(
+        f.app
+            .submit_direct(f.app.human_owner(), input(), &Launcher::default()),
+        Err(DirectRequestError::Locked)
+    ));
+    assert!(f.app.companion_pending().unwrap().is_empty());
+}

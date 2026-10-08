@@ -1,0 +1,40 @@
+{
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cz769ys5",
+  "verified_at_utc": "2026-10-07T15:49:56.024342+00:00",
+  "ready_at_utc": "2026-10-07T15:48:53.009528+00:00",
+  "same_durable_root": true,
+  "preserved": {
+    "pairings": true,
+    "operations": true,
+    "requests": true
+  },
+  "binding_preserved": true,
+  "policy_revision_preserved": true,
+  "resumed": true,
+  "client_revoked": true,
+  "registry": {
+    "version": 1,
+    "identities": []
+  },
+  "request_ids": [
+    "NoJ7M6AUWWHWRULkdSqhIQ3TKWAcuHd5VpiPPcj8Xxo"
+  ],
+  "responses": [
+    {
+      "command": "session",
+      "http_status": 403,
+      "error": "unauthorized"
+    },
+    {
+      "command": "list",
+      "http_status": 403,
+      "error": "unauthorized"
+    },
+    {
+      "command": "review",
+      "http_status": 403,
+      "error": "unauthorized"
+    }
+  ],
+  "execution_started_count": 0
+}

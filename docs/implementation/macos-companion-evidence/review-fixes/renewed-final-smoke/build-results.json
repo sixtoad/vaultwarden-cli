@@ -1,0 +1,34 @@
+{
+  "at_utc": "2026-10-08T13:12:47.703840+00:00",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--bin",
+        "vaultwarden-access-exec",
+        "--bin",
+        "vw-access"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "source_sha256": {
+    "src/adapters/companion.rs": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3",
+    "src/adapters/companion_acceptance_tests.rs": "d1f0e0597499e2265c1f2574d3a47b381d32d15122e16b17e6804571374e6417",
+    "tests/companion-acceptance.py": "244df78e11094b615456ba39285348bb0e36dedbe08722de616e5aba2fefd469"
+  }
+}

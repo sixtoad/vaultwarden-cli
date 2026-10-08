@@ -1,0 +1,50 @@
+{
+  "case": "replay-deny",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-cfs42p3r",
+  "at_utc": "2026-10-07T15:47:34.388498+00:00",
+  "before": {
+    "request_id": "FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI",
+    "status": {
+      "status": "pending"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted"
+    ]
+  },
+  "after": {
+    "request_id": "FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI",
+    "status": {
+      "status": "denied"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted",
+      "denied"
+    ]
+  },
+  "commands": [
+    "session",
+    "review",
+    "decision",
+    "decision"
+  ],
+  "decision_responses": [
+    {
+      "http_status": 200,
+      "error": null,
+      "status": {
+        "status": "denied"
+      }
+    },
+    {
+      "http_status": 409,
+      "error": "stale",
+      "status": null
+    }
+  ],
+  "passed": true,
+  "tls": "selected CA, hostname, TLS1.2+, exact leaf pin and enrolled client identity",
+  "operator_ui_observation": "separate; this driver does not automate the Mac",
+  "restart": null
+}

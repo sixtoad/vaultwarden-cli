@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "case": "original-red",
+      "exit_code": 1,
+      "result": "intended runtime assertion failed",
+      "log": "original-red.log"
+    },
+    {
+      "case": "fixed-green",
+      "exit_code": 0,
+      "result": "passed",
+      "log": "fixed-green.log"
+    },
+    {
+      "case": "restore-stdlib-bind-mutant",
+      "exit_code": 1,
+      "result": "intended runtime assertion failed",
+      "log": "restore-stdlib-bind-mutant.log"
+    }
+  ],
+  "source_restored_exactly": true,
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "scope": "Real loopback bind/listen; TLS context mocked only in focused startup test; no production changes or native runs",
+  "initial_sandbox_attempt": "socket creation denied before bind; authorized unsandboxed focused run passes",
+  "source_hashes": {
+    "macos/Tests/Fixtures/tls_fixture.py": "d0a740b8cf52d28ce805ee7cbacaae2df9c1f638bfbca2a6f6529f73c3f39816",
+    "macos/Tests/Fixtures/test_tls_fixture.py": "3921a96a22958b7f7087528f6a86cd530a2afb66b4f1736e7630a16cd529172b",
+    "scripts/test-macos-companion.sh": "c6e7ad6d440df38a8ea77770304c65a067551c36a465db7b0d4022d57723325c"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "request_id": "FnfQRg_543IhjezDUk74wGh-Asrd9qAn9q4yLAJw_mI",
+  "status": {
+    "status": "denied"
+  },
+  "execution_claimed": false,
+  "audit_outcomes": [
+    "submitted",
+    "denied"
+  ]
+}

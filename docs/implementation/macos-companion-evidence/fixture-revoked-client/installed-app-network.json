@@ -1,0 +1,49 @@
+{
+  "captured_at_utc": "2026-10-07T15:50:34.115461+00:00",
+  "provider_revoked_ready_at_utc": "2026-10-07T15:48:53.009528+00:00",
+  "provider_ready_source": "provider_acceptance reported exact ready.json modification time; same durable fixture root and endpoint",
+  "log_exit_code": 0,
+  "query": {
+    "process_pid": 69135,
+    "subsystem": "com.apple.CFNetwork",
+    "start_local": "2026-10-07 16:48:53",
+    "timezone": "Europe/Dublin",
+    "event_filters": [
+      "received response, status",
+      "finished with error"
+    ]
+  },
+  "events": [
+    {
+      "at_utc": "2026-10-07T15:48:58.397Z",
+      "pid": 69135,
+      "task_id": "97F56486-81E5-43C6-BCDB-6B2C6CFB43A8",
+      "http_status": 403
+    },
+    {
+      "at_utc": "2026-10-07T15:48:58.399Z",
+      "pid": 69135,
+      "task_id": "97F56486-81E5-43C6-BCDB-6B2C6CFB43A8",
+      "urlsession_error": -1206
+    },
+    {
+      "at_utc": "2026-10-07T15:50:01.419Z",
+      "pid": 69135,
+      "task_id": "FB475D65-9EF9-44D2-BB6F-D7720558EAF1",
+      "http_status": 403
+    },
+    {
+      "at_utc": "2026-10-07T15:50:01.420Z",
+      "pid": 69135,
+      "task_id": "FB475D65-9EF9-44D2-BB6F-D7720558EAF1",
+      "urlsession_error": -1206
+    }
+  ],
+  "observation": "Actual unchanged installed app attempted HTTPS and received HTTP403 followed by URLSession clientCertificateRejected during the revoked-enrollment window.",
+  "limits": "Passive network evidence only; operator UI observation, provider state/access audit and subsequent enrollment restoration/recovery are recorded separately by parent/provider.",
+  "operator_observation_inferred": false,
+  "raw_payloads_or_passwords_recorded": false,
+  "mac_configuration_or_lifecycle_changed": false,
+  "ui_automation_or_permission_changes": false,
+  "restoration_requested_at_capture": true
+}

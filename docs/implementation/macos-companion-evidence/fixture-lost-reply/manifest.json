@@ -1,0 +1,58 @@
+{
+  "check-production.log": {
+    "sha256": "0c293119aa1663ec45805b4e7ad80e9f7ce8368ebdaa2105f0353e1532b57f2a",
+    "bytes": 187
+  },
+  "check-tests.log": {
+    "sha256": "b2a3a43e7f4c024a75569ffa9b155bc4ffd08f0bf9b14e4a618b53d21102f12c",
+    "bytes": 188
+  },
+  "clippy.log": {
+    "sha256": "ea87179b096303155f9c5a2094d89ec9324e8ad19cdc2fa529f1e43afcf9ca07",
+    "bytes": 188
+  },
+  "commands.json": {
+    "sha256": "c3e5b35d45b06a74598f1e5d747372e7baf2fc9b5d6e5ff908307d9dfba09beb",
+    "bytes": 1547
+  },
+  "drop_failed_approval.log": {
+    "sha256": "3cb6a472c1fc32943b26614a4e315c936817ac625466f361e4a47f9f40317d11",
+    "bytes": 989
+  },
+  "drop_more_than_once.log": {
+    "sha256": "c30064e366c6fb09479f440632fb318b5c0c69946f5943ed8560ce6c285c94ba",
+    "bytes": 992
+  },
+  "fmt.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "focused-initial.log": {
+    "sha256": "7685b1e7130eccccf31c189d285666c31465bbf1fa1e8107221388239d52ef09",
+    "bytes": 2867
+  },
+  "focused.log": {
+    "sha256": "fcbb30d436a41473a359cecc9269df63a786a76484ddf13364f361a517299ccd",
+    "bytes": 2286
+  },
+  "mutation-results.json": {
+    "sha256": "771afbb2981ffd3a900b17370747bece2a7f1807d6b7b6e7393154bf339d7d68",
+    "bytes": 884
+  },
+  "python-compile.log": {
+    "sha256": "68fa4f850d3c6d40dfdaec085aaff4977a476ca0bc642b1143edce6f176ee0b5",
+    "bytes": 39
+  },
+  "restored-focused.log": {
+    "sha256": "9ff7abe406c08eff0410fb99d28350b67511c0b3b8b36bc496898066276db4d9",
+    "bytes": 2285
+  },
+  "results.json": {
+    "sha256": "406e760fa7f05fb839b14dbde2bfee366459abef540249ae6471fdc7792a948b",
+    "bytes": 3388
+  },
+  "installed-app-result.json": {
+    "sha256": "fe9f49453eff57749a115c48ac705a0c03321df036e0395158397ae020661b28",
+    "bytes": 3122
+  }
+}

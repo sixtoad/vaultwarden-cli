@@ -1,0 +1,13 @@
+# Notification diagnostics and test isolation
+
+The notification authorization callback previously discarded an NSError and displayed ordinary denial feedback. Actual OS logs showed `didGrant:0 hasError:1`. The diagnostic build now displays the error description/domain/code separately, and explains System Settings recovery for a normal denial. Notification permission remains unverified pending the operator's exact error report.
+
+Synthetic bundle probes now use unique test identifiers while retaining the exact production ATS dictionary. Their own registrations are explicitly removed in `finally`, with checked exit codes. All 24 earlier deleted probe registrations were removed by exact path; zero remain, the actual app record was preserved, and no global LaunchServices reset occurred. This collision was real incidental test state but is not proven to be the notification failure's cause.
+
+Nine Swift tests and thirteen real-bundle TLS cases passed again, including Keychain and new probe-registration cleanup. Thirteen source hashes match the tested snapshot. The diagnostic release bundle was built, signature-verified and reopened as PID 21950 with preferences intact. Prior seven-mutant evidence remains valid for unchanged production transport and is preserved separately.
+
+The new process then logged **“Local network prohibited”** in its unsatisfied network path. An independent Mac TCP connection to the provider succeeded in 2ms. This establishes an app-local privacy denial, not a host connectivity failure. No permission or signing setting was changed. See [redacted network witness](local-network-denial.json). Apple [TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy) explains the local-network purpose string and ad-hoc signing identity limitations; further operator action and packaging decisions remain with the parent.
+
+[Results](results.json), [source hashes](source-hashes.json), [full verified evidence](notification-diagnostics-evidence.tar.gz), [archive SHA256](notification-diagnostics-evidence.tar.gz.sha256). Every original byte was verified before compaction. Earlier archives are unchanged. Manual approval, notification delivery/click, unlock/reconnect and login acceptance remain incomplete.
+
+A [purpose-string packaging patch](pending-local-network-purpose.patch) is prepared but not applied. It adds `NSLocalNetworkUsageDescription` at the top level; it does not add `NSAllowsLocalNetworking` or change the approved ATS dictionary. No rebuild/reopen is being performed while the operator adjusts the current ad-hoc app’s local-network permission.

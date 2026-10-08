@@ -1,0 +1,19 @@
+{
+  "at_utc": "2026-10-07T15:31:54.910432+00:00",
+  "installed_app_sha256": "12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853",
+  "installed_process_pid": 68740,
+  "signature_verify_exit_code": 0,
+  "helper_check": {
+    "backup_sha256": "c6122d912fce32c412e975c9b713b197bb6a8edc2c61824af535179e3da78a33",
+    "current_sha256": "0146b0eff54e86360106a5c0f0c207f2eb433bde0f746fed19a75339d5b298e2",
+    "exact_original_bytes": false,
+    "identity_reference_matches_original": false,
+    "mode": "check",
+    "semantic_original_configuration": false,
+    "semantic_test_substitution": true
+  },
+  "app_launched_after_parent_verified_request_expiry": true,
+  "preferences_written_by_this_step": false,
+  "keychain_modified": false,
+  "ui_automation_used": false
+}

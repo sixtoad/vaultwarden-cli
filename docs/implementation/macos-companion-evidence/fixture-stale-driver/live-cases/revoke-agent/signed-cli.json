@@ -1,0 +1,8 @@
+{
+  "exit_code": 1,
+  "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"8oJcBR2y5zQsLOSZubA5spzPecsr4Lh_Zp-LnWYafbY\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"8oJcBR2y5zQsLOSZubA5spzPecsr4Lh_Zp-LnWYafbY\",\"state\":{\"status\":\"pending\"}}\n{\"status\":\"rejected\",\"protocol_version\":1,\"category\":\"unauthorized\"}\n",
+  "stderr": "",
+  "synthetic_secret_markers_present": false,
+  "non_tty": true,
+  "distinct_agent_uid": 100007
+}

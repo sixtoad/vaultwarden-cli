@@ -1,0 +1,11 @@
+{
+  "source": "macOS unified log for previous ApprovalCompanion process 76450",
+  "query_exit_code": 0,
+  "observed_markers": [
+    "ATS failed system trust",
+    "AnchorTrusted",
+    "-9802",
+    "-1200"
+  ],
+  "details_redacted": "Only failure markers retained; URLs, certificate details and session identifiers omitted."
+}

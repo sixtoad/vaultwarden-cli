@@ -1,0 +1,42 @@
+{
+  "case": "revoke-agent",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-wyva2ry3",
+  "at_utc": "2026-10-07T15:47:28.961446+00:00",
+  "before": {
+    "request_id": "8oJcBR2y5zQsLOSZubA5spzPecsr4Lh_Zp-LnWYafbY",
+    "status": {
+      "status": "pending"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted"
+    ]
+  },
+  "after": {
+    "request_id": "8oJcBR2y5zQsLOSZubA5spzPecsr4Lh_Zp-LnWYafbY",
+    "status": {
+      "status": "expired"
+    },
+    "execution_claimed": false,
+    "audit_outcomes": [
+      "submitted",
+      "invalidated"
+    ]
+  },
+  "commands": [
+    "session",
+    "review",
+    "decision"
+  ],
+  "decision_responses": [
+    {
+      "http_status": 409,
+      "error": "stale",
+      "status": null
+    }
+  ],
+  "passed": true,
+  "tls": "selected CA, hostname, TLS1.2+, exact leaf pin and enrolled client identity",
+  "operator_ui_observation": "separate; this driver does not automate the Mac",
+  "restart": null
+}

@@ -1,0 +1,15 @@
+{
+  "macos/Package.swift": "01f658415f96f1d3d1c645adcdcdbacdb2bb6334233090dddb046f8e1d7c9773",
+  "macos/Sources/ApprovalCompanion/App.swift": "e079fc0abcc115e8fc957e52a23cd9f54298153b74abfa1ea1131f0cfe2aecaf",
+  "macos/Sources/CompanionCore/DecisionController.swift": "f725c7494ad62e8f5011466f305f312b6a8b522e47aea8d77ee6a6cfb66c7322",
+  "macos/Sources/CompanionCore/Protocol.swift": "27f7041b060495c6197764b024a0589ed91c8ee74d4ee5b1390a0ecb61bc5fab",
+  "macos/Sources/CompanionCore/Trust.swift": "b1b0e3569a37cdf3f53331494339de6629d5975f94d08acffc3b6fe9f5c9a471",
+  "macos/Tests/CompanionCoreTests/ProtocolTests.swift": "f9676ccd1bb144cec3bef116991a793ef06daeece5972a72f37bd45ee4cc73e6",
+  "macos/Tests/CompanionCoreTests/TLSTests.swift": "58628ea254c717b088a8c30108dbe1103a725deaeeeac10ef16433864d191400",
+  "macos/Tests/Fixtures/BundleProbe.swift": "fe6889c2a0e75004d40b1eefc68bc6a1b61aefcdea76c87c988019bd1ebcf539",
+  "macos/Tests/Fixtures/bundle_tls.py": "fe30e55ca7e27ec35261ca3bbaf7adddc063ef8a751fb2efe57ca97bce2da829",
+  "macos/Tests/Fixtures/tls_fixture.py": "e2e8640417b2d13bd14dcedad51387adb1115ea35e146bd2b74f8657bd9495a7",
+  "scripts/build-macos-companion.sh": "aaf6c703bc6e1a184d4e9fc84d90dc382b90c760c8aa99e0733487555d7cae5f",
+  "scripts/test-macos-companion.sh": "f53093fc40da928d8adae07e9b19377886dbc6f3dda3f675b895cc6bb74d9f45",
+  "tests/fixtures/companion/review.json": "561f32fe6f17bfaad504746479bca877aa15644e5c1b6ccd2a50c90e9247910b"
+}

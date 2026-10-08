@@ -1,0 +1,42 @@
+{
+  "captured_after_operator_wake": true,
+  "date": "2026-10-08",
+  "timezone": "Europe/Dublin",
+  "command": "LC_ALL=C pmset -g log, filtered to dated Sleep/Wake/DarkWake event records",
+  "exit_code": 0,
+  "events": [
+    {
+      "utc": "2026-10-08T09:36:33Z",
+      "event": "Sleep",
+      "reason": "Software Sleep"
+    },
+    {
+      "utc": "2026-10-08T09:37:05Z",
+      "event": "DarkWake",
+      "reason": "network maintenance"
+    },
+    {
+      "utc": "2026-10-08T09:37:26Z",
+      "event": "Sleep",
+      "reason": "Maintenance Sleep"
+    },
+    {
+      "utc": "2026-10-08T09:44:53Z",
+      "event": "Wake",
+      "reason": "UserActivity"
+    }
+  ],
+  "request_admitted_utc": "2026-10-08T09:40:30Z",
+  "request_expires_utc": "2026-10-08T09:45:30Z",
+  "asleep_at_admission": true,
+  "asleep_at_expiry": false,
+  "wake_before_expiry_seconds": 37,
+  "operator_observation": "I left it open, when I woke up the mac I caould see the pending request, it refreshed itself after few seconds and disappeared",
+  "interpretation": "Actual sleep and wake recovery observed. Request admitted while asleep, expired after wake without execution; automatic refresh removed it. This is not expiry while asleep.",
+  "prior_read_failures": [
+    "First awk filter returned partial records then failed on an unrelated multibyte log string.",
+    "Second filter syntax failed; corrected byte-safe event filter completed successfully."
+  ],
+  "mac_changes": false,
+  "mac_contact_during_instructed_sleep": false
+}

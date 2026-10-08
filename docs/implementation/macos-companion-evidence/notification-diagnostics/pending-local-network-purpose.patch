@@ -1,0 +1,11 @@
+--- a/scripts/build-macos-companion.sh
++++ b/scripts/build-macos-companion.sh
+@@ -27,6 +27,8 @@
+ <key>LSMinimumSystemVersion</key><string>13.0</string>
+ <key>LSUIElement</key><true/>
+ <key>NSHighResolutionCapable</key><true/>
++<key>NSLocalNetworkUsageDescription</key>
++<string>Approval Companion connects to your configured Linux provider on the local network to retrieve pending reviews and submit your decisions.</string>
+ <key>NSAppTransportSecurity</key><dict>
+ <key>NSAllowsArbitraryLoads</key><true/>
+ </dict>

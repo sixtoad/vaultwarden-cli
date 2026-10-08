@@ -1034,6 +1034,72 @@ impl ProviderApplication {
         self.expire_requests(&mut authority)?;
         authority.provider.direct_review(owner, id)
     }
+    /// Authenticated companion inbox, read under the same expiry/authority gate.
+    pub(crate) fn companion_pending(&self) -> Result<Vec<String>, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.expire_requests(&mut authority)?;
+        authority.provider.pending_direct_ids(self.owner)
+    }
+    /// Snapshot and generation are captured atomically; no capability leaves core.
+    pub(crate) fn companion_review(
+        &self,
+        id: &str,
+    ) -> Result<(DirectReview, u64), DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.expire_requests(&mut authority)?;
+        Ok((
+            authority.provider.direct_review(self.owner, id)?,
+            authority.generation,
+        ))
+    }
+    pub(crate) fn companion_now(&self) -> Duration {
+        self.clock.now()
+    }
+    pub(crate) fn companion_prepare(
+        &self,
+        id: &str,
+        review: &DirectReview,
+        generation: u64,
+        deadline: Duration,
+    ) -> Result<PreparedApproval, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        self.request_agent_live(&authority, id)?;
+        if authority.generation != generation
+            || authority.provider.direct_review(self.owner, id)? != *review
+        {
+            return Err(DirectRequestError::StaleRevision);
+        }
+        Ok(PreparedApproval {
+            binding: authority.provider.prepare_direct(self.owner, id)?,
+            generation,
+            companion_deadline: Some(deadline),
+        })
+    }
+    pub(crate) fn companion_deny(
+        &self,
+        prepared: PreparedApproval,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.commit_decision(prepared, false)
+    }
     pub(crate) fn decision_generation(&self) -> Result<u64, DirectRequestError> {
         let mut authority = self
             .gate
@@ -1061,6 +1127,7 @@ impl ProviderApplication {
         Ok(PreparedApproval {
             binding: authority.provider.prepare_direct(owner, id)?,
             generation: authority.generation,
+            companion_deadline: None,
         })
     }
     pub(crate) fn commit_approval(
@@ -1479,7 +1546,11 @@ impl ProviderApplication {
             .map_err(|_error| DirectRequestError::Unavailable)?;
         self.admit(&mut authority)?;
         self.expire_requests(&mut authority)?;
-        if authority.generation != prepared.generation {
+        if authority.generation != prepared.generation
+            || prepared
+                .companion_deadline
+                .is_some_and(|deadline| self.clock.now() >= deadline)
+        {
             return Err(DirectRequestError::Locked);
         }
         let binding = &prepared.binding;
@@ -1547,7 +1618,10 @@ impl ProviderApplication {
             return Err(DirectRequestError::Unauthorized);
         }
         let result = authority.provider.decide_direct(binding, approve, now, || {
-            !self.closing.load(Ordering::Acquire)
+            prepared
+                .companion_deadline
+                .is_none_or(|deadline| self.clock.now() < deadline)
+                && !self.closing.load(Ordering::Acquire)
                 && Self::token_live(&token)
                 && self.clock.now() < deadline
                 && self.clock.now() < session_deadline

@@ -14,6 +14,8 @@ use std::{
 use vaultwarden_cli::{
     access::{application::ProviderApplication, provider::Provider},
     adapters::{
+        companion::Companion,
+        companion_identity,
         human_socket::HumanSocket,
         loopback_ui::LoopbackUi,
         session::{MonotonicClock, clear_persisted_session},
@@ -26,12 +28,13 @@ use vaultwarden_cli::{
 #[cfg(target_os = "linux")]
 #[derive(Debug, Parser)]
 #[command(name = "vaultwarden-accessd")]
+#[command(group(clap::ArgGroup::new("human_transport").args(["ui_tls_cert", "companion_listen"])))]
 struct Args {
     /// Provider-owned directory for lifecycle state.
     #[arg(long, env = "VAULTWARDEN_ACCESS_STATE_ROOT")]
     state_root: PathBuf,
     /// Preprovisioned provider-owned 0750 directory for the agent socket.
-    #[arg(long, requires_all = ["agent_socket_gid", "backend_config", "ui_tls_cert", "ui_tls_key"])]
+    #[arg(long, requires_all = ["agent_socket_gid", "backend_config", "human_transport"])]
     agent_socket_dir: Option<PathBuf>,
     /// Access group owning the 0660 agent socket.
     #[arg(long, requires = "agent_socket_dir")]
@@ -48,6 +51,26 @@ struct Args {
     /// Provider-owned, unencrypted PEM private key for the loopback HTTPS identity.
     #[arg(long, requires = "ui_tls_cert", requires = "backend_config")]
     ui_tls_key: Option<PathBuf>,
+    /// Opt-in direct LAN/VPN mutually authenticated companion endpoint.
+    #[arg(long, requires_all = ["backend_config", "companion_tls_cert", "companion_tls_key", "companion_client_ca"], conflicts_with = "ui_tls_cert")]
+    companion_listen: Option<std::net::SocketAddr>,
+    #[arg(long, requires = "companion_listen")]
+    companion_tls_cert: Option<PathBuf>,
+    #[arg(long, requires = "companion_listen")]
+    companion_tls_key: Option<PathBuf>,
+    /// Trusted CA for companion identities and enrollment certificate validation.
+    #[arg(long)]
+    companion_client_ca: Option<PathBuf>,
+    /// Offline trusted-console enrollment; daemon must be stopped.
+    #[arg(long, requires_all = ["companion_client_ca", "companion_label"], conflicts_with_all = ["companion_revoke", "companion_list", "backend_config"])]
+    companion_enroll_cert: Option<PathBuf>,
+    #[arg(long, requires = "companion_enroll_cert")]
+    companion_label: Option<String>,
+    /// Offline revocation by exact enrolled certificate fingerprint.
+    #[arg(long, conflicts_with_all = ["companion_enroll_cert", "companion_list", "backend_config"])]
+    companion_revoke: Option<String>,
+    #[arg(long, conflicts_with_all = ["companion_enroll_cert", "companion_revoke", "backend_config"])]
+    companion_list: bool,
 }
 #[cfg(target_os = "linux")]
 fn main() -> ExitCode {
@@ -62,6 +85,25 @@ fn main() -> ExitCode {
 }
 #[cfg(target_os = "linux")]
 fn run(args: Args) -> Result<(), ()> {
+    if let Some(certificate) = &args.companion_enroll_cert {
+        let fingerprint = companion_identity::enroll(
+            &args.state_root,
+            certificate,
+            args.companion_client_ca.as_deref().ok_or(())?,
+            args.companion_label.as_deref().ok_or(())?,
+        )
+        .map_err(|_error| ())?;
+        println!("{fingerprint}");
+        return Ok(());
+    }
+    if let Some(fingerprint) = &args.companion_revoke {
+        return companion_identity::revoke(&args.state_root, fingerprint).map_err(|_error| ());
+    }
+    if args.companion_list {
+        let entries = companion_identity::list(&args.state_root).map_err(|_error| ())?;
+        println!("{}", serde_json::to_string(&entries).map_err(|_error| ())?);
+        return Ok(());
+    }
     let runtime = tokio::runtime::Runtime::new().map_err(|_error| ())?;
     let (mut interrupt, mut term) = runtime.block_on(async {
         use tokio::signal::unix::{SignalKind, signal};
@@ -112,28 +154,59 @@ fn run(args: Args) -> Result<(), ()> {
         })
         .transpose()?;
     let artifact = args.state_root.join("open-vaultwarden-access.html");
-    let ui = LoopbackUi::bind(
-        &artifact,
-        args.ui_tls_cert.as_deref().ok_or(())?,
-        args.ui_tls_key.as_deref().ok_or(())?,
-    )
-    .map_err(|_error| ())?
-    .with_approval_authenticator(approval_authenticator)
-    .with_execution_dispatcher(execution_worker.dispatcher());
+    let companion = args
+        .companion_listen
+        .map(|address| {
+            Companion::bind(
+                address,
+                args.companion_tls_cert.as_deref().ok_or(())?,
+                args.companion_tls_key.as_deref().ok_or(())?,
+                args.companion_client_ca.as_deref().ok_or(())?,
+                &args.state_root.join("companion-identities.json"),
+            )
+            .map_err(|_error| ())
+            .map(|server| {
+                server
+                    .with_approval_authenticator(approval_authenticator.clone())
+                    .with_execution_dispatcher(execution_worker.dispatcher())
+            })
+        })
+        .transpose()?;
+    let ui = if companion.is_none() {
+        Some(
+            LoopbackUi::bind(
+                &artifact,
+                args.ui_tls_cert.as_deref().ok_or(())?,
+                args.ui_tls_key.as_deref().ok_or(())?,
+            )
+            .map_err(|_error| ())?
+            .with_approval_authenticator(approval_authenticator)
+            .with_execution_dispatcher(execution_worker.dispatcher()),
+        )
+    } else {
+        None
+    };
+    let launcher = match (&companion, &ui) {
+        (Some(server), _) => server.request_launcher(),
+        (_, Some(server)) => server.request_launcher(),
+        _ => return Err(()),
+    };
     let stop = Arc::new(AtomicBool::new(false));
-    let agent_worker = agent_socket.map(|socket| {
-        runtime.spawn(socket.serve(app.clone(), ui.request_launcher(), stop.clone()))
-    });
+    let agent_worker = agent_socket
+        .map(|socket| runtime.spawn(socket.serve(app.clone(), launcher.clone(), stop.clone())));
     let human_worker = {
         let app = app.clone();
         let stop = stop.clone();
-        let launcher = ui.request_launcher();
         std::thread::spawn(move || human_socket.serve(app, launcher, stop))
     };
     let worker = {
         let app = app.clone();
         let stop = stop.clone();
-        std::thread::spawn(move || ui.serve(app, stop))
+        std::thread::spawn(move || match (companion, ui) {
+            (Some(server), _) => server.serve(app, stop),
+            (_, Some(server)) => server.serve(app, stop),
+            _ => Err(vaultwarden_cli::access::ports::SessionError::InvalidRequest),
+        })
     };
     runtime.block_on(monitor_shutdown(
         app.clone(),
@@ -166,7 +239,7 @@ fn run(args: Args) -> Result<(), ()> {
         let persisted = clear_persisted_session().map_err(|_error| ());
         memory.and(persisted).and(human)
     });
-    let artifact_cleanup = std::fs::remove_file(artifact).map_err(|_error| ());
+    let artifact_cleanup = clear_previous_launch(&artifact);
     let execution_cleanup = execution_worker.join().map_err(|_error| ());
     cleanup
         .and(artifact_cleanup)
@@ -260,6 +333,61 @@ fn clear_previous_launch(path: &std::path::Path) -> Result<(), ()> {
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn companion_mode_is_explicit_and_allows_headless_agent_transport() {
+        let base = [
+            "accessd",
+            "--state-root",
+            "/private",
+            "--backend-config",
+            "/setup",
+            "--agent-socket-dir",
+            "/socket",
+            "--agent-socket-gid",
+            "7",
+            "--companion-listen",
+            "127.0.0.1:9443",
+            "--companion-tls-cert",
+            "/cert",
+            "--companion-tls-key",
+            "/key",
+            "--companion-client-ca",
+            "/ca",
+        ];
+        let args = Args::try_parse_from(base).unwrap();
+        assert!(args.ui_tls_cert.is_none());
+        assert!(args.companion_listen.is_some());
+        for omitted in [
+            "--companion-tls-cert",
+            "--companion-tls-key",
+            "--companion-client-ca",
+        ] {
+            let mut values = base.to_vec();
+            let index = values.iter().position(|value| *value == omitted).unwrap();
+            values.drain(index..index + 2);
+            assert!(Args::try_parse_from(values).is_err());
+        }
+        assert!(
+            Args::try_parse_from(base.into_iter().chain([
+                "--ui-tls-cert",
+                "/browser",
+                "--ui-tls-key",
+                "/browser-key"
+            ]))
+            .is_err()
+        );
+        assert!(
+            Args::try_parse_from([
+                "accessd",
+                "--state-root",
+                "/private",
+                "--companion-enroll-cert",
+                "/cert"
+            ])
+            .is_err()
+        );
+    }
 
     #[test]
     fn agent_listener_requires_explicit_paired_options_backend_and_tls() {

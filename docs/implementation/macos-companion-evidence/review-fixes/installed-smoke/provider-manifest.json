@@ -1,0 +1,10 @@
+{
+  "provider-result.json": {
+    "sha256": "5f6865713a8d77afce82a73edbb34196d5c6b20ad9f9b788725f678f4f916fbd",
+    "bytes": 3543
+  },
+  "cleanup.json": {
+    "sha256": "cf07cca566bc2f24cc25d259b1ef01007078a395728a4138484bc970cf6f7d94",
+    "bytes": 711
+  }
+}

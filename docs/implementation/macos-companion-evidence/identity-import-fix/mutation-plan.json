@@ -1,0 +1,35 @@
+{
+  "finalized": true,
+  "execution_requires_parent_go": true,
+  "source_manifest_sha256": "8a994018942bc79120e439c926705d9f91335ba79c64fc0b40cdfbd5e8a5dcc0",
+  "source_input_count": 16,
+  "required_guards": [
+    "exact_imported_identity"
+  ],
+  "full_timeout_seconds": 900,
+  "mutation_timeout_seconds": 240,
+  "mutations": [
+    {
+      "name": "restore_legacy_identity_import",
+      "guard": "exact_imported_identity",
+      "filter": "TLSTests",
+      "expected_runtime_failures": [
+        "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+      ],
+      "edits": [
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "                                   kSecMatchItemList as String: [identity],",
+          "after": "                                   kSecValueRef as String: identity,",
+          "count": 1
+        },
+        {
+          "path": "macos/Sources/CompanionCore/Trust.swift",
+          "before": "        // Keychain certificate uniqueness can reject a renewed certificate that\n        // collides with an older issuer/serial. Never return that older identity.\n        var importedCertificate: SecCertificate?\n        var persistedCertificate: SecCertificate?\n        let persistedIdentity = try resolve(reference)\n        guard SecIdentityCopyCertificate(identity, &importedCertificate) == errSecSuccess,\n              SecIdentityCopyCertificate(persistedIdentity, &persistedCertificate) == errSecSuccess,\n              let importedCertificate, let persistedCertificate,\n              SecCertificateCopyData(importedCertificate) as Data == SecCertificateCopyData(persistedCertificate) as Data\n        else { throw CompanionError.configuration }\n",
+          "after": "",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

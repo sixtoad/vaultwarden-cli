@@ -1,0 +1,274 @@
+{
+  "baseline_commit": "0c5c1d9a2780132db0c4b313934dbe66716e0851",
+  "platform": "Linux x86_64",
+  "rust_version": "1.98.1",
+  "test_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "RUST_TEST_THREADS": "4",
+    "actual_HOME_preserved": true,
+    "live_environment": "absent; 71 early-return tests/profile are not claimed exercised"
+  },
+  "full_suites": [
+    {
+      "profile": "default",
+      "command": "./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --offline --locked",
+      "exit_code": 0,
+      "test_result_summaries": 19,
+      "reported_passed": 965,
+      "live_environment_early_returns": 71,
+      "exercised_passed": 894,
+      "failed": 0,
+      "ignored": 15,
+      "benchmark_smoke_successes": 13,
+      "log": "default-tests.log"
+    },
+    {
+      "profile": "all-features",
+      "command": "./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --offline --locked --all-features",
+      "exit_code": 0,
+      "test_result_summaries": 19,
+      "reported_passed": 965,
+      "live_environment_early_returns": 71,
+      "exercised_passed": 894,
+      "failed": 0,
+      "ignored": 15,
+      "benchmark_smoke_successes": 13,
+      "log": "all-features-tests.log"
+    },
+    {
+      "profile": "no-default-features",
+      "command": "./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --offline --locked --no-default-features",
+      "exit_code": 0,
+      "test_result_summaries": 19,
+      "reported_passed": 965,
+      "live_environment_early_returns": 71,
+      "exercised_passed": 894,
+      "failed": 0,
+      "ignored": 15,
+      "benchmark_smoke_successes": 13,
+      "log": "no-default-features-tests.log"
+    }
+  ],
+  "doc_suites": [
+    {
+      "profile": "default",
+      "exit_code": 0,
+      "tests": 0
+    },
+    {
+      "profile": "all-features",
+      "exit_code": 0,
+      "tests": 0
+    },
+    {
+      "profile": "no-default-features",
+      "exit_code": 0,
+      "tests": 0
+    }
+  ],
+  "checks": {
+    "cargo_check_offline_locked": 0,
+    "cargo_fmt_all_check": 0,
+    "cargo_clippy_offline_locked_all_targets_all_features_D_warnings": 0,
+    "git_diff_check": 0
+  },
+  "regressions": {
+    "real_mapped_uid_noninteractive_agent": {
+      "exit_code": 0,
+      "passed": 1,
+      "log": "real-agent.log"
+    },
+    "real_firefox": {
+      "exit_code": 0,
+      "log": "browser.log",
+      "unexpected_diagnostics": 0,
+      "expected_cross_origin_or_CSP_diagnostics": 16
+    },
+    "real_systemd": {
+      "exit_code": 0,
+      "passed": 2,
+      "log": "systemd.log"
+    }
+  },
+  "mutations": {
+    "kind": "explicit scoped semantic security guards, not exhaustive cargo-mutants campaign",
+    "attempted": 11,
+    "killed_by_runtime_test_failure": 11,
+    "survived": 0,
+    "invalid": 0,
+    "skipped": 0,
+    "timeout": 0,
+    "cases": [
+      {
+        "name": "password-verification",
+        "file": "src/access/direct_request.rs",
+        "sha256": "4646c5e7f9f243cd27ffe2265cb82695d622b9ca27e0b06f071595bf4d29fad5",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 21.99,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_decision_is_device_bound_single_use_and_lost_reply_is_read_only",
+          "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device",
+          "adapters::companion::tests::companion_rejects_changed_review_generation_expiry_and_revocation"
+        ]
+      },
+      {
+        "name": "mutual-tls",
+        "file": "src/adapters/companion.rs",
+        "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 22.87,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_real_mtls_requires_ca_and_exact_enrolled_leaf"
+        ]
+      },
+      {
+        "name": "core-generation",
+        "file": "src/access/application.rs",
+        "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 17.59,
+        "runtime_failure_witnesses": [
+          "access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit"
+        ]
+      },
+      {
+        "name": "core-exact-review",
+        "file": "src/access/application.rs",
+        "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 15.1,
+        "runtime_failure_witnesses": [
+          "access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit",
+          "adapters::companion::tests::companion_rejects_changed_review_generation_expiry_and_revocation"
+        ]
+      },
+      {
+        "name": "core-final-ticket-deadline",
+        "file": "src/access/application.rs",
+        "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 21.87,
+        "runtime_failure_witnesses": [
+          "access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit"
+        ]
+      },
+      {
+        "name": "ticket-device",
+        "file": "src/adapters/companion.rs",
+        "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 23.66,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_decision_is_device_bound_single_use_and_lost_reply_is_read_only"
+        ]
+      },
+      {
+        "name": "ticket-consumption",
+        "file": "src/adapters/companion.rs",
+        "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 18.5,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_unlock_is_separate_and_authentication_is_serialized",
+          "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device"
+        ]
+      },
+      {
+        "name": "password-rate-limit",
+        "file": "src/adapters/companion.rs",
+        "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 23.18,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device"
+        ]
+      },
+      {
+        "name": "enrollment-leaf",
+        "file": "src/adapters/companion.rs",
+        "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 22.15,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_real_mtls_requires_ca_and_exact_enrolled_leaf"
+        ]
+      },
+      {
+        "name": "unknown-json-fields",
+        "file": "src/adapters/companion.rs",
+        "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 22.68,
+        "runtime_failure_witnesses": [
+          "adapters::companion::tests::companion_closed_json_http_and_password_limits"
+        ]
+      },
+      {
+        "name": "identity-file-permissions",
+        "file": "src/adapters/companion_identity.rs",
+        "sha256": "15c86e90e2c0c07fb195af8aa57da41cff9343b90d4736d4b079b9dd1ea544cf",
+        "exit_code": 101,
+        "outcome": "killed",
+        "elapsed_seconds": 33.43,
+        "runtime_failure_witnesses": [
+          "adapters::companion_identity::tests::companion_identity_rejects_symlink_hardlink_and_public_file"
+        ]
+      }
+    ]
+  },
+  "restoration": {
+    "exact_source_hashes_matched": 10,
+    "hash_file": "linux-source-hashes.json",
+    "final_focused_command": "./scripts/with-secure-test-tmpdir.sh cargo test --offline --locked --lib companion",
+    "exit_code": 0,
+    "passed": 15,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_reason": "manual real-Mac acceptance harness",
+    "log": "restored-companion-tests.log"
+  },
+  "source_relationship": {
+    "full_suite_hash_file": "linux-full-suite-source-hashes.json",
+    "final_hash_file": "linux-source-hashes.json",
+    "changes_after_full_suites": "Only five ignored-error closure bindings changed from |_| to |_error| in companion.rs and companion_acceptance_tests.rs, with formatting; final Clippy, all 11 mutations and restored focused tests use final source."
+  },
+  "earlier_failures": [
+    {
+      "log": "default-initial-tests.log",
+      "result": "687 passed, 2 failed, 11 ignored in initial library run; stopped before integration suites",
+      "resolution": "Explicit chmod 0644 in unsafe-file test avoids secure wrapper umask 077 assumption; existing launcher timeout passed on rerun with CI test concurrency 4."
+    },
+    {
+      "log": "browser-initial.log",
+      "result": "provider unavailable in late driver request",
+      "resolution": "Prebuilt fixture and isolated rerun passed. Concurrent build/test load may have exhausted bounded fixture lifetime; this cause is inferred, not established."
+    },
+    {
+      "log": "clippy-initial.log",
+      "result": "ignored error wildcard lint failure",
+      "resolution": "Named ignored error bindings; final strict Clippy exit 0."
+    }
+  ],
+  "archive": {
+    "file": "linux-verification-logs.tar.gz",
+    "sha256": "c8661448c87e42d9314d4ebc0367326da146b849e92a6b6d16e66f5773b2887d",
+    "original_files": 32,
+    "all_original_bytes_verified_before_removal": true,
+    "manifest": "linux-evidence-manifest.json"
+  },
+  "completion_gate": {
+    "logged_in_mac_linux_acceptance": "incomplete; no signed submissions in expired initial fixture",
+    "review_ready": false,
+    "details": "See acceptance-audit.md and interactive-acceptance.json; native automation is reported separately."
+  }
+}

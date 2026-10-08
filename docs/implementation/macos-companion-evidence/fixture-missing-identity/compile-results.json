@@ -1,0 +1,18 @@
+{
+  "at_utc": "2026-10-07T14:22:06.620739+00:00",
+  "command": [
+    "xcrun",
+    "swiftc",
+    "/tmp/vw-companion-identity-check.egccmf/helper.swift",
+    "-o",
+    "/tmp/vw-companion-identity-check.egccmf/preference-check"
+  ],
+  "exit_code": 0,
+  "source_sha256_before": "d1d088c96d3c5ee95a01bf55c397797f9d129e5d0adc2d58878a9b98db138a0c",
+  "source_sha256_after": "d1d088c96d3c5ee95a01bf55c397797f9d129e5d0adc2d58878a9b98db138a0c",
+  "source_unchanged": true,
+  "helper_executed": false,
+  "preferences_read_or_written": false,
+  "app_lifecycle_changed": false,
+  "binary_sha256": "e26c2391567068fb4243690e39b7a98bebd921876b030f36cc8fefcef2f9c15c"
+}

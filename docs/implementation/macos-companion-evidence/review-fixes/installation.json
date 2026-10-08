@@ -1,0 +1,20 @@
+{
+  "installed_at_utc": "20261008T111629Z",
+  "source": "/private/tmp/vw-companion-review-fixes.hIhmnk/review-verification/restored-baseline/bundle/Approval Companion.app",
+  "destination": "/Users/sixtocantolla/Applications/Approval Companion.app",
+  "backup": "/tmp/vw-companion-review-fixes.hIhmnk/previous-installation-20261008T111629Z",
+  "hashes": {
+    "Contents/MacOS/ApprovalCompanion": "97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113",
+    "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a"
+  },
+  "source_staging_destination_verified": true,
+  "strict_signature_verified": true,
+  "old_pids": [
+    69135
+  ],
+  "new_pid": 72015,
+  "configuration_and_keychain_untouched": true,
+  "login_registration_performed": false,
+  "os_permission_changes_performed": false,
+  "user_authorization": "Prior explicit do it/resume development installation; verified review corrections after23XCTest20bundle21mutation checks"
+}

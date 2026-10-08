@@ -1,0 +1,20 @@
+{
+  "scope": "Read-only independent audit after native campaign",
+  "archive_sha256": "0b7705d1f1c27acf5e804ad965c43c6e0e6f61291d5c63a7209aba8121becb4e",
+  "manifest_members_verified": 157,
+  "unmanifested_or_duplicate_members": 0,
+  "passing_xctest_per_baseline": 23,
+  "passing_bundle_cases_per_baseline": 20,
+  "baseline_count": 2,
+  "runtime_mutants_killed": 21,
+  "survivors": 0,
+  "invalid_runs": 0,
+  "timeouts": 0,
+  "unexecuted_mutants": 0,
+  "restored_source_hashes_verified": 15,
+  "source_backups_verified": 4,
+  "discrepancies": [],
+  "independent_agent": "implementation",
+  "parent_read_delta": "All1120lines native evidence delta plus all663lines current documentation delta read; unchanged prior diff sections retained by comparison",
+  "did_run_native_tests": false
+}

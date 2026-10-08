@@ -1,0 +1,207 @@
+[
+  {
+    "name": "focused",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "companion"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.02,
+    "log": "focused.log",
+    "reported_passed": 15,
+    "failed": 0,
+    "ignored": 1
+  },
+  {
+    "name": "native-fixtures",
+    "command": [
+      "./scripts/check-native-fixtures.sh"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.72,
+    "log": "native-fixtures.log"
+  },
+  {
+    "name": "default",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 356.14,
+    "log": "default.log",
+    "reported_passed": 965,
+    "failed": 0,
+    "ignored": 15,
+    "live_backend_early_returns": 71,
+    "exercised_passed": 894,
+    "benchmark_smoke_successes": 13
+  },
+  {
+    "name": "default-doc",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.99,
+    "log": "default-doc.log",
+    "reported_passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  {
+    "name": "all-features",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked",
+      "--all-features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 348.45,
+    "log": "all-features.log",
+    "reported_passed": 965,
+    "failed": 0,
+    "ignored": 15,
+    "live_backend_early_returns": 71,
+    "exercised_passed": 894,
+    "benchmark_smoke_successes": 13
+  },
+  {
+    "name": "all-features-doc",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked",
+      "--all-features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.55,
+    "log": "all-features-doc.log",
+    "reported_passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  {
+    "name": "no-default-features",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--all-targets",
+      "--offline",
+      "--locked",
+      "--no-default-features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 305.35,
+    "log": "no-default-features.log",
+    "reported_passed": 965,
+    "failed": 0,
+    "ignored": 15,
+    "live_backend_early_returns": 71,
+    "exercised_passed": 894,
+    "benchmark_smoke_successes": 13
+  },
+  {
+    "name": "no-default-features-doc",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "cargo",
+      "test",
+      "--workspace",
+      "--doc",
+      "--offline",
+      "--locked",
+      "--no-default-features"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.94,
+    "log": "no-default-features-doc.log",
+    "reported_passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  {
+    "name": "check",
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 8.52,
+    "log": "check.log"
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.71,
+    "log": "fmt.log"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 29.01,
+    "log": "clippy.log"
+  },
+  {
+    "name": "build-helper",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--bin",
+      "vw-access",
+      "--bin",
+      "vaultwarden-access-exec"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 11.05,
+    "log": "build-helper.log"
+  }
+]

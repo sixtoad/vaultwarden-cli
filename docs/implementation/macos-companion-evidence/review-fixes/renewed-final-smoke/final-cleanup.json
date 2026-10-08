@@ -1,0 +1,23 @@
+{
+  "at_utc": "2026-10-08T13:48:57.556197+00:00",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+  "unit": "vw-companion-acceptance-5jic_t74.service",
+  "MainPID": "0",
+  "Result": "success",
+  "ActiveState": "inactive",
+  "finished": {
+    "observed_requests": 1,
+    "shutdown": "complete"
+  },
+  "signed_requests": 1,
+  "execution_started_events": 1,
+  "final_request_status": {
+    "status": "completed",
+    "exit_code": 0
+  },
+  "source_sha256": {
+    "src/adapters/companion.rs": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3",
+    "src/adapters/companion_acceptance_tests.rs": "d1f0e0597499e2265c1f2574d3a47b381d32d15122e16b17e6804571374e6417",
+    "tests/companion-acceptance.py": "14a4066d00d4cde83ab4110da2900232348e44dadbafd6ca5ba3546e328d1bc4"
+  }
+}

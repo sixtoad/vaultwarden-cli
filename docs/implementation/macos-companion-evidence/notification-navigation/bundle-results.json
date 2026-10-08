@@ -1,0 +1,242 @@
+[
+  {
+    "case": "strict_ats_private_ca_rejected",
+    "response": {
+      "ats": {},
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "configured_private_ca_accepted",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "state": "unlocked",
+      "success": true
+    },
+    "commands": [
+      "session"
+    ],
+    "passed": true
+  },
+  {
+    "case": "wrong_ca_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "wrong_pin_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "wrong_hostname_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "expired_leaf_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "foreign_client_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "revoked_client_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [
+      "session"
+    ],
+    "passed": true
+  },
+  {
+    "case": "http_configuration_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": true,
+      "error": "Trusted setup is incomplete or invalid.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true
+  },
+  {
+    "case": "tls11_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "success": false
+    },
+    "commands": [],
+    "passed": true,
+    "legacy_fixture_protocol": "TLSv1.1"
+  },
+  {
+    "case": "redirect_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider returned an invalid response.",
+      "success": false
+    },
+    "commands": [
+      "session"
+    ],
+    "passed": true
+  },
+  {
+    "case": "oversized_response_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider returned an invalid response.",
+      "success": false
+    },
+    "commands": [
+      "session"
+    ],
+    "passed": true
+  },
+  {
+    "case": "wrong_password_explicitly_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider rejected the request: authentication_failed.",
+      "rejection": "authentication_failed",
+      "success": false
+    },
+    "commands": [
+      "decision"
+    ],
+    "passed": true
+  },
+  {
+    "case": "wrong_unlock_explicitly_rejected",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "configuration_rejected": false,
+      "error": "Provider rejected the request: authentication_failed.",
+      "rejection": "authentication_failed",
+      "success": false
+    },
+    "commands": [
+      "unlock"
+    ],
+    "passed": true
+  },
+  {
+    "case": "lost_decision_not_retried",
+    "response": {
+      "ats": {
+        "NSAllowsArbitraryLoads": true
+      },
+      "bundled": true,
+      "cleanup_verified": true,
+      "lost_reply": true,
+      "status": "pending",
+      "success": true
+    },
+    "commands": [
+      "decision",
+      "status"
+    ],
+    "passed": true
+  }
+]

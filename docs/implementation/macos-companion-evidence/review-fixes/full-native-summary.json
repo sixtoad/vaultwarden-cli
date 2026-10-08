@@ -1,0 +1,235 @@
+{
+  "status": "passed",
+  "environment": {
+    "macos": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+    "xcode": "Xcode 27.0\nBuild version 27A266a\n",
+    "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0\nswift-driver version: 1.168.6 ",
+    "architecture": "arm64\n"
+  },
+  "baselines": {
+    "baseline": {
+      "exit_code": 0,
+      "xctest_passed": 23,
+      "xctest_failed": 0,
+      "xctest_skipped": 0,
+      "bundled_tls_passed": 20,
+      "bundled_tls_failed": 0,
+      "bundled_tls_skipped": 0,
+      "probe_registration_cleanup_verified": true,
+      "release_bundle_built": true
+    },
+    "restored_baseline": {
+      "exit_code": 0,
+      "xctest_passed": 23,
+      "xctest_failed": 0,
+      "xctest_skipped": 0,
+      "bundled_tls_passed": 20,
+      "bundled_tls_failed": 0,
+      "bundled_tls_skipped": 0,
+      "probe_registration_cleanup_verified": true,
+      "release_bundle_built": true
+    }
+  },
+  "mutation_counts": {
+    "invalid_compile_or_launch": 0,
+    "killed_runtime": 21,
+    "no_tests_executed": 0,
+    "survived": 0,
+    "timeout": 0,
+    "unintended_runtime_failure": 0
+  },
+  "unexecuted_mutations": 0,
+  "mutations": [
+    {
+      "name": "omit_default_ignorable_escape",
+      "guard": "default_ignorable_display",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testReviewTextExposesInvisibleAndDirectionalScalars"
+      ]
+    },
+    {
+      "name": "accept_extra_response_keys",
+      "guard": "closed_response_keys",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testClosedV1ResponseAndNestedReviewKeys"
+      ]
+    },
+    {
+      "name": "ignore_http_body_status_mapping",
+      "guard": "http_status_body_mapping",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionRejectsHTTPBodyStatusMismatch"
+      ]
+    },
+    {
+      "name": "label_ambiguous_errors_rejected",
+      "guard": "ambiguous_application_error",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend"
+      ]
+    },
+    {
+      "name": "replace_unresolved_request",
+      "guard": "switching_unresolved_request",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown"
+      ]
+    },
+    {
+      "name": "apply_late_unlock_result",
+      "guard": "unlock_lifecycle_epoch",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testLateUnlockCannotMutateReplacementOrClearItsBusyFlag",
+        "testLateUnlockCannotUndoSleepOrRefresh"
+      ]
+    },
+    {
+      "name": "clear_replacement_unlock_busy",
+      "guard": "unlock_lifecycle_epoch",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testLateUnlockCannotMutateReplacementOrClearItsBusyFlag"
+      ]
+    },
+    {
+      "name": "apply_late_notification_result",
+      "guard": "notification_lifecycle_epoch",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testLateNotificationSessionOrListCannotUndoLifecycleChange"
+      ]
+    },
+    {
+      "name": "restore_late_review_result",
+      "guard": "notification_lifecycle_epoch",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testSleepDuringNotificationReviewLoadingCannotRestoreReview"
+      ]
+    },
+    {
+      "name": "apply_late_poll_result",
+      "guard": "polling_invalidation",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testLatePollCannotMutateReplacementOrSleepingState"
+      ]
+    },
+    {
+      "name": "retain_review_on_generation_change",
+      "guard": "polling_invalidation",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect"
+      ]
+    },
+    {
+      "name": "retain_review_on_disconnect",
+      "guard": "polling_invalidation",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect"
+      ]
+    },
+    {
+      "name": "retain_unlock_password_on_context_change",
+      "guard": "unlock_password_context",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges"
+      ]
+    },
+    {
+      "name": "remove_leaf_pin",
+      "guard": "retained_leaf_pin",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ]
+    },
+    {
+      "name": "skip_ca_trust_evaluation",
+      "guard": "retained_ca_trust",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ]
+    },
+    {
+      "name": "skip_hostname_validation",
+      "guard": "retained_hostname",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ]
+    },
+    {
+      "name": "retain_consumed_review_ticket",
+      "guard": "retained_ticket_consumption",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testWrongPasswordConsumesVisibleTicket"
+      ]
+    },
+    {
+      "name": "retry_failed_posts",
+      "guard": "retained_no_retry",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ]
+    },
+    {
+      "name": "remove_response_bounds",
+      "guard": "retained_response_bounds",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionAuthenticationAndSingleTransmission"
+      ]
+    },
+    {
+      "name": "render_raw_review_text",
+      "guard": "retained_quoted_review_display",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testReviewTextExposesInvisibleAndDirectionalScalars"
+      ]
+    },
+    {
+      "name": "reject_http422_error_envelopes",
+      "guard": "retained_http422",
+      "verdict": "killed_runtime",
+      "intended_runtime_witnesses": [
+        "testRealURLSessionRejectsHTTPBodyStatusMismatch"
+      ]
+    }
+  ],
+  "exact_source_hashes_restored": true,
+  "input_files": 15,
+  "linux_checkout_still_matches": true,
+  "bundle_verification": {
+    "source_hashes_matched": 15,
+    "installed_or_opened": false,
+    "bundle": "/private/tmp/vw-companion-review-fixes.hIhmnk/review-verification/restored-baseline/bundle/Approval Companion.app",
+    "codesign_verify_strict_exit_code": 0,
+    "bundle_hashes": {
+      "Contents/MacOS/ApprovalCompanion": "97c1c9a768e400975c7e80c8424939cdb2ada24c8516a921f0001c0e66ba0113",
+      "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a"
+    }
+  },
+  "archive": "review-verification.tar.gz",
+  "archive_sha256": "0b7705d1f1c27acf5e804ad965c43c6e0e6f61291d5c63a7209aba8121becb4e",
+  "archive_original_files": 157,
+  "archive_byte_for_byte_verified_locally": true,
+  "limitations": [
+    "Prepared development bundle was not installed or opened by this verification lane; refreshed logged-in operator acceptance remains separate.",
+    "Earlier Xcode license failure is retained in targeted-tests-blocked.log; user resolved it locally before this campaign.",
+    "HTTPS-scheme and TLS-minimum guards are unchanged; current bundle tests passed and prior mutation evidence remains applicable."
+  ]
+}

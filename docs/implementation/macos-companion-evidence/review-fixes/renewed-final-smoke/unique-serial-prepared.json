@@ -1,0 +1,39 @@
+{
+  "prepared_at_utc": "2026-10-08T13:30:57.741978+00:00",
+  "root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+  "endpoint": "https://pop-os.int.cantolla.casa:42155",
+  "status": "prepared only; no service/request",
+  "server_pin": "e06a55185b1d17ea0e0808074e4fe4b1c138b86e00b544acb342b2d6d4a90497",
+  "client_fingerprint": "1e13dcda84664b622abcc600d21a31445fd194374ab256d363b2cf8f79a22856",
+  "ca_fingerprint": "343c5727f98ddb6b34ffebf447ba9b7de47d0bee86ed1da67987c89bd5a17588",
+  "certificate_metadata": {
+    "ca.pem": [
+      "issuer=CN=Synthetic companion acceptance CA",
+      "serial=4541D76010454D4981C4865650AA9368348E1B4D",
+      "notBefore=Oct  8 13:30:37 2026 GMT",
+      "notAfter=Oct 10 13:30:37 2026 GMT"
+    ],
+    "server.pem": [
+      "issuer=CN=Synthetic companion acceptance CA",
+      "serial=4C698F634F23E25E9B47E087BD5556EAC3C3B162",
+      "notBefore=Oct  8 13:30:37 2026 GMT",
+      "notAfter=Oct 10 13:30:37 2026 GMT"
+    ],
+    "client.pem": [
+      "issuer=CN=Synthetic companion acceptance CA",
+      "serial=59250E713A93C0680F1DBE9D85BD7B4D30F5F1F0",
+      "notBefore=Oct  8 13:30:37 2026 GMT",
+      "notAfter=Oct 10 13:30:37 2026 GMT"
+    ]
+  },
+  "serial_check": "Both fresh leaf serials nonzero, distinct and at most159bits; fixed old serials2/3 replaced",
+  "ca_der_sha256": "343c5727f98ddb6b34ffebf447ba9b7de47d0bee86ed1da67987c89bd5a17588",
+  "client_pkcs12_sha256": "ae3eb7ed4befb8be1f86670c5002368ca5c08bf78ae83392b076fc256c103497",
+  "launcher_sha256": "14a4066d00d4cde83ab4110da2900232348e44dadbafd6ca5ba3546e328d1bc4",
+  "validation": {
+    "python_compile": "passed",
+    "diff_check": "passed",
+    "real_certificate_generation_and_serial_assertions": "passed",
+    "reuse_tls_branch": "unchanged"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "status": "passed: operator confirmed notification opened full review and approved; signed Linux execution exactly once, redacted CLIexit0",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+  "request_id": "WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk",
+  "wrong_password_operator_report": "User reported using wrong password; exact GUI error text not separately reported for this installed build.",
+  "wrong_password_durable_snapshot": {
+    "at_utc": "2026-10-08T13:46:48.464625+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+    "requests": [
+      {
+        "request_id": "WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk",
+        "status": {
+          "status": "pending"
+        },
+        "execution_claimed": false,
+        "owner_binding_id": "qX6DtVSwPgy6-M0ctD9ACO8JAG_01Ojf2jnDs95_77Y",
+        "audit": [
+          {
+            "ordinal": 0,
+            "outcome": "submitted",
+            "status": {
+              "status": "pending"
+            }
+          }
+        ]
+      }
+    ],
+    "execution_started_events": 0,
+    "kind": "final_unique_serial_user_wrongpassword_pending_noexecution"
+  },
+  "cli_result": {
+    "kind": "signed_agent_cli_result",
+    "case": "final-unique-serial-native-approval",
+    "started_at_utc": "2026-10-08T13:44:41.810377+00:00",
+    "at_utc": "2026-10-08T13:47:53.559445+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+    "cli_exit_code": 0,
+    "elapsed_seconds": 191.749,
+    "synthetic_secret_markers_absent": true,
+    "observation": {
+      "at_utc": "2026-10-08T13:47:53.559757+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-5jic_t74",
+      "requests": [
+        {
+          "request_id": "WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk",
+          "status": {
+            "status": "completed",
+            "exit_code": 0
+          },
+          "execution_claimed": true,
+          "owner_binding_id": "qX6DtVSwPgy6-M0ctD9ACO8JAG_01Ojf2jnDs95_77Y",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "approved",
+              "status": {
+                "status": "approved"
+              }
+            },
+            {
+              "ordinal": 2,
+              "outcome": "execution_started",
+              "status": {
+                "status": "running"
+              }
+            },
+            {
+              "ordinal": 3,
+              "outcome": "succeeded",
+              "status": {
+                "status": "completed",
+                "exit_code": 0
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 1
+    },
+    "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk\",\"state\":{\"status\":\"pending\"}}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"WIeps7IdX4O1e2CuqeYzl4D0Vkh8UDPzTjgFWH7O3mk\",\"state\":{\"status\":\"completed\",\"exit_code\":0}}\n",
+    "stderr": ""
+  },
+  "command_counters": "not instrumented in normal fixture mode",
+  "operator_notification_and_success_confirmation": {
+    "reported_at_utc": "2026-10-08T13:49:14.701643+00:00",
+    "verbatim": "Approved; notification opened the full review",
+    "installed_binary_prefix_parent_verified": "ad6413",
+    "scope": "Corrected exact-identity native build, direct HTTPS, no tunnelling"
+  },
+  "production_identity_provisioning": "Exact unique-serial fresh client/CA/endpoint; no expired-certificate bypass"
+}

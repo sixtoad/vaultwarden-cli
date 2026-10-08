@@ -1,0 +1,10 @@
+{
+  "cancelled-artifact.tar.gz": {
+    "bytes": 6711,
+    "sha256": "cbb71e295d5e8df380ef05fab602ec3b596b588196b42fb407ecf164e150b505"
+  },
+  "cancelled-job.log.gz": {
+    "bytes": 9050,
+    "sha256": "a3cfaf1d4ead3583516254b4f0f1895c0bb227cdf440135b4fc6372bca1d3f34"
+  }
+}

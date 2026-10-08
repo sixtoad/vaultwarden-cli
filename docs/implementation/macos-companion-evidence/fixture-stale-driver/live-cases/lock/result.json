@@ -1,0 +1,23 @@
+{
+  "case": "lock",
+  "at_utc": "2026-10-07T15:47:18.464670+00:00",
+  "operator_ui_observation": false,
+  "submission_attempts": 1,
+  "passed": true,
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-6czg3kox",
+  "endpoint": "https://127.0.0.1:55389",
+  "agent_uid": 100007,
+  "provider_unit": "vw-companion-acceptance-6czg3kox.service",
+  "fixture_binary_sha256": "598411a59b83da44a6f062a2a2fa107c611c5e194bcca2822e0f8e092f019f8a",
+  "request_id": "HPGTipx2Z8WUXOwQha_FuhUUXzymb9TDIRaIu8N-VDo",
+  "driver_exit_code": 0,
+  "stop_exit_code": 0,
+  "cleanup_complete": true,
+  "final_unit_state": "inactive",
+  "source_hashes": {
+    "tests/companion-acceptance.py": "244df78e11094b615456ba39285348bb0e36dedbe08722de616e5aba2fefd469",
+    "tests/companion-stale-acceptance.py": "348fc159214bc858e4b3d1bc1b1e4a06c37e5a6674e2b9ff35658f3668cd74c1",
+    "src/adapters/companion.rs": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3",
+    "src/adapters/companion_acceptance_tests.rs": "35504d2226a02ec38a5cafdda10305de40435398e11cd5a4deb105d6f5ec39b9"
+  }
+}

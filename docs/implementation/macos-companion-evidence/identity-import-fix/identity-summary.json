@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "baseline": {
+    "xctest_passed": 25,
+    "protocol": 13,
+    "app_model": 8,
+    "tls_and_identity": 4,
+    "failed": 0,
+    "skipped": 0,
+    "python_fixture_startup_passed": 1,
+    "bundle_cases_passed": 20,
+    "bundle_cases_failed": 0,
+    "bundle_cases_skipped": 0,
+    "release_build": "passed"
+  },
+  "mutation": {
+    "name": "restore_legacy_identity_import",
+    "verdict": "killed_runtime",
+    "intended_witness": "testIssuerSerialCollisionNeverSubstitutesExistingIdentity"
+  },
+  "restored_identity_tests_passed": 2,
+  "source_hashes_restored": 16,
+  "source_input_manifest_sha256": "8a994018942bc79120e439c926705d9f91335ba79c64fc0b40cdfbd5e8a5dcc0",
+  "bundle": "/tmp/vw-companion-review-identity.TO7am0/bounded-verification/bundle/Approval Companion.app",
+  "bundle_hashes": {
+    "Contents/MacOS/ApprovalCompanion": "ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf",
+    "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a"
+  },
+  "codesign_verify_strict": true,
+  "temporary_keychain_cleanup_verified": true,
+  "probe_registration_cleanup_verified": true,
+  "installed_or_opened": false,
+  "initial_interrupted_attempt": {
+    "status": "preserved",
+    "cause_observed": "XCTest stack waiting in TLSFixture.stopServer Process.waitUntilExit after server child absent",
+    "mutations_applied": false,
+    "source_restored": true,
+    "orphan_xctest_terminated_by_SIGTERM": 57003,
+    "exact_temporary_keychain_and_directory_cleanup_verified": true,
+    "recovery": "Single bounded rerun using separate TLSTests processes; startup/Protocol/AppModel checks retained from first attempt"
+  },
+  "retained_prior_mutations": {
+    "runtime_killed": 21,
+    "evidence": "../review-fixes/full-native-summary.json",
+    "scope": "Previously verified guards unchanged by the exact-identity import fix"
+  },
+  "environment": {
+    "macos": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+    "xcode": "Xcode 27.0\nBuild version 27A266a\n",
+    "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0\n"
+  }
+}

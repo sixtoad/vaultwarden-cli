@@ -1,0 +1,10 @@
+Attempt: extract authorized source snapshot, inspect source-manifest.json with python3, then swift test --package-path macos --filter 'ProtocolTests|AppModelTests|TLSTests'.
+Mac scratch: /tmp/vw-companion-review-fixes.hIhmnk
+Result: exit 69 before test execution; no targeted-tests.log was created.
+
+Observed stderr:
+/Users/sixtocantolla/.bashrc: line 92: runpodctl: command not found
+You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license' from within a Terminal window to review and agree to the Xcode and Apple SDKs license.
+tail: /tmp/vw-companion-review-fixes.hIhmnk/targeted-tests.log: No such file or directory
+
+No license was accepted, no OS permissions were changed, and the installed app was not replaced.

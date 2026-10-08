@@ -1,0 +1,56 @@
+{
+  "baseline_commit": "0c5c1d9a2780132db0c4b313934dbe66716e0851",
+  "change": "password authentication_failed HTTP422; enrollment unauthorized remains403",
+  "full_profiles_passed": 3,
+  "reported_passed_per_profile": 965,
+  "exercised_passed_per_profile": 894,
+  "live_backend_early_returns_per_profile": 71,
+  "ignored_per_profile": 15,
+  "doc_profiles_passed": 3,
+  "doc_tests_per_profile": 0,
+  "restored_companion": {
+    "passed": 15,
+    "ignored": 1,
+    "failed": 0,
+    "ignored_reason": "manual logged-in acceptance fixture"
+  },
+  "checks": "native fixture machine code, cargo check, fmt, strict all-target/all-feature Clippy, default CLI/helper build passed",
+  "regressions": {
+    "real_mapped_agent": {
+      "passed": 1,
+      "initial_failure_retained": "existing held-query admission handshake received EOF at tests/agent_submission.rs:860; unchanged prebuilt isolated rerun passed; exact cause not established"
+    },
+    "firefox": {
+      "passed": true,
+      "unexpected_diagnostics": 0
+    },
+    "real_systemd": {
+      "passed": 2
+    }
+  },
+  "security_mutations": {
+    "attempted": 12,
+    "runtime_killed": 12,
+    "survived": 0,
+    "invalid": 0,
+    "skipped": 0,
+    "timeout": 0
+  },
+  "source_restoration": {
+    "all_hashes_match": true,
+    "files": 11,
+    "hash_file": "linux-source-hashes.json"
+  },
+  "limitations": [
+    "71 live-backend tests per profile return early because test URL/admin token are absent; excluded from exercised counts.",
+    "Ignored harness tests are not counted passed.",
+    "Linux x86_64 Rust1.98.1 only; remote CI OS/architecture/compiler matrix not run by these commands.",
+    "Native tests and logged-in Mac/Linux acceptance are recorded separately; this is not completion or human-review approval."
+  ],
+  "archive": {
+    "file": "linux-evidence.tar.gz",
+    "sha256": "de4fd5f58d9a8ddca3ab3c000a8693c8f407a90191ab827c560a00f0e7efd02a",
+    "logs": 29,
+    "all_original_bytes_verified_before_removal": true
+  }
+}

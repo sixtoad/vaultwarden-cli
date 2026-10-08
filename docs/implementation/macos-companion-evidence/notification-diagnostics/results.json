@@ -1,0 +1,76 @@
+{
+  "swift_tests": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0
+  },
+  "bundled_tls": {
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "production_ats_dictionary_preserved": true,
+    "probe_identifiers_isolated": true
+  },
+  "mutations_reference": "../bundle-fix/results.json: 7/7 runtime caught; production transport unchanged; isolated-ID bundled baseline rerun passed",
+  "probe_registration_cleanup": {
+    "new_probe_records_unregistered": 2,
+    "new_cleanup_exit_codes": [
+      0,
+      0
+    ],
+    "legacy_deleted_probe_records_removed": 24,
+    "remaining_legacy_records": 0,
+    "actual_app_record_preserved": true,
+    "global_database_reset": false
+  },
+  "keychain_cleanup_verified": true,
+  "source_match": {
+    "matched": 13,
+    "checked": 13,
+    "mismatches": []
+  },
+  "actual_app": {
+    "pid": 21950,
+    "bundle": "/tmp/vw-companion-native.reIOJJ/final-evidence/bundle/Approval Companion.app",
+    "info_plist_sha256": "e0c68562c23a2a85952744d6c64a8f6602f6797b473d8ec12e0c880e5457c10a",
+    "executable_sha256": "1aba1783e67eed5d752d79b1114e82a194a11ede822078c33210ac79b6dce550",
+    "preferences_preserved": true,
+    "open_exit_code": 0,
+    "codesign_verify_strict": "passed"
+  },
+  "notification_diagnostic": {
+    "observed_old_callback": "didGrant:0 hasError:1",
+    "fix": "Show NSError description/domain/code distinctly from permission denial",
+    "permission_status": "Awaiting operator-reported NSError from diagnostic build; no permission change performed",
+    "registration_collision": "Observed and cleaned; not proven to cause the notification error"
+  },
+  "local_network": {
+    "app_pid": 21950,
+    "timestamp": "2026-10-06 17:28:19.833093+0100",
+    "subsystem": "com.apple.network",
+    "observed_marker": "waiting path (unsatisfied (Local network prohibited), interface: en0, ipv4, ipv6)",
+    "host_tcp_check": {
+      "hostname": "pop-os.int.cantolla.casa",
+      "resolved_ipv4": "192.168.1.235",
+      "port": 40701,
+      "connected": true,
+      "seconds": 0.002
+    },
+    "diagnosis": "macOS local-network privacy prohibited this app process while host connectivity was healthy",
+    "privacy_permissions_changed": false,
+    "signing_identity_changed": false
+  },
+  "manual_acceptance_complete": false,
+  "archive": {
+    "path": "notification-diagnostics-evidence.tar.gz",
+    "sha256": "c0c395066a4dbdaee70e53c19bb28d115247225cf677631e884f2254fbe6941d",
+    "original_files": 43,
+    "every_original_byte_verified_before_removal": true
+  },
+  "pending_packaging_fix": {
+    "status": "Prepared only; not applied or rebuilt while operator adjusts current app permission",
+    "patch": "pending-local-network-purpose.patch",
+    "key": "NSLocalNetworkUsageDescription",
+    "ats_policy_changed": false
+  }
+}

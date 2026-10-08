@@ -1,0 +1,12 @@
+{
+  "at_utc": "2026-10-08T13:43:34.049322+00:00",
+  "source": "/private/tmp/vw-companion-review-identity.TO7am0/bounded-verification/bundle/Approval Companion.app",
+  "destination": "/Users/sixtocantolla/Applications/Approval Companion.app",
+  "backup": "/tmp/companion-renew.SGW4aiJi/previous-installation.app",
+  "binary_sha256": "ad6413f8ce4ae15596f2646a4ae0d30f06385cc2354f311067f791c5bd086daf",
+  "plist_sha256": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a",
+  "strict_signature_verified": true,
+  "preferences_unchanged": true,
+  "keychain_unchanged": true,
+  "opened": false
+}

@@ -1,0 +1,78 @@
+{
+  "fmt.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "python-compile.log": {
+    "sha256": "bdab8ec07e052918a86d856a9b3942b9b2a633b420b75a2aa203f4a789ca35d8",
+    "bytes": 26
+  },
+  "results.json": {
+    "sha256": "eca04798ba6f5bb3eb1e99fe05a1d5f7424ffa08ac1d9649e056a3162dcc5d55",
+    "bytes": 3079
+  },
+  "focused-final.log": {
+    "sha256": "caea210904da1430045efeaf1d2dc21e4516d4f415abc02942b3aada341096b9",
+    "bytes": 2286
+  },
+  "restart-revoked.json": {
+    "sha256": "56fd928cefa10a672498acbed92f32da24e1e7b2207b45c6e931c00025e82782",
+    "bytes": 1684
+  },
+  "focused.log": {
+    "sha256": "bed167ea90640ef6a5e7910b337434ba6a40118624fa26fa34def509d1d693f6",
+    "bytes": 2285
+  },
+  "fmt-final.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "restart.json": {
+    "sha256": "38606d242e29c66b80cc35b7867b2a78b063adc19fd2d6175bf5bc088dee6d5b",
+    "bytes": 1620
+  },
+  "python-final.log": {
+    "sha256": "bdab8ec07e052918a86d856a9b3942b9b2a633b420b75a2aa203f4a789ca35d8",
+    "bytes": 26
+  },
+  "check-final.log": {
+    "sha256": "5f4cad75c76e867d66a1eef85deca51eff3cf365048ac21d1b8e9a63a42d3dd6",
+    "bytes": 187
+  },
+  "revocation-persists.json": {
+    "sha256": "cda79f8610b7fe7cb6d681af1717fa6b4532046c0c5bf7a68dc383faf93ca8c6",
+    "bytes": 340
+  },
+  "runtime-summary.json": {
+    "sha256": "5b2cc51630c33ef0ed0ca920f6c1b0efd27236005509a92438740a998d76bfed",
+    "bytes": 3831
+  },
+  "commands-final.json": {
+    "sha256": "b9adc0ed5dbf94d54a0f3296f93e98ab1c139d54cef25ad82485f407a8406de8",
+    "bytes": 1223
+  },
+  "check.log": {
+    "sha256": "890993a5e14349ae2b1239fd0eacfda2f73c37dbbca5df93d2d833a674737c10",
+    "bytes": 187
+  },
+  "commands.json": {
+    "sha256": "0f671907954f5808ba9dbd6110c08c0c61e1dff0dadb40df24f30137d594cd40",
+    "bytes": 954
+  },
+  "clippy-final.log": {
+    "sha256": "50ec1b4a49b10da94d927448d75d6a4b03f63b7e94eab3ef8029d5e26d61ac2a",
+    "bytes": 188
+  },
+  "installed-mac-revocation.json": {
+    "sha256": "f55323e578b47ca60ecf02d2ceb78dfa28a21efec0aea012a901d92d3fb25417",
+    "bytes": 892
+  },
+  "installed-mac-restoration.json": {
+    "sha256": "fbea8aec9e688f8058bc0e60970b5995e214b03545f62e95b949ecf7443d2013",
+    "bytes": 1029
+  },
+  "installed-mac-wrong-peer.json": {
+    "sha256": "5b3e3f1ec7aa3777b611600cd148f8ac25aceb8391606620c7908e7eed057d40",
+    "bytes": 1982
+  }
+}

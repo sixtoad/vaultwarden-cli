@@ -1,0 +1,24 @@
+{
+  "installed_at_utc": "20261007T103940Z",
+  "source": "/tmp/vw-companion-native.reIOJJ/navigation-fix/evidence/bundle/Approval Companion.app",
+  "destination": "/Users/sixtocantolla/Applications/Approval Companion.app",
+  "backup": "/tmp/vw-companion-native.reIOJJ/navigation-fix/previous-installation-20261007T103940Z",
+  "hashes": {
+    "Contents/MacOS/ApprovalCompanion": "12ce69b8745ddf8580947d140fc39e96d1b39dbd401ca1760b91d6e1be722853",
+    "Contents/Info.plist": "93b130095117bd9081e9d54583c4ef9c501119347d1a21bd0663878a79e01a4a"
+  },
+  "source_staging_destination_verified": true,
+  "strict_signature_verified": true,
+  "old_pids": [
+    235
+  ],
+  "new_pid": 28331,
+  "configuration_and_keychain_untouched": true,
+  "login_registration_performed": false,
+  "os_permission_changes_performed": false,
+  "user_authorization": "Prior explicit do it/resume development installation; routine verified navigation correction",
+  "operator_notification_routing": "2026-10-07 11:31 UTC: user confirmed background notification click selected Approvals and showed full review",
+  "protected_execution_acceptance": "Exactly one real protected execution; redacted signed-agent exit 0; evidence in interactive-continuation.json",
+  "operator_login_registration": "User selected Start at login and reported Login startup enabled.",
+  "actual_login_startup_acceptance": "pending actual logout/login"
+}

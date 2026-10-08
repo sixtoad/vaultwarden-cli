@@ -1,0 +1,64 @@
+{
+  "captured_at_utc": "2026-10-07T15:54:49.488543+00:00",
+  "provider_wrong_peer_ready_at_utc": "2026-10-07T15:54:00.153498+00:00",
+  "provider_ready_source": "provider_acceptance reported same endpoint with temporary foreign-CA server leaf and unchanged client CA/enrollment",
+  "temporary_server_leaf_sha256": "74b4daf31d331a4672eadfdbe344ef1ef965245fdff16e837661ee2d94f94bd0",
+  "log_exit_code": 0,
+  "query": {
+    "process_pid": 69135,
+    "subsystem": "com.apple.CFNetwork",
+    "start_local": "2026-10-07 16:54:00",
+    "timezone": "Europe/Dublin",
+    "event_filters": [
+      "received response, status",
+      "finished with error",
+      "auth completion disp="
+    ]
+  },
+  "events": [
+    {
+      "at_utc": "2026-10-07T15:54:01.813Z",
+      "pid": 69135,
+      "task_id": "338027D7-F912-4D31-93C6-52B920A88AC1",
+      "authentication_disposition": 2
+    },
+    {
+      "at_utc": "2026-10-07T15:54:01.813Z",
+      "pid": 69135,
+      "task_id": "338027D7-F912-4D31-93C6-52B920A88AC1",
+      "urlsession_error": -999
+    },
+    {
+      "at_utc": "2026-10-07T15:54:12.335Z",
+      "pid": 69135,
+      "task_id": "DA8BFA49-B0CC-401C-BEA2-2DD1CA7F9E10",
+      "authentication_disposition": 2
+    },
+    {
+      "at_utc": "2026-10-07T15:54:12.335Z",
+      "pid": 69135,
+      "task_id": "DA8BFA49-B0CC-401C-BEA2-2DD1CA7F9E10",
+      "urlsession_error": -999
+    },
+    {
+      "at_utc": "2026-10-07T15:54:33.352Z",
+      "pid": 69135,
+      "task_id": "11218C5C-C592-4C1E-BF75-9E6752F53E5C",
+      "authentication_disposition": 2
+    },
+    {
+      "at_utc": "2026-10-07T15:54:33.353Z",
+      "pid": 69135,
+      "task_id": "11218C5C-C592-4C1E-BF75-9E6752F53E5C",
+      "urlsession_error": -999
+    }
+  ],
+  "http_response_events_observed": 0,
+  "interpretation": "The actual installed app cancelled authentication challenges (disposition 2) and URLSession completed -999. In this configured wrong-peer window, that matches the production explicit trust-rejection path; this is not an observed -1202 or HTTP403 response.",
+  "limits": "Passive app networking witness only. Provider request counters, exact server-pair restoration/recovery, and operator UI reports are recorded separately. A log with no HTTP response event alone does not prove zero transmitted commands.",
+  "operator_observation_inferred": false,
+  "raw_payloads_or_passwords_recorded": false,
+  "mac_configuration_or_lifecycle_changed": false,
+  "ui_automation_or_permission_changes": false,
+  "provider_notified_to_restore_immediately_after_capture": true
+}

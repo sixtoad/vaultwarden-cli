@@ -1,0 +1,10 @@
+{
+  "archive_sha256": "5c7b69b46781711a756a7855cbb6ed5aab566a1d3dff678d27edc9f06d854341",
+  "archive_members_verified": 74,
+  "snapshot_sources_verified": 16,
+  "raw_runtime_mutant_assertion_read": true,
+  "current_native_passes": 25,
+  "bundle_cases_passed": 20,
+  "private_key_pem_scan": "none found",
+  "initial_interrupted_attempt_preserved": true
+}

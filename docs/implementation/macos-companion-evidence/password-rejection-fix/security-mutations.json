@@ -1,0 +1,138 @@
+[
+  {
+    "name": "password-http-status",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 17.86,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device"
+    ]
+  },
+  {
+    "name": "password-verification",
+    "file": "src/access/direct_request.rs",
+    "sha256": "4646c5e7f9f243cd27ffe2265cb82695d622b9ca27e0b06f071595bf4d29fad5",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 18.42,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_decision_is_device_bound_single_use_and_lost_reply_is_read_only",
+      "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device",
+      "adapters::companion::tests::companion_rejects_changed_review_generation_expiry_and_revocation"
+    ]
+  },
+  {
+    "name": "mutual-tls",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 20.85,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_real_mtls_requires_ca_and_exact_enrolled_leaf"
+    ]
+  },
+  {
+    "name": "core-generation",
+    "file": "src/access/application.rs",
+    "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 17.37,
+    "runtime_failure_witnesses": [
+      "access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit"
+    ]
+  },
+  {
+    "name": "core-exact-review",
+    "file": "src/access/application.rs",
+    "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 16.14,
+    "runtime_failure_witnesses": [
+      "access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit",
+      "adapters::companion::tests::companion_rejects_changed_review_generation_expiry_and_revocation"
+    ]
+  },
+  {
+    "name": "core-final-ticket-deadline",
+    "file": "src/access/application.rs",
+    "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 23.76,
+    "runtime_failure_witnesses": [
+      "access::direct_request_tests::companion_snapshot_generation_review_and_deadline_are_bound_at_commit"
+    ]
+  },
+  {
+    "name": "ticket-device",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 23.75,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_decision_is_device_bound_single_use_and_lost_reply_is_read_only"
+    ]
+  },
+  {
+    "name": "ticket-consumption",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 21.97,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_unlock_is_separate_and_authentication_is_serialized",
+      "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device"
+    ]
+  },
+  {
+    "name": "password-rate-limit",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 27.21,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_wrong_password_consumes_ticket_and_rate_limits_per_device"
+    ]
+  },
+  {
+    "name": "enrollment-leaf",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 24.52,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_real_mtls_requires_ca_and_exact_enrolled_leaf"
+    ]
+  },
+  {
+    "name": "unknown-json-fields",
+    "file": "src/adapters/companion.rs",
+    "sha256": "022dce1d98e21a8391481efe48fad4ab46a4645d61239e4ae9feda39ec4d4736",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 25.04,
+    "runtime_failure_witnesses": [
+      "adapters::companion::tests::companion_closed_json_http_and_password_limits"
+    ]
+  },
+  {
+    "name": "identity-file-permissions",
+    "file": "src/adapters/companion_identity.rs",
+    "sha256": "15c86e90e2c0c07fb195af8aa57da41cff9343b90d4736d4b079b9dd1ea544cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 29.32,
+    "runtime_failure_witnesses": [
+      "adapters::companion_identity::tests::companion_identity_rejects_symlink_hardlink_and_public_file"
+    ]
+  }
+]

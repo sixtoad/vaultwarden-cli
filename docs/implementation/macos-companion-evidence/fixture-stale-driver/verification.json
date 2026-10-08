@@ -1,0 +1,24 @@
+{
+  "at_utc": "2026-10-07T14:23:11.305239+00:00",
+  "driver": "tests/companion-stale-acceptance.py",
+  "sha256": "348fc159214bc858e4b3d1bc1b1e4a06c37e5a6674e2b9ff35658f3668cd74c1",
+  "python_compile": "passed without bytecode",
+  "help": "passed",
+  "live_cases": "Isolatedsame-rootrestart/restart-revokedpassed; lock/revoke-agent/replay-deny and nativeendpoint cases notyetinvoked",
+  "scope": [
+    "lock thenoldticketapproval rejected",
+    "revokedagentbinding thenoldticketapproval rejected",
+    "denythenconsumedticketreplay rejected",
+    "samestate restartlocked thenoldticket409",
+    "offlinecompanionrevocation samestaterestart then403"
+  ],
+  "runtime_transport": "stdlibssl privatefixture-derived CA/hostname/TLS1.2+/DER-hashed exactserverleafpin/clientcert; ready and trustedlauncher consistency required; bounded64commands/1MiBresponses/10secondIO",
+  "logging": "allowlisted statuses/errorcategories/staticcommandnames; no bodies/tickets/passwords",
+  "limitations": [
+    "NativeGUI stale-tickettransmission notautomated; APIproofseparatefromoperatorUI."
+  ],
+  "source_changes": "New testdriver only; production unchanged",
+  "offline_fixture_derivation": "passed; no network calls",
+  "sanitized_initialization_failure": "injectedValueError detail notprinted; emptycommand/decision logs",
+  "initial_sandbox_check": "Fixture ancestry check refused remapped sandbox /home ownership; unchanged check passed outside mapping"
+}

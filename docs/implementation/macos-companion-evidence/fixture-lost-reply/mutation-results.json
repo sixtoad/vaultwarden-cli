@@ -1,0 +1,26 @@
+{
+  "results": [
+    {
+      "name": "drop_failed_approval",
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_assertion_failed": true,
+      "intended_witness_matched": true,
+      "elapsed_seconds": 10.621,
+      "log": "drop_failed_approval.log"
+    },
+    {
+      "name": "drop_more_than_once",
+      "exit_code": 101,
+      "compiled": true,
+      "runtime_assertion_failed": true,
+      "intended_witness_matched": true,
+      "elapsed_seconds": 8.36,
+      "log": "drop_more_than_once.log",
+      "matcher_note": "Initial exactsubstring missed rustfmt linebreak in failure; independent normalized-whitespace check confirms intended second-approval assertion. Originalrawlog preserved; no compile/runtime validity issue."
+    }
+  ],
+  "source_restored_sha256": "b9a09e64f891c8bb6b670e546336777e6008cbb10ec747ca2349c16623ad1ec3",
+  "survivors": 0,
+  "invalids": 0
+}

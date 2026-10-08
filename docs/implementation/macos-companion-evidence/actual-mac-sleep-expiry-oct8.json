@@ -1,0 +1,96 @@
+{
+  "case": "actual-mac-sleep-expiry-oct8",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+  "cli": {
+    "kind": "signed_agent_cli_result",
+    "case": "actual-mac-sleep-expiry-oct8",
+    "started_at_utc": "2026-10-08T09:40:30.018935+00:00",
+    "at_utc": "2026-10-08T09:45:30.126314+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+    "cli_exit_code": 4,
+    "elapsed_seconds": 300.107,
+    "synthetic_secret_markers_absent": true,
+    "observation": {
+      "at_utc": "2026-10-08T09:45:30.126569+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+      "requests": [
+        {
+          "request_id": "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI",
+          "status": {
+            "status": "pending"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "7g5D1VW5OrNoF6TzSAPGe9RHH4mz7-vZCNTS8sqO0po",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0
+    },
+    "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI\",\"state\":{\"status\":\"pending\"}}\n",
+    "stderr": "{\"event\":\"client_error\",\"category\":\"wait_timeout\",\"request_id\":\"BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI\"}\n"
+  },
+  "durable_postdeadline": {
+    "at_utc": "2026-10-08T09:45:56.738169+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-0_ghlhrj",
+    "requests": [
+      {
+        "request_id": "BpbnR1rBaWakJhnBGee2LmfWfMemHF5kBVH1qve84FI",
+        "status": {
+          "status": "expired"
+        },
+        "execution_claimed": false,
+        "owner_binding_id": "7g5D1VW5OrNoF6TzSAPGe9RHH4mz7-vZCNTS8sqO0po",
+        "audit": [
+          {
+            "ordinal": 0,
+            "outcome": "submitted",
+            "status": {
+              "status": "pending"
+            }
+          },
+          {
+            "ordinal": 1,
+            "outcome": "expired",
+            "status": {
+              "status": "expired"
+            }
+          }
+        ]
+      }
+    ],
+    "execution_started_events": 0,
+    "kind": "actual_sleep_request_expired_after_wake"
+  },
+  "operator_actual_sleep_and_recovery_confirmation": {
+    "operator_report": "I left it open, when I woke up the mac I caould see the pending request, it refreshed itself after few seconds and disappeared",
+    "powerlog_utc": {
+      "sleep": "2026-10-08T09:36:33Z",
+      "dark_wake": "2026-10-08T09:37:05Z",
+      "sleep_again": "2026-10-08T09:37:26Z",
+      "wake": "2026-10-08T09:44:53Z"
+    },
+    "wake_before_request_expiry_seconds": 37,
+    "verified_scope": "Actual sleep, wake/reconnect and automatic inbox refresh removing ordinarily expired request; no execution. Expiry while asleep not established."
+  },
+  "native_contacts_during_sleep": false,
+  "acceptance": "Accepted cumulatively with separate quit-through-expiry evidence: unavailable-Mac behavior preserves approval requirements, expires pending work, and recovers inbox. Sleep at exact expiry is not claimed or required by frozen intent.",
+  "cleanup": {
+    "at_utc": "2026-10-08T09:49:37.821822+00:00",
+    "unit": "vw-companion-acceptance-0_ghlhrj.service",
+    "MainPID": "0",
+    "Result": "success",
+    "ActiveState": "inactive",
+    "finished": {
+      "observed_requests": 1,
+      "shutdown": "complete"
+    }
+  }
+}

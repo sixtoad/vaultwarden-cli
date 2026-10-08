@@ -1,0 +1,87 @@
+{
+  "at_utc": "2026-10-07T14:33:14.529644+00:00",
+  "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+  "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+  "transport": {
+    "counts": {
+      "decision": 1,
+      "list": 132,
+      "review": 1,
+      "session": 132,
+      "status": 1
+    },
+    "decision_status_sequence": [
+      "decision",
+      "status"
+    ],
+    "drop_next_successful_approval": false,
+    "dropped_approval_replies": 1,
+    "sequence_truncated": false
+  },
+  "cli": {
+    "kind": "signed_agent_cli_result",
+    "case": "installed-app-lost-approval-reply",
+    "started_at_utc": "2026-10-07T14:30:34.557739+00:00",
+    "at_utc": "2026-10-07T14:32:28.174899+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+    "cli_exit_code": 0,
+    "elapsed_seconds": 113.617,
+    "synthetic_secret_markers_absent": true,
+    "observation": {
+      "at_utc": "2026-10-07T14:32:28.175175+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-v08cxvy0",
+      "requests": [
+        {
+          "request_id": "Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w",
+          "status": {
+            "status": "completed",
+            "exit_code": 0
+          },
+          "execution_claimed": true,
+          "owner_binding_id": "AIFyVRYbQvrd9vmVWz10_Si03XSLYoaPpYz-QBeiyt0",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            },
+            {
+              "ordinal": 1,
+              "outcome": "approved",
+              "status": {
+                "status": "approved"
+              }
+            },
+            {
+              "ordinal": 2,
+              "outcome": "execution_started",
+              "status": {
+                "status": "running"
+              }
+            },
+            {
+              "ordinal": 3,
+              "outcome": "succeeded",
+              "status": {
+                "status": "completed",
+                "exit_code": 0
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 1
+    },
+    "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w\",\"state\":{\"status\":\"pending\"}}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"Noafj_vhjnVmV0pmcukQeZqIjOzz9_oUWLsBeZ2uR6w\",\"state\":{\"status\":\"completed\",\"exit_code\":0}}\n",
+    "stderr": "",
+    "transport_recovery_verified": true,
+    "protected_execution_verified": true,
+    "expected_scenario_verified": true,
+    "operator_visible_recovery_confirmation": "Operator confirmsapproved; actualstatusrecovery independentlyprovedbytransportcounter",
+    "operator_approval_confirmed": true
+  },
+  "operator_visible_confirmation": "Userconfirmedapproved14:32:41UTC; transportverifiedreadonlystatusrecovery; uncertaintytextnotseparatelyquoted",
+  "passed": true
+}

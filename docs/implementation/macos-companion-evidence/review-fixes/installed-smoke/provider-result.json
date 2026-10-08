@@ -1,0 +1,100 @@
+{
+  "status": "wrong-password rejection verified; correct-password approval not observed before expiry",
+  "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+  "operator_wrong_password_message": "Decision rejected (authentication_failed). Obtain a fresh review before trying again.",
+  "wrong_password_durable_snapshot": {
+    "at_utc": "2026-10-08T11:18:20.172530+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+    "requests": [
+      {
+        "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+        "status": {
+          "status": "pending"
+        },
+        "execution_claimed": false,
+        "owner_binding_id": "RgkXoqZh_q9o6YfysKBLjKHHRGgpExQ1Zm9aF8WWreg",
+        "audit": [
+          {
+            "ordinal": 0,
+            "outcome": "submitted",
+            "status": {
+              "status": "pending"
+            }
+          }
+        ]
+      }
+    ],
+    "execution_started_events": 0,
+    "kind": "final_native_wrong_password_rejected_pending_noexecution"
+  },
+  "cli_result": {
+    "kind": "signed_agent_cli_result",
+    "case": "final-patched-native-wrong-then-correct",
+    "started_at_utc": "2026-10-08T11:17:36.773989+00:00",
+    "at_utc": "2026-10-08T11:22:36.871260+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+    "cli_exit_code": 4,
+    "elapsed_seconds": 300.097,
+    "synthetic_secret_markers_absent": true,
+    "observation": {
+      "at_utc": "2026-10-08T11:22:36.871582+00:00",
+      "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+      "requests": [
+        {
+          "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+          "status": {
+            "status": "pending"
+          },
+          "execution_claimed": false,
+          "owner_binding_id": "RgkXoqZh_q9o6YfysKBLjKHHRGgpExQ1Zm9aF8WWreg",
+          "audit": [
+            {
+              "ordinal": 0,
+              "outcome": "submitted",
+              "status": {
+                "status": "pending"
+              }
+            }
+          ]
+        }
+      ],
+      "execution_started_events": 0
+    },
+    "stdout": "{\"status\":\"pending\",\"protocol_version\":1,\"request_id\":\"H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA\"}\n{\"status\":\"status\",\"protocol_version\":1,\"request_id\":\"H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA\",\"state\":{\"status\":\"pending\"}}\n",
+    "stderr": "{\"event\":\"client_error\",\"category\":\"wait_timeout\",\"request_id\":\"H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA\"}\n"
+  },
+  "terminal_snapshot": {
+    "at_utc": "2026-10-08T11:23:00.979532+00:00",
+    "fixture_root": "/home/sixtocantolla/.vw-companion-acceptance-mttxnfa5",
+    "requests": [
+      {
+        "request_id": "H4Ynt9U-G9nmzTjsGB-tfLeDwKVznGGqWKMGIg1jdsA",
+        "status": {
+          "status": "expired"
+        },
+        "execution_claimed": false,
+        "owner_binding_id": "RgkXoqZh_q9o6YfysKBLjKHHRGgpExQ1Zm9aF8WWreg",
+        "audit": [
+          {
+            "ordinal": 0,
+            "outcome": "submitted",
+            "status": {
+              "status": "pending"
+            }
+          },
+          {
+            "ordinal": 1,
+            "outcome": "expired",
+            "status": {
+              "status": "expired"
+            }
+          }
+        ]
+      }
+    ],
+    "execution_started_events": 0,
+    "kind": "final_native_smoke_wrongpassword_then_expiry"
+  },
+  "command_counters": "not instrumented in normal fixture mode",
+  "native_pid_parent_verified": 72015
+}

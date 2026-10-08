@@ -1,0 +1,23 @@
+{
+  "archive_sha256": "a97076f946cfb4f531e900f1960cf55430f302fa51b8e2067e4343aa80c48a8c",
+  "byte_for_byte_extraction_verified": true,
+  "files": {
+    "docs/companion-setup.md": {
+      "bytes": 13216,
+      "sha256": "608b65a3bb2f81f2345631fb57a3f46cdf8b7b542026c77e7842e042953af66d"
+    },
+    "docs/implementation/macos-companion-evidence/acceptance-audit.md": {
+      "bytes": 11371,
+      "sha256": "25f2bef7752fbc75505bb440fb7786bb95a024b524731416f3992b737078f7f1"
+    },
+    "docs/implementation/macos-companion-evidence/native-summary.json": {
+      "bytes": 4794,
+      "sha256": "4297e169c129acc0c24394ddacb1a366d884e653ca5cab6c0740746d5bb71b5f"
+    },
+    "docs/implementation/macos-companion-evidence/native-verification.md": {
+      "bytes": 2990,
+      "sha256": "baab034e55f6dbafc44f94fd5a6301cd1ab223fda9e5d9822a33ec1b360599b8"
+    }
+  },
+  "reason": "Preserve exact pre-consolidation acceptance/native/setup documents; current status is summarized separately."
+}

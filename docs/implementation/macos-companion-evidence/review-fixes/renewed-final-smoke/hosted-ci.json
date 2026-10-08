@@ -1,0 +1,309 @@
+{
+  "autoMergeRequest": null,
+  "headRefOid": "2918f504ce814869133b12edeefc18ff437e6bb2",
+  "isDraft": true,
+  "mergeable": "MERGEABLE",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:48:04Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093123",
+      "name": "Native macOS approval companion",
+      "startedAt": "2026-10-08T12:46:51Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:45:37Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779164141/job/113317573695",
+      "name": "Enable auto-merge",
+      "startedAt": "2026-10-08T12:45:33Z",
+      "status": "COMPLETED",
+      "workflowName": "Dependabot Auto Merge"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:45:38Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779164141/job/113317640472",
+      "name": "Notify when dependabot auto-merge fails",
+      "startedAt": "2026-10-08T12:45:38Z",
+      "status": "COMPLETED",
+      "workflowName": "Dependabot Auto Merge"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:47:43Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318092601",
+      "name": "Check",
+      "startedAt": "2026-10-08T12:46:47Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:52:08Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093297",
+      "name": "Test (ubuntu-24.04, stable)",
+      "startedAt": "2026-10-08T12:48:06Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:52:19Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093232",
+      "name": "Test (ubuntu-24.04, beta)",
+      "startedAt": "2026-10-08T12:47:44Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:50:09Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318092959",
+      "name": "Test (macos-latest, stable)",
+      "startedAt": "2026-10-08T12:46:53Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:49:47Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093177",
+      "name": "Test (macos-latest, beta)",
+      "startedAt": "2026-10-08T12:46:53Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:51:50Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093250",
+      "name": "Test (ubuntu-24.04, 1.88.0)",
+      "startedAt": "2026-10-08T12:47:46Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:51:14Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093109",
+      "name": "Test (ubuntu-24.04-arm, stable)",
+      "startedAt": "2026-10-08T12:46:50Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:51:49Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093100",
+      "name": "Test (ubuntu-24.04-arm, 1.88.0)",
+      "startedAt": "2026-10-08T12:46:50Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:50:15Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093227",
+      "name": "Real agent transport (ubuntu-24.04)",
+      "startedAt": "2026-10-08T12:48:01Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:49:08Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093343",
+      "name": "Real agent transport (ubuntu-24.04-arm)",
+      "startedAt": "2026-10-08T12:46:50Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:52:59Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093214",
+      "name": "Browser (ubuntu-24.04)",
+      "startedAt": "2026-10-08T12:46:47Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:50:29Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093074",
+      "name": "Browser (ubuntu-24.04-arm)",
+      "startedAt": "2026-10-08T12:46:51Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:51:17Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093568",
+      "name": "Real systemd (ubuntu-24.04)",
+      "startedAt": "2026-10-08T12:48:09Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:50:04Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093094",
+      "name": "Real systemd (ubuntu-24.04-arm)",
+      "startedAt": "2026-10-08T12:46:50Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:47:41Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318092994",
+      "name": "Build (x86_64-unknown-linux-gnu)",
+      "startedAt": "2026-10-08T12:46:48Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:48:53Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093192",
+      "name": "Build (x86_64-unknown-linux-musl)",
+      "startedAt": "2026-10-08T12:46:48Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:50:14Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093167",
+      "name": "Build (aarch64-unknown-linux-gnu)",
+      "startedAt": "2026-10-08T12:47:24Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:48:29Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093280",
+      "name": "Build (x86_64-apple-darwin)",
+      "startedAt": "2026-10-08T12:46:54Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:47:58Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093058",
+      "name": "Build (aarch64-apple-darwin)",
+      "startedAt": "2026-10-08T12:46:53Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:50:31Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093102",
+      "name": "Build (x86_64-pc-windows-msvc)",
+      "startedAt": "2026-10-08T12:46:50Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:49:11Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093323",
+      "name": "Build (aarch64-pc-windows-msvc)",
+      "startedAt": "2026-10-08T12:46:49Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:58:20Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093003",
+      "name": "Coverage (Tarpaulin)",
+      "startedAt": "2026-10-08T12:46:48Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:48:06Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093062",
+      "name": "Rustfmt",
+      "startedAt": "2026-10-08T12:46:48Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:51:05Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113318093321",
+      "name": "Security Audit",
+      "startedAt": "2026-10-08T12:46:48Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:53:04Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113320668581",
+      "name": "Merge Ready",
+      "startedAt": "2026-10-08T12:53:02Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:52:59Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113320669839",
+      "name": "Detect Release Tag",
+      "startedAt": "2026-10-08T12:52:59Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-08T12:52:59Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/sixtoad/vaultwarden-cli/actions/runs/37779169046/job/113320670863",
+      "name": "Release",
+      "startedAt": "2026-10-08T12:52:59Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    }
+  ],
+  "observed_at_utc": "2026-10-08T13:24:43.722978+00:00"
+}

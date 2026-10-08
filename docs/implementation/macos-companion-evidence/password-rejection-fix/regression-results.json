@@ -1,0 +1,47 @@
+[
+  {
+    "name": "real-agent",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-auto",
+      "--map-root-user",
+      "--fork",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "agent_submission",
+      "real_linux_peer_matrix_and_noninteractive_cli",
+      "--",
+      "--ignored",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 9.64,
+    "log": "real-agent.log"
+  },
+  {
+    "name": "browser",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "node",
+      "tests/ui/direct-request.mjs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 88.9,
+    "log": "browser.log"
+  },
+  {
+    "name": "systemd",
+    "command": [
+      "./scripts/with-secure-test-tmpdir.sh",
+      "./scripts/test-systemd-supervisor.sh"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 91.96,
+    "log": "systemd.log"
+  }
+]

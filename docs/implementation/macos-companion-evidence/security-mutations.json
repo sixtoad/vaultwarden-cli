@@ -1,0 +1,90 @@
+[
+  {
+    "name": "password-verification",
+    "file": "src/access/direct_request.rs",
+    "sha256": "4646c5e7f9f243cd27ffe2265cb82695d622b9ca27e0b06f071595bf4d29fad5",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 21.99
+  },
+  {
+    "name": "mutual-tls",
+    "file": "src/adapters/companion.rs",
+    "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 22.87
+  },
+  {
+    "name": "core-generation",
+    "file": "src/access/application.rs",
+    "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 17.59
+  },
+  {
+    "name": "core-exact-review",
+    "file": "src/access/application.rs",
+    "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 15.1
+  },
+  {
+    "name": "core-final-ticket-deadline",
+    "file": "src/access/application.rs",
+    "sha256": "7e61e91a54b312f5b8d76b9cd2701157403638f661ebc9b832ff3899e6e085cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 21.87
+  },
+  {
+    "name": "ticket-device",
+    "file": "src/adapters/companion.rs",
+    "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 23.66
+  },
+  {
+    "name": "ticket-consumption",
+    "file": "src/adapters/companion.rs",
+    "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 18.5
+  },
+  {
+    "name": "password-rate-limit",
+    "file": "src/adapters/companion.rs",
+    "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 23.18
+  },
+  {
+    "name": "enrollment-leaf",
+    "file": "src/adapters/companion.rs",
+    "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 22.15
+  },
+  {
+    "name": "unknown-json-fields",
+    "file": "src/adapters/companion.rs",
+    "sha256": "c5f36bb5dbb0e77562a49b5e97dcdf24af2dbf18c78c495ebbf2eb776ae75b2c",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 22.68
+  },
+  {
+    "name": "identity-file-permissions",
+    "file": "src/adapters/companion_identity.rs",
+    "sha256": "15c86e90e2c0c07fb195af8aa57da41cff9343b90d4736d4b079b9dd1ea544cf",
+    "exit_code": 101,
+    "outcome": "killed",
+    "elapsed_seconds": 33.43
+  }
+]

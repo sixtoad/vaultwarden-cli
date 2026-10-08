@@ -1,0 +1,3 @@
+Timestamp               Ty Process[PID:TID]
+2026-10-07 09:55:19.949 Df ApprovalCompanion[60645:896dc15] [com.apple.CFNetwork:Default] Task <7DC092AA-5BE0-4A71-87BB-387C65B80AE0>.<1> received response, status 403 content K
+2026-10-07 09:55:19.950 E  ApprovalCompanion[60645:896380a] [com.apple.CFNetwork:Default] Task <7DC092AA-5BE0-4A71-87BB-387C65B80AE0>.<1> finished with error [-1206] Error Domain=NSURLErrorDomain Code=-1206 UserInfo={NSLocalizedDescription=<private>, NSErrorFailingURLStringKey=<private>, NSErrorFailingURLKey=<private>, _NSURLErrorRelatedURLSessionTaskErrorKey=<private>, _NSURLErrorFailingURLSessionTaskErrorKey=<private>, NSUnderlyingError=0xc40c377e0 {Error Domain=kCFErrorDomainCFNetwork Code=-1206 UserInfo={NSErrorPeerAddressKey=<private>}}}

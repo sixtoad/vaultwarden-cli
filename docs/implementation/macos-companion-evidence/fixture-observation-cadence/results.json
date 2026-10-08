@@ -1,0 +1,55 @@
+{
+  "at_utc": "2026-10-07T11:41:38.413179+00:00",
+  "commands": [
+    {
+      "name": "focused",
+      "command": [
+        "./scripts/with-secure-test-tmpdir.sh",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--lib",
+        "companion"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.615,
+      "log": "focused.log"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.863,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--tests"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 24.978,
+      "log": "check.log"
+    }
+  ],
+  "source_hash_delta": {
+    "src/adapters/companion_acceptance_tests.rs": {
+      "before": "882256ca9fbc420de0d0171bd58c5a9568aa4e814daee735799e823feb31aff8",
+      "after": "3e798b9bad7f0ae2c4d3f3ebcbd5a749cd0dc1f312f24ad8f27a45566bed1e02"
+    }
+  },
+  "unchanged_hash_count": 10,
+  "scope": "Test fixture polling100ms to1s only; production security code unchanged; previous full profiles and12 killed security mutations retained, not unnecessarily repeated",
+  "limitation": "Observer contention plausible and CPU corroborated; exact holder of earlier busy responses not established; new actual acceptance still required"
+}
