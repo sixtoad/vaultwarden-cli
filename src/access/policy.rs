@@ -53,8 +53,34 @@ pub enum ExecutionProfile {
     ReviewedSelfContainedElf64V1,
 }
 
-/// Provider-private registry state; this story intentionally has no public
-/// provisioning or inspection API.
+/// Secret-free registration input and inspection metadata. The profile is an
+/// operator's behavioral review declaration, not something a digest proves.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageRegistration {
+    pub id: String,
+    pub execution_root: String,
+    pub path: String,
+    pub sha256: String,
+    pub profile: ExecutionProfile,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OperationMetadata {
+    pub policy: OperationPolicyDraft,
+    pub revision: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OperationSummary {
+    pub id: String,
+    pub image_id: String,
+    pub revision: String,
+}
+
+/// Provider-private registry state.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApprovedImage {
@@ -66,6 +92,36 @@ pub(crate) struct ApprovedImage {
 }
 
 impl ApprovedImage {
+    pub(crate) fn from_registration(
+        input: ImageRegistration,
+    ) -> Result<Self, PolicyValidationError> {
+        Self::new(
+            input.id,
+            input.execution_root,
+            input.path,
+            input.sha256,
+            input.profile,
+        )
+    }
+
+    pub(crate) fn metadata(&self) -> ImageRegistration {
+        ImageRegistration {
+            id: self.id.clone(),
+            execution_root: self.execution_root.clone(),
+            path: self.path.clone(),
+            sha256: self.sha256.clone(),
+            profile: self.profile,
+        }
+    }
+
+    pub(crate) fn execution_image(&self) -> super::ports::ExecutionImage<'_> {
+        super::ports::ExecutionImage {
+            root: Path::new(&self.execution_root),
+            path: Path::new(&self.path),
+            sha256: &self.sha256,
+            profile: self.profile,
+        }
+    }
     pub(crate) fn new(
         id: String,
         execution_root: String,
@@ -299,6 +355,27 @@ impl fmt::Display for PolicyValidationError {
 impl std::error::Error for PolicyValidationError {}
 
 impl OperationPolicy {
+    pub(crate) fn summary(&self) -> OperationSummary {
+        OperationSummary {
+            id: self.id.clone(),
+            image_id: self.image.image_id.clone(),
+            revision: self.revision.clone(),
+        }
+    }
+    pub(crate) fn metadata(&self) -> OperationMetadata {
+        OperationMetadata {
+            policy: OperationPolicyDraft {
+                id: self.id.clone(),
+                description: self.description.clone(),
+                image_id: self.image.image_id.clone(),
+                targets: self.targets.clone(),
+                arguments: self.arguments.clone(),
+                credentials: self.credentials.clone(),
+                ssh: self.ssh.clone(),
+            },
+            revision: self.revision.clone(),
+        }
+    }
     pub(crate) fn from_draft(
         mut draft: OperationPolicyDraft,
         approved: &ApprovedImage,

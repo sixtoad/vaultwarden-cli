@@ -6,7 +6,9 @@ use crate::access::{
         AuthenticatedHuman, DirectRequestError, DirectStatus, DirectSubmission, SubmissionReceipt,
     },
     history::HistoryEvent,
+    policy::{ImageRegistration, OperationMetadata, OperationPolicyDraft, OperationSummary},
     ports::DirectReviewLauncher,
+    provisioning::ProvisioningError,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -43,6 +45,12 @@ pub struct HumanMessage {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HumanCommand {
+    ImageRegister { image: ImageRegistration },
+    ImageList {},
+    ImageShow { id: String },
+    OperationCreate { policy: Box<OperationPolicyDraft> },
+    OperationList {},
+    OperationShow { id: String },
     Request { submission: DirectSubmission },
     Status { id: String },
     History { limit: Option<u32> },
@@ -53,6 +61,13 @@ pub enum HumanCommand {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HumanResponse {
+    ImageRegistered { image: ImageRegistration },
+    Images { images: Vec<ImageRegistration> },
+    Image { image: ImageRegistration },
+    OperationCreated { operation: OperationSummary },
+    Operations { operations: Vec<OperationSummary> },
+    Operation { operation: Box<OperationMetadata> },
+    ProvisioningRejected { reason: ProvisioningError },
     Submitted { receipt: SubmissionReceipt },
     Status { state: DirectStatus },
     History { events: Vec<HistoryEvent> },
@@ -375,6 +390,36 @@ fn serve_one(
             version: 1,
             command,
         }) => match command {
+            HumanCommand::ImageRegister { image } => {
+                match app.register_image(owner, image, &super::execution::LinuxExecutablePreparer) {
+                    Ok(image) => HumanResponse::ImageRegistered { image },
+                    Err(reason) => HumanResponse::ProvisioningRejected { reason },
+                }
+            }
+            HumanCommand::ImageList {} => match app.list_images(owner) {
+                Ok(images) => HumanResponse::Images { images },
+                Err(reason) => HumanResponse::ProvisioningRejected { reason },
+            },
+            HumanCommand::ImageShow { id } => match app.show_image(owner, &id) {
+                Ok(image) => HumanResponse::Image { image },
+                Err(reason) => HumanResponse::ProvisioningRejected { reason },
+            },
+            HumanCommand::OperationCreate { policy } => {
+                match app.create_operation(owner, *policy) {
+                    Ok(operation) => HumanResponse::OperationCreated { operation },
+                    Err(reason) => HumanResponse::ProvisioningRejected { reason },
+                }
+            }
+            HumanCommand::OperationList {} => match app.list_operations(owner) {
+                Ok(operations) => HumanResponse::Operations { operations },
+                Err(reason) => HumanResponse::ProvisioningRejected { reason },
+            },
+            HumanCommand::OperationShow { id } => match app.show_operation(owner, &id) {
+                Ok(operation) => HumanResponse::Operation {
+                    operation: Box::new(operation),
+                },
+                Err(reason) => HumanResponse::ProvisioningRejected { reason },
+            },
             HumanCommand::Request { submission } => {
                 match app.submit_direct(owner, submission, launcher) {
                     Ok(receipt) => HumanResponse::Submitted { receipt },
@@ -724,6 +769,10 @@ mod tests {
             ));
         }
         for input in [
+            r#"{"version":1,"command":{"kind":"image_list","id":"sentinel-secret"}}"#,
+            r#"{"version":1,"command":{"kind":"operation_list","id":"sentinel-secret"}}"#,
+            r#"{"version":1,"command":{"kind":"image_register","image":{"id":"sentinel-secret","profile":"unsupported"}}}"#,
+            r#"{"version":1,"command":{"kind":"operation_create","policy":{"password":"sentinel-secret"}}}"#,
             r#"{"version":1,"command":{"kind":"history","limit":4294967296}}"#,
             r#"{"version":1,"command":{"kind":"history","limit":-1}}"#,
             r#"{"version":1,"command":{"kind":"history","limit":"private-input-sentinel"}}"#,

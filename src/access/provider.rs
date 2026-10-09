@@ -18,6 +18,7 @@ pub enum ProviderDiagnostic {
     CredentialIneligible,
     StaleOperationPolicyRevision,
     ExpiredAccessRequest,
+    Conflict,
 }
 
 impl fmt::Display for ProviderDiagnostic {
@@ -30,6 +31,7 @@ impl fmt::Display for ProviderDiagnostic {
             Self::CredentialIneligible => "credential is not eligible",
             Self::StaleOperationPolicyRevision => "stale operation policy revision",
             Self::ExpiredAccessRequest => "access request expired",
+            Self::Conflict => "record already exists",
         })
     }
 }
@@ -1017,13 +1019,32 @@ impl Provider {
         self.activate_operation_checked(draft, verifier, || true)
     }
 
+    #[cfg(test)]
     pub(crate) fn activate_operation_checked<V: LoginEligibilityVerifier>(
         &mut self,
         draft: OperationPolicyDraft,
         verifier: &V,
         still_authorized: impl Fn() -> bool,
     ) -> Result<String, ProviderError> {
+        self.provision_operation(draft, verifier, false, still_authorized)
+    }
+
+    pub(crate) fn provision_operation<V: LoginEligibilityVerifier>(
+        &mut self,
+        draft: OperationPolicyDraft,
+        verifier: &V,
+        create_only: bool,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<String, ProviderError> {
         let state = self.store.read_state()?;
+        if create_only
+            && state
+                .operations
+                .iter()
+                .any(|policy| policy.id() == draft.id)
+        {
+            return Err(ProviderError::new(ProviderDiagnostic::Conflict));
+        }
         let Some(image) = state
             .approved_images
             .iter()
@@ -1055,9 +1076,72 @@ impl Provider {
             return Err(ProviderError::new(ProviderDiagnostic::CredentialIneligible));
         }
         let revision = policy.revision().to_owned();
-        let updated = self.store.upsert_operation(&state, policy)?;
+        let updated = self
+            .store
+            .upsert_operation_guarded(&state, policy, still_authorized)?;
         self.state = updated;
         Ok(revision)
+    }
+
+    pub(crate) fn register_image(
+        &mut self,
+        input: super::policy::ImageRegistration,
+        verifier: &dyn super::ports::ImageVerifier,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::policy::ImageRegistration, ProviderError> {
+        let mut state = self.store.read_state()?;
+        if state
+            .approved_images
+            .iter()
+            .any(|image| image.id() == input.id)
+        {
+            return Err(ProviderError::new(ProviderDiagnostic::Conflict));
+        }
+        let image = super::policy::ApprovedImage::from_registration(input)
+            .map_err(|_error| ProviderError::new(ProviderDiagnostic::InvalidOperationPolicy))?;
+        verifier.verify(image.execution_image()).map_err(|error| {
+            ProviderError::new(match error {
+                // An unavailable preparation environment cannot establish safe authority.
+                super::ports::ExecutionError::Unavailable => ProviderDiagnostic::UnsafeState,
+                _ => ProviderDiagnostic::InvalidOperationPolicy,
+            })
+        })?;
+        let metadata = image.metadata();
+        state.approved_images.push(image);
+        self.store.write_state_guarded(&state, still_authorized)?;
+        self.state = state;
+        Ok(metadata)
+    }
+
+    pub(crate) fn images(&self) -> Result<Vec<super::policy::ImageRegistration>, ProviderError> {
+        Ok(self
+            .store
+            .read_state()?
+            .approved_images
+            .iter()
+            .map(|image| image.metadata())
+            .collect())
+    }
+    pub(crate) fn operations(&self) -> Result<Vec<super::policy::OperationSummary>, ProviderError> {
+        Ok(self
+            .store
+            .read_state()?
+            .operations
+            .iter()
+            .map(|policy| policy.summary())
+            .collect())
+    }
+    pub(crate) fn operation(
+        &self,
+        id: &str,
+    ) -> Result<Option<super::policy::OperationMetadata>, ProviderError> {
+        Ok(self
+            .store
+            .read_state()?
+            .operations
+            .iter()
+            .find(|policy| policy.id() == id)
+            .map(|policy| policy.metadata()))
     }
 
     /// This preflight is deliberately side-effect free and must run before an
