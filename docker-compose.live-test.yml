@@ -5,7 +5,7 @@ services:
   vaultwarden:
     image: vaultwarden/server:1.36.0
     ports:
-      - "18222:80"
+      - "127.0.0.1::80"
     environment:
       SIGNUPS_ALLOWED: "true"
       ADMIN_TOKEN: "live-test-admin-token"

@@ -5,8 +5,8 @@
 //!   `VAULTWARDEN_LIVE_TEST_URL`     — URL of a running Vaultwarden instance
 //!   `VAULTWARDEN_LIVE_ADMIN_TOKEN`  — admin token for user teardown
 //!
-//! If either variable is absent every test module that calls
-//! `LiveTestEnv::maybe_create().await` will simply return early (skip).
+//! If both variables are absent tests return early (not a live execution).
+//! Setting only one is an error.
 #![allow(dead_code)]
 
 use aes::cipher::{BlockModeEncrypt, KeyIvInit, block_padding::Pkcs7};
@@ -20,8 +20,10 @@ use rand::Rng;
 use reqwest::{Client, ClientBuilder};
 use serde_json::{Value, json};
 use sha2::Sha256;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command as ProcessCommand, Output, Stdio};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
 use vaultwarden_cli::{
     crypto::{CryptoKeys, KdfIterations, MasterKey},
@@ -34,6 +36,289 @@ type Aes256CbcEnc = Encryptor<aes::Aes256>;
 
 /// Master password used for every test user.
 pub const TEST_PASSWORD: &str = "LiveTest-P@ss!1"; // secrets-ignore: test fixture
+
+/// Explicit private bus addresses prevent desktop-bus auto-discovery.
+pub fn isolate_command(cmd: &mut Command, home: &Path, config_root: &Path) {
+    #[cfg(not(target_os = "linux"))]
+    panic!("live CLI isolation is supported only on Linux");
+    cmd.env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .env("HOME", home)
+        .env("XDG_CONFIG_HOME", config_root)
+        .env("XDG_DATA_HOME", home.join("data"))
+        .env("XDG_CACHE_HOME", home.join("cache"))
+        .env("XDG_RUNTIME_DIR", home.join("runtime"))
+        .env("TMPDIR", home)
+        .env(
+            "DBUS_SESSION_BUS_ADDRESS",
+            format!("unix:path={}/bus", home.display()),
+        )
+        .env(
+            "DBUS_SYSTEM_BUS_ADDRESS",
+            format!("unix:path={}/unavailable-bus", home.display()),
+        )
+        .env("VAULTWARDEN_ALLOW_HTTP", "1")
+        .env("VAULTWARDEN_ALLOW_PLAINTEXT_JSON", "true");
+}
+
+/// Shared actual CLI constructor, also exercised without a server by preflight.
+pub fn isolated_cli(home: &Path, config_root: &Path) -> Command {
+    let mut command = Command::cargo_bin("vaultwarden-cli").expect("vaultwarden-cli binary");
+    isolate_command(&mut command, home, config_root);
+    command
+}
+
+/// All probes have tiny, bounded input/output. On timeout or input/wait errors,
+/// retain ownership until the exact child has been killed and reaped.
+fn finish_probe(mut child: Child, input: Option<&[u8]>, timeout: Duration) -> Result<Output> {
+    let result = (|| -> Result<()> {
+        if let Some(input) = input {
+            child
+                .stdin
+                .take()
+                .context("probe stdin is unavailable")?
+                .write_all(input)?;
+        }
+        let deadline = Instant::now() + timeout;
+        loop {
+            if child.try_wait()?.is_some() {
+                return Ok(());
+            }
+            anyhow::ensure!(Instant::now() < deadline, "private service probe timed out");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    })();
+    if let Err(error) = result {
+        drop(child.kill());
+        drop(child.wait());
+        return Err(error);
+    }
+    child
+        .wait_with_output()
+        .context("collect private service probe")
+}
+
+/// Owns only the private services spawned for one fixture. Drop reaps their
+/// exact process handles before the enclosing temporary directory is removed.
+pub struct PrivateKeyring {
+    keyring: Option<Child>,
+    bus: Child,
+}
+
+impl PrivateKeyring {
+    pub fn start(home: &Path, config_root: &Path) -> Result<Self> {
+        anyhow::ensure!(cfg!(target_os = "linux"), "private keyring requires Linux");
+        for path in [
+            home.to_path_buf(),
+            home.join("runtime"),
+            config_root.to_path_buf(),
+        ] {
+            std::fs::create_dir_all(&path)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+            }
+        }
+        let mut isolated = Command::new("unused");
+        isolate_command(&mut isolated, home, config_root);
+        let environment: Vec<_> = isolated
+            .get_envs()
+            .filter_map(|(key, value)| value.map(|value| (key.to_owned(), value.to_owned())))
+            .collect();
+        let service = |program: &str| {
+            let mut command = ProcessCommand::new(program);
+            command
+                .env_clear()
+                .envs(environment.clone())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+            command
+        };
+        let bus = service("/usr/bin/dbus-daemon")
+            .args(["--session", "--nofork", "--nopidfile"])
+            .arg(format!("--address=unix:path={}/bus", home.display()))
+            .spawn()
+            .context("start private test D-Bus")?;
+        let mut guard = Self { keyring: None, bus };
+        for _ in 0..100 {
+            anyhow::ensure!(guard.bus.try_wait()?.is_none(), "private D-Bus exited");
+            if home.join("bus").exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        anyhow::ensure!(home.join("bus").exists(), "private D-Bus startup timed out");
+        let keyring = service("/usr/bin/gnome-keyring-daemon")
+            .args(["--foreground", "--components=secrets", "--unlock"])
+            .stdin(Stdio::piped())
+            .spawn()
+            .context("start private test keyring")?;
+        guard.keyring = Some(keyring);
+        guard
+            .keyring
+            .as_mut()
+            .unwrap()
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"synthetic-test-keyring-password\n")?;
+        let mut ready = false;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
+            anyhow::ensure!(
+                guard.keyring.as_mut().unwrap().try_wait()?.is_none(),
+                "private keyring exited"
+            );
+            let probe = service("/usr/bin/gdbus")
+                .args([
+                    "call",
+                    "--session",
+                    "--dest",
+                    "org.freedesktop.DBus",
+                    "--object-path",
+                    "/org/freedesktop/DBus",
+                    "--method",
+                    "org.freedesktop.DBus.NameHasOwner",
+                    "org.freedesktop.secrets",
+                ])
+                .stdout(Stdio::piped())
+                .spawn()?;
+            let output = finish_probe(probe, None, remaining)?;
+            if output.status.success() && String::from_utf8_lossy(&output.stdout).contains("true") {
+                ready = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        anyhow::ensure!(ready, "private Secret Service startup timed out");
+        // Exercise persistence before any user is provisioned. These attributes
+        // and credentials exist only in this fixture's private keyring.
+        let probe = service("/usr/bin/secret-tool")
+            .args([
+                "store",
+                "--label=live isolation sentinel",
+                "live-test",
+                "sentinel",
+            ])
+            .stdin(Stdio::piped())
+            .spawn()?;
+        let output = finish_probe(
+            probe,
+            Some(b"synthetic-private-sentinel"),
+            Duration::from_secs(5),
+        )?;
+        anyhow::ensure!(
+            output.status.success(),
+            "private keyring cannot persist sentinel"
+        );
+        let probe = service("/usr/bin/secret-tool")
+            .args(["lookup", "live-test", "sentinel"])
+            .stdout(Stdio::piped())
+            .spawn()?;
+        let output = finish_probe(probe, None, Duration::from_secs(5))?;
+        anyhow::ensure!(
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout).trim_end()
+                    == "synthetic-private-sentinel",
+            "private keyring sentinel was not reusable"
+        );
+        Ok(guard)
+    }
+}
+
+impl Drop for PrivateKeyring {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.keyring {
+            drop(child.kill());
+            drop(child.wait());
+        }
+        drop(self.bus.kill());
+        drop(self.bus.wait());
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod private_service_tests {
+    use super::*;
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
+    fn identity(child: &Child) -> (libc::pid_t, OwnedFd) {
+        let pid = libc::pid_t::try_from(child.id()).unwrap();
+        // SAFETY: pid is our live owned child; flags 0 requests a new pidfd.
+        let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) };
+        assert!(fd >= 0, "pidfd_open: {}", std::io::Error::last_os_error());
+        // SAFETY: the successful syscall returned a new, uniquely owned fd.
+        (pid, unsafe {
+            OwnedFd::from_raw_fd(i32::try_from(fd).unwrap())
+        })
+    }
+
+    fn assert_exited_and_reaped((pid, fd): &(libc::pid_t, OwnedFd)) {
+        let mut event = libc::pollfd {
+            fd: fd.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // SAFETY: event points to one initialized pollfd. The pidfd identifies
+        // the original process even if its numeric PID has since been reused.
+        assert_eq!(unsafe { libc::poll(&raw mut event, 1, 0) }, 1);
+        assert_ne!(
+            event.revents & libc::POLLIN,
+            0,
+            "owned process still running"
+        );
+        // SAFETY: waitpid targets only our recorded child; no status is requested.
+        assert_eq!(
+            unsafe { libc::waitpid(*pid, std::ptr::null_mut(), libc::WNOHANG) },
+            -1
+        );
+        assert_eq!(
+            std::io::Error::last_os_error().raw_os_error(),
+            Some(libc::ECHILD),
+            "child was not reaped"
+        );
+    }
+
+    #[test]
+    fn dropping_private_services_exits_and_reaps_exact_children() {
+        let root = tempfile::tempdir().unwrap();
+        let guard =
+            PrivateKeyring::start(&root.path().join("home"), &root.path().join("config")).unwrap();
+        let children = [
+            identity(&guard.bus),
+            identity(guard.keyring.as_ref().unwrap()),
+        ];
+        drop(guard);
+        for child in &children {
+            assert_exited_and_reaped(child);
+        }
+    }
+
+    #[test]
+    fn probe_timeout_and_input_error_kill_and_reap_exact_child() {
+        for input in [None, Some(b"synthetic".as_slice())] {
+            let child = ProcessCommand::new("/usr/bin/sleep")
+                .arg("60")
+                .env_clear()
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap();
+            let child_identity = identity(&child);
+            let start = Instant::now();
+            let error = finish_probe(child, input, Duration::from_millis(30)).unwrap_err();
+            assert!(error.to_string().contains(if input.is_some() {
+                "stdin is unavailable"
+            } else {
+                "timed out"
+            }));
+            assert!(start.elapsed() < Duration::from_secs(2));
+            assert_exited_and_reaped(&child_identity);
+        }
+    }
+}
 
 // ── Fixture constants ──────────────────────────────────────────────────────
 
@@ -80,6 +365,7 @@ pub const FIXTURE_SSH_FINGERPRINT: &str = "SHA256:liveTestFingerprint1234";
 /// Creates a throwaway Vaultwarden user, provisions vault fixtures, writes
 /// config/token/key files to a temp directory, and deletes the user on drop.
 pub struct LiveTestEnv {
+    _private_keyring: PrivateKeyring,
     _temp_dir: TempDir,
     /// $HOME set for the test binary
     pub home_dir: PathBuf,
@@ -115,8 +401,13 @@ impl LiveTestEnv {
     /// Returns `None` when live-test env vars are not set (tests skip silently).
     /// Returns `Some(env)` with a fully provisioned environment.
     pub async fn maybe_create() -> Option<Self> {
-        let server_url = std::env::var("VAULTWARDEN_LIVE_TEST_URL").ok()?;
-        let admin_token = std::env::var("VAULTWARDEN_LIVE_ADMIN_TOKEN").ok()?;
+        let server_url = std::env::var("VAULTWARDEN_LIVE_TEST_URL").ok();
+        let admin_token = std::env::var("VAULTWARDEN_LIVE_ADMIN_TOKEN").ok();
+        let (server_url, admin_token) = match (server_url, admin_token) {
+            (None, None) => return None,
+            (Some(url), Some(token)) => (url, token),
+            _ => panic!("set both live-test URL and admin token, or neither"),
+        };
         Some(
             Self::create(server_url, admin_token)
                 .await
@@ -127,18 +418,7 @@ impl LiveTestEnv {
     /// Build a `Command` for the `vaultwarden-cli` binary with the correct
     /// `HOME/XDG_CONFIG_HOME` and HTTP-allow env vars pointing at our temp dir.
     pub fn binary(&self) -> Command {
-        let mut cmd = Command::cargo_bin("vaultwarden-cli").expect("vaultwarden-cli binary");
-        cmd.env("HOME", &self.home_dir);
-        cmd.env("XDG_CONFIG_HOME", &self.config_root);
-        // The test server uses plain HTTP; tell the CLI to accept it.
-        cmd.env("VAULTWARDEN_ALLOW_HTTP", "1");
-        // Live tests capture stdout and assert JSON payloads intentionally.
-        cmd.env("VAULTWARDEN_ALLOW_PLAINTEXT_JSON", "true");
-        // Live fixtures intentionally use isolated legacy keys.json storage.
-        cmd.env("VAULTWARDEN_ALLOW_INSECURE_KEY_FILE", "true");
-        // Disable keyring so tests stay file-based and fully isolated.
-        cmd.env("KEYRING_BACKEND", "plaintext");
-        cmd
+        isolated_cli(&self.home_dir, &self.config_root)
     }
 
     /// Build a binary command with `VAULTWARDEN_PASSWORD` pre-set.
@@ -148,10 +428,38 @@ impl LiveTestEnv {
         cmd
     }
 
-    /// Remove keys.json so the vault appears locked to the binary.
+    /// Clear native and legacy keys using the real command in the private bus.
     pub fn lock_vault(&self) {
-        let path = self.config_dir.join("keys.json");
-        drop(std::fs::remove_file(path));
+        self.binary().arg("lock").assert().success();
+    }
+
+    /// Provision a selected field whose ciphertext is deliberately invalid.
+    pub async fn malformed_field_fixture(&self, malformed_name: bool) -> String {
+        let tokens: Value =
+            serde_json::from_slice(&std::fs::read(self.config_dir.join("tokens.json")).unwrap())
+                .unwrap();
+        let name = if malformed_name {
+            "Malformed-Name"
+        } else {
+            "Malformed-Value"
+        };
+        post_cipher(
+            &Client::builder().no_proxy().build().unwrap(),
+            &self.server_url,
+            tokens["access_token"].as_str().unwrap(),
+            json!({
+                "type": 1,
+                "name": encrypt_str(name, &self.user_keys),
+                "login": { "uris": [{"uri": encrypt_str(name, &self.user_keys)}] },
+                "fields": [{
+                    "type": 1,
+                    "name": if malformed_name { "invalid-ciphertext".to_string() } else { encrypt_str("secret", &self.user_keys) },
+                    "value": if malformed_name { encrypt_str("hidden", &self.user_keys) } else { "invalid-ciphertext".to_string() },
+                }],
+                "favorite": false,
+                "reprompt": 0,
+            }),
+        ).await.expect("malformed field fixture")
     }
 
     /// Remove all session files so the binary sees a fresh (logged-out) state.
@@ -186,8 +494,19 @@ impl LiveTestEnv {
 
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     async fn create(server_url: String, admin_token: String) -> Result<Self> {
+        anyhow::ensure!(
+            cfg!(target_os = "linux"),
+            "live isolation requires Linux; refusing provisioning"
+        );
+        // Establish and verify isolation before contacting the disposable server.
+        let temp_dir = TempDir::new().context("TempDir")?;
+        let home_dir = temp_dir.path().join("home");
+        let config_root = temp_dir.path().join("config-root");
+        let config_dir = config_root.join("vaultwarden-cli");
+        let private_keyring = PrivateKeyring::start(&home_dir, &config_root)?;
+        std::fs::create_dir_all(&config_dir)?;
         install_rustls_crypto_provider();
-        let http = Client::new();
+        let http = Client::builder().no_proxy().build()?;
 
         // Unique per-test credentials (8-hex suffix prevents collisions).
         let suffix = random_hex(8);
@@ -326,12 +645,6 @@ impl LiveTestEnv {
         let user_keys = CryptoKeys::from_key_bytes(enc_arr, mac_arr);
 
         // ── Temp directory layout ────────────────────────────────────────
-        let temp_dir = TempDir::new().context("TempDir")?;
-        let home_dir = temp_dir.path().join("home");
-        let config_root = temp_dir.path().join("config-root");
-        let config_dir = config_root.join("vaultwarden-cli");
-        std::fs::create_dir_all(&home_dir)?;
-        std::fs::create_dir_all(&config_dir)?;
 
         // ── config.json ──────────────────────────────────────────────────
         write_json(
@@ -356,16 +669,6 @@ impl LiveTestEnv {
                 "token_expiry": token_expiry,
             }),
             0o600,
-        )?;
-
-        // ── keys.json (vault unlocked by default in provisioned env) ─────
-        write_secret_file(
-            &config_dir.join("keys.json"),
-            &format!(
-                r#"{{"user_keys":{{"enc_key":"{}","mac_key":"{}"}},"org_keys":{{}}}}"#,
-                BASE64.encode(user_keys.enc_key_bytes()),
-                BASE64.encode(user_keys.mac_key_bytes()),
-            ),
         )?;
 
         // ── Vault fixtures ───────────────────────────────────────────────
@@ -452,7 +755,8 @@ impl LiveTestEnv {
         )
         .await?;
 
-        Ok(Self {
+        let environment = Self {
+            _private_keyring: private_keyring,
             _temp_dir: temp_dir,
             home_dir,
             config_root,
@@ -470,7 +774,13 @@ impl LiveTestEnv {
             card_item_id,
             ssh_item_id,
             user_keys,
-        })
+        };
+        environment
+            .binary_with_password()
+            .arg("unlock")
+            .assert()
+            .success();
+        Ok(environment)
     }
 }
 
@@ -491,6 +801,7 @@ impl Drop for LiveTestEnv {
                     install_rustls_crypto_provider();
                     let timeout = std::time::Duration::from_secs(5);
                     let client = ClientBuilder::new()
+                        .no_proxy()
                         .timeout(timeout)
                         .build()
                         .unwrap_or_else(|_| Client::new());
@@ -794,9 +1105,7 @@ async fn create_ssh(
     private_key: &str,
     fingerprint: &str,
 ) -> Result<String> {
-    // Type 5 = SSH key.  Vaultwarden may return a 400 if SSH keys are not
-    // supported in the installed version; in that case fall back to a login
-    // item with custom fields so the rest of the test suite still works.
+    // Type 5 is mandatory: a fixture error must never substitute a login.
     let body = json!({
         "type": 5,
         "name": encrypt_str(name, keys),
@@ -830,25 +1139,7 @@ async fn create_ssh(
             .with_context(|| format!("no ID in cipher response: {parsed}"));
     }
 
-    // SSH not supported — use a login item as a stand-in so tests can skip
-    // gracefully rather than hard-fail.
-    eprintln!(
-        "Warning: SSH cipher type not supported by this Vaultwarden version \
-         ({status}); substituting a login item for {name}."
-    );
-    create_login(
-        http,
-        server_url,
-        access_token,
-        keys,
-        name,
-        public_key,
-        private_key,
-        "",
-        None,
-        &[("fingerprint", fingerprint, false)],
-    )
-    .await
+    anyhow::bail!("create SSH type-5 fixture failed ({status}): {text}")
 }
 
 // ── File helpers ───────────────────────────────────────────────────────────

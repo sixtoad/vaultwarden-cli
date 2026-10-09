@@ -42,7 +42,7 @@ async fn status_when_logged_in_unlocked() {
     let Some(env) = LiveTestEnv::maybe_create().await else {
         return;
     };
-    // keys.json is written during provisioning → vault is unlocked.
+    // Provisioning persists an unlocked session in the private keyring.
 
     env.binary()
         .arg("status")
@@ -215,10 +215,14 @@ async fn unlock_with_correct_password_succeeds() {
         .success()
         .stdout(predicate::str::contains("Vault unlocked"));
 
-    // keys.json should now exist.
+    // A new process must reuse the persisted private-keyring session.
+    env.binary()
+        .args(["get", FIXTURE_LOGIN_NAME])
+        .assert()
+        .success();
     assert!(
-        env.config_dir.join("keys.json").exists(),
-        "keys.json not written after unlock"
+        !env.config_dir.join("keys.json").exists(),
+        "native keyring must retain priority"
     );
 }
 
@@ -234,6 +238,11 @@ async fn unlock_with_wrong_password_fails() {
         .assert()
         .failure()
         .stderr(predicate::str::is_match("(?i)(password|decrypt|failed)").unwrap());
+    env.binary()
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Vault: Locked"));
 }
 
 #[tokio::test]
@@ -258,8 +267,11 @@ async fn lock_clears_vault_keys() {
     let Some(env) = LiveTestEnv::maybe_create().await else {
         return;
     };
-    // Vault starts unlocked (keys.json present).
-    assert!(env.config_dir.join("keys.json").exists());
+    env.binary()
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Vault: Unlocked"));
 
     env.binary()
         .arg("lock")
@@ -267,7 +279,12 @@ async fn lock_clears_vault_keys() {
         .success()
         .stdout(predicate::str::contains("Vault locked"));
 
-    // keys.json should be gone.
+    env.binary()
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Vault: Locked"));
+    // No legacy file survives either.
     assert!(
         !env.config_dir.join("keys.json").exists(),
         "keys.json still present after lock"
@@ -282,7 +299,67 @@ async fn lock_when_already_locked_is_graceful() {
     env.lock_vault();
 
     // Should not error — lock is idempotent.
+    for _ in 0..2 {
+        env.binary()
+            .arg("lock")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Vault locked."));
+    }
+}
+
+#[tokio::test]
+async fn lock_logged_out_fails() {
+    let Some(env) = LiveTestEnv::maybe_create().await else {
+        return;
+    };
+    env.clear_session();
+    env.binary()
+        .arg("lock")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Not logged in"));
+}
+
+#[tokio::test]
+async fn unlock_session_is_reusable_and_failed_persistence_is_not_success() {
+    let Some(env) = LiveTestEnv::maybe_create().await else {
+        return;
+    };
+    env.lock_vault();
+    env.binary_with_password().arg("unlock").assert().success();
+    env.binary()
+        .args(["get", FIXTURE_LOGIN_NAME])
+        .assert()
+        .success();
     env.binary().arg("lock").assert().success();
+    env.binary()
+        .args(["unlock", "--password", "wrong-synthetic-password"])
+        .assert()
+        .failure();
+    assert!(!env.config_dir.join("keys.json").exists());
+    // Explicit unavailable test address exercises production persistence failure;
+    // no fallback opt-in is present, and no desktop bus can be discovered.
+    env.binary_with_password()
+        .env(
+            "DBUS_SESSION_BUS_ADDRESS",
+            format!("unix:path={}/missing-test-bus", env.home_dir.display()),
+        )
+        .arg("unlock")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("unlocked").not());
+    env.binary()
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Vault: Locked"));
+    std::fs::create_dir(env.config_dir.join("keys.json")).unwrap();
+    env.binary()
+        .arg("lock")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("Vault locked").not());
 }
 
 // ── vault commands require unlock ─────────────────────────────────────────

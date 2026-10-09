@@ -8,6 +8,9 @@
 #[path = "live/env.rs"]
 mod live_env;
 
+#[path = "live/isolation.rs"]
+mod isolation;
+
 // Test modules — one file per command group.
 #[path = "live/session.rs"]
 mod session;
