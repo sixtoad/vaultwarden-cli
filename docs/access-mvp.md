@@ -143,6 +143,117 @@ the launch artifact. Delayed unlock cannot recreate authority after shutdown. Pr
 implemented with the later execution/supervisor stories; this story starts no
 protected processes.
 
+## Human operator provisioning
+
+The human owner can register reviewed executables and create operations through
+`vw-access` and `human.sock`, starting with empty provider state. Unlock through
+the existing desktop UI first. These writes use the owner's existing local
+administration authority; they do not prompt for a second approval or accept a
+password. Every later execution still requires its own approval. Agents use
+different OS identities and cannot provision through the agent protocol. There
+is no same-UID isolation: the provider owner remains trusted to administer policy.
+
+Keep the reviewed, self-contained native ELF64 artifact in a private execution
+root with safe ancestry, owned by root or the provider as required below. The
+file must be non-writable, executable, and not a symlink. Ordinary dynamically
+linked executables, scripts and general-purpose interpreters are unsupported.
+The command verifies using production execution preparation, without launching
+the image or resolving credentials. A matching digest does not establish that
+the program's behavior was reviewed; specifying the profile declares that review.
+
+```sh
+export VAULTWARDEN_ACCESS_STATE_ROOT=/path/to/private-provider-directory
+vw-access image register --id backup-image \
+  --execution-root /path/to/private-executables \
+  --path /path/to/private-executables/reviewed-backup \
+  --sha256 <64-lowercase-hex-digest> \
+  --profile reviewed_self_contained_elf64_v1
+vw-access image list
+vw-access image show backup-image
+vw-access operation create --file backup-policy.json
+vw-access operation list
+vw-access operation show backup
+```
+
+`operation create` reads an `OperationPolicyDraft`, not persisted provider JSON.
+Files are regular, non-symlink JSON files at most 128 KiB. Unknown fields and
+invalid input produce redacted errors. Responses are JSON containing metadata;
+inspection is available while locked, and results above the inspection bound
+(1 MiB) produce an explicit error instead of a truncated listing. Lists take no ID.
+
+This Login-backed secret example maps a pre-existing Login item's password field:
+
+```json
+{
+  "id": "backup",
+  "description": "Back up the reviewed staging resource",
+  "image_id": "backup-image",
+  "targets": ["staging"],
+  "arguments": [{"type": "target"}],
+  "credentials": [{
+    "item_id": "11111111-1111-1111-1111-111111111111",
+    "label": "Backup service token",
+    "use_type": "login",
+    "field_mappings": [{"field": "password", "environment": "BACKUP_TOKEN"}]
+  }]
+}
+```
+
+For a username/password Login, use the same credential binding with
+`field_mappings` containing both `{"field":"username","environment":"BACKUP_USER"}`
+and `{"field":"password","environment":"BACKUP_PASSWORD"}`. The exact Login item
+must contain the requested fields and exactly one custom field named `vw-access`
+whose value is `backup` (the marker `vw-access=backup`);
+markers are specific to each operation ID. Only immutable item IDs and policy
+metadata belong in these files, never passwords, tokens or private-key values.
+Credential onboarding remains a separate human task.
+
+An SSH-key operation uses a pre-existing SSH-key item, fixed destination and
+pinned host fingerprint. Replace these synthetic identifiers and fingerprint
+with reviewed metadata before creating a real policy:
+
+```json
+{
+  "id": "ssh-backup",
+  "description": "Back up the fixed resource",
+  "image_id": "backup-image",
+  "targets": [], "arguments": [], "credentials": [],
+  "ssh": {
+    "credential": {
+      "item_id": "22222222-2222-2222-2222-222222222222",
+      "label": "Backup SSH key", "use_type": "ssh"
+    },
+    "working_directory": "/var/empty",
+    "destination": {
+      "host": "backup.example.test", "port": 2222, "user": "backup",
+      "resource_path": "/srv/archive",
+      "host_fingerprint": "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  }
+}
+```
+
+SSH eligibility checks the SSH-key item type/body; it does not substitute a Login
+or apply Login markers to SSH-key items. Provisioning does not install an SSH
+client or make ordinary OpenSSH compatible with the self-contained image profile.
+The operator must supply and review a compatible artifact; destination controls,
+private key material handling and execution containment restrictions still apply.
+
+Registration and creation are atomic and create-only. Every existing ID conflicts,
+including an identical retry; there is no replace/delete command. On a timeout or
+disconnect, the write may already have committed. Reconcile with `image show ID`
+or `operation show ID`, compare digest/revision and metadata, and only retry if the
+record is absent. An `Unavailable` persistence failure can poison the store and
+prevent inspection in that process. Restart the provider before reconciling;
+owner-only inspection works while the restarted provider is locked. Inspect
+before unlocking and retrying: a post-rename failure may have committed the record,
+and an identical retry must then conflict. Retain each registered artifact at its
+pinned path/root with identical bytes and permissions: all state reads validate
+registered artifacts, and execution
+revalidates using production preparation. Moving or deleting even an unused
+artifact can make the store unavailable. Back up metadata and artifacts together;
+do not hand-edit state to recover or treat a lost response as rollback.
+
 ## One-time human requests (Story 1.4)
 
 With a provisioned operation and an unlocked provider, use the human terminal
@@ -569,8 +680,8 @@ re-provisioned. They are rejected without rewriting user data or silently assign
 a profile. Empty default state remains supported. Root, profile, image identity
 and policy fields are bound into the new policy revision; old approvals cannot
 be reused with a newly provisioned policy.
-Story 1.6 provides no operator-facing command to migrate or re-provision populated
-legacy state; provisioning integration is later work. Manually editing persisted
+Operator provisioning supports new registrations in valid state; it does not
+migrate invalid legacy state or replace existing IDs. Manually editing persisted
 fields or revisions, moving a live store, or reusing approvals is not a supported
 recovery procedure.
 

@@ -8,6 +8,82 @@ mod bounded_process;
 use bounded_process::BoundedChild;
 
 #[test]
+fn provisioning_cli_redacts_invalid_files_and_unknown_profiles() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = dir.path().join("sentinel-secret.json");
+    let valid = serde_json::json!({
+        "id":"sentinel-secret", "description":"Synthetic policy", "image_id":"test-image",
+        "targets":[], "arguments":[], "credentials":[]
+    });
+    let mut oversized = serde_json::to_vec(&valid).unwrap();
+    oversized.resize(
+        vaultwarden_cli::access::provisioning::MAX_POLICY_BYTES + 1,
+        b' ',
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&oversized).unwrap(),
+        valid
+    );
+    for (bytes, diagnostic) in [
+        (
+            b"{\"password\":\"sentinel-secret\"}".to_vec(),
+            "vw-access: invalid policy file\n",
+        ),
+        (oversized, "vw-access: invalid or oversized policy file\n"),
+    ] {
+        std::fs::write(&path, bytes).unwrap();
+        Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+            .arg("--state-root")
+            .arg(dir.path())
+            .args(["operation", "create", "--file"])
+            .arg(&path)
+            .assert()
+            .failure()
+            .stdout("")
+            .stderr(diagnostic);
+    }
+    std::fs::write(&path, serde_json::to_vec(&valid).unwrap()).unwrap();
+    let symlink = dir.path().join("sentinel-secret-link");
+    std::os::unix::fs::symlink(&path, &symlink).unwrap();
+    let directory = dir.path().join("sentinel-secret-directory");
+    std::fs::create_dir(&directory).unwrap();
+    let fifo = dir.path().join("sentinel-secret-fifo");
+    use std::os::unix::ffi::OsStrExt;
+    let fifo_name = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(fifo_name.as_ptr(), 0o600) }, 0);
+    for (file, diagnostic) in [
+        (&symlink, "vw-access: invalid policy file\n"),
+        (&directory, "vw-access: invalid or oversized policy file\n"),
+        (&fifo, "vw-access: invalid or oversized policy file\n"),
+    ] {
+        let output = bounded_process::output(
+            std::process::Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+                .arg("--state-root")
+                .arg(dir.path())
+                .args(["operation", "create", "--file"])
+                .arg(file),
+        );
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        assert_eq!(output.stderr, diagnostic.as_bytes());
+    }
+    for args in [
+        vec!["image", "register", "--profile", "sentinel-secret"],
+        vec!["operation", "list", "sentinel-secret"],
+        vec!["image", "list", "sentinel-secret"],
+    ] {
+        Command::new(assert_cmd::cargo::cargo_bin!("vw-access"))
+            .args(args)
+            .assert()
+            .failure()
+            .stdout("")
+            .stderr("vw-access: invalid command; use --help\n");
+    }
+}
+
+#[test]
 fn agent_commands_send_exact_identity_fields_and_print_only_safe_views() {
     use std::{
         fs,
