@@ -10,7 +10,12 @@ use std::{
 };
 #[cfg(target_os = "linux")]
 use vaultwarden_cli::{
-    access::{agent_binding::AgentPairing, direct_request::DirectSubmission},
+    access::{
+        agent_binding::AgentPairing,
+        direct_request::DirectSubmission,
+        policy::{ExecutionProfile, ImageRegistration, OperationPolicyDraft},
+        provisioning::MAX_POLICY_BYTES,
+    },
     adapters::human_socket::{HumanCommand, HumanResponse, exchange},
 };
 
@@ -31,6 +36,16 @@ struct Args {
 #[cfg(target_os = "linux")]
 #[derive(Subcommand)]
 enum Command {
+    /// Register or inspect provider-owned executable images.
+    Image {
+        #[command(subcommand)]
+        command: ImageCommand,
+    },
+    /// Create or inspect protected operation policies.
+    Operation {
+        #[command(subcommand)]
+        command: OperationCommand,
+    },
     /// Submit a signed agent request without a terminal or provider-state access.
     Submit {
         operation: String,
@@ -131,6 +146,62 @@ enum AgentCommand {
         #[arg(allow_hyphen_values = true)]
         id: String,
     },
+}
+#[cfg(target_os = "linux")]
+#[derive(Subcommand)]
+enum ImageCommand {
+    /// Declare behavioral review and verify an immutable executable without running it.
+    Register {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        execution_root: String,
+        #[arg(long)]
+        path: String,
+        #[arg(long)]
+        sha256: String,
+        #[arg(long, value_parser = ["reviewed_self_contained_elf64_v1"])]
+        profile: String,
+    },
+    List,
+    Show {
+        id: String,
+    },
+}
+#[cfg(target_os = "linux")]
+#[derive(Subcommand)]
+enum OperationCommand {
+    /// Read a strict, bounded OperationPolicyDraft JSON file containing metadata only.
+    Create {
+        #[arg(long)]
+        file: PathBuf,
+    },
+    List,
+    Show {
+        id: String,
+    },
+}
+
+#[cfg(target_os = "linux")]
+fn read_policy(path: &std::path::Path) -> Result<OperationPolicyDraft, String> {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|_error| "invalid policy file")?;
+    let metadata = file.metadata().map_err(|_error| "invalid policy file")?;
+    if !metadata.is_file() || metadata.len() > MAX_POLICY_BYTES as u64 {
+        return Err("invalid or oversized policy file".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_POLICY_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_error| "invalid policy file")?;
+    if bytes.len() > MAX_POLICY_BYTES {
+        return Err("invalid or oversized policy file".into());
+    }
+    serde_json::from_slice(&bytes).map_err(|_error| "invalid policy file".into())
 }
 #[cfg(target_os = "linux")]
 fn main() -> ExitCode {
@@ -343,6 +414,38 @@ fn run_agent(command: &Command) -> u8 {
 fn run(args: Args) -> Result<(), String> {
     let state_root = args.state_root.ok_or("provider state root required")?;
     let (command, wait) = match args.command {
+        Command::Image { command } => (
+            match command {
+                ImageCommand::Register {
+                    id,
+                    execution_root,
+                    path,
+                    sha256,
+                    profile: _,
+                } => HumanCommand::ImageRegister {
+                    image: ImageRegistration {
+                        id,
+                        execution_root,
+                        path,
+                        sha256,
+                        profile: ExecutionProfile::ReviewedSelfContainedElf64V1,
+                    },
+                },
+                ImageCommand::List => HumanCommand::ImageList {},
+                ImageCommand::Show { id } => HumanCommand::ImageShow { id },
+            },
+            false,
+        ),
+        Command::Operation { command } => (
+            match command {
+                OperationCommand::Create { file } => HumanCommand::OperationCreate {
+                    policy: Box::new(read_policy(&file)?),
+                },
+                OperationCommand::List => HumanCommand::OperationList {},
+                OperationCommand::Show { id } => HumanCommand::OperationShow { id },
+            },
+            false,
+        ),
         Command::Submit { .. } | Command::Poll { .. } | Command::Wait { .. } => {
             return Err("invalid command".into());
         }
@@ -419,6 +522,7 @@ fn run(args: Args) -> Result<(), String> {
 #[cfg(target_os = "linux")]
 fn reject_error(response: &HumanResponse) -> Result<(), String> {
     match response {
+        HumanResponse::ProvisioningRejected { reason } => Err(reason.to_string()),
         HumanResponse::Rejected { reason } => Err(reason.to_string()),
         HumanResponse::InvalidRequest => Err("invalid request".into()),
         HumanResponse::Unauthorized => Err("unauthorized human".into()),

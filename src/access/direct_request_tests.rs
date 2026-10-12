@@ -137,12 +137,14 @@ fn fixture_with_lifetime(lifetime: Duration) -> Fixture {
     );
     app.authenticate(SensitiveString::new("synthetic-password".into()))
         .unwrap();
-    let path = dir.path().join("provider/provider-state.json");
-    let mut state: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    state["approved_images"] = serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
-    std::fs::write(path, serde_json::to_vec(&state).unwrap()).unwrap();
-    app.activate_operation(operation_draft()).unwrap();
+    app.register_image(
+        app.human_owner(),
+        test_approved_image(dir.path(), "deploy-image").metadata(),
+        &crate::adapters::execution::LinuxExecutablePreparer,
+    )
+    .unwrap();
+    app.create_operation(app.human_owner(), operation_draft())
+        .unwrap();
     Fixture {
         dir,
         app,

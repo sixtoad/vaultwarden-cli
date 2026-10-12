@@ -30,6 +30,9 @@ pub mod protocol;
 mod protocol_tests;
 pub mod provider;
 pub(crate) mod provider_store;
+pub mod provisioning;
+#[cfg(test)]
+mod provisioning_tests;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const MAX_OPERATION_ID_LEN: usize = 64;

@@ -25,6 +25,13 @@ const MAX_ARG_BYTES: usize = 32 * 1024;
 
 pub(crate) struct LinuxExecutablePreparer;
 
+impl crate::access::ports::ImageVerifier for LinuxExecutablePreparer {
+    fn verify(&self, image: ExecutionImage<'_>) -> Result<(), ExecutionError> {
+        self.prepare(image, vec!["registered-image".into()])
+            .map(drop)
+    }
+}
+
 /// Noncloneable bytes capability, deliberately independent of approval authority.
 #[allow(dead_code)] // Consumed by supervised dispatch in Story 1.7.
 pub(crate) struct PreparedExecutable {

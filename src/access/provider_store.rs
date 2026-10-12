@@ -451,10 +451,19 @@ impl ProviderStore {
         self.write_state(&state)?;
         Ok(state)
     }
+    #[cfg(test)]
     pub(crate) fn upsert_operation(
         &mut self,
         state: &ProviderState,
         operation: OperationPolicy,
+    ) -> Result<ProviderState, ProviderError> {
+        self.upsert_operation_guarded(state, operation, || true)
+    }
+    pub(crate) fn upsert_operation_guarded(
+        &mut self,
+        state: &ProviderState,
+        operation: OperationPolicy,
+        still_authorized: impl Fn() -> bool,
     ) -> Result<ProviderState, ProviderError> {
         state.validate()?;
         let mut updated = state.clone();
@@ -468,7 +477,7 @@ impl ProviderStore {
             updated.operations.push(operation);
         }
         updated.validate()?;
-        self.write_state(&updated)?;
+        self.write_state_guarded(&updated, still_authorized)?;
         Ok(updated)
     }
     fn state_path(&self) -> PathBuf {

@@ -1,4 +1,5 @@
 //! Serialized session authority. No adapter or caller can obtain resolved values.
+use super::provisioning::{ProvisioningError, bounded};
 use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider::Provider};
 use std::{
     sync::{
@@ -1652,6 +1653,160 @@ impl ProviderApplication {
     /// Registry validation still precedes eligibility; the backend is held behind
     /// the same gate as unlock, expiry, lock and future scoped consumption.
     pub fn activate_operation(&self, draft: OperationPolicyDraft) -> Result<String, SessionError> {
+        self.provision_operation(draft, false)
+            .map_err(|error| match error {
+                ProvisioningError::Locked => SessionError::Locked,
+                ProvisioningError::Unavailable => SessionError::CleanupFailed,
+                ProvisioningError::Incompatible => SessionError::Incompatible,
+                _ => SessionError::InvalidRequest,
+            })
+    }
+
+    pub fn create_operation(
+        &self,
+        owner: AuthenticatedHuman,
+        draft: OperationPolicyDraft,
+    ) -> Result<super::policy::OperationSummary, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        if serde_json::to_vec(&draft)
+            .map_err(|_error| ProvisioningError::InvalidInput)?
+            .len()
+            > super::provisioning::MAX_POLICY_BYTES
+        {
+            return Err(ProvisioningError::InvalidInput);
+        }
+        let id = draft.id.clone();
+        let image_id = draft.image_id.clone();
+        let revision = self.provision_operation(draft, true)?;
+        Ok(super::policy::OperationSummary {
+            id,
+            image_id,
+            revision,
+        })
+    }
+
+    fn provisioning_result<T>(
+        &self,
+        authority: &mut Authority,
+        result: Result<T, ProvisioningError>,
+    ) -> Result<T, ProvisioningError> {
+        if matches!(result, Err(ProvisioningError::Unavailable)) {
+            self.close_admission();
+            let _ignored = Self::revoke(authority);
+            return result;
+        }
+        if self.revocation_epoch.load(Ordering::Acquire) != authority.session_epoch {
+            Self::revoke(authority)?;
+            return Err(ProvisioningError::Locked);
+        }
+        self.admit(authority)?;
+        result
+    }
+
+    pub(crate) fn register_image(
+        &self,
+        owner: AuthenticatedHuman,
+        input: super::policy::ImageRegistration,
+        verifier: &dyn ImageVerifier,
+    ) -> Result<super::policy::ImageRegistration, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        self.admit(&mut authority)?;
+        let deadline = authority.deadline.ok_or(ProvisioningError::Locked)?;
+        let epoch = authority.session_epoch;
+        if epoch != self.revocation_epoch.load(Ordering::Acquire) {
+            return Err(ProvisioningError::Locked);
+        }
+        let result = authority
+            .provider
+            .register_image(input, verifier, || {
+                !self.closing.load(Ordering::Acquire)
+                    && self.clock.now() < deadline
+                    && self.revocation_epoch.load(Ordering::Acquire) == epoch
+            })
+            .map_err(Into::into);
+        self.provisioning_result(&mut authority, result)
+    }
+
+    pub fn list_images(
+        &self,
+        owner: AuthenticatedHuman,
+    ) -> Result<Vec<super::policy::ImageRegistration>, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(authority.provider.images()?)
+    }
+    pub fn show_image(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::policy::ImageRegistration, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        if !super::valid_operation_id(id) {
+            return Err(ProvisioningError::InvalidInput);
+        }
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(
+            authority
+                .provider
+                .images()?
+                .into_iter()
+                .find(|image| image.id == id)
+                .ok_or(ProvisioningError::NotFound)?,
+        )
+    }
+    pub fn list_operations(
+        &self,
+        owner: AuthenticatedHuman,
+    ) -> Result<Vec<super::policy::OperationSummary>, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(authority.provider.operations()?)
+    }
+    pub fn show_operation(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::policy::OperationMetadata, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        if !super::valid_operation_id(id) {
+            return Err(ProvisioningError::InvalidInput);
+        }
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(
+            authority
+                .provider
+                .operation(id)?
+                .ok_or(ProvisioningError::NotFound)?,
+        )
+    }
+
+    fn provision_operation(
+        &self,
+        draft: OperationPolicyDraft,
+        create_only: bool,
+    ) -> Result<String, ProvisioningError> {
         let mut authority = self
             .gate
             .lock()
@@ -1661,15 +1816,24 @@ impl ProviderApplication {
         self.admit(&mut authority)?;
         probe?;
         let deadline = authority.deadline.ok_or(SessionError::Locked)?;
+        let epoch = authority.session_epoch;
+        if epoch != self.revocation_epoch.load(Ordering::Acquire) {
+            return Err(ProvisioningError::Locked);
+        }
         struct Verifier<'a> {
             backend: std::cell::RefCell<&'a mut dyn SecretBackend>,
             clock: &'a dyn SessionClock,
             deadline: Duration,
             closing: &'a AtomicBool,
+            epoch: u64,
+            revocation_epoch: &'a AtomicU64,
         }
         impl LoginEligibilityVerifier for Verifier<'_> {
             fn is_ssh_eligible(&self, id: &str) -> Result<bool, LoginEligibilityError> {
-                if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
                     return Err(LoginEligibilityError);
                 }
                 let result = self
@@ -1677,7 +1841,10 @@ impl ProviderApplication {
                     .borrow_mut()
                     .ssh_eligible(id)
                     .map_err(|_error| LoginEligibilityError);
-                if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
                     return Err(LoginEligibilityError);
                 }
                 result
@@ -1688,7 +1855,10 @@ impl ProviderApplication {
                 fields: &[super::policy::LoginField],
                 marker: &str,
             ) -> Result<bool, LoginEligibilityError> {
-                if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
                     return Err(LoginEligibilityError);
                 }
                 let result = self
@@ -1700,7 +1870,10 @@ impl ProviderApplication {
                         marker,
                     })
                     .map_err(|_error| LoginEligibilityError);
-                if self.closing.load(Ordering::Acquire) || self.clock.now() >= self.deadline {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
                     return Err(LoginEligibilityError);
                 }
                 result
@@ -1710,20 +1883,26 @@ impl ProviderApplication {
             provider, backend, ..
         } = &mut *authority;
         let result = provider
-            .activate_operation_checked(
+            .provision_operation(
                 draft,
                 &Verifier {
                     backend: std::cell::RefCell::new(backend.as_mut()),
                     clock: self.clock.as_ref(),
                     deadline,
                     closing: &self.closing,
+                    epoch,
+                    revocation_epoch: &self.revocation_epoch,
                 },
-                || !self.closing.load(Ordering::Acquire) && self.clock.now() < deadline,
+                create_only,
+                || {
+                    !self.closing.load(Ordering::Acquire)
+                        && self.clock.now() < deadline
+                        && self.revocation_epoch.load(Ordering::Acquire) == epoch
+                },
             )
-            .map_err(|_error| SessionError::InvalidRequest);
+            .map_err(Into::into);
         // Failed/slow eligibility revokes the session before returning to callers.
-        self.admit(&mut authority)?;
-        result
+        self.provisioning_result(&mut authority, result)
     }
     // No public resolver exists until execution can consume values inside this gate.
     #[allow(dead_code)] // Execution adapter will consume within this private scope in Story 1.7.

@@ -13,6 +13,12 @@ pub(crate) struct ExecutionImage<'a> {
     pub(crate) profile: super::policy::ExecutionProfile,
 }
 
+/// Registration must perform the same preparation as execution, then discard
+/// the prepared capability. This port cannot launch or resolve credentials.
+pub(crate) trait ImageVerifier {
+    fn verify(&self, image: ExecutionImage<'_>) -> Result<(), ExecutionError>;
+}
+
 #[allow(dead_code)]
 /// Preparation owns a noncloneable bytes capability; it grants no approval.
 /// The adapter chooses its opaque resource type, keeping OS handles out of core.
