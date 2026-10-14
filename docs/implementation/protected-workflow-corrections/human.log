@@ -1,0 +1,26 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.23s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+test production_chain ... PASS: preflight; fixed provider unit/runtime absent, real manager and distinct kernel UID available
+PASS: real xdg-open delivered to isolated trusted Firefox
+PASS: synthetic HTTPS vault and private provider bootstrap provisioned
+HUMAN: unlock the disposable provider; instructions and synthetic password are in its private Firefox guide tab (five-minute limit)
+PASS: production daemon unlocked through trusted browser UI
+HUMAN: denied; follow the private Firefox guide and enter the decision yourself (five-minute limit)
+PASS: denied; human decision observed, terminal controls disabled and redacted restricted-agent result
+HUMAN: wrong-password; follow the private Firefox guide and enter the decision yourself (five-minute limit)
+PASS: wrong-password; human decision observed, terminal controls disabled and redacted restricted-agent result
+HUMAN: approved; follow the private Firefox guide and enter the decision yourself (five-minute limit)
+PASS: approved; human decision observed, terminal controls disabled and redacted restricted-agent result
+HUMAN: wrong-field; follow the private Firefox guide and enter the decision yourself (five-minute limit)
+PASS: wrong-field; human decision observed, terminal controls disabled and redacted restricted-agent result
+PASS: agent responses and human history redaction; private service output scanned during cleanup
+Approval evidence: human-operated browser decisions observed
+PASS: bounded private stdout/stderr and redacted observations scanned before deletion
+PASS: owned processes/units/container stopped before private files removed
+PASS: independent post-cleanup resource absence checks
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 104.64s

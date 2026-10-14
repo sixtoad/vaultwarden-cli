@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/agent_submission.rs (target/debug/deps/agent_submission-8e06c15f88694662)
+
+running 1 test
+test real_linux_peer_matrix_and_noninteractive_cli ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 4.15s
+

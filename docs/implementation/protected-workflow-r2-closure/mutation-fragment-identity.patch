@@ -1,0 +1,8 @@
+--- a/src/adapters/loopback_ui.rs
++++ b/src/adapters/loopback_ui.rs
+@@
+-let [capability]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
++let [capability,fragmentRequest]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
+@@
+-if(launch.role==='request')sessionStorage.setItem('vw_request',launch.request_id);
++if(launch.role==='request')sessionStorage.setItem('vw_request',fragmentRequest);

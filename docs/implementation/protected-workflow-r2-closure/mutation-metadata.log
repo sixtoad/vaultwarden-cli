@@ -1,0 +1,19 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.18s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+
+thread 'cleanup_retries_retain_controller_identity_and_reject_uncertain_metadata' (3274011) panicked at tests/protected_rehearsal.rs:323:47:
+called `Result::unwrap()` on an `Err` value: metadata failure accepted as absence
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test cleanup_retries_retain_controller_identity_and_reject_uncertain_metadata ... FAILED
+
+failures:
+
+failures:
+    cleanup_retries_retain_controller_identity_and_reject_uncertain_metadata
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test protected_rehearsal`

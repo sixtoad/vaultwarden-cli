@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: /home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal/src/adapters/loopback_ui.rs
+@@
+-        self.browser_session_index(request, BrowserRole::for_path(&request.path)?)
+-            .map(|index| &self.sessions[index])
++        self.sessions
++            .iter()
++            .find(|session| request.header("x-csrf-token") == Some(session.csrf.expose()))
+*** End Patch

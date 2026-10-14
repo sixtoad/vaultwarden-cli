@@ -158,7 +158,7 @@ jobs:
           VW_UI_DEPS: ${{ github.workspace }}/tests/ui/node_modules
           CERTUTIL: /usr/bin/certutil
           FIREFOX: /usr/bin/firefox
-        run: ./scripts/with-secure-test-tmpdir.sh node tests/ui/direct-request.mjs
+        run: ./scripts/with-secure-test-tmpdir.sh npm test --prefix tests/ui
 
   systemd-integration:
     name: Real systemd (${{ matrix.os }})

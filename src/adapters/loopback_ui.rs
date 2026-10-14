@@ -35,9 +35,30 @@ fn deserialize_password<'de, D: serde::Deserializer<'de>>(
     <String as serde::Deserialize>::deserialize(deserializer).map(SensitiveString::new)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BrowserRole {
+    Provider,
+    Request,
+}
+impl BrowserRole {
+    fn cookie(self) -> &'static str {
+        match self {
+            Self::Provider => "vw_provider_session",
+            Self::Request => "vw_request_session",
+        }
+    }
+    fn for_path(path: &str) -> Option<Self> {
+        match path {
+            "/unlock" | "/lock" | "/provider/history" => Some(Self::Provider),
+            "/approve" | "/deny" | "/review" | "/history" => Some(Self::Request),
+            _ => None,
+        }
+    }
+}
 struct BrowserSession {
     cookie: SensitiveString,
     csrf: SensitiveString,
+    role: BrowserRole,
     decision_generation: u64,
 }
 pub struct LoopbackUi {
@@ -299,7 +320,8 @@ impl LoopbackUi {
             && request.header("origin") == Some(self.origin.as_str())
             && request.header("content-type") == Some("application/json")
             && self.browser_session(request).is_some_and(|session| {
-                request.header("x-csrf-token") == Some(session.csrf.expose())
+                session.role == BrowserRole::Request
+                    && request.header("x-csrf-token") == Some(session.csrf.expose())
                     && app.decision_generation().ok() == Some(session.decision_generation)
             })
     }
@@ -410,22 +432,23 @@ body{font-family:system-ui,sans-serif;max-width:54rem;margin:2rem auto;padding:0
 </style><main><h1>Vaultwarden Access</h1><section aria-labelledby=session-title><h2 id=session-title>Provider session</h2><form id=unlock hidden><label for=password>Master password</label><input id=password type=password autocomplete=current-password required maxlength=4096><button>Unlock for up to 15 minutes</button></form><button id=lock hidden>Lock</button><p id=result role=status aria-live=polite aria-atomic=true>Open the provider desktop launch file.</p></section><section id=review hidden aria-labelledby=review-title><h2 id=review-title>Review one-time request</h2><p>Decide this request once. Approval schedules one protected execution.</p><dl id=details></dl><p id=review-status role=status aria-live=polite aria-atomic=true>Loading request status</p><p id=decision-feedback role=status aria-live=polite aria-atomic=true></p><div id=decisions hidden><button id=deny type=button>Deny request</button><button id=begin-approval type=button>Authenticate and approve once</button><form id=approval hidden><label for=approval-password>Master password for this approval</label><input id=approval-password type=password autocomplete=current-password required maxlength=4096><button id=approve type=submit>Approve once</button><button id=cancel-approval type=button>Cancel authentication</button></form></div><button id=refresh type=button>Refresh request status</button></section><section id=operation-history hidden aria-labelledby=history-title><h2 id=history-title>Operation history</h2><p>Recent redacted lifecycle events, newest first.</p><form id=history-form><label for=history-limit>Number of events</label><input id=history-limit type=number min=1 max=200 value=50 required><button id=history-refresh type=submit>Refresh history</button></form><p id=history-status role=status aria-live=polite aria-atomic=true></p><ol id=history-events></ol></section></main><script>
 (async()=>{
 const result=document.getElementById('result'), input=document.getElementById('password');
-let [capability,requestId]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
+let [capability]=location.hash.slice(1).split(':');history.replaceState(null,'','/');
 if(location.protocol!=='https:')return;
-if(capability){try{await navigator.locks.request('vw-launch',async()=>{const r=await fetch('/launch',{method:'POST',headers:{'Content-Type':'text/plain'},body:capability});capability='';if(!r.ok)throw Error();sessionStorage.setItem('vw_proof',await r.text());if(requestId)sessionStorage.setItem('vw_request',requestId);});}catch{result.textContent='Launch unavailable';return;}}
-const csrf=sessionStorage.getItem('vw_proof');if(!csrf)return;
-requestId=sessionStorage.getItem('vw_request');
+if(capability){try{await navigator.locks.request('vw-launch',async()=>{const r=await fetch('/launch',{method:'POST',headers:{'Content-Type':'text/plain'},body:capability});capability='';if(!r.ok)throw Error();const launch=await r.json();if(!['provider','request'].includes(launch.role))throw Error();sessionStorage.removeItem('vw_provider_proof');sessionStorage.removeItem('vw_request_proof');sessionStorage.setItem('vw_role',launch.role);sessionStorage.setItem('vw_'+launch.role+'_proof',launch.proof);if(launch.role==='request')sessionStorage.setItem('vw_request',launch.request_id);else sessionStorage.removeItem('vw_request');});}catch{result.textContent='Launch unavailable';return;}}
+const role=sessionStorage.getItem('vw_role'),csrf=sessionStorage.getItem(role==='provider'?'vw_provider_proof':'vw_request_proof');if(!csrf||!['provider','request'].includes(role))return;
+const requestId=role==='request'?sessionStorage.getItem('vw_request'):null,historyPath=role==='provider'?'/provider/history':'/history';
 document.getElementById('operation-history').hidden=false;
-document.getElementById('unlock').hidden=false;document.getElementById('lock').hidden=false;result.textContent='Ready for an action';
+if(requestId){document.getElementById('unlock').remove();document.getElementById('lock').remove();document.getElementById('session-title').textContent='Request approval';result.textContent='Use the decisions below. The password for this approval belongs only in Authenticate and approve once.';}
+else{document.getElementById('unlock').hidden=false;document.getElementById('lock').hidden=false;result.textContent='Unlocking again or locking resets the provider session and invalidates pending requests. Finish pending decisions before resetting; invalidated requests need a new submission.';}
 let mutations=Promise.resolve(),pendingMutations=0;
 function act(path,password){input.value='';pendingMutations++;resetHistory();const run=async()=>{try{const body=JSON.stringify({password});password='';let r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});result.textContent='Last action result: '+await r.text();if(requestId)await review();}catch{password='';result.textContent='Last action result: Provider unavailable';}finally{pendingMutations--;resetHistory();}};mutations=mutations.then(run,run);}
-document.getElementById('unlock').onsubmit=e=>{e.preventDefault();act('/unlock',input.value)};document.getElementById('lock').onclick=()=>act('/lock','');
+if(!requestId){document.getElementById('unlock').onsubmit=e=>{e.preventDefault();act('/unlock',input.value)};document.getElementById('lock').onclick=()=>act('/lock','');const warning=document.createElement('p');warning.id='session-warning';warning.textContent=result.textContent;result.before(warning);result.textContent='Ready for an action';}
 let reviewRequest=null,reviewEpoch=0,timer,detailsReady=false,retryDelay=1000,deciding=false,retired=false;
 const decisions=document.getElementById('decisions'),approval=document.getElementById('approval'),approvalPassword=document.getElementById('approval-password'),beginApproval=document.getElementById('begin-approval'),refresh=document.getElementById('refresh'),feedback=document.getElementById('decision-feedback');
 function showFeedback(text){if(!retired)feedback.textContent=text;}
 function decisionControls(unavailable){if(unavailable&&decisions.contains(document.activeElement))refresh.focus();decisions.querySelectorAll('button,input').forEach(control=>control.disabled=unavailable);}
 function invalidateReview(){reviewEpoch++;reviewRequest=null;clearTimeout(timer);}
-function retireSession(){retired=true;resetHistory();approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired. Reopen this request from a fresh launch to continue.';showStatus('Request status unavailable for this browser session.');}
+function retireSession(){retired=true;resetHistory();approvalPassword.value='';decisionControls(true);approval.hidden=true;document.querySelectorAll('#unlock button,#unlock input,#lock').forEach(control=>control.disabled=true);feedback.textContent='Browser session retired or request unavailable. Check the authoritative request status before submitting again: this operation may already have run. If expired or invalidated, obtain a fresh request after the provider is ready. A fresh launch is required for renewed browser access.';showStatus('Request status unavailable for this browser session.');}
 beginApproval.onclick=()=>{approval.hidden=false;approvalPassword.focus();};
 document.getElementById('cancel-approval').onclick=()=>{approvalPassword.value='';approval.hidden=true;showFeedback('Authentication form cancelled.');beginApproval.focus();review(true);};
 async function decide(path,password){approvalPassword.value='';deciding=true;invalidateReview();decisionControls(true);showFeedback('Submitting decision.');try{const body=JSON.stringify(path==='/approve'?{request_id:requestId,password}:{request_id:requestId});password='';const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body});showFeedback(response.ok?'Decision submitted. See the current request status below.':'Decision rejected. Check the request status below.');}catch{password='';showFeedback('Decision response unavailable. Request status below is authoritative; do not resubmit.');}finally{approval.hidden=true;deciding=false;await review(true);refresh.focus();}}
@@ -433,13 +456,13 @@ approval.onsubmit=e=>{e.preventDefault();decide('/approve',approvalPassword.valu
 function showStatus(text){const status=document.getElementById('review-status');if(status.textContent!==text)status.textContent=text;}
 function sshDetails(ssh){return ssh?[['SSH host',ssh.destination.host],['SSH port',ssh.destination.port],['SSH user',ssh.destination.user],['Resource path',ssh.destination.resource_path],['Pinned host fingerprint',ssh.destination.host_fingerprint],['Working directory',ssh.working_directory]]:[];}
 function renderDetails(value){const details=document.getElementById('details');for(const [name,text] of [['Request ID',value.id],['Requester',value.requester],['Operation',value.operation],['Effect',value.effect],['Target',value.target],...sshDetails(value.ssh),['Permitted arguments',value.arguments],['Credentials and use types',value.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Executable digest',value.executable_digest],['Policy digest',value.policy_digest],['Arguments digest',value.arguments_digest],['Expires at',new Date(value.expires_at_unix_seconds*1000).toISOString()],['One-time meaning',value.one_time]]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;if(Array.isArray(text)){const values=document.createElement('ol');values.id='arguments';for(const [index,value] of text.entries()){const item=document.createElement('li');item.setAttribute('aria-label','Argument '+(index+1));item.textContent=value;values.append(item);}dd.append(values);}else{dd.textContent=text;}details.append(dt,dd);}detailsReady=true;}
-async function review(force=false){if(force)invalidateReview();if(reviewRequest)return;const request={epoch:reviewEpoch};reviewRequest=request;clearTimeout(timer);let delay=0;const current=()=>reviewRequest===request&&request.epoch===reviewEpoch;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!current())return;if([400,401,403,404].includes(r.status)){retireSession();return;}if(!r.ok)throw Error();const value=await r.json();if(!current()||retired)return;if(!detailsReady)renderDetails(value);const state=value.status.status;decisions.hidden=false;decisionControls(deciding||state!=='pending');if(state!=='pending'){approvalPassword.value='';approval.hidden=true;}showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:state==='approved'?'; approved once; awaiting protected execution':state==='denied'?'; no operation will run':''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{if(current()&&!retired){showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}}finally{if(current()){reviewRequest=null;if(delay&&!retired)timer=setTimeout(review,delay);}}}
+async function review(force=false){if(force)invalidateReview();if(reviewRequest)return;const request={epoch:reviewEpoch};reviewRequest=request;clearTimeout(timer);let delay=0;const current=()=>reviewRequest===request&&request.epoch===reviewEpoch;try{const r=await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({request_id:requestId})});if(!current())return;if([400,401,403,404].includes(r.status)){retireSession();return;}if(!r.ok)throw Error();const value=await r.json();if(!current()||retired)return;if(!detailsReady)renderDetails(value);const state=value.status.status;decisions.hidden=false;decisionControls(deciding||state!=='pending');if(state!=='pending'){approvalPassword.value='';approval.hidden=true;}if(state==='expired')feedback.textContent='This request expired or was invalidated by a provider-session reset. It can no longer run. Wait until the provider is ready, then ask the requester to submit a fresh request.';showStatus('Request status: '+state+(state==='completed'?'; exit code: '+value.status.exit_code:state==='failed'?'; reason: '+value.status.reason:state==='approved'?'; approved once; awaiting protected execution':state==='denied'?'; no operation will run':''));retryDelay=1000;if(['pending','approved','running'].includes(state))delay=1000;}catch{if(current()&&!retired){showStatus('Request status unavailable; retrying');delay=retryDelay;retryDelay=Math.min(retryDelay*2,8000);}}finally{if(current()){reviewRequest=null;if(delay&&!retired)timer=setTimeout(review,delay);}}}
 function visibleText(value){return String(value).replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b\u2060\ufeff\u200e\u200f\u2028-\u202e\u2066-\u2069]/gu,c=>'\\u'+c.codePointAt(0).toString(16).padStart(4,'0'));}
 function historyTime(value){if(value===null)return 'Unknown (legacy record)';const date=new Date(value*1000);return Number.isNaN(date.getTime())?String(value)+' Unix seconds':date.toISOString();}
 let historyLoading=false,historyEpoch=0;
 const historyFailure='History unavailable. Try fewer events, reopen a fresh provider launch to authenticate, or check provider availability.';
 function resetHistory(){historyEpoch++;historyLoading=false;document.getElementById('history-events').replaceChildren();document.querySelectorAll('#history-form button,#history-form input').forEach(control=>control.disabled=retired||pendingMutations>0);document.getElementById('history-status').textContent=retired?'History unavailable for this retired browser session.':pendingMutations?'History unavailable while a provider action is pending.':'Refresh history to read current events.';}
-async function loadHistory(){if(historyLoading||retired||pendingMutations)return;historyLoading=true;const epoch=historyEpoch,rows=document.getElementById('history-events'),status=document.getElementById('history-status'),button=document.getElementById('history-refresh');rows.replaceChildren();button.disabled=true;status.textContent='Loading history';const controller=new AbortController();let deadlineTimer;const deadline=new Promise((_,reject)=>{deadlineTimer=setTimeout(()=>{controller.abort();reject(Error());},15000);});try{const limit=Number(document.getElementById('history-limit').value);if(!Number.isInteger(limit)||limit<1||limit>200)throw Error();const events=await Promise.race([(async()=>{const response=await fetch('/history',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({limit}),signal:controller.signal});if(!response.ok)throw Error();return response.json();})(),deadline]);if(epoch!==historyEpoch)return;for(const event of events){const item=document.createElement('li'),details=document.createElement('dl');const requester=event.requester;for(const [name,value] of [['Request ID',event.request_id],['Operation',event.operation],['Requester',requester.label],['Requester kind',requester.kind],['Requester identity',requester.kind==='human'?requester.uid:requester.fingerprint],['Policy revision',event.policy_revision],...sshDetails(event.ssh),['Credentials and use types',event.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Created at',historyTime(event.created_at_unix_seconds)],['Expires at',historyTime(event.expires_at_unix_seconds)],['Event time',historyTime(event.at_unix_seconds)],['Event ordinal',event.ordinal],['Outcome',event.outcome],['Status',event.status===null?'Unknown (legacy record)':JSON.stringify(event.status)]]){const term=document.createElement('dt'),description=document.createElement('dd');term.textContent=name;description.textContent=visibleText(value);details.append(term,description);}item.append(details);rows.append(item);}status.textContent=events.length?events.length+' history events shown.':'No operation history.';}catch{if(epoch===historyEpoch){rows.replaceChildren();status.textContent=historyFailure;}}finally{clearTimeout(deadlineTimer);if(epoch===historyEpoch){button.disabled=false;historyLoading=false;}}}
+async function loadHistory(){if(historyLoading||retired||pendingMutations)return;historyLoading=true;const epoch=historyEpoch,rows=document.getElementById('history-events'),status=document.getElementById('history-status'),button=document.getElementById('history-refresh');rows.replaceChildren();button.disabled=true;status.textContent='Loading history';const controller=new AbortController();let deadlineTimer;const deadline=new Promise((_,reject)=>{deadlineTimer=setTimeout(()=>{controller.abort();reject(Error());},15000);});try{const limit=Number(document.getElementById('history-limit').value);if(!Number.isInteger(limit)||limit<1||limit>200)throw Error();const events=await Promise.race([(async()=>{const response=await fetch(historyPath,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({limit}),signal:controller.signal});if(!response.ok)throw Error();return response.json();})(),deadline]);if(epoch!==historyEpoch)return;for(const event of events){const item=document.createElement('li'),details=document.createElement('dl');const requester=event.requester;for(const [name,value] of [['Request ID',event.request_id],['Operation',event.operation],['Requester',requester.label],['Requester kind',requester.kind],['Requester identity',requester.kind==='human'?requester.uid:requester.fingerprint],['Policy revision',event.policy_revision],...sshDetails(event.ssh),['Credentials and use types',event.credentials.map(c=>c.label+' ('+c.use_type+')').join(' · ')],['Created at',historyTime(event.created_at_unix_seconds)],['Expires at',historyTime(event.expires_at_unix_seconds)],['Event time',historyTime(event.at_unix_seconds)],['Event ordinal',event.ordinal],['Outcome',event.outcome],['Status',event.status===null?'Unknown (legacy record)':JSON.stringify(event.status)]]){const term=document.createElement('dt'),description=document.createElement('dd');term.textContent=name;description.textContent=visibleText(value);details.append(term,description);}item.append(details);rows.append(item);}status.textContent=events.length?events.length+' history events shown.':'No operation history.';}catch{if(epoch===historyEpoch){rows.replaceChildren();status.textContent=historyFailure;}}finally{clearTimeout(deadlineTimer);if(epoch===historyEpoch){button.disabled=false;historyLoading=false;}}}
 document.getElementById('history-form').onsubmit=event=>{event.preventDefault();loadHistory();};
 void loadHistory();
 if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=>review();void review();}
@@ -452,12 +475,23 @@ if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=
             if request.header("content-type") != Some("text/plain") {
                 return Response::denied();
             }
-            if self
+            if let Some(cookies) = request.header("cookie") {
+                let mut names = std::collections::HashSet::new();
+                if cookies.split(';').any(|pair| {
+                    pair.trim().split_once('=').is_none_or(|(name, value)| {
+                        name.is_empty() || value.is_empty() || !names.insert(name)
+                    })
+                }) {
+                    return Response::denied();
+                }
+            }
+            let (role, request_id) = if self
                 .launch
                 .as_ref()
                 .is_some_and(|launch| request.body.as_slice() == launch.expose().as_bytes())
             {
                 self.launch = None;
+                (BrowserRole::Provider, None)
             } else {
                 let Some(launch) = self.broker.take(&request.body) else {
                     return Response::denied();
@@ -468,44 +502,50 @@ if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=
                 ) {
                     return Response::denied();
                 }
-            }
+                (BrowserRole::Request, Some(launch.request_id.clone()))
+            };
             let Ok(decision_generation) = app.decision_generation() else {
                 return Response::denied();
             };
-            let existing_session = self.browser_session_index(&request);
+            let existing_session = self.browser_session_index(&request, role);
             if let Some(index) = existing_session
-                && self.sessions[index].decision_generation == decision_generation
+                && (role == BrowserRole::Provider
+                    || self.sessions[index].decision_generation == decision_generation)
             {
-                return Response::text(self.sessions[index].csrf.expose());
+                return Self::launch_response(&self.sessions[index], request_id.as_deref(), None);
             }
-            if existing_session.is_none() && self.sessions.len() >= MAX_BROWSER_SESSIONS {
+            if existing_session.is_none()
+                && self
+                    .sessions
+                    .iter()
+                    .filter(|session| session.role == role)
+                    .count()
+                    >= MAX_BROWSER_SESSIONS
+            {
                 return Response::denied();
             }
             let (Ok(cookie), Ok(csrf)) = (random(), random()) else {
                 return Response::denied();
             };
             let header = format!(
-                "vw_session={}; Secure; HttpOnly; SameSite=Strict; Path=/",
+                "{}={}; Secure; HttpOnly; SameSite=Strict; Path=/",
+                role.cookie(),
                 cookie.expose()
             );
-            let proof = csrf.expose().to_owned();
             let session = BrowserSession {
                 cookie,
                 csrf,
+                role,
                 decision_generation,
             };
+            let response = Self::launch_response(&session, request_id.as_deref(), Some(header));
             if let Some(index) = existing_session {
                 // A recognized browser rotates its proof without consuming another slot.
                 self.sessions[index] = session;
             } else {
                 self.sessions.push(session);
             }
-            return Response {
-                status: 200,
-                body: proof,
-                cookie: Some(header),
-                html: false,
-            };
+            return response;
         }
         if !self.authenticated(&request)
             || request.header("x-csrf-token")
@@ -514,25 +554,35 @@ if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=
         {
             return Response::denied();
         }
-        if request.path == "/history" {
+        if request.path == "/history" || request.path == "/provider/history" {
             let Ok(input) = serde_json::from_slice::<HistoryInput>(&request.body) else {
                 return Response::denied();
             };
             let Some(session) = self.browser_session(&request) else {
                 return Response::denied();
             };
-            return match app.browser_history(session.decision_generation, input.limit) {
+            let events = match session.role {
+                BrowserRole::Provider => app.history(app.human_owner(), input.limit),
+                BrowserRole::Request => {
+                    app.browser_history(session.decision_generation, input.limit)
+                }
+            };
+            return match events {
                 Ok(events) => Response::history_json(&events),
                 Err(_) => Response::denied(),
             };
         }
         if request.path == "/review" {
+            if !self.decision_authorized(&request, app) {
+                return Response::denied();
+            }
             let Ok(input) = serde_json::from_slice::<ReviewInput>(&request.body) else {
                 return Response::denied();
             };
             return match app
                 .review_direct(app.human_owner(), &input.request_id)
                 .ok()
+                .filter(|_| self.decision_authorized(&request, app))
                 .and_then(|review| serde_json::to_string(&review).ok())
             {
                 Some(body) => Response::text(&body),
@@ -586,24 +636,41 @@ if(requestId){document.getElementById('review').hidden=false;refresh.onclick=()=
         self.browser_session(request).is_some()
     }
     fn browser_session(&self, request: &Request) -> Option<&BrowserSession> {
-        self.browser_session_index(request)
+        self.browser_session_index(request, BrowserRole::for_path(&request.path)?)
             .map(|index| &self.sessions[index])
     }
-    fn browser_session_index(&self, request: &Request) -> Option<usize> {
+    fn launch_response(
+        session: &BrowserSession,
+        request_id: Option<&str>,
+        cookie: Option<String>,
+    ) -> Response {
+        let mut response = Response::text(
+            &serde_json::json!({
+                "role": if session.role == BrowserRole::Provider { "provider" } else { "request" },
+                "proof": session.csrf.expose(),
+                "request_id": request_id,
+            })
+            .to_string(),
+        );
+        response.cookie = cookie;
+        response
+    }
+    fn browser_session_index(&self, request: &Request, role: BrowserRole) -> Option<usize> {
         let cookies = request.header("cookie")?;
         let mut found = None;
+        let mut names = std::collections::HashSet::new();
         for pair in cookies.split(';') {
             let (name, value) = pair.trim().split_once('=')?;
-            if name == "vw_session" {
-                if found.is_some() {
-                    return None;
-                }
+            if name.is_empty() || value.is_empty() || !names.insert(name) {
+                return None;
+            }
+            if name == role.cookie() {
                 found = Some(value);
             }
         }
         self.sessions
             .iter()
-            .position(|session| found == Some(session.cookie.expose()))
+            .position(|session| session.role == role && found == Some(session.cookie.expose()))
     }
 }
 
@@ -1036,10 +1103,28 @@ mod tests {
             ("origin".into(), ui.origin.clone()),
             ("content-type".into(), "application/json".into()),
         ];
-        if let Some(session) = ui.sessions.last() {
+        let role = BrowserRole::for_path(path).unwrap_or(BrowserRole::Request);
+        if let Some(session) = ui
+            .sessions
+            .iter()
+            .rev()
+            .find(|session| session.role == role)
+        {
             headers.push((
                 "cookie".into(),
-                format!("vw_session={}", session.cookie.expose()),
+                ui.sessions
+                    .iter()
+                    .map(|s| format!("{}={}", s.role.cookie(), s.cookie.expose()))
+                    .rev()
+                    .fold(Vec::<String>::new(), |mut pairs, pair| {
+                        if !pairs.iter().any(|p| {
+                            p.split_once('=').unwrap().0 == pair.split_once('=').unwrap().0
+                        }) {
+                            pairs.push(pair);
+                        }
+                        pairs
+                    })
+                    .join("; "),
             ));
             headers.push(("x-csrf-token".into(), session.csrf.expose().into()));
         }
@@ -1470,7 +1555,10 @@ mod tests {
     fn cookie_only_pages_never_recover_proof_and_cookie_pairs_are_unambiguous() {
         let (_dir, mut ui, app, calls) = fixture();
         let launch = launch(&mut ui, &app);
-        let proof = launch.body;
+        let proof = serde_json::from_str::<serde_json::Value>(&launch.body).unwrap()["proof"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         assert_eq!(proof.len(), 43);
         let mut get = request(&ui, "/", "");
         get.method = "GET".into();
@@ -1478,7 +1566,7 @@ mod tests {
         let page = ui.handle(get, &app);
         assert_eq!(page.status, 200);
         assert!(!page.body.contains(&proof));
-        assert!(page.body.contains("sessionStorage.getItem('vw_proof')"));
+        assert!(page.body.contains("sessionStorage.getItem('vw_role')"));
         assert!(
             page.body
                 .contains("function act(path,password){input.value='';")
@@ -1489,9 +1577,9 @@ mod tests {
         let cookie = request.header("cookie").unwrap().to_owned();
         for value in [
             format!("other=ok; {cookie}; preference=value"),
-            format!("{cookie}; vw_session=bad"),
-            format!("vw_session=bad; {cookie}"),
-            "vw_session".into(),
+            format!("{cookie}; vw_provider_session=bad"),
+            format!("vw_provider_session=bad; {cookie}"),
+            "vw_provider_session".into(),
         ] {
             request
                 .headers
@@ -1547,7 +1635,7 @@ mod tests {
         for (key, value) in [
             ("host", "evil.test"),
             ("origin", "http://evil.test"),
-            ("cookie", "vw_session=wrong"),
+            ("cookie", "vw_request_session=wrong"),
             ("x-csrf-token", "wrong"),
             ("content-type", "text/plain"),
         ] {
@@ -1700,6 +1788,66 @@ mod tests {
     }
 
     #[test]
+    fn launch_cookie_prevalidation_preserves_both_role_capabilities() {
+        use crate::access::direct_request_tests;
+        for provider in [true, false] {
+            for cookie in [
+                "vw_provider_session",
+                "vw_request_session",
+                "vw_provider_session=a; vw_provider_session=b",
+                "vw_request_session=a; vw_request_session=b",
+            ] {
+                let f = direct_request_tests::fixture();
+                let root = f.dir.path().join("provider");
+                let (cert, key) = identity(&root);
+                let mut ui = LoopbackUi::bind(&root.join("launch.html"), &cert, &key).unwrap();
+                Arc::get_mut(&mut ui.broker).unwrap().desktop = Box::new(FakeDesktop {
+                    fail: false,
+                    observed: Arc::new(Mutex::new(Vec::new())),
+                });
+                let capability = if provider {
+                    ui.launch.as_ref().unwrap().expose().to_owned()
+                } else {
+                    f.app
+                        .submit_direct(
+                            f.app.human_owner(),
+                            direct_request_tests::input(),
+                            ui.request_launcher().as_ref(),
+                        )
+                        .unwrap();
+                    ui.broker.pending.lock().unwrap()[0]
+                        .capability
+                        .expose()
+                        .to_owned()
+                };
+                let exchange = |ui: &LoopbackUi, cookie: Option<&str>| {
+                    let mut req = request(ui, "/launch", &capability);
+                    req.headers.retain(|(name, _)| name != "cookie");
+                    req.headers
+                        .iter_mut()
+                        .find(|(name, _)| name == "content-type")
+                        .unwrap()
+                        .1 = "text/plain".into();
+                    if let Some(cookie) = cookie {
+                        req.headers.push(("cookie".into(), cookie.into()));
+                    }
+                    req
+                };
+                assert_eq!(ui.handle(exchange(&ui, Some(cookie)), &f.app).status, 403);
+                assert!(ui.sessions.is_empty());
+                let reply = ui.handle(exchange(&ui, None), &f.app);
+                assert_eq!(
+                    reply.status, 200,
+                    "malformed cookie consumed launch capability"
+                );
+                let reply: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
+                assert_eq!(reply["role"], if provider { "provider" } else { "request" });
+                assert_eq!(ui.handle(exchange(&ui, None), &f.app).status, 403);
+            }
+        }
+    }
+
+    #[test]
     fn pending_request_exchange_review_expiry_and_prune_are_authenticated() {
         use crate::access::{direct_request::DirectReview, direct_request_tests};
         let fixture = direct_request_tests::fixture();
@@ -1772,12 +1920,117 @@ mod tests {
         assert!(ui.broker.pending.lock().unwrap().is_empty());
         fixture.app.lock().unwrap();
         let review = ui.handle(request(&ui, "/review", &body), &fixture.app);
-        assert_eq!(review.status, 200);
-        assert_eq!(
-            serde_json::from_str::<DirectReview>(&review.body)
-                .unwrap()
+        assert_eq!(review.status, 403);
+    }
+
+    #[test]
+    fn roles_reject_opposite_endpoints_even_with_both_cookies_and_provider_survives_resets() {
+        let (f, ui, id) = decision_fixture(Arc::new(ApprovalCheck(AtomicUsize::new(0))));
+        let mut guard = ui.lock().unwrap();
+        let ui = &mut *guard;
+        let provider_proof = ui
+            .sessions
+            .iter()
+            .find(|s| s.role == BrowserRole::Provider)
+            .unwrap()
+            .csrf
+            .expose()
+            .to_owned();
+        let request_proof = ui
+            .sessions
+            .iter()
+            .find(|s| s.role == BrowserRole::Request)
+            .unwrap()
+            .csrf
+            .expose()
+            .to_owned();
+        for (paths, opposite) in [
+            (vec!["/unlock", "/lock", "/provider/history"], request_proof),
+            (
+                vec!["/review", "/history", "/deny", "/approve"],
+                provider_proof.clone(),
+            ),
+        ] {
+            for path in paths {
+                let body = match path {
+                    "/unlock" => serde_json::json!({"password":"synthetic"}),
+                    "/approve" => {
+                        serde_json::json!({"request_id":id,"password":"approval-sentinel"})
+                    }
+                    "/review" | "/deny" => serde_json::json!({"request_id":id}),
+                    _ => serde_json::json!({}),
+                }
+                .to_string();
+                let mut req = request(ui, path, &body);
+                assert!(
+                    req.header("cookie")
+                        .unwrap()
+                        .contains("vw_provider_session=")
+                );
+                assert!(
+                    req.header("cookie")
+                        .unwrap()
+                        .contains("vw_request_session=")
+                );
+                req.headers
+                    .iter_mut()
+                    .find(|(k, _)| k == "x-csrf-token")
+                    .unwrap()
+                    .1 = opposite.clone();
+                if path == "/approve" {
+                    assert!(!ui.decision_authorized(&req, &f.app));
+                }
+                assert_eq!(ui.handle(req, &f.app).status, 403, "{path}");
+            }
+        }
+        for reset in ["/lock", "/unlock", "/unlock"] {
+            assert_eq!(
+                ui.handle(request(ui, reset, r#"{"password":"synthetic"}"#), &f.app)
+                    .status,
+                200
+            );
+            assert_eq!(
+                ui.handle(request(ui, "/provider/history", "{}"), &f.app)
+                    .status,
+                200
+            );
+            assert_eq!(ui.handle(request(ui, "/history", "{}"), &f.app).status, 403);
+            assert_eq!(
+                ui.handle(
+                    request(
+                        ui,
+                        "/review",
+                        &serde_json::json!({"request_id":id}).to_string()
+                    ),
+                    &f.app
+                )
                 .status,
-            DirectStatus::Expired
+                403
+            );
+            assert_eq!(
+                ui.sessions
+                    .iter()
+                    .find(|s| s.role == BrowserRole::Provider)
+                    .unwrap()
+                    .csrf
+                    .expose(),
+                provider_proof
+            );
+        }
+        f.monotonic.store(1000, Ordering::SeqCst);
+        assert_eq!(f.app.status(), Ok(SessionStatus::Locked));
+        assert_eq!(
+            ui.handle(request(ui, "/provider/history", "{}"), &f.app)
+                .status,
+            200
+        );
+        assert_eq!(
+            ui.handle(
+                request(ui, "/unlock", r#"{"password":"synthetic"}"#),
+                &f.app
+            )
+            .status,
+            200
         );
     }
 
@@ -1810,6 +2063,7 @@ mod tests {
                 "cross_session" => {
                     let wrong = random().unwrap();
                     ui.sessions.push(BrowserSession {
+                        role: BrowserRole::Request,
                         cookie: random().unwrap(),
                         csrf: wrong,
                         decision_generation: f.app.decision_generation().unwrap(),
@@ -1880,7 +2134,7 @@ mod tests {
             .unwrap()
             .1 = "text/plain".into();
         assert_eq!(ui.handle(launch, &f.app).status, 200);
-        let current = request(&ui, "/history", "{}");
+        let current = request(&ui, "/provider/history", "{}");
         let response = ui.handle(current, &f.app);
         assert_eq!(response.status, 200);
         let events: Vec<crate::access::history::HistoryEvent> =
@@ -1915,16 +2169,24 @@ mod tests {
         let mut ui = LoopbackUi::bind(&root.join("launch.html"), &cert, &key)
             .unwrap()
             .with_approval_authenticator(authenticator);
+        Arc::get_mut(&mut ui.broker).unwrap().desktop = Box::new(FakeDesktop {
+            fail: false,
+            observed: Arc::new(Mutex::new(Vec::new())),
+        });
         let id = f
             .app
             .submit_direct(
                 f.app.human_owner(),
                 crate::access::direct_request_tests::input(),
-                &crate::access::direct_request_tests::Launcher::default(),
+                ui.request_launcher().as_ref(),
             )
             .unwrap()
             .id;
-        let mut exchange = request(&ui, "/launch", ui.launch.as_ref().unwrap().expose());
+        let capability = ui.broker.pending.lock().unwrap()[0]
+            .capability
+            .expose()
+            .to_owned();
+        let mut exchange = request(&ui, "/launch", &capability);
         exchange
             .headers
             .iter_mut()
@@ -1932,6 +2194,7 @@ mod tests {
             .unwrap()
             .1 = "text/plain".into();
         assert_eq!(ui.handle(exchange, &f.app).status, 200);
+        assert_eq!(launch(&mut ui, &f.app).status, 200);
         (f, Arc::new(Mutex::new(ui)), id)
     }
     struct ApprovalCheck(AtomicUsize);
@@ -2019,6 +2282,7 @@ mod tests {
                         .unwrap()
                         .id;
                     locked.sessions.push(BrowserSession {
+                        role: BrowserRole::Request,
                         cookie: random().unwrap(),
                         csrf: random().unwrap(),
                         decision_generation: f.app.decision_generation().unwrap(),
@@ -2026,6 +2290,7 @@ mod tests {
                 }
                 if case == "cross_session" {
                     locked.sessions.push(BrowserSession {
+                        role: BrowserRole::Request,
                         cookie: random().unwrap(),
                         csrf: random().unwrap(),
                         decision_generation: f.app.decision_generation().unwrap(),
@@ -2047,7 +2312,7 @@ mod tests {
                             .iter_mut()
                             .find(|(k, _)| k == "cookie")
                             .unwrap()
-                            .1 = format!("vw_session={old_cookie}");
+                            .1 = format!("vw_request_session={old_cookie}");
                         req.headers
                             .iter_mut()
                             .find(|(k, _)| k == "x-csrf-token")
@@ -2056,12 +2321,14 @@ mod tests {
                     }
                     _ => {
                         let (key, value) = match case {
-                            "cookie_wrong" => ("cookie", "vw_session=wrong".into()),
+                            "cookie_wrong" => ("cookie", "vw_request_session=wrong".into()),
                             "csrf_wrong" => ("x-csrf-token", "wrong".into()),
                             "host" => ("host", "attacker.invalid".into()),
                             "origin" => ("origin", "https://attacker.invalid".into()),
                             "content_type" => ("content-type", "text/plain".into()),
-                            "cookie_stale" => ("cookie", format!("vw_session={old_cookie}")),
+                            "cookie_stale" => {
+                                ("cookie", format!("vw_request_session={old_cookie}"))
+                            }
                             "csrf_stale" | "cross_session" => ("x-csrf-token", old_csrf.clone()),
                             _ => panic!("unknown test case"),
                         };
@@ -2172,7 +2439,11 @@ mod tests {
                 assert_eq!(LoopbackUi::dispatch(&ui, req, &f.app).status, 200);
             } else {
                 let mut locked = ui.lock().unwrap();
-                let session = locked.sessions.last_mut().unwrap();
+                let session = locked
+                    .sessions
+                    .iter_mut()
+                    .find(|s| s.role == BrowserRole::Request)
+                    .unwrap();
                 match action {
                     "rotate_cookie" => session.cookie = random().unwrap(),
                     "rotate_csrf" => session.csrf = random().unwrap(),
@@ -2239,7 +2510,7 @@ mod tests {
             let response = ui.handle(exchange, &f.app);
             assert_eq!(response.status, 200);
             assert!(response.cookie.is_some());
-            assert_eq!(ui.sessions.len(), 1);
+            assert_eq!(ui.sessions.len(), 2);
             last_id = receipt.id;
         }
         let review_request = request(

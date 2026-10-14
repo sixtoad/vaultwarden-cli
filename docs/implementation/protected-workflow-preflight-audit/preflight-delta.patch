@@ -1,0 +1,132 @@
+diff --git a/scripts/rehearse-protected-workflow.sh b/scripts/rehearse-protected-workflow.sh
+index 5650a7e..e19ee10 100755
+--- a/scripts/rehearse-protected-workflow.sh
++++ b/scripts/rehearse-protected-workflow.sh
+@@ -2,12 +2,18 @@
+ # No passwords, tokens, UI capabilities, or private keys are shell arguments.
+ set -euo pipefail
+ umask 077
+-repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
++for dependency in /usr/bin/dirname /usr/bin/uname; do
++    [[ -f "$dependency" && -x "$dependency" ]] || { echo "FAIL: missing prerequisite $dependency"; exit 2; }
++done
++repo="$(cd -- "$(/usr/bin/dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+ mode="${1:---check}"
+ case "$mode" in --check|--automated|--human|--human-check|--interrupt|--cleanup-failure|--collision-check) ;; *) echo 'usage: rehearse-protected-workflow.sh [--check|--automated|--human|--human-check|--interrupt|--cleanup-failure|--collision-check]' >&2; exit 2;; esac
+ [[ $# -le 1 ]] || exit 2
+-[[ "$(uname -s)" == Linux ]] || { echo 'FAIL: Linux required'; exit 2; }
+-case "$(uname -m)" in x86_64|aarch64) ;; *) echo 'FAIL: unsupported architecture'; exit 2;; esac
++[[ "$(/usr/bin/uname -s)" == Linux ]] || { echo 'FAIL: Linux required'; exit 2; }
++case "$(/usr/bin/uname -m)" in x86_64|aarch64) ;; *) echo 'FAIL: unsupported architecture'; exit 2;; esac
++for tool in cargo node; do
++    command -v "$tool" >/dev/null || { echo "FAIL: missing prerequisite $tool"; exit 2; }
++done
+ # These paths are dependencies, never command snippets. Nothing is installed.
+ export VW_REHEARSAL_XVFB="${VW_REHEARSAL_XVFB:-/usr/bin/Xvfb}"
+ export VW_REHEARSAL_CERTUTIL="${VW_REHEARSAL_CERTUTIL:-/usr/bin/certutil}"
+@@ -20,8 +26,10 @@ if [[ "$mode" != --human && "$mode" != --human-check ]]; then desktop_dependenci
+ for dependency in "${desktop_dependencies[@]}"; do
+     [[ "$dependency" == /* && -x "$dependency" ]] || { echo 'FAIL: private desktop dependency unavailable'; exit 2; }
+ done
+-for tool in cargo node cc openssl docker systemctl systemd-run unshare newuidmap newgidmap dbus-daemon gnome-keyring-daemon secret-tool gdbus setpriv xdg-open journalctl xauth timeout id cat env true sleep rm; do
+-    command -v "$tool" >/dev/null || { echo "FAIL: missing prerequisite $tool"; exit 2; }
++# Check the paths actually invoked by the harness/browser, including the
++# external test binary (command -v test would accept Bash's builtin).
++for dependency in /bin/bash /bin/sh /bin/rm /usr/bin/{cc,openssl,docker,systemctl,systemd-run,unshare,newuidmap,newgidmap,dbus-daemon,gnome-keyring-daemon,secret-tool,gdbus,setpriv,xdg-open,journalctl,xauth,timeout,id,cat,env,true,sleep,chown,dd,test}; do
++    [[ -f "$dependency" && -x "$dependency" ]] || { echo "FAIL: missing prerequisite $dependency"; exit 2; }
+ done
+ [[ -r "$VW_REHEARSAL_UI_DEPS/puppeteer-core/package.json" ]] || { echo 'FAIL: private browser automation dependency unavailable'; exit 2; }
+ [[ "${DOCKER_HOST:-unix:///var/run/docker.sock}" == unix:///var/run/docker.sock && "${DOCKER_CONTEXT:-default}" == default ]] || { echo 'FAIL: only local default Docker is supported'; exit 2; }
+diff --git a/tests/protected_rehearsal.rs b/tests/protected_rehearsal.rs
+index 757fae4..d9bc5cf 100644
+--- a/tests/protected_rehearsal.rs
++++ b/tests/protected_rehearsal.rs
+@@ -290,6 +290,12 @@ fn missing_desktop_prerequisite_fails_before_provisioning() {
+     support::missing_prerequisite_regression().unwrap();
+ }
+ 
++#[test]
++#[ignore = "requires actual subordinate user namespaces; no provider resources are provisioned"]
++fn restricted_identity_refuses_inaccessible_directory_before_provisioning() {
++    support::restricted_traversal_regression().unwrap();
++}
++
+ #[test]
+ fn cleanup_acceptance_rejects_retained_private_root_independently() {
+     support::cleanup_removal_regression().unwrap();
+diff --git a/tests/support/protected_rehearsal.rs b/tests/support/protected_rehearsal.rs
+index c898466..261169d 100644
+--- a/tests/support/protected_rehearsal.rs
++++ b/tests/support/protected_rehearsal.rs
+@@ -459,6 +459,53 @@ fn restricted() -> Command {
+     ]);
+     cmd
+ }
++fn require_restricted_traversal(path: &Path) -> Result<()> {
++    ensure!(
++        output(
++            restricted().args(["/usr/bin/test", "-x"]).arg(path),
++            None,
++            5
++        )?
++        .status
++        .success(),
++        "restricted identity cannot traverse rehearsal home; no resources provisioned"
++    );
++    Ok(())
++}
++
++pub fn restricted_traversal_regression() -> Result<()> {
++    ensure!(unsafe { libc::geteuid() } != 0, "never run as host root");
++    ensure!(
++        checked(restricted().args(["/usr/bin/id", "-u"]))? == b"1\n",
++        "restricted test identity unavailable"
++    );
++    // Use only owned, empty directories beneath /tmp, independently of HOME and
++    // the secure-temp wrapper. A private ancestor must block even a 0755 child.
++    let root = tempfile::Builder::new()
++        .prefix("vw-traversal-regression-")
++        .tempdir_in("/tmp")?;
++    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o755))?;
++    let private = root.path().join("private");
++    directory(&private, 0o700)?;
++    let child = private.join("child");
++    directory(&child, 0o755)?;
++    require_restricted_traversal(root.path())?;
++    let rejected = require_restricted_traversal(&child)
++        .err()
++        .context("inaccessible ancestor accepted")?;
++    ensure!(
++        rejected.to_string()
++            == "restricted identity cannot traverse rehearsal home; no resources provisioned",
++        "wrong restricted traversal failure"
++    );
++    // The same namespace and target must pass after changing only our fixture.
++    fs::set_permissions(&private, fs::Permissions::from_mode(0o755))?;
++    require_restricted_traversal(&child)?;
++    let path = root.path().to_owned();
++    root.close()?;
++    assert_absent(&path)?;
++    Ok(())
++}
+ fn private_file(path: &Path, data: &[u8]) -> Result<()> {
+     let mut file = OpenOptions::new()
+         .write(true)
+@@ -1673,16 +1720,7 @@ pub fn run() -> Result<()> {
+         .success(),
+         "agent can regain provider identity"
+     );
+-    ensure!(
+-        output(
+-            restricted().args(["/usr/bin/test", "-x"]).arg(&home),
+-            None,
+-            5
+-        )?
+-        .status
+-        .success(),
+-        "restricted identity cannot traverse rehearsal home; no resources provisioned"
+-    );
++    require_restricted_traversal(&home)?;
+     let namespace = Sha256::digest(format!("{uid}:{UNIT}").as_bytes())[..8]
+         .iter()
+         .map(|b| format!("{b:02x}"))

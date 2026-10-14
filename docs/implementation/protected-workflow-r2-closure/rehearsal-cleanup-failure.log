@@ -1,0 +1,20 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+test production_chain ... PASS: preflight; fixed provider unit/runtime absent, real manager and distinct kernel UID available
+PASS: authenticated X setup succeeds; unauthenticated X setup rejects
+PASS: real xdg-open delivered to isolated trusted Firefox
+PASS: synthetic HTTPS vault and private provider bootstrap provisioned
+PASS: production daemon unlocked through trusted browser UI
+PASS: injected stop failure retained live material; unit identities recovered from durable ledger
+PASS: injected post-stop reap observation failure retained private material for verified recovery
+PASS: post-container-removal failure retained material; retry confirms absent owned ID without inspection
+PASS: bounded private stdout/stderr and redacted observations scanned before deletion
+PASS: owned processes/units/container stopped before private files removed
+PASS: independent post-cleanup resource absence checks
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 20.65s
+

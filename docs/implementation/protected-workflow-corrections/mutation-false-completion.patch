@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: /home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal/src/access/application.rs
+@@
+-                (true, Ok(ExecutionOutcome::ExitedNonZero)) => DirectStatus::Failed {
+-                    reason: DirectFailure::ExecutionNonzero,
+-                },
++                (true, Ok(ExecutionOutcome::ExitedNonZero)) => {
++                    DirectStatus::Completed { exit_code: 0 }
++                }
+*** End Patch

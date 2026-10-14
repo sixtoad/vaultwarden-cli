@@ -1,0 +1,25 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.90s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.49s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+test production_chain ... PASS: preflight; fixed provider unit/runtime absent, real manager and distinct kernel UID available
+PASS: bounded private stdout/stderr and redacted observations scanned before deletion
+PASS: owned processes/units/container stopped before private files removed
+PASS: independent post-cleanup resource absence checks
+
+thread 'production_chain' (3336374) panicked at tests/protected_rehearsal.rs:273:9:
+protected rehearsal failed: private browser gate failed at private-xserver
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    production_chain
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 2.05s
+
+error: test failed, to rerun pass `--test protected_rehearsal`

@@ -1,0 +1,20 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: server selects request despite fragment suffix
++ actual - expected
+
++ '_FOjk1FNbUD-TT5JLBdtSeodkNOo4Egm14Gbgn2fDHw'
+- 'MEHEPzZr1PxtTBAYMEtL0Xx8m0_hQxdkMXoL8Vms028'
+
+    at file:///home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal/tests/ui/direct-request.mjs:203:12 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '_FOjk1FNbUD-TT5JLBdtSeodkNOo4Egm14Gbgn2fDHw',
+  expected: 'MEHEPzZr1PxtTBAYMEtL0Xx8m0_hQxdkMXoL8Vms028',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.3.1

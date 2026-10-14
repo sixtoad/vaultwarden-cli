@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: /home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal/src/adapters/session.rs
+@@
+-        let keys = derive_keys(&self.config, &password)?;
++        let keys = derive_keys(&self.config, &password);
+*** End Patch

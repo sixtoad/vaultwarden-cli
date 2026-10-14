@@ -1,0 +1,5 @@
+--- a/tests/support/protected_rehearsal.rs
++++ b/tests/support/protected_rehearsal.rs
+@@
+-        Err(_) => anyhow::bail!("filesystem absence unconfirmed; private material retained"),
++        Err(_) => Ok(false),

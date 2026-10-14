@@ -1,0 +1,21 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.27s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+PASS: bounded private stdout/stderr and redacted observations scanned before deletion
+PASS: owned processes/units/container stopped before private files removed
+
+thread 'controller_stdout_audits_trailing_leaks_overflow_and_uncertain_eof' (3253761) panicked at tests/protected_rehearsal.rs:318:45:
+called `Result::unwrap()` on an `Err` value: controller audit accepted deletion of private leak/overflow evidence
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test controller_stdout_audits_trailing_leaks_overflow_and_uncertain_eof ... FAILED
+
+failures:
+
+failures:
+    controller_stdout_audits_trailing_leaks_overflow_and_uncertain_eof
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `--test protected_rehearsal`

@@ -1,0 +1,63 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.23s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/systemd_supervisor.rs (target/debug/deps/systemd_supervisor-48ba7792a1e4a7c1)
+
+running 2 tests
+real-manager scenario: exit; provider: vw18-harness-1571538-.tmpY4sMOn-exit.service
+
+thread 'assertion_unwind_reaps_exact_resources_and_preserves_unrelated' (1571539) panicked at tests/systemd_supervisor.rs:645:9:
+injected scenario assertion failure
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+real-manager scenario: orphan; provider: vw18-harness-1571538-.tmpKOBn9z-orphan.service
+test assertion_unwind_reaps_exact_resources_and_preserves_unrelated ... ok
+real-manager scenario: cancel; provider: vw18-harness-1571538-.tmp2RojFG-cancel.service
+real-manager scenario: crash; provider: vw18-harness-1571538-.tmp6lH7gh-crash.service
+real-manager scenario: collision; provider: vw18-harness-1571538-.tmpmUqGIM-collision.service
+real-manager scenario: helper-failure; provider: vw18-harness-1571538-.tmpsEBTl7-helper-failure.service
+real-manager scenario: failed-launch-recovery; provider: vw18-harness-1571538-.tmp9jw6bZ-failed-launch-recovery.service
+real-manager scenario: helper-environment; provider: vw18-harness-1571538-.tmp8X5gme-helper-environment.service
+real-manager scenario: app-worker-exit; provider: vw18-harness-1571538-.tmpyLGaET-app-worker-exit.service
+real-manager scenario: app-worker-shutdown; provider: vw18-harness-1571538-.tmp2aOx3p-app-worker-shutdown.service
+real-manager scenario: app-exit; provider: vw18-harness-1571538-.tmpwuTD6L-app-exit.service
+real-manager scenario: app-nonzero; provider: vw18-harness-1571538-.tmp7tBn8e-app-nonzero.service
+real-manager scenario: app-signal; provider: vw18-harness-1571538-.tmpPxQOnN-app-signal.service
+real-manager scenario: app-lock; provider: vw18-harness-1571538-.tmpkrYoaa-app-lock.service
+real-manager scenario: app-cancel; provider: vw18-harness-1571538-.tmpihwXpe-app-cancel.service
+real-manager scenario: app-revoke; provider: vw18-harness-1571538-.tmpfJt9qh-app-revoke.service
+real-manager scenario: app-agent-revoke; provider: vw18-harness-1571538-.tmpZKfPb8-app-agent-revoke.service
+real-manager scenario: app-shutdown; provider: vw18-harness-1571538-.tmpL7qsbQ-app-shutdown.service
+real-manager scenario: app-ssh-nonzero; provider: vw18-harness-1571538-.tmpdIeoKP-app-ssh-nonzero.service
+real-manager scenario: app-ssh-signal; provider: vw18-harness-1571538-.tmpyVIrrp-app-ssh-signal.service
+real-manager scenario: app-ssh-lock; provider: vw18-harness-1571538-.tmpijDbwi-app-ssh-lock.service
+real-manager scenario: app-ssh-cancel; provider: vw18-harness-1571538-.tmpvjm0id-app-ssh-cancel.service
+real-manager scenario: ssh-exit; provider: vw18-harness-1571538-.tmpKOT4SC-ssh-exit.service
+real-manager scenario: ssh-cancel; provider: vw18-harness-1571538-.tmpuqoLgh-ssh-cancel.service
+real-manager scenario: ssh-crash; provider: vw18-harness-1571538-.tmpNt3Xig-ssh-crash.service
+real-manager scenario: ssh-uncertain; provider: vw18-harness-1571538-.tmp0MgEGf-ssh-uncertain.service
+real-manager scenario: ssh-cleanup-failure; provider: vw18-harness-1571538-.tmpbS5SOt-ssh-cleanup-failure.service
+real-manager scenario: app-deadline; provider: vw18-harness-1571538-.tmp1H6f8P-app-deadline.service
+real-manager scenario: app-persistence; provider: vw18-harness-1571538-.tmpPz2vE6-app-persistence.service
+test independent_descendants_provider_crash_and_recovery has been running for over 60 seconds
+real-manager scenario: phase-job; provider: vw18-harness-1571538-.tmpg0v0oo-phase-job.service
+real-manager scenario: phase-helper; provider: vw18-harness-1571538-.tmpaiB4Kf-phase-helper.service
+real-manager scenario: phase-transfer; provider: vw18-harness-1571538-.tmp7vnAUf-phase-transfer.service
+real-manager scenario: phase-release; provider: vw18-harness-1571538-.tmpR388Nf-phase-release.service
+real-manager scenario: phase-exit; provider: vw18-harness-1571538-.tmpLpGZef-phase-exit.service
+real-manager scenario: fault-missing; provider: vw18-harness-1571538-.tmp8itCWw-fault-missing.service
+real-manager scenario: fault-job; provider: vw18-harness-1571538-.tmppqbUWb-fault-job.service
+real-manager scenario: fault-exec; provider: vw18-harness-1571538-.tmpyobqoP-fault-exec.service
+real-manager scenario: fault-monitor; provider: vw18-harness-1571538-.tmpU97VHM-fault-monitor.service
+real-manager scenario: fault-stop; provider: vw18-harness-1571538-.tmpJ9RJW7-fault-stop.service
+test independent_descendants_provider_crash_and_recovery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 74.04s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test adapters::ssh_material::tests::distinct_agent_principals_cannot_read_live_provider_material ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 749 filtered out; finished in 0.13s
+

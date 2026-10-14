@@ -1,0 +1,8 @@
+--- a/tests/support/protected_rehearsal.rs
++++ b/tests/support/protected_rehearsal.rs
+@@
+-    if let Some(child) = driver.as_mut() {
++    if let Some(mut child) = driver.take() {
+         ensure!(
+-            observe(child)?,
++            observe(&mut child)?,
