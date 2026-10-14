@@ -1,0 +1,3 @@
+scripts/rehearse-protected-workflow.sh: OK
+tests/protected_rehearsal.rs: OK
+tests/support/protected_rehearsal.rs: OK

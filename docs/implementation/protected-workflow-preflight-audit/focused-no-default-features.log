@@ -1,0 +1,25 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 18 tests
+test browser_failure_stages_never_reflect_child_data ... ok
+test docker_disconnect_ownership_and_post_removal_retry_are_fail_closed ... ok
+test cleanup_acceptance_rejects_retained_private_root_independently ... ok
+test namespace_map_requires_a_distinct_unprivileged_identity ... ok
+test production_chain ... ignored, run scripts/rehearse-protected-workflow.sh; creates only disposable owned resources
+test human_display_requires_private_owned_runtime_and_actual_socket ... ok
+test restricted_agent_malformed_responses_never_reflect_payloads_or_parser_errors ... ok
+test restricted_agent_rejections_preserve_only_closed_categories_and_action ... ok
+test restricted_identity_refuses_inaccessible_directory_before_provisioning ... ignored, requires actual subordinate user namespaces; no provider resources are provisioned
+test restricted_agent_valid_observations_keep_their_redacted_shape ... ok
+test terminal_status_malformed_data_and_unsupported_expectations_are_safe ... ok
+test terminal_status_mismatch_malformed_and_rejection_stop_after_one_poll ... ok
+test terminal_status_accepts_exact_outcome_and_rejects_every_terminal_mismatch ... ok
+test missing_desktop_prerequisite_fails_before_provisioning ... ok
+test credential_checker_rejects_wrong_missing_and_ambient_fields ... ok
+test terminal_status_waits_only_for_valid_nonterminal_progress ... ok
+test private_stdout_and_stderr_capture_preserves_leaks_and_rejects_overflow ... ok
+test blocked_stdin_descendant_pipes_and_continuous_output_are_bounded_and_reaped ... ok
+
+test result: ok. 16 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.50s
+

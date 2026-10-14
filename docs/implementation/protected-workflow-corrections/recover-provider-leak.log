@@ -1,0 +1,4 @@
+PASS: injected synthetic leak matched privately; raw capture not published.
+PASS: four owned units/cgroups, exact container and owned process arguments absent; runtime empty.
+Owned empty runtime: /run/user/1000/vw-access-e59027bdb6ca6583
+PASS: exact stopped synthetic leak fixture and empty runtime removed after independent audit; redacted failure and recovery evidence retained.

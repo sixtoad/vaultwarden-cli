@@ -25,10 +25,16 @@ try{
   assert(fs.existsSync(path.join(control,'ready.json')),'fixture startup timeout');
   const ready=JSON.parse(fs.readFileSync(path.join(control,'ready.json')));
   browser=await puppeteer.launch({browser:'firefox',executablePath:process.env.FIREFOX || '/usr/bin/firefox',userDataDir:profile,headless:true,acceptInsecureCerts:false});
+  // Provider and request tabs use the same profile and shared cookie jar.
+
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+  await page.evaluateOnNewDocument(()=>{if(location.protocol==='https:')sessionStorage.setItem('vw_request','previous-tab-request');});
   await page.goto(pathToFileURL(ready.artifact).href);await page.click('a');
-  await page.waitForFunction(()=>location.protocol==='https:'&&sessionStorage.getItem('vw_proof'));
+  await page.waitForFunction(()=>location.protocol==='https:'&&sessionStorage.getItem('vw_provider_proof'));
   const origin=await page.evaluate(()=>location.origin);
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('vw_request')),null,'fresh provider launch clears previous request role');
+  assert.match(await page.$eval('#session-warning',node=>node.textContent),/Unlocking again or locking.*invalidates pending requests/);
+  assert(await page.$eval('#review',node=>node.hidden));
   await page.waitForFunction(()=>document.querySelector('#history-status').textContent==='No operation history.');
   assert.equal(await page.$$eval('#history-events > li',events=>events.length),0);
   // Keyboard-only unlock, with an explicit nonvisual confirmation.
@@ -55,6 +61,11 @@ try{
   await review.evaluateOnNewDocument(()=>{const actual=window.fetch.bind(window);window.fetch=async(url,options)=>{const response=await actual(url,options);if(url==='/history'&&!window.initialHistoryHeld){window.initialHistoryHeld=true;await new Promise(resolve=>window.releaseInitialHistory=resolve);}return response;};});
   let dialogs=0;review.on('dialog',async dialog=>{dialogs++;await dialog.dismiss();});review.on('pageerror',e=>errors.push(String(e)));await review.goto(pathToFileURL(artifact).href); // automatic artifact navigation
   await review.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+  const assertRequestRole=async tab=>{
+    assert.equal(await tab.$$eval('#unlock,#password,#lock',nodes=>nodes.length),0,'request tabs must not expose provider lifecycle controls');
+    assert(await tab.$$eval('#deny,#begin-approval',nodes=>nodes.length===2&&nodes.every(node=>!node.disabled)));
+  };
+  await assertRequestRole(review);
   await review.waitForFunction(()=>window.initialHistoryHeld);
   assert.equal(await review.$eval('#history-status',e=>e.textContent),'Loading history');
   assert(await review.$$eval('#deny,#begin-approval',controls=>controls.every(control=>!control.disabled)),'held initial history must not block decisions');
@@ -86,7 +97,7 @@ try{
   assert.equal(await review.$$eval('#history-events > li',events=>events.length),3);
   await refreshHistory(1);
   const historyGuards=await review.evaluate(async()=>{
-    const post=(headers,body)=>fetch('/history',{method:'POST',headers,body}).then(r=>r.status),headers={'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')};
+    const post=(headers,body)=>fetch('/history',{method:'POST',headers,body}).then(r=>r.status),headers={'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_request_proof')};
     return {noProof:await post({'Content-Type':'application/json'},'{}'),wrongProof:await post({...headers,'X-CSRF-Token':'wrong'},'{}'),zero:await post(headers,'{"limit":0}'),oversized:await post(headers,'{"limit":201}'),overflow:await post(headers,'{"limit":4294967296}'),unknown:await post(headers,'{"agent":"private-sentinel"}')};
   });assert.deepEqual(historyGuards,{noProof:403,wrongProof:403,zero:403,oversized:403,overflow:403,unknown:403});
   // An internal rendering fixture covers agent attribution and invisible controls;
@@ -160,8 +171,8 @@ try{
   await tabs[first].evaluate(()=>window.releaseLaunch());await tabs[first].waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: pending');
   await tabs[second].waitForFunction(()=>window.launchFetchStarted===true);await tabs[second].evaluate(()=>window.releaseLaunch());
   await tabs[second].waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: pending');
-  const proofs=await Promise.all(tabs.map(tab=>tab.evaluate(()=>sessionStorage.getItem('vw_proof'))));assert(proofs[0]);assert.equal(proofs[0],proofs[1]);
-  for(let index=0;index<tabs.length;index++){const status=await tabs[index].evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,concurrentReceipts[index].id);assert.equal(status,200);}
+  const proofs=await Promise.all(tabs.map(tab=>tab.evaluate(()=>sessionStorage.getItem('vw_request_proof'))));assert(proofs[0]);assert.equal(proofs[0],proofs[1]);
+  for(let index=0;index<tabs.length;index++){const status=await tabs[index].evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_request_proof')},body:JSON.stringify({request_id:id})})).status,concurrentReceipts[index].id);assert.equal(status,200);}
   await fresh.close();
 
   // Keyboard cancellation clears password without submitting or changing Pending.
@@ -170,21 +181,40 @@ try{
   assert.equal(await review.$eval('#approval-password',e=>e.value),'');assert.equal(await review.evaluate(()=>document.activeElement.id),'begin-approval');assert.equal(run(['status',receipt.id]).state.status,'pending');
   await review.focus('#refresh');await review.keyboard.press('Enter');
   await review.addScriptTag({content:axe});const audit=await review.evaluate(async()=>{const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});return {violations:r.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.length})),passes:r.passes.length};});assert.deepEqual(audit.violations,[]);
-  const cookies=await review.cookies();const cookie=cookies.find(c=>c.name==='vw_session');assert(cookie.secure&&cookie.httpOnly&&cookie.sameSite==='Strict');
+  const cookies=await review.cookies();const cookie=cookies.find(c=>c.name==='vw_request_session');assert(cookie.secure&&cookie.httpOnly&&cookie.sameSite==='Strict');
   const attacks=await review.evaluate(async({capability,id})=>{
-    const proof=sessionStorage.getItem('vw_proof');const post=(p,headers,body)=>fetch(p,{method:'POST',headers,body}).then(r=>r.status);
+    const proof=sessionStorage.getItem('vw_request_proof');const post=(p,headers,body)=>fetch(p,{method:'POST',headers,body}).then(r=>r.status);
     const replay=await post('/launch',{'Content-Type':'text/plain'},capability);
     const noProof=await post('/review',{'Content-Type':'application/json'},JSON.stringify({request_id:id}));
     const wrongProof=await post('/review',{'Content-Type':'application/json','X-CSRF-Token':'wrong'},JSON.stringify({request_id:id}));
     const page=await fetch('/').then(r=>r.text());return{replay,noProof,wrongProof,publicLeaks:page.includes(proof)||page.includes(id)};
   },{capability,id:receipt.id});assert.deepEqual(attacks,{replay:403,noProof:403,wrongProof:403,publicLeaks:false});
   // Existing browser session still works after the second request launch.
-  const proofStillWorks=await page.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,receipt.id);assert.equal(proofStillWorks,403); // Pre-unlock session proof was rotated by the new launch.
+  const proofStillWorks=await page.evaluate(async()=>(await fetch('/provider/history',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_provider_proof')},body:'{}'})).status);assert.equal(proofStillWorks,200);
   // Distinct requests exercise keyboard denial and authenticated approval.
+  for(const suffix of ['conflicting','absent']){
+    const selected=await submit(['staging','safe','3']);
+    const other=await submit(['staging','safe','3']);
+    const html=fs.readFileSync(path.join(ready.root,`review-${selected.id}.html`),'utf8');
+    const url=new URL(html.match(/href="([^"]+)"/)[1]);
+    url.hash=url.hash.slice(1).split(':')[0]+(suffix==='conflicting'?':'+other.id:'');
+    const tab=await browser.newPage();await tab.goto(url.href);
+    await tab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+    assert.equal(await tab.evaluate(()=>sessionStorage.getItem('vw_request')),selected.id,'server selects request despite fragment suffix');
+    const details=await tab.$eval('#details',node=>node.textContent);
+    assert(details.includes(selected.id)&&!details.includes(other.id),'review shows only server-selected request');
+    await tab.click('#deny');
+    await tab.waitForFunction(()=>document.querySelector('#review-status')?.textContent.includes('Request status: denied'));
+    assert.equal(run(['status',selected.id]).state.status,'denied');
+    assert.equal(run(['status',other.id]).state.status,'pending','fragment-selected request must remain untouched');
+    await tab.close();
+  }
   for(const decision of ['deny','approve']){
     const decided=await submit(['staging','safe','3']);const tab=await browser.newPage();
     await tab.goto(pathToFileURL(path.join(ready.root,`review-${decided.id}.html`)).href);
     await tab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+    await tab.reload();await tab.waitForFunction(()=>document.querySelector('#review-status')?.textContent==='Request status: pending');
+    await assertRequestRole(tab);
     if(decision==='deny'){await tab.focus('#deny');await tab.keyboard.press('Enter');}
     else{
       await tab.focus('#begin-approval');await tab.keyboard.press('Enter');
@@ -195,7 +225,7 @@ try{
     assert.equal(run(['status',decided.id]).state.status,decision==='deny'?'denied':'approved');
     assert(await tab.$$eval('#decisions button',buttons=>buttons.every(b=>b.disabled)));
     assert.match(await tab.$eval('#review-status',e=>e.textContent),decision==='deny'?/no operation will run/:/approved once; awaiting protected execution/);
-    const replay=await tab.evaluate(async({id,decision})=>(await fetch('/'+decision,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify(decision==='approve'?{request_id:id,password:'synthetic-browser-password'}:{request_id:id})})).status,{id:decided.id,decision});assert.equal(replay,403);
+    const replay=await tab.evaluate(async({id,decision})=>(await fetch('/'+decision,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_request_proof')},body:JSON.stringify(decision==='approve'?{request_id:id,password:'synthetic-browser-password'}:{request_id:id})})).status,{id:decided.id,decision});assert.equal(replay,403);
     await tab.addScriptTag({content:axe});assert.deepEqual(await tab.evaluate(async()=>(await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>v.id)),[]);
     await tab.close();
   }
@@ -284,7 +314,7 @@ try{
     const {tab,receipt:external}=await openDecision();await typeApproval(tab,'cancelled-password-sentinel');
     await tab.evaluate(()=>{window.holdNextReview=true;document.querySelector('#refresh').click();});
     await tab.waitForFunction(()=>window.heldReviewState==='pending');
-    assert.equal(await tab.evaluate(async id=>(await window.sendDirect('/deny',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).status,external.id),200);
+    assert.equal(await tab.evaluate(async id=>(await window.sendDirect('/deny',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_request_proof')},body:JSON.stringify({request_id:id})})).status,external.id),200);
     if(cancel){await tab.focus('#cancel-approval');await tab.keyboard.press('Enter');}
     else await tab.evaluate(()=>window.releaseReview());
     await tab.waitForFunction(()=>document.querySelector('#review-status').textContent.includes('Request status: denied'));
@@ -293,37 +323,59 @@ try{
     await tab.close();
   }
   fs.writeFileSync(path.join(control,'clock'),'310');await review.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status: expired');
-  await review.evaluate(()=>{const actual=window.fetch.bind(window);window.historyFetches=0;window.heldLocks=[];window.fetch=async(url,options)=>{if(url==='/lock')await new Promise(resolve=>window.heldLocks.push(resolve));if(url==='/history')window.historyFetches++;const response=await actual(url,options);if(url==='/history'&&!window.historyResponseHeld){window.historyResponseHeld=true;await new Promise(resolve=>window.releaseHistory=resolve);}return response;};document.querySelector('#history-refresh').click();});
-  await review.waitForFunction(()=>window.historyResponseHeld);
-  await review.focus('#lock');await review.keyboard.press('Enter');
-  await review.waitForFunction(()=>window.heldLocks.length===1);
-  await review.evaluate(()=>{document.querySelector('#lock').click();document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true}));});
-  assert(await review.$$eval('#history-form button,#history-form input',controls=>controls.every(control=>control.disabled)));
-  assert.equal(await review.evaluate(()=>window.historyFetches),1,'refresh cannot start after lock was queued');
-  await review.evaluate(()=>window.heldLocks[0]());
-  await review.waitForFunction(()=>window.heldLocks.length===2);
-  await review.evaluate(()=>document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true})));
-  assert(await review.$$eval('#history-form button,#history-form input',controls=>controls.every(control=>control.disabled)));
-  assert.equal(await review.evaluate(()=>window.historyFetches),1,'refresh stays blocked across queued mutations');
-  await review.evaluate(()=>window.heldLocks[1]());
-  await review.waitForFunction(()=>!document.querySelector('#history-refresh').disabled&&document.querySelector('#result').textContent.includes('Provider locked'));assert.equal(run(['status',receipt.id]).state.status,'expired');assert.equal(await review.$eval('#review-status',e=>e.textContent),'Request status: expired');
-  await review.evaluate(()=>window.releaseHistory());
-  await review.waitForFunction(()=>document.querySelector('#history-status').textContent==='Refresh history to read current events.');
-  assert.equal(await review.$$eval('#history-events > li',events=>events.length),0);
-  await review.focus('#history-refresh');await review.keyboard.press('Enter');
-  await review.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('reopen a fresh provider launch'));
+  // Reproduce the reported reset: Unlock again while already unlocked, with no
+  // preceding Lock. Real authentication must invalidate the pending authority.
+  {
+    const {tab,receipt:reset}=await openDecision();await typeApproval(tab,'cleared-on-reset-sentinel');
+    await page.type('#password','synthetic-browser-password');
+    const unlocked=page.waitForResponse(response=>new URL(response.url()).pathname==='/unlock');
+    await page.click('#unlock button');assert.equal((await unlocked).status(),200);
+    await tab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status unavailable for this browser session.');
+    assert.equal(run(['status',reset.id]).state.status,'expired');
+    await assertUnavailable(tab);
+    assert.match(await tab.$eval('#decision-feedback',node=>node.textContent),/Browser session retired.*fresh request/);
+    const replay=await tab.evaluate(async id=>(await fetch('/approve',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_request_proof')},body:JSON.stringify({request_id:id,password:'synthetic-browser-password'})})).status,reset.id);
+    assert.equal(replay,403);await tab.close();
+  }
+  await page.evaluate(()=>{const actual=window.fetch.bind(window);window.restoreProviderFetch=()=>{window.fetch=actual;};window.historyFetches=0;window.heldLocks=[];window.fetch=async(url,options)=>{if(url==='/lock')await new Promise(resolve=>window.heldLocks.push(resolve));if(url==='/provider/history')window.historyFetches++;const response=await actual(url,options);if(url==='/provider/history'&&!window.historyResponseHeld){window.historyResponseHeld=true;await new Promise(resolve=>window.releaseHistory=resolve);}return response;};document.querySelector('#history-refresh').click();});
+  await page.waitForFunction(()=>window.historyResponseHeld);
+  await page.bringToFront();await page.focus('#lock');await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>window.heldLocks.length===1);
+  await page.evaluate(()=>{document.querySelector('#lock').click();document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true}));});
+  assert(await page.$$eval('#history-form button,#history-form input',controls=>controls.every(control=>control.disabled)));
+  assert.equal(await page.evaluate(()=>window.historyFetches),1,'refresh cannot start after lock was queued');
+  await page.evaluate(()=>window.heldLocks[0]());
+  await page.waitForFunction(()=>window.heldLocks.length===2);
+  await page.evaluate(()=>document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true})));
+  assert(await page.$$eval('#history-form button,#history-form input',controls=>controls.every(control=>control.disabled)));
+  assert.equal(await page.evaluate(()=>window.historyFetches),1,'refresh stays blocked across queued mutations');
+  await page.evaluate(()=>window.heldLocks[1]());
+  await page.waitForFunction(()=>!document.querySelector('#history-refresh').disabled&&document.querySelector('#result').textContent.includes('Provider locked'));assert.equal(run(['status',receipt.id]).state.status,'expired');assert.equal(await review.$eval('#review-status',e=>e.textContent),'Request status: expired');
+  await page.evaluate(()=>window.releaseHistory());
+  await page.waitForFunction(()=>document.querySelector('#history-status').textContent==='Refresh history to read current events.');
+  assert.equal(await page.$$eval('#history-events > li',events=>events.length),0);
+  await page.bringToFront();await page.focus('#history-refresh');await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('history events shown.'));
   const lockedHistory=run(['history']);assert(lockedHistory.events.length>0);assert.equal(lockedHistory.events.find(event=>event.request_id===receipt.id).outcome,'expired');
+  await page.evaluate(()=>window.restoreProviderFetch());
   // A real lock/unlock and new launch rotates the shared cookie. Old tab proof
   // must remain retired, with persistent guidance and no cookie-based recovery.
   {
-    assert.equal(await review.evaluate(async()=>(await fetch('/unlock',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({password:'synthetic-browser-password'})})).status),200);
+    await page.type('#password','synthetic-browser-password');await page.click('#unlock button');
+    await page.waitForFunction(()=>document.querySelector('#result').textContent.includes('Provider unlocked'));
     const {tab}=await openDecision();await typeApproval(tab,'retired-password-sentinel');
-    const oldProof=await tab.evaluate(()=>sessionStorage.getItem('vw_proof'));
+    const oldProof=await tab.evaluate(()=>sessionStorage.getItem('vw_request_proof'));
     await tab.waitForFunction(()=>document.querySelector('#history-status').textContent.includes('history events shown.'));
     await tab.evaluate(()=>{const actual=window.fetch.bind(window);window.retiringHistoryFetches=0;window.fetch=async(url,options)=>{if(url==='/history')window.retiringHistoryFetches++;const response=await actual(url,options);if(url==='/history'){window.retiringHistoryHeld=true;await new Promise(resolve=>window.releaseRetiringHistory=resolve);window.retiringHistoryReleased=true;}return response;};document.querySelector('#history-refresh').click();});
     await tab.waitForFunction(()=>window.retiringHistoryHeld);
-    for(const action of ['lock','unlock'])assert.equal(await tab.evaluate(async action=>(await window.sendDirect('/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({password:action==='unlock'?'synthetic-browser-password':''})})).status,action),200);
-    const fresh=await openDecision();assert.notEqual(await fresh.tab.evaluate(()=>sessionStorage.getItem('vw_proof')),oldProof);
+    await page.click('#lock');await page.waitForFunction(()=>document.querySelector('#result').textContent.includes('Provider locked'));
+    await tab.evaluate(()=>document.querySelector('#refresh').click());
+    await tab.waitForFunction(()=>document.querySelector('#review-status').textContent==='Request status unavailable for this browser session.');
+    await assertUnavailable(tab);
+    assert.match(await tab.$eval('#decision-feedback',node=>node.textContent),/Browser session retired.*fresh request/);
+    await page.type('#password','synthetic-browser-password');await page.click('#unlock button');
+    await page.waitForFunction(()=>document.querySelector('#result').textContent.includes('Provider unlocked'));
+    const fresh=await openDecision();assert.notEqual(await fresh.tab.evaluate(()=>sessionStorage.getItem('vw_request_proof')),oldProof);
     await tab.evaluate(()=>document.querySelector('#refresh').click());
     await tab.waitForFunction(()=>document.querySelector('#decision-feedback').textContent.includes('Browser session retired'));
     await assertUnavailable(tab);assert(await tab.$$eval('#unlock input,#unlock button,#lock',controls=>controls.every(c=>c.disabled)));
@@ -334,8 +386,9 @@ try{
     assert.match(await tab.$eval('#history-status',e=>e.textContent),/retired browser session/);
     await tab.evaluate(()=>document.querySelector('#history-form').dispatchEvent(new Event('submit',{cancelable:true})));
     assert.equal(await tab.evaluate(()=>window.retiringHistoryFetches),1,'retired history cannot refresh or repaint');
-    assert.equal(await tab.evaluate(()=>sessionStorage.getItem('vw_proof')),oldProof);
-    const message=await tab.$eval('#decision-feedback',e=>e.textContent);assert.match(message,/fresh launch/);
+    assert.equal(await tab.evaluate(()=>sessionStorage.getItem('vw_request_proof')),oldProof);
+    const message=await tab.$eval('#decision-feedback',e=>e.textContent);assert.match(message,/authoritative request status.*may already have run.*fresh launch/);
+    assert(!message.includes('was invalidated'),'generic authentication rejection must not assert a reset cause');
     const polls=await tab.evaluate(()=>{const n=window.reviewDelivered;document.querySelector('#refresh').click();return n;});
     await tab.waitForFunction(n=>window.reviewDelivered>n,{},polls);assert.equal(await tab.$eval('#decision-feedback',e=>e.textContent),message);await assertUnavailable(tab);
     await tab.close();await fresh.tab.close();
@@ -380,7 +433,7 @@ try{
   const sshDetails=await sshTab.$$eval('#details dt',terms=>Object.fromEntries(terms.map(term=>[term.textContent,term.nextElementSibling.textContent])));
   for(const [name,value] of Object.entries({'Target':'backup@backup.example.test:2222/srv/archive','SSH host':'backup.example.test','SSH port':'2222','SSH user':'backup','Resource path':'/srv/archive','Pinned host fingerprint':'SHA256:'+'A'.repeat(43),'Working directory':'/var/empty','Credentials and use types':'Backup SSH (ssh)','Policy digest':ready.ssh_revision,'One-time meaning':'Approval authorizes one protected execution. Lock or cancellation stops its descendants.'}))assert.equal(sshDetails[name],value,name);
   assert.deepEqual(await sshTab.$$eval('#arguments > li',items=>items.map(item=>item.textContent)),[]);
-  const sshReview=await sshTab.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_proof')},body:JSON.stringify({request_id:id})})).json(),sshReceipt.id);
+  const sshReview=await sshTab.evaluate(async id=>(await fetch('/review',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('vw_request_proof')},body:JSON.stringify({request_id:id})})).json(),sshReceipt.id);
   assert.deepEqual(sshReview.credentials,[{label:'Backup SSH',use_type:'ssh'}]);
   assert.equal(sshReview.ssh.destination.port,2222);assert.equal(sshReview.ssh.working_directory,'/var/empty');
   await sshTab.addScriptTag({content:axe});
@@ -413,6 +466,6 @@ try{
   assert.deepEqual(errors.filter(e=>!knownDiagnostics.includes(e)),[]);
   for(const error of errors)for(const secret of ['synthetic-browser-password','cancelled-password-sentinel','wrong-password-sentinel','retired-password-sentinel','synthetic-private-key-sentinel','synthetic-ssh-agent-capability-sentinel','BEGIN OPENSSH PRIVATE KEY',sshCapability,sshApprovalCapability,capability,receipt.id])assert(!error.includes(secret),'diagnostic reflected protected input');
   const diagnosticCategories=[...new Set(knownDiagnostics.map(e=>e.replace(/https:\/\/127\.0\.0\.1:\d+/g,'https://127.0.0.1:<port>')))];
-  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,sshFixedTargetReview:true,sshReviewRedaction:true,sshHistoryProjection:true,sshKeyboardDenial:true,signedAgentAdmission:true,signedAgentCompleteReview:true,signedAgentCapabilityIsolation:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',stalePreUnlockProofRejected:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
+  console.log(JSON.stringify({browser:await browser.version(),trustedTLS:true,requestLifecycleControlsAbsent:true,requestRoleSurvivesReload:true,providerLaunchClearsStaleRequestRole:true,providerLifecycleWarning:true,pendingReunlockInvalidates:true,crossTabResetDisablesDecisions:true,invalidatedRecoveryGuidance:true,genericRetirementAvoidsCauseClaims:true,providerLifecycleCookieContext:'same profile and cookie jar',sshFixedTargetReview:true,sshReviewRedaction:true,sshHistoryProjection:true,sshKeyboardDenial:true,signedAgentAdmission:true,signedAgentCompleteReview:true,signedAgentCapabilityIsolation:true,historyEmptyAndRows:true,historyCliAndBrowser:true,historyLimitsAndAuth:true,historyAgentControlEscaping:true,historyStaleSessionRejected:true,historyLateResponseDiscarded:true,historyQueuedMutationBlocked:true,historyRetirementClearsAndDisables:true,historyInitialReadIndependent:true,historyAmbiguousFailureGuidance:true,historyBoundedFetchAndBody:true,historyInvisibleSeparators:true,historyLimitChangesObserved:true,automaticArtifactNavigation:true,keyboardFocus:focus,axe:audit,requestReview:'pending -> expired -> expired while locked',launchReplay:'403',cookieOnly:'403',invalidProof:'403',independentProviderProofSurvivesRequestLaunch:true,terminalInspectionAfterLock:true,keyboardApproveDenyCancel:true,passwordCleared:true,immediateInFlightClearingAndDisabling:true,staleReviewDiscarded:true,activeAndInFlightAxe:true,persistentDecisionFeedback:true,retiredSessionGuidance:true,externalCompletionFocus:true,deliveredApprovalResponseDiscarded:true,exactlyOneApprovalSubmission:true,decisionReplayRejected:true,concurrentFreshCookieTabs:true,transientPollingRecovery:true,immutableDetailsStable:true,unchangedLiveStatusStable:true,argumentBoundariesPreserved:true,screenReaderManual:false,automationDiagnostics:{knownCrossOriginOrBlockedFavicon:knownDiagnostics.length,categories:diagnosticCategories,unexpected:0}},null,2));
   fs.writeFileSync(path.join(control,'stop'),'stop');assert.equal(await closed,0,childOutput);
 }finally{fs.writeFileSync(path.join(control,'stop'),'stop');await browser?.close();if(child.exitCode===null)child.kill('SIGTERM');}

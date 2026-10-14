@@ -1,0 +1,3 @@
+8a072ffc15129833aa480d7741e9721654c149eb262e0c88633c994eb1d1e4fe  scripts/rehearse-protected-workflow.sh
+7803db01a582e8f39f18e76f9c6686e9991b41269e93ecbba044dfafa9e2ec78  tests/protected_rehearsal.rs
+f08288db10318d25a6a23547f66225daba97b4411ed68e61f199fb98418e1066  tests/support/protected_rehearsal.rs

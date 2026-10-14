@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test access::history_tests::history_old_records_without_audits_recover_without_inventing_event_times ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 749 filtered out; finished in 0.71s
+

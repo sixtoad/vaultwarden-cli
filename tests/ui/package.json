@@ -2,7 +2,7 @@
   "name": "vaultwarden-access-ui-verification",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node direct-request.mjs" },
+  "scripts": { "test": "node --test protected-rehearsal-human.test.mjs && node direct-request.mjs", "test:observer": "node --test protected-rehearsal-human.test.mjs" },
   "devDependencies": {
     "axe-core": "4.13.0",
     "puppeteer-core": "25.11.0"

@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: /home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal/tests/support/protected_rehearsal.rs
+@@
+-        fs::remove_dir_all(&self.root)?;
++        // Mutation: omit final owned private-root removal.
+*** End Patch

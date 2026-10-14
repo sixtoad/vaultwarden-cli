@@ -1,0 +1,5 @@
+--- a/tests/ui/protected-rehearsal.mjs
++++ b/tests/ui/protected-rehearsal.mjs
+@@
+-    xserver = spawn(process.env.VW_REHEARSAL_XVFB, ['-displayfd', '3', '-screen', '0', '1024x768x24', '-nolisten', 'tcp', '-auth', env.XAUTHORITY], {env, stdio: ['ignore', 'ignore', 'ignore', 'pipe']});
++    xserver = spawn(process.env.VW_REHEARSAL_XVFB, ['-ac', '-displayfd', '3', '-screen', '0', '1024x768x24', '-nolisten', 'tcp', '-auth', env.XAUTHORITY], {env, stdio: ['ignore', 'ignore', 'ignore', 'pipe']});

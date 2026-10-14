@@ -1,0 +1,6 @@
+src/adapters/loopback_ui.rs: OK
+tests/support/protected_rehearsal.rs: OK
+tests/protected_rehearsal.rs: OK
+tests/ui/direct-request.mjs: OK
+tests/ui/protected-rehearsal.mjs: OK
+tests/ui/protected-rehearsal-human.test.mjs: OK

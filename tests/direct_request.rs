@@ -328,6 +328,40 @@ fn cli_provisioning_restart_retains_revision_and_agent_approval() {
 }
 #[test]
 fn human_submission_https_review_expiry_and_independent_negative_cases() {
+    // The production broker must issue request authority. Isolate its fixed
+    // xdg-open handoff in a subprocess with a synthetic desktop association.
+    let desktop = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(desktop.path().join(".config")).unwrap();
+    std::fs::create_dir_all(desktop.path().join(".local/share/applications")).unwrap();
+    std::fs::write(desktop.path().join(".local/share/applications/fixture.desktop"), "[Desktop Entry]\nType=Application\nName=Synthetic handoff\nExec=/usr/bin/true %f\nTerminal=false\nMimeType=text/html;\n").unwrap();
+    std::fs::write(
+        desktop.path().join(".config/mimeapps.list"),
+        "[Default Applications]\ntext/html=fixture.desktop;\ntext/plain=fixture.desktop;\n",
+    )
+    .unwrap();
+    let child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "isolated_human_submission_https_child",
+            "--ignored",
+        ])
+        .env("HOME", desktop.path())
+        .env("DISPLAY", ":987")
+        .env("XDG_CURRENT_DESKTOP", "X-Generic")
+        .env_remove("DBUS_SESSION_BUS_ADDRESS")
+        .env_remove("WAYLAND_DISPLAY")
+        .output()
+        .unwrap();
+    assert!(
+        child.status.success(),
+        "isolated transport fixture failed: {}",
+        String::from_utf8_lossy(&child.stdout)
+    );
+}
+
+#[test]
+#[ignore = "invoked by the isolated desktop transport fixture"]
+fn isolated_human_submission_https_child() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let root = dir.path().join("provider");
@@ -406,13 +440,21 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         .split('"')
         .next()
         .unwrap();
-    let (base, cap) = url.split_once("/#").unwrap();
-    let (base, cap) = (base.to_owned(), cap.to_owned());
+    let (base, _) = url.split_once("/#").unwrap();
+    let base = base.to_owned();
     let socket = HumanSocket::bind(&root).unwrap();
     let stop = Arc::new(AtomicBool::new(false));
     let launcher = Arc::new(Launcher(AtomicUsize::new(0)));
+    struct ReviewLauncher(Arc<Launcher>, Arc<dyn DirectReviewLauncher>);
+    impl DirectReviewLauncher for ReviewLauncher {
+        fn launch(&self, id: &str) -> Result<(), DirectRequestError> {
+            self.0.launch(id)?;
+            self.1.launch(id)
+        }
+    }
+    let request_launcher = Arc::new(ReviewLauncher(launcher.clone(), ui.request_launcher()));
     let human = {
-        let (app, stop, launcher) = (app.clone(), stop.clone(), launcher.clone());
+        let (app, stop, launcher) = (app.clone(), stop.clone(), request_launcher);
         std::thread::spawn(move || socket.serve(app, launcher, stop))
     };
     let browser = {
@@ -510,6 +552,16 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
     };
     assert_eq!(receipt.status, DirectStatus::Pending);
     assert_eq!(launcher.0.load(Ordering::SeqCst), 1);
+    let request_artifact =
+        std::fs::read_to_string(root.join(format!("review-{}.html", receipt.id))).unwrap();
+    let cap = request_artifact
+        .split("/#")
+        .nth(1)
+        .unwrap()
+        .split(':')
+        .next()
+        .unwrap()
+        .to_owned();
     let client = reqwest::blocking::Client::builder()
         .no_proxy()
         .tls_certs_only([reqwest::Certificate::from_pem(include_bytes!(
@@ -533,7 +585,10 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         .next()
         .unwrap()
         .to_owned();
-    let proof = launch.text().unwrap();
+    let proof = launch.json::<serde_json::Value>().unwrap()["proof"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let review_body = serde_json::json!({"request_id":receipt.id}).to_string();
     for case in ["cookie", "csrf", "origin", "host", "unknown_field"] {
         let request = client
@@ -557,7 +612,7 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
             .header(
                 "Cookie",
                 if case == "cookie" {
-                    "vw_session=wrong"
+                    "vw_request_session=wrong"
                 } else {
                     &cookie
                 },
@@ -816,8 +871,7 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         assert!(!visible.contains(forbidden));
     }
     app.lock().unwrap();
-    let r: DirectReview = review().json().unwrap();
-    assert_eq!(r.status, DirectStatus::Expired);
+    assert_eq!(review().status().as_u16(), 403);
     assert_eq!(
         client
             .post(format!("{base}/launch"))

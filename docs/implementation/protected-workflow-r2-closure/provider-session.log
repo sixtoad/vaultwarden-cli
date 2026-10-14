@@ -1,0 +1,15 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.71s
+     Running tests/provider_session.rs (target/debug/deps/provider_session-2ed0798291b44b6b)
+
+running 7 tests
+test actual_loopback_exchange_unlock_lock_and_replay_are_redacted ... ok
+test completed_connections_do_not_exhaust_parser_capacity ... ok
+test daemon_missing_keyring_fails_closed_even_without_backend_config ... ok
+test parser_capacity_exhaustion_revokes_authority_and_joins_all_workers ... ok
+test plaintext_cannot_submit_and_slow_clients_do_not_starve_lock ... ok
+test stale_origin_replacement_with_untrusted_identity_receives_no_password ... ok
+test unsupported_session_backend_denies_ssh_metadata_without_resolving ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.99s
+

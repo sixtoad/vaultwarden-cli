@@ -1,0 +1,24 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.92s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+test production_chain ... PASS: preflight; fixed provider unit/runtime absent, real manager and distinct kernel UID available
+PASS: authenticated X setup succeeds; unauthenticated X setup rejects
+PASS: real xdg-open delivered to isolated trusted Firefox
+PASS: synthetic HTTPS vault and private provider bootstrap provisioned
+PASS: production daemon unlocked through trusted browser UI
+PASS: denied; one-time decision and redacted restricted-agent result
+PASS: wrong-password; one-time decision and redacted restricted-agent result
+PASS: approved; one-time decision and redacted restricted-agent result
+PASS: wrong-field; one-time decision and redacted restricted-agent result
+PASS: agent responses and human history redaction; private service output scanned during cleanup
+Approval evidence: AUTOMATED UI ONLY; no actual human approval claimed
+PASS: bounded private stdout/stderr and redacted observations scanned before deletion
+PASS: owned processes/units/container stopped before private files removed
+PASS: independent post-cleanup resource absence checks
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 35.19s
+

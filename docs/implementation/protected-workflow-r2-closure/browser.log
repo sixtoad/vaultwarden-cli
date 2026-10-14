@@ -1,0 +1,100 @@
+
+> test
+> node --test protected-rehearsal-human.test.mjs && node direct-request.mjs
+
+✔ human unlock only observes actual unlocked result and cleared field (6.732243ms)
+✔ instructed wrong-password step requires generic rejection while pending, then denial (0.846855ms)
+✔ rapid rejected-pending then denied before polling is retained as booleans only (0.346346ms)
+✔ regular human denial observes denied status and cleared field (0.224469ms)
+✔ human approval observes completed or wrong-field failed terminal status (0.447821ms)
+✔ uncleared password fields reject both unlock and approval observations (0.547542ms)
+✔ denial alone does not prove the instructed rejection transition (0.285597ms)
+✔ unexpected completion does not satisfy requested denial (0.242804ms)
+✔ expired and retired sessions reject immediately instead of awaiting another manual decision (1.012955ms)
+✔ pending observer rejects invalidated, expired and retired requests immediately (0.63846ms)
+✔ browser failure output permits only fixed stages, never exception or page data (0.307752ms)
+✔ human timeout and closed-page failures propagate without input attempts (10.713426ms)
+✔ human replay observation checks disabled controls without sending a decision (0.427492ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 95.693492
+{
+  "browser": "firefox/151.0.2",
+  "trustedTLS": true,
+  "requestLifecycleControlsAbsent": true,
+  "requestRoleSurvivesReload": true,
+  "providerLaunchClearsStaleRequestRole": true,
+  "providerLifecycleWarning": true,
+  "pendingReunlockInvalidates": true,
+  "crossTabResetDisablesDecisions": true,
+  "invalidatedRecoveryGuidance": true,
+  "genericRetirementAvoidsCauseClaims": true,
+  "providerLifecycleCookieContext": "same profile and cookie jar",
+  "sshFixedTargetReview": true,
+  "sshReviewRedaction": true,
+  "sshHistoryProjection": true,
+  "sshKeyboardDenial": true,
+  "signedAgentAdmission": true,
+  "signedAgentCompleteReview": true,
+  "signedAgentCapabilityIsolation": true,
+  "historyEmptyAndRows": true,
+  "historyCliAndBrowser": true,
+  "historyLimitsAndAuth": true,
+  "historyAgentControlEscaping": true,
+  "historyStaleSessionRejected": true,
+  "historyLateResponseDiscarded": true,
+  "historyQueuedMutationBlocked": true,
+  "historyRetirementClearsAndDisables": true,
+  "historyInitialReadIndependent": true,
+  "historyAmbiguousFailureGuidance": true,
+  "historyBoundedFetchAndBody": true,
+  "historyInvisibleSeparators": true,
+  "historyLimitChangesObserved": true,
+  "automaticArtifactNavigation": true,
+  "keyboardFocus": {
+    "name": "Unlock for up to 15 minutes",
+    "style": "solid",
+    "width": "3px"
+  },
+  "axe": {
+    "violations": [],
+    "passes": 23
+  },
+  "requestReview": "pending -> expired -> expired while locked",
+  "launchReplay": "403",
+  "cookieOnly": "403",
+  "invalidProof": "403",
+  "independentProviderProofSurvivesRequestLaunch": true,
+  "terminalInspectionAfterLock": true,
+  "keyboardApproveDenyCancel": true,
+  "passwordCleared": true,
+  "immediateInFlightClearingAndDisabling": true,
+  "staleReviewDiscarded": true,
+  "activeAndInFlightAxe": true,
+  "persistentDecisionFeedback": true,
+  "retiredSessionGuidance": true,
+  "externalCompletionFocus": true,
+  "deliveredApprovalResponseDiscarded": true,
+  "exactlyOneApprovalSubmission": true,
+  "decisionReplayRejected": true,
+  "concurrentFreshCookieTabs": true,
+  "transientPollingRecovery": true,
+  "immutableDetailsStable": true,
+  "unchangedLiveStatusStable": true,
+  "argumentBoundariesPreserved": true,
+  "screenReaderManual": false,
+  "automationDiagnostics": {
+    "knownCrossOriginOrBlockedFavicon": 29,
+    "categories": [
+      "Error: Error: Permission denied to access property \"length\"",
+      "Error: SecurityError: Permission denied to access property \"__bidi_args\" on cross-origin object",
+      "Error: Content-Security-Policy: The page’s settings blocked the loading of a resource (img-src) at https://127.0.0.1:<port>/favicon.ico because it violates the following directive: “default-src 'none'”"
+    ],
+    "unexpected": 0
+  }
+}

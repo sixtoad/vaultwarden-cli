@@ -1,0 +1,6 @@
+--- a/tests/support/protected_rehearsal.rs
++++ b/tests/support/protected_rehearsal.rs
+@@
+         if let Some(capture) = &self.driver_lines {
+-            self.redacted_output(&fs::read(&capture.path)?)?;
++            let _discarded = fs::read(&capture.path)?;

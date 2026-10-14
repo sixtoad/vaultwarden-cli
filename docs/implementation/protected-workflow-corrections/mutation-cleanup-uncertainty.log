@@ -1,0 +1,19 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.43s
+     Running tests/protected_rehearsal.rs (target/debug/deps/protected_rehearsal-2ed0babb1ee01cb5)
+
+running 1 test
+
+thread 'docker_disconnect_ownership_and_post_removal_retry_are_fail_closed' (1755478) panicked at tests/protected_rehearsal.rs:300:42:
+called `Result::unwrap()` on an `Err` value: uncertain Docker cleanup accepted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test docker_disconnect_ownership_and_post_removal_retry_are_fail_closed ... FAILED
+
+failures:
+
+failures:
+    docker_disconnect_ownership_and_post_removal_retry_are_fail_closed
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test protected_rehearsal`

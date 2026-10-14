@@ -87,7 +87,10 @@ fn actual_loopback_exchange_unlock_lock_and_replay_are_redacted() {
         .next()
         .unwrap()
         .to_owned();
-    let csrf = response.text().unwrap();
+    let csrf = response.json::<serde_json::Value>().unwrap()["proof"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     assert_eq!(launch().status().as_u16(), 403);
     let page = client
         .get(format!("{base}/"))
@@ -97,7 +100,7 @@ fn actual_loopback_exchange_unlock_lock_and_replay_are_redacted() {
         .text()
         .unwrap();
     assert!(!page.contains(&csrf));
-    assert!(page.contains("sessionStorage.getItem('vw_proof')"));
+    assert!(page.contains("sessionStorage.getItem('vw_role')"));
     let send = |path: &str, body: &str, origin: &str| {
         client
             .post(format!("{base}{path}"))
@@ -252,7 +255,10 @@ fn plaintext_cannot_submit_and_slow_clients_do_not_starve_lock() {
             .unwrap()
             .contains("Secure")
     );
-    let proof = launch.text().unwrap();
+    let proof = launch.json::<serde_json::Value>().unwrap()["proof"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let address = base.strip_prefix("https://").unwrap();
     let mut raw = std::net::TcpStream::connect(address).unwrap();
     raw.set_read_timeout(Some(Duration::from_secs(3))).unwrap();

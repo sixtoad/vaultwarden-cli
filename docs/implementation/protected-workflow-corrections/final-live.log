@@ -1,0 +1,111 @@
+→ Checking CLI isolation before provisioning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/live_tests.rs (target/debug/deps/live_tests-2b8522b1d9e7604c)
+
+running 2 tests
+test isolation::linux::inherited_environment_and_desktop_bus_are_isolated ... ok
+test isolation::linux::isolated_cli_probe ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 0.19s
+
+→ Starting owned Compose project vw-live-live-1dzszr
+ Network vw-live-live-1dzszr_default Creating 
+ Network vw-live-live-1dzszr_default Created 
+ Container vw-live-live-1dzszr-vaultwarden-1 Creating 
+ Container vw-live-live-1dzszr-vaultwarden-1 Created 
+ Container vw-live-live-1dzszr-vaultwarden-1 Starting 
+ Container vw-live-live-1dzszr-vaultwarden-1 Started 
+→ Running configured live tests against http://127.0.0.1:32811 (Vaultwarden 1.36.0)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/live_tests.rs (target/debug/deps/live_tests-2b8522b1d9e7604c)
+
+running 79 tests
+test get::get_by_exact_name_json ... ok
+test get::get_by_item_id ... ok
+test get::get_format_env_produces_key_value_pairs ... ok
+test get::get_format_json_contains_all_fields ... ok
+test get::get_format_username_outputs_only_username ... ok
+test get::get_format_value_outputs_only_password ... ok
+test get::get_json_includes_custom_fields ... ok
+test get::get_not_found_returns_error ... ok
+test get::get_requires_login ... ok
+test get::get_shorthand_password_flag ... ok
+test get::get_shorthand_username_flag ... ok
+test get::get_ssh_item_includes_key_fields_in_json ... ok
+test get::get_uri_by_exact_domain ... ok
+test get::get_uri_no_match_returns_error ... ok
+test get::get_uri_partial_uri_matches ... ok
+test get::get_uri_with_format_value ... ok
+test interpolate::interpolate_custom_field ... ok
+test interpolate::interpolate_hidden_custom_field ... ok
+test interpolate::interpolate_item_name_is_case_insensitive ... ok
+test interpolate::interpolate_missing_placeholder_with_skip_succeeds ... ok
+test interpolate::interpolate_missing_placeholder_without_skip_fails ... ok
+test interpolate::interpolate_multiple_placeholders_in_one_template ... ok
+test interpolate::interpolate_note_notes_field ... ok
+test interpolate::interpolate_output_defaults_to_stdout ... ok
+test interpolate::interpolate_output_to_file ... ok
+test interpolate::interpolate_password_placeholder ... ok
+test interpolate::interpolate_requires_vault_unlocked ... ok
+test interpolate::interpolate_ssh_public_key ... ok
+test interpolate::interpolate_uri_placeholder ... ok
+test interpolate::interpolate_username_placeholder ... ok
+test isolation::linux::inherited_environment_and_desktop_bus_are_isolated ... ok
+test isolation::linux::isolated_cli_probe ... ok
+test list::list_json_includes_all_fixture_items ... ok
+test list::list_json_output_is_valid_json_array ... ok
+test list::list_requires_login ... ok
+test list::list_returns_all_provisioned_items ... ok
+test list::list_search_by_name_prefix ... ok
+test list::list_search_by_username ... ok
+test list::list_search_with_no_matches_prints_no_items_found ... ok
+test list::list_type_and_search_combined ... ok
+test list::list_type_card_shows_only_cards ... ok
+test list::list_type_invalid_returns_error ... ok
+test list::list_type_login_shows_only_logins ... ok
+test list::list_type_note_shows_only_notes ... ok
+test list::list_type_ssh_shows_only_ssh_keys ... ok
+test live_env::private_service_tests::dropping_private_services_exits_and_reaps_exact_children ... ok
+test live_env::private_service_tests::probe_timeout_and_input_error_kill_and_reap_exact_child ... ok
+test run::malformed_selected_fields_fail_before_child_launch ... ok
+test run::run_child_receives_whitelisted_vars ... ok
+test run::run_comma_separated_names_injects_all ... ok
+test run::run_does_not_leak_parent_env_to_child ... ok
+test run::run_info_flag_shows_item_names ... ok
+test run::run_injects_vault_vars_into_child_env ... ok
+test run::run_propagates_child_exit_code ... ok
+test run::run_requires_vault_unlocked ... ok
+test run::run_uri_info_flag_reports_matched_item ... ok
+test run::run_uri_injects_vars_for_matching_item ... ok
+test run::run_uri_no_match_fails ... ok
+test run::run_with_name_flag ... ok
+test run::run_with_unknown_item_fails ... ok
+test run::selected_fields_reach_children_by_name_id_and_uri_and_info_redacts ... ok
+test session::get_requires_vault_unlocked ... ok
+test session::list_requires_vault_unlocked ... ok
+test session::lock_clears_vault_keys ... ok
+test session::lock_logged_out_fails ... ok
+test session::lock_when_already_locked_is_graceful ... ok
+test session::login_does_not_store_access_token_in_config_json ... ok
+test session::login_with_invalid_client_secret_fails ... ok
+test session::login_with_unreachable_server_fails ... ok
+test session::login_with_valid_credentials ... ok
+test session::logout_clears_session ... ok
+test session::logout_when_not_logged_in_is_graceful ... ok
+test session::status_when_logged_in_locked ... ok
+test session::status_when_logged_in_unlocked ... ok
+test session::status_when_not_logged_in ... ok
+test session::unlock_reads_password_from_env_var ... ok
+test session::unlock_session_is_reusable_and_failed_persistence_is_not_success ... ok
+test session::unlock_with_correct_password_succeeds ... ok
+test session::unlock_with_wrong_password_fails ... ok
+
+test result: ok. 79 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 384.61s
+
+→ Cleaning owned Compose project vw-live-live-1dzszr
+ Container vw-live-live-1dzszr-vaultwarden-1 Stopping 
+ Container vw-live-live-1dzszr-vaultwarden-1 Stopped 
+ Container vw-live-live-1dzszr-vaultwarden-1 Removing 
+ Container vw-live-live-1dzszr-vaultwarden-1 Removed 
+ Network vw-live-live-1dzszr_default Removing 
+ Network vw-live-live-1dzszr_default Removed 

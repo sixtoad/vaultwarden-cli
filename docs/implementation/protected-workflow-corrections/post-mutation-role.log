@@ -1,0 +1,9 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.66s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-e3f6bc7a555f4483)
+
+running 1 test
+test adapters::loopback_ui::tests::roles_reject_opposite_endpoints_even_with_both_cookies_and_provider_survives_resets ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 749 filtered out; finished in 0.29s
+

@@ -1,0 +1,1 @@
+PASS: provider not-found/inactive; no rehearsal units/cgroups, labeled containers, owned live Compose resources, private rehearsal roots, supervisor runtime or browser controller.

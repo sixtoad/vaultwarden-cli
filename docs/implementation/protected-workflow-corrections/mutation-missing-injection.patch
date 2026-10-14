@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: /home/sixtocantolla/sessions/day-to-day/vaultwarden-protected-workflow-rehearsal/src/adapters/supervisor/bridge.rs
+@@
+-    let envp = launch.pointers(&launch.environment);
++    let envp = launch.pointers(&launch.environment[..2]);
+*** End Patch
