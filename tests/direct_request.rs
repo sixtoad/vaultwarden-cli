@@ -502,6 +502,45 @@ fn isolated_human_submission_https_child() {
         panic!("creation rejected")
     };
     let revision = operation.revision;
+    // Validate malformed SSH inputs before any pending desktop launches exist.
+    // Later, periodic launch pruning reads request status under the same gate
+    // that deliberately makes contending submissions fail as unavailable.
+    let HumanResponse::OperationCreated { operation } = exchange(
+        &root,
+        HumanCommand::OperationCreate {
+            policy: Box::new(ssh_policy::draft("test-image")),
+        },
+    )
+    .unwrap() else {
+        panic!("SSH creation failed")
+    };
+    let ssh_revision = operation.revision;
+    for values in [
+        vec!["--host=other".into()],
+        vec!["--key=/tmp/private-key-sentinel".into()],
+    ] {
+        let response = exchange(
+            &root,
+            HumanCommand::Request {
+                submission: DirectSubmission {
+                    operation: "ssh-backup".into(),
+                    revision: Some(ssh_revision.clone()),
+                    values,
+                },
+            },
+        )
+        .unwrap();
+        assert!(
+            matches!(
+                response,
+                HumanResponse::Rejected {
+                    reason: DirectRequestError::InvalidRequest
+                }
+            ),
+            "SSH override rejection returned {response:?}"
+        );
+        assert_eq!(launcher.0.load(Ordering::SeqCst), 0);
+    }
     let input = || DirectSubmission {
         operation: "deploy".into(),
         revision: Some(revision.clone()),
@@ -766,7 +805,12 @@ fn isolated_human_submission_https_child() {
         let _ignored = waiting.kill();
     }
     let first: HumanResponse = serde_json::from_str(&first.unwrap()).unwrap();
-    assert!(matches!(first, HumanResponse::Submitted { .. }));
+    let HumanResponse::Submitted {
+        receipt: waiting_receipt,
+    } = first
+    else {
+        panic!("waiting CLI did not return a receipt: {first:?}")
+    };
     assert!(waiting.try_wait().unwrap().is_none());
     assert_eq!(launcher.0.load(Ordering::SeqCst), 3);
     clock.store(300, Ordering::SeqCst);
@@ -796,39 +840,21 @@ fn isolated_human_submission_https_child() {
     assert!(waiting.wait().unwrap().success());
     reader.join().unwrap();
     assert_eq!(launcher.0.load(Ordering::SeqCst), 3);
-    let HumanResponse::OperationCreated { operation } = exchange(
-        &root,
-        HumanCommand::OperationCreate {
-            policy: Box::new(ssh_policy::draft("test-image")),
-        },
-    )
-    .unwrap() else {
-        panic!("SSH creation failed")
-    };
-    let ssh_revision = operation.revision;
-    for values in [
-        vec!["--host=other".into()],
-        vec!["--key=/tmp/private-key-sentinel".into()],
-    ] {
-        let response = exchange(
-            &root,
-            HumanCommand::Request {
-                submission: DirectSubmission {
-                    operation: "ssh-backup".into(),
-                    revision: Some(ssh_revision.clone()),
-                    values,
-                },
-            },
-        )
-        .unwrap();
-        assert!(matches!(
-            response,
-            HumanResponse::Rejected {
-                reason: DirectRequestError::InvalidRequest
-            }
-        ));
-        assert_eq!(launcher.0.load(Ordering::SeqCst), 3);
+    // Terminal status does not mean the browser broker has pruned its launch.
+    // Observe cleanup before a new submission so its intentional try_lock
+    // admission cannot race the broker's status reads.
+    let retired_launches =
+        [&denied_receipt.id, &waiting_receipt.id].map(|id| root.join(format!("review-{id}.html")));
+    let cleanup_deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while retired_launches.iter().any(|path| path.exists())
+        && std::time::Instant::now() < cleanup_deadline
+    {
+        std::thread::sleep(Duration::from_millis(10));
     }
+    assert!(
+        retired_launches.iter().all(|path| !path.exists()),
+        "terminal desktop launches were not pruned before SSH admission"
+    );
     let response = exchange(
         &root,
         HumanCommand::Request {
@@ -844,7 +870,7 @@ fn isolated_human_submission_https_child() {
         receipt: ssh_receipt,
     } = response
     else {
-        panic!("SSH fixed policy should admit")
+        panic!("SSH fixed policy should admit: {response:?}")
     };
     let stored: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&state_path).unwrap()).unwrap();
