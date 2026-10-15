@@ -72,7 +72,12 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Install native dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config clang llvm dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config clang llvm dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools xdg-utils shared-mime-info file
+          test -x /usr/bin/xdg-open
+          test -x /usr/bin/xdg-mime
+          test -x /usr/bin/file
       - name: Verify native fixture machine code
         if: runner.os == 'Linux'
         run: ./scripts/check-native-fixtures.sh
@@ -271,7 +276,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools xdg-utils shared-mime-info file
+          test -x /usr/bin/xdg-open
+          test -x /usr/bin/xdg-mime
+          test -x /usr/bin/file
 
       - name: Install Tarpaulin
         id: install-tarpaulin

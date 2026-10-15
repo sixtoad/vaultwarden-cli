@@ -328,6 +328,14 @@ fn cli_provisioning_restart_retains_revision_and_agent_approval() {
 }
 #[test]
 fn human_submission_https_review_expiry_and_independent_negative_cases() {
+    for prerequisite in ["/usr/bin/xdg-open", "/usr/bin/xdg-mime", "/usr/bin/file"] {
+        let metadata = std::fs::metadata(prerequisite)
+            .unwrap_or_else(|error| panic!("desktop fixture prerequisite {prerequisite}: {error}"));
+        assert!(
+            metadata.is_file() && metadata.permissions().mode() & 0o111 != 0,
+            "desktop fixture prerequisite is not executable: {prerequisite}"
+        );
+    }
     // The production broker must issue request authority. Isolate its fixed
     // xdg-open handoff in a subprocess with a synthetic desktop association.
     let desktop = tempfile::tempdir().unwrap();
@@ -354,8 +362,9 @@ fn human_submission_https_review_expiry_and_independent_negative_cases() {
         .unwrap();
     assert!(
         child.status.success(),
-        "isolated transport fixture failed: {}",
-        String::from_utf8_lossy(&child.stdout)
+        "isolated transport fixture failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&child.stdout),
+        String::from_utf8_lossy(&child.stderr)
     );
 }
 

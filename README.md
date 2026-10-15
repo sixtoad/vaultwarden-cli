@@ -345,15 +345,19 @@ cargo build --release
 
 Ordinary `cargo test` runs server-independent private-keyring isolation tests,
 even when live-server variables are unset. Install `dbus-daemon`,
-`gnome-keyring-daemon`, `gdbus`, and `secret-tool` first. On Debian/Ubuntu:
+`gnome-keyring-daemon`, `gdbus`, and `secret-tool` first. The request-launch
+fixture also needs `xdg-open`, `xdg-mime`, `file`, and the shared MIME database.
+On Debian/Ubuntu:
 
 ```bash
-sudo apt-get install dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools
+sudo apt-get install dbus-daemon gnome-keyring libglib2.0-bin libsecret-tools xdg-utils shared-mime-info file
 ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --locked
 ```
 
 These tests start disposable private services; they do not need a desktop session
 or Docker. Their process-ownership checks require Linux pidfds (kernel 5.3+).
+The request-launch fixture uses an isolated synthetic desktop association; it
+does not open your browser or use your personal desktop configuration.
 
 ### Disposable live regression suite (Linux)
 

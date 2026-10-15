@@ -558,8 +558,11 @@ mod tests {
             // Deliberately cross the former ten-second exchange deadline using
             // a valid response, so parse failure cannot masquerade as timeout.
             std::thread::sleep(Duration::from_secs(11));
-            write_frame(
-                &mut stream,
+            // This fixture tests the client's long response deadline, not the
+            // production writer's short budget. Preserve raw I/O errors and
+            // close the stream for EOF after sending the valid synthetic frame.
+            stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+            stream.write_all(
                 &serde_json::to_vec(&HumanResponse::AgentRevoked { agent: response }).unwrap(),
             )
         });
@@ -569,7 +572,11 @@ mod tests {
                 id: expected.id.clone(),
             },
         );
-        server.join().unwrap().unwrap();
+        let server_result = server.join().expect("delayed-response fixture panicked");
+        assert!(
+            server_result.is_ok() && response.is_ok(),
+            "delayed response failed: server={server_result:?}, client={response:?}"
+        );
         let HumanResponse::AgentRevoked { agent } = response.unwrap() else {
             panic!("expected delayed revocation response")
         };
