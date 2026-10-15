@@ -532,6 +532,29 @@ mod tests {
     }
     #[test]
     fn agent_revoke_exchange_waits_beyond_the_ordinary_response_timeout() {
+        // Keep this long-lived socket exchange out of the parallel fixture
+        // process, just like the descriptor regressions below. The wrapper is
+        // never ignored: it requires the complete child assertion to pass.
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "adapters::human_socket::tests::isolated_delayed_revocation_fixture",
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "isolated delayed revocation failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    #[test]
+    #[ignore = "invoked by the ordinary delayed-revocation regression wrapper"]
+    fn isolated_delayed_revocation_fixture() {
         use crate::access::{RequestId, agent_binding::AgentBindingStatus};
         let directory = private_temp();
         let path = directory.path().join(SOCKET_NAME);
@@ -566,16 +589,18 @@ mod tests {
                 &serde_json::to_vec(&HumanResponse::AgentRevoked { agent: response }).unwrap(),
             )
         });
+        let started = Instant::now();
         let response = exchange(
             directory.path(),
             HumanCommand::AgentRevoke {
                 id: expected.id.clone(),
             },
         );
+        let exchange_elapsed = started.elapsed();
         let server_result = server.join().expect("delayed-response fixture panicked");
         assert!(
             server_result.is_ok() && response.is_ok(),
-            "delayed response failed: server={server_result:?}, client={response:?}"
+            "delayed response failed after {exchange_elapsed:?}: server={server_result:?}, client={response:?}"
         );
         let HumanResponse::AgentRevoked { agent } = response.unwrap() else {
             panic!("expected delayed revocation response")
