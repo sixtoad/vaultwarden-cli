@@ -53,3 +53,40 @@ func isInteractionRequired(domain: String, code: Int) -> Bool {
     (domain == "NSOSStatusErrorDomain" && code == -25308)
         || (domain == "com.apple.LocalAuthentication" && code == -1004)
 }
+
+/// Main-thread platform worker ownership, shared with harmless native tests.
+/// It cannot sign or approve; Rust still validates the returned proof.
+struct NativeAttemptSlot {
+    private struct Active {
+        let token: UInt32
+        let epoch: UInt32
+        let cancel: () -> Void
+        var invalidated = false
+    }
+    private var active: Active?
+    private var lastToken: UInt32 = 0
+    var isBusy: Bool { active != nil }
+
+    mutating func begin(_ work: SyntheticWork, cancel: @escaping () -> Void) -> Bool {
+        guard active == nil, work.token > lastToken else { return false }
+        lastToken = work.token
+        active = Active(token: work.token, epoch: work.epoch, cancel: cancel)
+        return true
+    }
+
+    mutating func invalidate(token: UInt32? = nil) {
+        guard let current = active, token == nil || token == current.token else { return }
+        active?.invalidated = true
+        current.cancel()
+    }
+
+    mutating func finish(token: UInt32, epoch: UInt32, reply: SignerReply) -> SignerReply? {
+        guard let current = active, current.token == token, current.epoch == epoch else { return nil }
+        defer { active = nil }
+        if current.invalidated && reply.outcome == .verified {
+            return SignerReply(outcome: .cancelled)
+        }
+        // Key mutations cannot be undone, and unsafe evidence must survive cancel.
+        return reply
+    }
+}

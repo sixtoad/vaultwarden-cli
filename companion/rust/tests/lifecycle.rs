@@ -207,3 +207,59 @@ fn unavailable_and_malformed_proofs_cannot_approve() {
     }
     assert!(core.select(3).is_err());
 }
+
+#[test]
+fn explicit_absent_key_deletion_retires_identity_and_allows_recovery() {
+    let (mut core, key) = ready();
+    let work = core.begin(Operation::Sign).unwrap();
+    core.finish(work.token, work.epoch, proof(&work, &key));
+    let fingerprint = core.snapshot().key_fingerprint;
+    assert_eq!(fingerprint.len(), 64);
+    retain(&mut core, &key);
+    assert_eq!(core.snapshot().key_fingerprint, fingerprint);
+    let work = core.begin(Operation::Reopen).unwrap();
+    core.finish(work.token, work.epoch, result(Outcome::MissingKey));
+    assert!(core.snapshot().has_key);
+    assert_eq!(core.snapshot().verified, 1);
+    let work = core.begin(Operation::Delete).unwrap();
+    core.invalidate(Invalidation::Cancel);
+    core.finish(work.token, work.epoch, result(Outcome::MissingKey));
+    assert_eq!(core.snapshot().outcome, Outcome::Deleted);
+    assert!(!core.snapshot().has_key);
+    assert!(core.snapshot().key_fingerprint.is_empty());
+    assert_eq!(core.snapshot().verified, 0);
+    assert!(core.begin(Operation::Create).is_ok());
+}
+
+#[test]
+fn unsafe_observation_survives_later_reviews_and_key_mutations() {
+    let (mut core, key) = ready();
+    let work = core.begin(Operation::NoInteraction).unwrap();
+    core.invalidate(Invalidation::Cancel);
+    core.finish(work.token, work.epoch, proof(&work, &key));
+    assert!(core.snapshot().unsafe_observed);
+    for operation in [Operation::Reopen, Operation::Delete, Operation::Create] {
+        core.select(2).unwrap();
+        assert!(!core.snapshot().can_sign);
+        assert!(core.begin(Operation::Sign).is_err());
+        assert!(core.begin(Operation::NoInteraction).is_err());
+        let work = core.begin(operation).unwrap();
+        let mut completion = result(match operation {
+            Operation::Reopen => Outcome::Reopened,
+            Operation::Delete => Outcome::Deleted,
+            _ => Outcome::Created,
+        });
+        if operation != Operation::Delete {
+            completion.public_key = key
+                .verifying_key()
+                .to_encoded_point(false)
+                .as_bytes()
+                .to_vec();
+        }
+        core.finish(work.token, work.epoch, completion);
+        core.invalidate(Invalidation::Cancel);
+        assert!(core.snapshot().unsafe_observed);
+        assert!(!core.snapshot().can_sign);
+    }
+    assert!(!Core::default().snapshot().unsafe_observed);
+}

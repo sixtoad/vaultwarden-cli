@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/platform/signer.dart';
@@ -106,4 +108,80 @@ void main() {
     ).perform(work(Operation.noInteraction));
     expect(result.outcome, Outcome.unsafe);
   });
+
+  test(
+    'non-map and wrong-key channel replies become completed failures',
+    () async {
+      for (final reply in <Object?>[
+        null,
+        'not a map',
+        <Object?>[1],
+        true,
+        <Object, Object>{1: 'wrong key', 'signature': Uint8List(0)},
+        {
+          'outcome': 'verified',
+          'publicKey': <int>[],
+          'signature': 'wrong type',
+        },
+      ]) {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (_) async => reply);
+        final result = await NativeApprovalPlatform(
+          macOS: true,
+          channel: channel,
+        ).perform(work(Operation.sign));
+        expect(result.outcome, Outcome.failed);
+        expect(result.signature, isEmpty);
+        expect(
+          await NativeApprovalPlatform(
+            macOS: true,
+            channel: channel,
+          ).availability(),
+          AuthenticationAvailability.unavailable,
+        );
+      }
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            channel,
+            (_) async => <Object, Object>{
+              1: 'malformed key',
+              'signature': Uint8List.fromList([1]),
+            },
+          );
+      final unsafe = await NativeApprovalPlatform(
+        macOS: true,
+        channel: channel,
+      ).perform(work(Operation.noInteraction));
+      expect(unsafe.outcome, Outcome.unsafe);
+    },
+  );
+
+  test(
+    'older unregistration cannot clear a replacement channel listener',
+    () async {
+      var oldCalls = 0;
+      var newCalls = 0;
+      final old = NativeApprovalPlatform(macOS: true, channel: channel);
+      final replacement = NativeApprovalPlatform(macOS: true, channel: channel);
+      final removeOld = old.onInvalidation((_) {
+        oldCalls++;
+      });
+      final removeNew = replacement.onInvalidation((_) {
+        newCalls++;
+      });
+      removeOld();
+      final done = Completer<void>();
+      ServicesBinding.instance.channelBuffers.push(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('invalidate', 'sleep'),
+        ),
+        (_) => done.complete(),
+      );
+      await done.future;
+      expect(oldCalls, 0);
+      expect(newCalls, 1);
+      removeNew();
+    },
+  );
 }

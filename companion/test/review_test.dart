@@ -26,7 +26,8 @@ class DelayedPlatform implements ApprovalPlatform {
   }
 
   @override
-  void onInvalidation(void Function(core.Invalidation) callback) {}
+  void Function() onInvalidation(void Function(core.Invalidation) callback) =>
+      () {};
 }
 
 void main() {
@@ -90,6 +91,41 @@ void main() {
       expect(core.snapshot().busy, false);
       expect(core.snapshot().outcome, core.Outcome.cancelled);
       expect(core.snapshot().verified, 0);
+      // A late noninteractive signature fails acceptance for the entire session.
+      await tester.tap(find.text('Review request 2'));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Check without interaction'));
+      await tester.tap(find.text('Check without interaction'));
+      await tester.pump();
+      await tester.tap(find.text('Cancel attempt'));
+      platform.pending!.complete(
+        core.Completion(
+          outcome: core.Outcome.unsafe,
+          publicKey: Uint8List(0),
+          signature: Uint8List(0),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('unsafe-warning')), findsOneWidget);
+      expect(find.byKey(const Key('key-fingerprint')), findsOneWidget);
+      await tester.ensureVisible(find.text('Review request 1'));
+      await tester.tap(find.text('Review request 1'));
+      await tester.pump();
+      expect(core.snapshot().unsafeObserved, true);
+      expect(core.snapshot().canSign, false);
+      await tester.ensureVisible(find.text('Delete test key'));
+      await tester.tap(find.text('Delete test key'));
+      await tester.pump();
+      platform.pending!.complete(
+        core.Completion(
+          outcome: core.Outcome.deleted,
+          publicKey: Uint8List(0),
+          signature: Uint8List(0),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('unsafe-warning')), findsOneWidget);
+      expect(find.byKey(const Key('key-fingerprint')), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

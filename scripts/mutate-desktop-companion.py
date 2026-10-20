@@ -25,6 +25,7 @@ mutations = {
                    ('self.active.take().expect("matched active worker")', 'self.active.as_ref().cloned().expect("matched active worker")')],
     "admission": [("if self.active.is_some() {", "if false {"),
                   ("can_sign: self.active.is_none() && self.key.is_some() && fresh,", "can_sign: self.key.is_some() && fresh,")],
+    "unsafe-latch": [("self.unsafe_observed |= self.outcome == Outcome::Unsafe;", "self.unsafe_observed = false;")],
 }
 
 def run(name):

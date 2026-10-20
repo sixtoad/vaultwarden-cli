@@ -55,16 +55,21 @@ import SwiftUI
                     Button("Create test key") { model.run(.create) }
                     Button("Reopen test key") { model.run(.reopen) }
                     Button("No-interaction check") { model.run(.noInteraction) }
+                        .disabled(model.gate.unsafeObserved)
                 }.disabled(model.gate.active != nil)
                 HStack {
                     Button("Sign once with Touch ID") { model.run(.sign) }
-                        .disabled(model.gate.active != nil)
+                        .disabled(model.gate.active != nil || model.gate.unsafeObserved)
                     Button("Cancel attempt") { model.cancel() }
                         .disabled(model.gate.active == nil)
                     Button("Delete this probe's test key", role: .destructive) { model.run(.delete) }
                         .disabled(model.gate.active != nil)
                 }
                 Divider()
+                if model.gate.unsafeObserved {
+                    Text("Acceptance failed: unsafe signing observed in this session. Signing is disabled; delete the test key for cleanup. Restart begins a new session, not a passing hardware result.")
+                        .foregroundStyle(.red)
+                }
                 Text(model.result).textSelection(.enabled)
                 Text("Verified signatures this session: \(model.gate.verifiedSignatures); blocked no-interaction checks: \(model.gate.blockedWithoutInteraction)")
                 Text("Public test-key SHA-256: \(model.fingerprint)").font(.system(.caption, design: .monospaced)).textSelection(.enabled)

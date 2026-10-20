@@ -6,8 +6,7 @@ import LocalAuthentication
 final class ApprovalSigner {
     private let channel: FlutterMethodChannel
     private let worker = DispatchQueue(label: "dev.vaultwarden.companionSlice.signer")
-    private var active: (UInt32, LAContext)?
-    private var invalidated = false
+    private var attempts = NativeAttemptSlot()
     private var observers: [NSObjectProtocol] = []
 
     init(messenger: FlutterBinaryMessenger) {
@@ -22,8 +21,7 @@ final class ApprovalSigner {
     }
 
     private func invalidate(_ reason: String) {
-        invalidated = true
-        active?.1.invalidate()
+        attempts.invalidate()
         channel.invokeMethod("invalidate", arguments: reason)
     }
 
@@ -31,11 +29,13 @@ final class ApprovalSigner {
         if call.method == "availability" { result(NativeTestKey.availability() ? "touchID" : "unavailable"); return }
         if call.method == "cancel" {
             // Retain the active slot until the worker has returned.
-            if let token = call.arguments as? NSNumber, token.uint32Value == active?.0 { invalidated = true; active?.1.invalidate() }
+            if let token = number(call.arguments, max: UInt64(UInt32.max)) {
+                attempts.invalidate(token: UInt32(token))
+            }
             result(nil); return
         }
         guard call.method == "perform" else { result(FlutterMethodNotImplemented); return }
-        guard active == nil, let args = call.arguments as? [String: Any],
+        guard !attempts.isBusy, let args = call.arguments as? [String: Any],
               Set(args.keys) == Set(["token", "epoch", "operation", "fixture", "expiresUnixMs", "nonce", "keyId"]),
               let token = number(args["token"], max: UInt64(UInt32.max)), token > 0,
               let epoch = number(args["epoch"], max: UInt64(UInt32.max)),
@@ -48,18 +48,19 @@ final class ApprovalSigner {
                                             fixture: UInt32(fixture), expiresUnixMs: expires, nonce: nonce.data, keyID: keyID.data)
         else { result(FlutterError(code: "invalid_request", message: "Invalid or overlapping synthetic operation", details: nil)); return }
         let context = NativeTestKey.context(for: operation)
-        active = (work.token, context); invalidated = false
+        guard attempts.begin(work, cancel: { context.invalidate() }) else {
+            context.invalidate()
+            result(FlutterError(code: "invalid_request", message: "Stale synthetic operation", details: nil))
+            return
+        }
         worker.async { [weak self] in
             let reply = NativeTestKey.perform(work, context: context)
             DispatchQueue.main.async {
-                guard let self else { return }
-                // Preserve mutations and unsafe outcomes even if the OS event
-                // reaches Dart after this callback. Discard late signing success.
-                let outcome = self.invalidated && reply.outcome == .verified ? TestOutcome.cancelled : reply.outcome
-                self.active = nil
-                result(["outcome": outcome.rawValue,
-                        "publicKey": FlutterStandardTypedData(bytes: reply.publicKey),
-                        "signature": FlutterStandardTypedData(bytes: outcome == .cancelled ? Data() : reply.signature)])
+                guard let self,
+                      let accepted = self.attempts.finish(token: work.token, epoch: work.epoch, reply: reply) else { return }
+                result(["outcome": accepted.outcome.rawValue,
+                        "publicKey": FlutterStandardTypedData(bytes: accepted.publicKey),
+                        "signature": FlutterStandardTypedData(bytes: accepted.signature)])
             }
         }
     }

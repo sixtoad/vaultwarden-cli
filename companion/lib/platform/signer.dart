@@ -10,7 +10,7 @@ abstract interface class ApprovalPlatform {
   Future<AuthenticationAvailability> availability();
   Future<Completion> perform(Work work);
   Future<void> cancel(int token);
-  void onInvalidation(void Function(Invalidation) callback);
+  void Function() onInvalidation(void Function(Invalidation) callback);
 }
 
 class NativeApprovalPlatform implements ApprovalPlatform {
@@ -21,12 +21,13 @@ class NativeApprovalPlatform implements ApprovalPlatform {
           const MethodChannel('dev.vaultwarden.companionSlice/signer');
   final bool _macOS;
   final MethodChannel _channel;
+  static final Map<String, Object> _handlerOwners = {};
 
   @override
   Future<AuthenticationAvailability> availability() async {
     if (!_macOS) return AuthenticationAvailability.unavailable;
     try {
-      return await _channel.invokeMethod<String>('availability') == 'touchID'
+      return await _channel.invokeMethod<Object?>('availability') == 'touchID'
           ? AuthenticationAvailability.touchId
           : AuthenticationAvailability.unavailable;
     } on PlatformException {
@@ -42,7 +43,7 @@ class NativeApprovalPlatform implements ApprovalPlatform {
     // Do not synthesize a completion on a timeout. Only a returned method call
     // can release the Rust admission slot; cancellation keeps awaiting it.
     try {
-      final reply = await _channel.invokeMapMethod<String, Object?>('perform', {
+      final reply = await _channel.invokeMethod<Object?>('perform', {
         'token': work.token,
         'epoch': work.epoch,
         'operation': work.operation.name,
@@ -51,14 +52,14 @@ class NativeApprovalPlatform implements ApprovalPlatform {
         'nonce': work.nonce,
         'keyId': work.keyId,
       });
-      final returnedSignature = reply?['signature'];
+      if (reply is! Map) return _empty(Outcome.failed);
+      final returnedSignature = reply['signature'];
       if (work.operation == Operation.noInteraction &&
           returnedSignature is Uint8List &&
           returnedSignature.isNotEmpty) {
         return _empty(Outcome.unsafe);
       }
-      if (reply == null ||
-          reply.length != 3 ||
+      if (reply.length != 3 ||
           reply['publicKey'] is! Uint8List ||
           reply['signature'] is! Uint8List) {
         return _empty(Outcome.failed);
@@ -92,15 +93,28 @@ class NativeApprovalPlatform implements ApprovalPlatform {
   }
 
   @override
-  void onInvalidation(void Function(Invalidation) callback) {
-    if (!_macOS) return;
+  void Function() onInvalidation(void Function(Invalidation) callback) {
+    if (!_macOS) return () {};
+    final owner = Object();
+    _handlerOwners[_channel.name] = owner;
+    var subscribed = true;
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'invalidate') {
+      if (subscribed &&
+          identical(_handlerOwners[_channel.name], owner) &&
+          call.method == 'invalidate') {
         callback(
           call.arguments == 'sleep' ? Invalidation.sleep : Invalidation.close,
         );
       }
     });
+    return () {
+      subscribed = false;
+      // An older widget must not unregister a replacement's channel handler.
+      if (identical(_handlerOwners[_channel.name], owner)) {
+        _handlerOwners.remove(_channel.name);
+        _channel.setMethodCallHandler(null);
+      }
+    };
   }
 
   Completion _empty(Outcome outcome) => Completion(

@@ -35,6 +35,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -58,9 +61,6 @@ jobs:
           name: companion-slice-${{ runner.os }}-development
           path: |
             ${{ runner.temp }}/desktop-evidence
-            companion/build/linux/*/release/bundle/
-            companion/build/macos/Build/Products/Release/*.app/
-            companion/build/windows/*/runner/Release/
 
   desktop-companion-msrv:
     name: Companion Rust 1.88 and security mutations

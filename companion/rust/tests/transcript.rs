@@ -23,6 +23,17 @@ fn shared_swift_rust_golden_vector() {
         actual,
         include_str!("../../fixtures/transcript-v1.hex").trim()
     );
+    let mut second = work.clone();
+    second.fixture = 2;
+    let actual: String = transcript(&second)
+        .unwrap()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        actual,
+        include_str!("../../fixtures/transcript-v1-fixture-two.hex").trim()
+    );
     let mut bad = work;
     bad.nonce.push(0);
     assert!(transcript(&bad).is_err());

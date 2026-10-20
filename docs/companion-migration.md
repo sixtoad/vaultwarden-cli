@@ -24,8 +24,13 @@ Run `bash scripts/test-desktop-companion.sh` on the matching desktop host.
 Linux needs clang, CMake, Ninja, pkg-config, GTK3 development files and Xvfb.
 macOS needs Xcode and Rust targets for both Apple architectures; Windows needs
 the Visual Studio desktop C++ workload. This builds the Rust library, runs the
-core/Dart tests, builds the application, and runs an integration test that loads
-the library from inside the desktop bundle. It never creates a key or opens an
+core/Dart tests and debug packaged integration, then builds and executes a release
+AOT smoke entrypoint that checks the packaged library, native contract and rendered
+fixture using explicit runtime failures. The pinned Flutter SDK's `flutter test`
+forces debug mode, so a release build alone is not counted as a release run.
+The script rebuilds `lib/main.dart` afterward and archives that ordinary
+application for operator acceptance. Python 3.12 is pinned in desktop CI.
+It never creates a key or opens an
 authentication prompt. Public dependencies must be available before offline
 mutation tests.
 
@@ -46,6 +51,10 @@ retains the public key returned by an explicit create/reopen operation; it never
 accepts a signing completion's supplied public key as a trust anchor. Reopening
 a different identity fails until an explicit successful deletion retires the
 old identity. Public key and proof bytes are held only in memory.
+The UI exposes a selectable SHA-256 fingerprint of the retained SEC1 public key
+for comparison across explicit reopen/relaunch/rebuild. Deletion clears it.
+Confirmed key absence counts as retirement only during explicit deletion;
+missing keys during signing or reopen do not silently reset identity or counters.
 
 The bridge exposes typed operations, work, completion and snapshot records.
 There is one process-wide Rust lifecycle and one in-flight native worker. A
@@ -70,7 +79,9 @@ length. Fields, in order:
 
 `companion/fixtures/transcript-v1.hex` freezes fixture 1, epoch 7, token 9,
 expiry 1700000000000, nonce `11` repeated 32 times and key ID `22` repeated 32
-times. Rust and Swift tests check that exact vector. The native adapter accepts
+times. `transcript-v1-fixture-two.hex` freezes the same binding values with
+fixture 2 and its distinct complete text. Rust and Swift independently check both
+vectors. The native adapter accepts
 typed fixture fields and independently constructs this transcript; it does not
 accept arbitrary message bytes. This is not the production biometric v2
 transcript and conveys no provider authority or remote hardware attestation.
@@ -90,6 +101,20 @@ unavailable hardware do not count. Any noninteractive signature is unsafe,
 including after cancellation. Completed key creation/deletion is reported even
 after cancellation; cancellation cannot undo a Keychain mutation. Failed key
 operations leave counters and retained identity intact.
+Any unsafe result latches an enduring acceptance-failed warning for the session,
+including a late result after cancellation. Further signing/negative probes are
+blocked; selection, cancel, reopen and deletion cannot clear that warning.
+Explicit deletion remains available for cleanup. Restart begins a new session;
+it does not turn the previous failed observation into passing hardware evidence.
+The standalone probe applies the same session rule.
+
+Availability is queried without prompting on startup, application resume and
+the explicit Refresh availability action. Request generations prevent stale
+replies from overwriting newer state. Native-event subscriptions are removed on
+widget replacement/disposal; queued obsolete callbacks cannot retire the live
+Rust review. A completed worker still returns to Rust after its old widget is
+disposed. Malformed returned channel values yield bounded failure completions,
+while a noninteractive signature is classified unsafe before other metadata.
 
 ## Native identity and operation
 
@@ -116,7 +141,7 @@ set changes and signing-profile changes require operator coordination.
 
 Automated tests establish protocol/lifecycle behavior, not a physical touch.
 `scripts/mutate-desktop-companion.py` changes verification, transcript binding,
-expiry, cancellation, duplicate consumption and admission one at a time. Each
+expiry, cancellation, duplicate consumption, admission and the unsafe latch one at a time. Each
 mutation must fail an actual test, not compilation; it restores the exact source
 bytes and reruns the baseline. CI retains logs and development application
 artifacts for three operating systems. The new desktop jobs join Merge Ready;
@@ -127,23 +152,80 @@ Linux build container (CMake 3.25.1, Ninja 1.11.1, GTK 3.24.38, Xvfb, Rust 1.88)
 No host desktop packages were installed. Six Dart tests include an actual FFI
 load and a widget/native-worker cancellation flow; one additional desktop
 integration test loads the library from the built bundle. The release bundle
-builds successfully; desktop integration uses the debug bundle. Native
-macOS/Windows builds and hardware cases are pending until executed on matching
-runners. CI configuration alone does not establish a passing run.
+builds successfully; desktop integration used the debug bundle. The original
+desktop/native matrix subsequently passed on revision
+`08997f752a80ae1dc458771c8ce2d6c3d46e12d9` in
+[CI run 39397597833](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39397597833).
+That run predates the review fixes and new release-runtime/archive checks below.
+Updated native results require a new matching-runner execution. CI configuration
+alone does not establish a passing run.
 
 | Required evidence | Status |
 | --- | --- |
-| Rust 1.88 lifecycle and shared transcript vector | 10 tests passed locally with generated bridge |
+| Rust 1.88 lifecycle and both shared transcript vectors | 12 tests passed locally after review fixes with regenerated bridge |
 | Rustfmt and stable Clippy | Passed locally |
-| Security mutations and exact restored baseline | Six mutations caught by test failures; restored baseline passed |
-| Flutter analysis, widget/platform tests and actual FFI load | Analysis clean; all six tests passed |
-| Linux desktop build and packaged bridge integration | Release build and debug packaged integration passed in isolated container |
-| macOS build, native contract tests and packaged bridge integration | Pending matching runner |
-| Windows build and packaged bridge integration | Pending matching runner |
+| Security mutations and exact restored baseline | All seven caught by test failures; exact restoration and baseline retest passed |
+| Flutter analysis, widget/platform tests and actual FFI load | Review-fix analysis clean; all 11 tests passed |
+| Linux debug integration, release AOT runtime, normal-entry archive | Both launch checks passed in isolated container; Python 3.12 archive round-trip and all five artifact tests passed |
+| macOS build, native/probe tests, debug integration, release runtime and archive | Original matrix passed; review-fix matching-runner execution pending |
+| Windows build, debug integration, release runtime and archive | Original matrix passed; review-fix matching-runner execution pending |
 | Two successive separate touches on the real Mac | Pending coordinated operator evidence |
 | No-interaction refusal, cancel/late completion, reopen after exit | Pending coordinated operator evidence |
 | Same identity after rebuild and changed bundle/signing profile | Pending coordinated operator evidence |
 | Biometric-set change makes old key unusable | Pending separately authorized hardware action |
+
+Review-fix local verification ran on 2026-10-20. The container's minimal Rust
+toolchain lacks rustfmt/Clippy, so those checks ran on the host; its older Python
+cannot run the archive extraction filter, so archive verification ran on host
+Python 3.12 against the same completed bundle. CI installs all required tools
+and runs the complete script. Seven-mutation restoration matched source SHA-256
+`d32ffb3b8345e0c0aebfbb78072edc8e302bc024959c6c615af68cd58f0ca761`.
+These results do not claim native or physical acceptance for the review fixes;
+the PR check history records the matching native runs.
+
+## Coordinated check of the development artifact
+
+CI uploads an inner `companion-<platform>-development.tar.gz`, its `.sha256`,
+`artifact.json` source/content inventory, and release smoke evidence. The tar
+preserves executable permissions and framework links; packaging verifies a fresh
+extraction against the complete original inventory. The smoke entrypoint uses
+stdout on Linux/macOS and a task-owned result file on Windows, always requiring
+exit status zero. Uploaded bundles are rebuilt with the normal `lib/main.dart`.
+For an isolated local build without Git metadata, the packaging helper accepts
+an explicit full `--source-revision` together with `--source-dirty`; CI obtains
+provenance directly from its checkout.
+
+On the operator's Mac, use the artifact from the passing run for the exact
+revision being accepted. Verify and extract the inner tar into a fresh directory:
+
+```sh
+shasum -a 256 -c companion-macos-development.tar.gz.sha256
+tar -xzf companion-macos-development.tar.gz -C /path/to/fresh-test-directory
+open "/path/to/fresh-test-directory/companion_slice.app"
+```
+
+Do not replace the installed companion or disable Gatekeeper. If development
+signing cannot run/reopen the key, preserve that result and coordinate recovery.
+
+1. Confirm the Rust connection, fixture and availability; startup must not create
+   a key or prompt. Explicitly create/reopen the disposable key and record its
+   public fingerprint plus source revision.
+2. Review request 1, check without interaction (only interactionRequired passes),
+   review again and sign with a fresh touch. Immediately review/check without
+   interaction again. Repeat with request 2 and a second separate touch.
+3. Cancel a prompt and change selection during an attempt. Neither late result
+   may increment verification; admission stays closed until the worker returns.
+   Observe lock/unlock and fast-user-switch with the operator; these event
+   mappings remain deferred until real-Mac evidence exists.
+4. Quit/relaunch, explicitly reopen and compare the fingerprint. Repeat with a
+   changed executable whose different SHA-256 is recorded to test update
+   continuity. A rebuild of identical bytes does not establish update behavior.
+5. Delete the exact disposable key; its fingerprint disappears and reopen
+   reports missingKey. Any unsafe warning stops acceptance and persists through
+   cleanup. Restarting does not erase the recorded failed observation.
+
+Record actual separate touches and outcomes; automated counters do not prove
+physical touches. Enrollment changes and lockout require separate authorization.
 
 ## Parity and eventual Swift removal
 

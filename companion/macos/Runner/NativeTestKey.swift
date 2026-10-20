@@ -36,7 +36,7 @@ enum NativeTestKey {
         if work.operation == .create { return create(context) }
         if work.operation == .delete {
             let status = SecItemDelete(query(context) as CFDictionary)
-            return SignerReply(outcome: status == errSecSuccess ? .deleted : status == errSecItemNotFound ? .missingKey : .failed)
+            return SignerReply(outcome: deletionOutcome(status))
         }
         var attributes = query(context)
         attributes[kSecReturnRef as String] = true
@@ -71,6 +71,11 @@ enum NativeTestKey {
         // Rust verifies the proof. No local authenticated boolean grants authority.
         return SignerReply(outcome: work.operation == .noInteraction ? .unsafe : .verified,
                            signature: signature as Data)
+    }
+
+    static func deletionOutcome(_ status: OSStatus) -> TestOutcome {
+        // Only an explicit deletion retires an already absent identity.
+        status == errSecSuccess || status == errSecItemNotFound ? .deleted : .failed
     }
 
     private static func create(_ context: LAContext) -> SignerReply {

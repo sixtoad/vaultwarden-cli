@@ -67,6 +67,8 @@ pub struct Snapshot {
     pub fixture: Fixture,
     pub busy: bool,
     pub has_key: bool,
+    pub key_fingerprint: String,
+    pub unsafe_observed: bool,
     pub can_sign: bool,
     pub verified: u32,
     pub blocked_without_interaction: u32,

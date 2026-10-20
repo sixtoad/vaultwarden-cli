@@ -68,6 +68,7 @@ pub struct Core {
     active: Option<Active>,
     verified: u32,
     blocked: u32,
+    unsafe_observed: bool,
     outcome: Outcome,
 }
 
@@ -82,6 +83,7 @@ impl Default for Core {
             active: None,
             verified: 0,
             blocked: 0,
+            unsafe_observed: false,
             outcome: Outcome::Ready,
         }
     }
@@ -110,13 +112,25 @@ impl Core {
     }
 
     pub fn snapshot(&self) -> Snapshot {
-        let fresh = self
-            .reviewed
-            .is_some_and(|(deadline, wall)| Instant::now() < deadline && unix_ms() < wall);
+        let fresh = !self.unsafe_observed
+            && self
+                .reviewed
+                .is_some_and(|(deadline, wall)| Instant::now() < deadline && unix_ms() < wall);
         Snapshot {
             fixture: fixture(self.selected).expect("selected fixture"),
             busy: self.active.is_some(),
             has_key: self.key.is_some(),
+            key_fingerprint: self
+                .key
+                .as_ref()
+                .map(|key| {
+                    Sha256::digest(key)
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            unsafe_observed: self.unsafe_observed,
             can_sign: self.active.is_none() && self.key.is_some() && fresh,
             verified: self.verified,
             blocked_without_interaction: self.blocked,
@@ -193,6 +207,7 @@ impl Core {
         }
         let active = self.active.take().expect("matched active worker");
         self.outcome = self.complete(active, completion);
+        self.unsafe_observed |= self.outcome == Outcome::Unsafe;
     }
 
     fn complete(&mut self, active: Active, completion: Completion) -> Outcome {
@@ -208,7 +223,9 @@ impl Core {
         if completion.signature.len() > 72 || completion.public_key.len() > 65 {
             return Outcome::Rejected;
         }
-        if operation == Operation::Delete && completion.outcome == Outcome::Deleted {
+        if operation == Operation::Delete
+            && matches!(completion.outcome, Outcome::Deleted | Outcome::MissingKey)
+        {
             self.key = None;
             self.verified = 0;
             self.blocked = 0;

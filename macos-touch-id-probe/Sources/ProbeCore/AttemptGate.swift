@@ -15,12 +15,14 @@ public struct AttemptGate {
     public private(set) var invalidated = false
     public private(set) var verifiedSignatures = 0
     public private(set) var blockedWithoutInteraction = 0
+    public private(set) var unsafeObserved = false
     private var operation: ProbeOperation?
 
     public init() {}
 
     public mutating func begin(_ operation: ProbeOperation) -> UUID? {
         guard active == nil else { return nil }
+        guard !unsafeObserved || (operation != .sign && operation != .noInteraction) else { return nil }
         let token = UUID()
         active = token
         invalidated = false
@@ -36,7 +38,7 @@ public struct AttemptGate {
         defer { active = nil; operation = nil; invalidated = false }
         // Cancellation cannot undo a completed Keychain mutation or hide a
         // security failure. Preserve these observations even after invalidation.
-        if outcome == .unsafe { return .unsafe }
+        if outcome == .unsafe { unsafeObserved = true; return .unsafe }
         if (operation == .create && outcome == .created)
             || (operation == .delete && outcome == .deleted) {
             verifiedSignatures = 0

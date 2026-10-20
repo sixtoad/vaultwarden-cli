@@ -16,20 +16,34 @@ cargo build --release --locked --manifest-path rust/Cargo.toml --target-dir "$re
 flutter pub get --enforce-lockfile
 flutter analyze
 flutter test
+python3 "$repo/scripts/test-desktop-companion-artifact.py"
 
 case "$(uname -s)" in
   Linux*)
-    flutter build linux --release
+    target=linux
     xvfb-run -a flutter test integration_test/bridge_test.dart -d linux
     ;;
   Darwin*)
+    target=macos
     swift test --package-path .
-    flutter build macos --release
+    swift test --package-path "$repo/macos-touch-id-probe"
     flutter test integration_test/bridge_test.dart -d macos
     ;;
   MINGW*|MSYS*|CYGWIN*)
-    flutter build windows --release
+    target=windows
     flutter test integration_test/bridge_test.dart -d windows
     ;;
   *) echo 'Unsupported build host' >&2; exit 1 ;;
 esac
+
+# flutter test forces debug mode in the pinned SDK. Build/run a separate AOT
+# smoke entrypoint with explicit runtime checks (never Dart assert statements).
+flutter build "$target" --release --target integration_test/release_smoke.dart
+if [[ "$target" == linux ]]; then
+  xvfb-run -a python3 "$repo/scripts/desktop-companion-artifact.py" smoke "$target" "$evidence"
+else
+  python3 "$repo/scripts/desktop-companion-artifact.py" smoke "$target" "$evidence"
+fi
+# Never publish the self-exiting smoke harness as the operator's application.
+flutter build "$target" --release --target lib/main.dart
+python3 "$repo/scripts/desktop-companion-artifact.py" package "$target" "$evidence"

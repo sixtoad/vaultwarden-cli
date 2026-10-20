@@ -323,6 +323,8 @@ impl SseDecode for crate::api::Snapshot {
         let mut var_fixture = <crate::api::Fixture>::sse_decode(deserializer);
         let mut var_busy = <bool>::sse_decode(deserializer);
         let mut var_hasKey = <bool>::sse_decode(deserializer);
+        let mut var_keyFingerprint = <String>::sse_decode(deserializer);
+        let mut var_unsafeObserved = <bool>::sse_decode(deserializer);
         let mut var_canSign = <bool>::sse_decode(deserializer);
         let mut var_verified = <u32>::sse_decode(deserializer);
         let mut var_blockedWithoutInteraction = <u32>::sse_decode(deserializer);
@@ -331,6 +333,8 @@ impl SseDecode for crate::api::Snapshot {
             fixture: var_fixture,
             busy: var_busy,
             has_key: var_hasKey,
+            key_fingerprint: var_keyFingerprint,
+            unsafe_observed: var_unsafeObserved,
             can_sign: var_canSign,
             verified: var_verified,
             blocked_without_interaction: var_blockedWithoutInteraction,
@@ -525,6 +529,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::Snapshot {
             self.fixture.into_into_dart().into_dart(),
             self.busy.into_into_dart().into_dart(),
             self.has_key.into_into_dart().into_dart(),
+            self.key_fingerprint.into_into_dart().into_dart(),
+            self.unsafe_observed.into_into_dart().into_dart(),
             self.can_sign.into_into_dart().into_dart(),
             self.verified.into_into_dart().into_dart(),
             self.blocked_without_interaction
@@ -683,6 +689,8 @@ impl SseEncode for crate::api::Snapshot {
         <crate::api::Fixture>::sse_encode(self.fixture, serializer);
         <bool>::sse_encode(self.busy, serializer);
         <bool>::sse_encode(self.has_key, serializer);
+        <String>::sse_encode(self.key_fingerprint, serializer);
+        <bool>::sse_encode(self.unsafe_observed, serializer);
         <bool>::sse_encode(self.can_sign, serializer);
         <u32>::sse_encode(self.verified, serializer);
         <u32>::sse_encode(self.blocked_without_interaction, serializer);

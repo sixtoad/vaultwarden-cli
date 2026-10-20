@@ -102,6 +102,8 @@ class Snapshot {
   final Fixture fixture;
   final bool busy;
   final bool hasKey;
+  final String keyFingerprint;
+  final bool unsafeObserved;
   final bool canSign;
   final int verified;
   final int blockedWithoutInteraction;
@@ -111,6 +113,8 @@ class Snapshot {
     required this.fixture,
     required this.busy,
     required this.hasKey,
+    required this.keyFingerprint,
+    required this.unsafeObserved,
     required this.canSign,
     required this.verified,
     required this.blockedWithoutInteraction,
@@ -122,6 +126,8 @@ class Snapshot {
       fixture.hashCode ^
       busy.hashCode ^
       hasKey.hashCode ^
+      keyFingerprint.hashCode ^
+      unsafeObserved.hashCode ^
       canSign.hashCode ^
       verified.hashCode ^
       blockedWithoutInteraction.hashCode ^
@@ -135,6 +141,8 @@ class Snapshot {
           fixture == other.fixture &&
           busy == other.busy &&
           hasKey == other.hasKey &&
+          keyFingerprint == other.keyFingerprint &&
+          unsafeObserved == other.unsafeObserved &&
           canSign == other.canSign &&
           verified == other.verified &&
           blockedWithoutInteraction == other.blockedWithoutInteraction &&

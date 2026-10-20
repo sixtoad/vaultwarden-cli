@@ -33,11 +33,13 @@ final class AttemptGateTests: XCTestCase {
     }
 
     func testNegativeRequiresCorrectOperationAndOutcome() {
-        var gate = AttemptGate()
         for outcome in [ProbeOutcome.missingKey, .unavailable, .failed, .unsafe, .cancelled] {
+            var gate = AttemptGate()
             let token = gate.begin(.noInteraction)!
             XCTAssertEqual(gate.finish(token, outcome: outcome), outcome)
+            XCTAssertEqual(gate.blockedWithoutInteraction, 0)
         }
+        var gate = AttemptGate()
         XCTAssertEqual(gate.blockedWithoutInteraction, 0)
         let sign = gate.begin(.sign)!
         _ = gate.finish(sign, outcome: .interactionRequired)
@@ -45,6 +47,24 @@ final class AttemptGateTests: XCTestCase {
         let negative = gate.begin(.noInteraction)!
         _ = gate.finish(negative, outcome: .interactionRequired)
         XCTAssertEqual(gate.blockedWithoutInteraction, 1)
+    }
+
+    func testUnsafeLatchSurvivesCleanupAndBlocksFurtherSigning() {
+        var gate = AttemptGate()
+        let token = gate.begin(.noInteraction)!
+        gate.cancel()
+        XCTAssertEqual(gate.finish(token, outcome: .unsafe), .unsafe)
+        for (operation, outcome) in [(ProbeOperation.delete, ProbeOutcome.deleted),
+                                     (.create, .created), (.reopen, .reopened)] {
+            XCTAssertTrue(gate.unsafeObserved)
+            XCTAssertNil(gate.begin(.sign))
+            XCTAssertNil(gate.begin(.noInteraction))
+            let mutation = gate.begin(operation)!
+            gate.cancel()
+            _ = gate.finish(mutation, outcome: outcome)
+            XCTAssertTrue(gate.unsafeObserved)
+        }
+        XCTAssertFalse(AttemptGate().unsafeObserved)
     }
 
     func testOnlyExplicitSignCountsAndKeyChangesResetEvidence() {

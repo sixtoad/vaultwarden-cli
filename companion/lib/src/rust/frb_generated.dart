@@ -302,16 +302,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Snapshot dco_decode_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return Snapshot(
       fixture: dco_decode_fixture(arr[0]),
       busy: dco_decode_bool(arr[1]),
       hasKey: dco_decode_bool(arr[2]),
-      canSign: dco_decode_bool(arr[3]),
-      verified: dco_decode_u_32(arr[4]),
-      blockedWithoutInteraction: dco_decode_u_32(arr[5]),
-      outcome: dco_decode_outcome(arr[6]),
+      keyFingerprint: dco_decode_String(arr[3]),
+      unsafeObserved: dco_decode_bool(arr[4]),
+      canSign: dco_decode_bool(arr[5]),
+      verified: dco_decode_u_32(arr[6]),
+      blockedWithoutInteraction: dco_decode_u_32(arr[7]),
+      outcome: dco_decode_outcome(arr[8]),
     );
   }
 
@@ -437,6 +439,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_fixture = sse_decode_fixture(deserializer);
     var var_busy = sse_decode_bool(deserializer);
     var var_hasKey = sse_decode_bool(deserializer);
+    var var_keyFingerprint = sse_decode_String(deserializer);
+    var var_unsafeObserved = sse_decode_bool(deserializer);
     var var_canSign = sse_decode_bool(deserializer);
     var var_verified = sse_decode_u_32(deserializer);
     var var_blockedWithoutInteraction = sse_decode_u_32(deserializer);
@@ -445,6 +449,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       fixture: var_fixture,
       busy: var_busy,
       hasKey: var_hasKey,
+      keyFingerprint: var_keyFingerprint,
+      unsafeObserved: var_unsafeObserved,
       canSign: var_canSign,
       verified: var_verified,
       blockedWithoutInteraction: var_blockedWithoutInteraction,
@@ -573,6 +579,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_fixture(self.fixture, serializer);
     sse_encode_bool(self.busy, serializer);
     sse_encode_bool(self.hasKey, serializer);
+    sse_encode_String(self.keyFingerprint, serializer);
+    sse_encode_bool(self.unsafeObserved, serializer);
     sse_encode_bool(self.canSign, serializer);
     sse_encode_u_32(self.verified, serializer);
     sse_encode_u_32(self.blockedWithoutInteraction, serializer);
