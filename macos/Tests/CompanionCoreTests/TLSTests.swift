@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 import Security
 import XCTest
@@ -7,6 +8,77 @@ import XCTest
 /// These tests use real URLSession, Security.framework, Keychain, and a localhost
 /// TLS server requiring a client certificate. They are mandatory, not skipped.
 final class TLSTests: XCTestCase {
+    func testFixtureRestartAndShutdownAfterAsyncRequest() async throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        for _ in 0..<3 {
+            try fixture.start()
+            let session = try await fixture.client().session()
+            XCTAssertEqual(session.state, "unlocked")
+            XCTAssertEqual(try fixture.commands(), ["session"])
+        }
+        XCTAssertEqual(fixture.stopServer(), [])
+        XCTAssertNil(fixture.server)
+        XCTAssertEqual(fixture.stopServer(), [], "Repeated shutdown must be harmless")
+    }
+
+    func testFixtureShutdownObservesAlreadyExitedChild() async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        let child = TLSFixtureProcess(process)
+        try child.run()
+        defer { XCTAssertEqual(child.stop(), []) }
+        await Task.yield()
+        XCTAssertEqual(child.exited.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(child.stop(), [])
+        XCTAssertEqual(child.stop(), [], "Exit observation must be reusable")
+    }
+
+    func testFixtureFailedLaunchLeavesNothingToStop() {
+        let process = Process()
+        process.executableURL = FileManager.default.temporaryDirectory.appendingPathComponent("missing-child-\(UUID().uuidString)")
+        let child = TLSFixtureProcess(process)
+        XCTAssertEqual(child.stop(), [], "An unlaunched child needs no cleanup")
+        XCTAssertThrowsError(try child.run())
+        XCTAssertEqual(child.exited.wait(timeout: .now()), .success)
+        XCTAssertEqual(child.stop(), [], "Failed launch must balance exit observation")
+        XCTAssertThrowsError(try child.run(), "A child wrapper permits only one launch attempt")
+        XCTAssertEqual(child.stop(), [])
+    }
+
+    func testFixtureShutdownFailsAndCleansUpChildIgnoringTermination() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("companion-child-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let ready = directory.appendingPathComponent("ready")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["python3", "-c",
+            "import pathlib,signal,sys,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); pathlib.Path(sys.argv[1]).touch(); time.sleep(60)",
+            ready.path]
+        let child = TLSFixtureProcess(process)
+        try child.run()
+        defer { XCTAssertEqual(child.stop(), []) }
+        let deadline = DispatchTime.now() + 5
+        while !FileManager.default.fileExists(atPath: ready.path), DispatchTime.now() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        guard FileManager.default.fileExists(atPath: ready.path) else {
+            XCTFail("Child must install its signal handler before shutdown")
+            return
+        }
+        let start = DispatchTime.now()
+        XCTAssertEqual(child.stop(timeout: 0.1), ["TLS fixture child exit was not observed after SIGTERM"])
+        XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000, 3)
+        guard child.exited.wait(timeout: .now()) == .success else {
+            XCTFail("Forced cleanup must observe exit")
+            return
+        }
+        XCTAssertFalse(process.isRunning)
+        XCTAssertEqual(process.terminationReason, .uncaughtSignal)
+        XCTAssertEqual(process.terminationStatus, SIGKILL)
+    }
+
     func testSameSubjectRenewalReturnsExactImportedIdentity() throws {
         let fixture = try TLSFixture()
         defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
@@ -104,12 +176,57 @@ final class TLSTests: XCTestCase {
     }
 }
 
+/// Observe exit independently of the calling thread's run loop. Foundation's
+/// waitUntilExit can hang when this synchronous fixture is used after an await.
+private final class TLSFixtureProcess {
+    let process: Process
+    let exited = DispatchGroup()
+    private var launchAttempted = false
+    private var launched = false
+
+    init(_ process: Process) {
+        self.process = process
+        // Install before launch so even an immediately exiting child is observed.
+        let exited = self.exited
+        process.terminationHandler = { _ in exited.leave() }
+    }
+
+    func run() throws {
+        guard !launchAttempted else { throw CompanionError.configuration }
+        launchAttempted = true
+        exited.enter()
+        do {
+            try process.run()
+            launched = true
+        } catch {
+            // A launch failure has no child and therefore no termination callback.
+            exited.leave()
+            throw error
+        }
+    }
+
+    func stop(timeout: TimeInterval = 2) -> [String] {
+        guard launched else { return [] }
+        if process.isRunning { process.terminate() }
+        if exited.wait(timeout: .now() + timeout) == .success { return [] }
+        var failures = ["TLS fixture child exit was not observed after SIGTERM"]
+        // This is cleanup after a failed check, never a successful retry.
+        if process.isRunning, Darwin.kill(process.processIdentifier, SIGKILL) != 0, errno != ESRCH {
+            failures.append("TLS fixture child SIGKILL failed: \(errno)")
+        }
+        if exited.wait(timeout: .now() + 2) != .success {
+            failures.append("TLS fixture child exit was not observed after cleanup")
+        }
+        return failures
+    }
+}
+
 private final class TLSFixture {
     let directory: URL
     let script: URL
     var keychain: SecKeychain?
     var originalSearchList: CFArray?
-    var server: Process?
+    var server: TLSFixtureProcess?
     var port = 0
     var references: [String: Data] = [:]
     init() throws {
@@ -137,11 +254,12 @@ private final class TLSFixture {
         } catch { _ = close(); throw error }
     }
     func start(mode: String = "normal") throws {
-        stopServer()
+        guard stopServer().isEmpty else { throw CompanionError.configuration }
         let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["python3", script.path, "serve", directory.path, "--mode", mode]
         let output = Pipe(); process.standardOutput = output; process.standardError = FileHandle.nullDevice
-        try process.run(); server = process
+        let child = TLSFixtureProcess(process)
+        try child.run(); server = child
         var line = Data()
         while line.count < 16, let byte = try output.fileHandleForReading.read(upToCount: 1), !byte.isEmpty {
             if byte == Data([10]) { break }; line.append(byte)
@@ -199,13 +317,14 @@ private final class TLSFixture {
             return object["command"]!
         }
     }
-    func stopServer() {
-        if let server, server.isRunning { server.terminate(); server.waitUntilExit() }
-        server = nil
+    func stopServer() -> [String] {
+        guard let server else { return [] }
+        let failures = server.stop()
+        if server.exited.wait(timeout: .now()) == .success { self.server = nil }
+        return failures
     }
     @discardableResult func close() -> [String] {
-        stopServer()
-        var failures: [String] = []
+        var failures = stopServer()
         let hadKeychain = keychain != nil
         if let originalSearchList {
             let status = SecKeychainSetSearchList(originalSearchList)
