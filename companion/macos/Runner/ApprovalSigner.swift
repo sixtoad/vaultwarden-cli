@@ -53,14 +53,16 @@ final class ApprovalSigner {
             result(FlutterError(code: "invalid_request", message: "Stale synthetic operation", details: nil))
             return
         }
+        let queue = worker
         worker.async { [weak self] in
-            let reply = NativeTestKey.perform(work, context: context)
-            DispatchQueue.main.async {
-                guard let self,
-                      let accepted = self.attempts.finish(token: work.token, epoch: work.epoch, reply: reply) else { return }
-                result(["outcome": accepted.outcome.rawValue,
-                        "publicKey": FlutterStandardTypedData(bytes: accepted.publicKey),
-                        "signature": FlutterStandardTypedData(bytes: accepted.signature)])
+            NativeTestKey.perform(work, context: context, worker: queue) { reply in
+                DispatchQueue.main.async {
+                    guard let self,
+                          let accepted = self.attempts.finish(token: work.token, epoch: work.epoch, reply: reply) else { return }
+                    result(["outcome": accepted.outcome.rawValue,
+                            "publicKey": FlutterStandardTypedData(bytes: accepted.publicKey),
+                            "signature": FlutterStandardTypedData(bytes: accepted.signature)])
+                }
             }
         }
     }

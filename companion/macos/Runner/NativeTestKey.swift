@@ -18,7 +18,9 @@ enum NativeTestKey {
         context.touchIDAuthenticationAllowableReuseDuration = 0
         context.localizedFallbackTitle = ""
         context.localizedReason = "Sign this synthetic companion request with Touch ID"
-        context.interactionNotAllowed = operation != .sign
+        // Keychain lookup/signing never owns an implicit authentication prompt.
+        // Only the explicit access-control evaluation below may show one.
+        context.interactionNotAllowed = true
         return context
     }
 
@@ -31,7 +33,70 @@ enum NativeTestKey {
          kSecUseAuthenticationContext as String: context]
     }
 
-    static func perform(_ work: SyntheticWork, context: LAContext) -> SignerReply {
+    static func perform(_ work: SyntheticWork, context: LAContext,
+                        worker: DispatchQueue, completion: @escaping (SignerReply) -> Void) {
+        guard work.operation == .sign else {
+            completion(performWithoutInteraction(work, context: context))
+            return
+        }
+        // Fetch the stored key's ACL without prompting. Authorize that actual ACL,
+        // not a separate device-owner boolean, on the context we can invalidate.
+        var attributes = query(context)
+        attributes[kSecReturnAttributes as String] = true
+        attributes[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(attributes as CFDictionary, &item)
+        guard status == errSecSuccess else {
+            context.invalidate()
+            completion(status == errSecItemNotFound ? SignerReply(outcome: .missingKey)
+                       : classify(.sign, domain: NSOSStatusErrorDomain, code: Int(status)))
+            return
+        }
+        guard let dictionary = item as? [String: Any],
+              let access = dictionary[kSecAttrAccessControl as String],
+              CFGetTypeID(access as CFTypeRef) == SecAccessControlGetTypeID() else {
+            context.invalidate()
+            completion(SignerReply(outcome: .failed))
+            return
+        }
+        authorize(work, access: access as! SecAccessControl, context: context, worker: worker) { failure in
+            if let failure {
+                context.invalidate()
+                completion(failure)
+            } else {
+                // Re-query with this authenticated context after evaluation, so
+                // the SecKey captures its credential. Signing must not prompt again.
+                completion(performWithoutInteraction(work, context: context))
+            }
+        }
+    }
+
+    /// Callback runs on the worker only after evaluation actually returns.
+    /// Invalidating the same context cancels the explicit OS prompt; the caller
+    /// must still await this callback before releasing admission.
+    static func authorize(_ work: SyntheticWork, access: SecAccessControl, context: LAContext,
+                          worker: DispatchQueue, completion: @escaping (SignerReply?) -> Void) {
+        guard UInt64(Date().timeIntervalSince1970 * 1000) < work.expiresUnixMs else {
+            completion(SignerReply(outcome: .cancelled))
+            return
+        }
+        context.interactionNotAllowed = false
+        context.evaluateAccessControl(access, operation: .useKeySign,
+                                      localizedReason: "Sign synthetic request \(work.fixture) with Touch ID") { success, error in
+            worker.async {
+                if success {
+                    context.interactionNotAllowed = true
+                    completion(nil)
+                } else if let error = error as NSError? {
+                    completion(classify(.sign, domain: error.domain, code: error.code))
+                } else {
+                    completion(SignerReply(outcome: .failed))
+                }
+            }
+        }
+    }
+
+    private static func performWithoutInteraction(_ work: SyntheticWork, context: LAContext) -> SignerReply {
         defer { context.invalidate() }
         if work.operation == .create { return create(context) }
         if work.operation == .delete {
@@ -109,7 +174,8 @@ enum NativeTestKey {
         }
         if (domain == NSOSStatusErrorDomain && code == Int(errSecUserCanceled))
             || (domain == LAError.errorDomain && [LAError.userCancel.rawValue,
-                LAError.appCancel.rawValue, LAError.systemCancel.rawValue].contains(code)) {
+                LAError.appCancel.rawValue, LAError.systemCancel.rawValue,
+                LAError.invalidContext.rawValue].contains(code)) {
             return SignerReply(outcome: .cancelled)
         }
         return SignerReply(outcome: .failed)

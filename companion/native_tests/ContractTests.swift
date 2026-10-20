@@ -101,10 +101,119 @@ final class ContractTests: XCTestCase {
         XCTAssertFalse(first === second)
         XCTAssertEqual(first.touchIDAuthenticationAllowableReuseDuration, 0)
         XCTAssertEqual(first.localizedFallbackTitle, "")
-        XCTAssertFalse(first.interactionNotAllowed)
+        XCTAssertTrue(first.interactionNotAllowed)
         let silent = NativeTestKey.context(for: .noInteraction)
         defer { silent.invalidate() }
         XCTAssertTrue(silent.interactionNotAllowed)
         XCTAssertEqual(NativeTestKey.tag, Data("dev.vaultwarden.companionSlice.test-key.v1".utf8))
+    }
+
+    func testInvalidatedContextReturnsWithoutPromptAndReleasesOnlyOnCallback() throws {
+        let context = NativeTestKey.context(for: .sign)
+        let access = try XCTUnwrap(SecAccessControlCreateWithFlags(nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly, [.privateKeyUsage, .biometryCurrentSet], nil))
+        let request = try SyntheticWork(token: 1, epoch: 3, operation: .sign, fixture: 1,
+            expiresUnixMs: UInt64(Date().timeIntervalSince1970 * 1000) + 30_000,
+            nonce: Data(repeating: 0, count: 32), keyID: Data(repeating: 0, count: 32))
+        var slot = NativeAttemptSlot()
+        XCTAssertTrue(slot.begin(request, cancel: { context.invalidate() }))
+        // Invalidated before calling LA: cannot display UI or require enrollment.
+        // This is callback/admission evidence, not a real prompt-dismissal test.
+        slot.invalidate(token: request.token)
+        XCTAssertTrue(slot.isBusy)
+        let returned = expectation(description: "Invalid context returns without a touch")
+        NativeTestKey.authorize(request, access: access, context: context,
+                                worker: DispatchQueue(label: "test.invalidated-context")) { failure in
+            DispatchQueue.main.async {
+                // An invalidated LAContext ignores property writes; it must
+                // return cancellation, never enter the signature operation.
+                XCTAssertEqual(failure?.outcome, .cancelled)
+                XCTAssertTrue(slot.isBusy)
+                let completion = slot.finish(token: request.token, epoch: request.epoch,
+                                             reply: failure ?? SignerReply(outcome: .failed))
+                XCTAssertEqual(completion?.outcome, .cancelled)
+                XCTAssertFalse(slot.isBusy)
+                returned.fulfill()
+            }
+        }
+        wait(for: [returned], timeout: 5)
+    }
+
+    func testExpiredAuthorizationDoesNotEvaluateOrEnableInteraction() throws {
+        let context = NativeTestKey.context(for: .sign)
+        defer { context.invalidate() }
+        let access = try XCTUnwrap(SecAccessControlCreateWithFlags(nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly, [.privateKeyUsage, .biometryCurrentSet], nil))
+        var completed = false
+        NativeTestKey.authorize(try work(token: 1), access: access, context: context,
+                                worker: DispatchQueue(label: "test.expired")) { failure in
+            completed = true
+            XCTAssertEqual(failure?.outcome, .cancelled)
+        }
+        XCTAssertTrue(completed)
+        XCTAssertTrue(context.interactionNotAllowed)
+    }
+
+    func testExplicitAuthorizationOwnsCancellationAndRejectsSigning() throws {
+        let context = ControlledAuthorizationContext()
+        context.interactionNotAllowed = true
+        let access = try XCTUnwrap(SecAccessControlCreateWithFlags(nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly, [.privateKeyUsage, .biometryCurrentSet], nil))
+        let request = try SyntheticWork(token: 1, epoch: 3, operation: .sign, fixture: 2,
+            expiresUnixMs: UInt64(Date().timeIntervalSince1970 * 1000) + 30_000,
+            nonce: Data(repeating: 0, count: 32), keyID: Data(repeating: 0, count: 32))
+        let returned = expectation(description: "Cancelled evaluation returned")
+        NativeTestKey.authorize(request, access: access, context: context,
+                                worker: DispatchQueue(label: "test.controlled-cancel")) { failure in
+            XCTAssertEqual(failure?.outcome, .cancelled)
+            returned.fulfill()
+        }
+        XCTAssertNotNil(context.pending)
+        XCTAssertFalse(context.interactionNotAllowed)
+        XCTAssertEqual(context.operation, .useKeySign)
+        XCTAssertEqual(context.reason, "Sign synthetic request 2 with Touch ID")
+        context.invalidate()
+        wait(for: [returned], timeout: 5)
+    }
+
+    func testSuccessfulEvaluationStillRequiresNoninteractiveSigning() throws {
+        let context = ControlledAuthorizationContext()
+        let access = try XCTUnwrap(SecAccessControlCreateWithFlags(nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly, [.privateKeyUsage, .biometryCurrentSet], nil))
+        let request = try SyntheticWork(token: 1, epoch: 3, operation: .sign, fixture: 1,
+            expiresUnixMs: UInt64(Date().timeIntervalSince1970 * 1000) + 30_000,
+            nonce: Data(repeating: 0, count: 32), keyID: Data(repeating: 0, count: 32))
+        let returned = expectation(description: "Evaluation returned, no signature granted")
+        NativeTestKey.authorize(request, access: access, context: context,
+                                worker: DispatchQueue(label: "test.controlled-success")) { failure in
+            XCTAssertTrue(context.interactionNotAllowed)
+            XCTAssertNil(failure) // Allows the key operation, never grants a proof.
+            returned.fulfill()
+        }
+        try XCTUnwrap(context.pending)(true, nil)
+        wait(for: [returned], timeout: 5)
+    }
+}
+
+/// Harmless API-boundary double: no key lookup, biometric evaluation or signature.
+private final class ControlledAuthorizationContext: LAContext {
+    var pending: ((Bool, Error?) -> Void)?
+    var operation: LAAccessControlOperation?
+    var reason: String?
+
+    override func evaluateAccessControl(_ accessControl: SecAccessControl,
+                                        operation: LAAccessControlOperation,
+                                        localizedReason: String,
+                                        reply: @escaping (Bool, Error?) -> Void) {
+        self.operation = operation
+        reason = localizedReason
+        pending = reply
+    }
+
+    override func invalidate() {
+        let reply = pending
+        pending = nil
+        reply?(false, NSError(domain: LAError.errorDomain, code: LAError.appCancel.rawValue))
+        super.invalidate()
     }
 }

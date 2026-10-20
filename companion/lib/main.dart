@@ -53,6 +53,9 @@ class _CompanionReviewState extends State<CompanionReview>
   AuthenticationAvailability availability =
       AuthenticationAvailability.unavailable;
   core.Work? active;
+  bool cancelling = false;
+  core.Work? lastCompleted;
+  core.Outcome? lastOutcome;
   ApprovalPlatform? activePlatform;
   VoidCallback? unsubscribe;
   int platformGeneration = 0;
@@ -109,7 +112,10 @@ class _CompanionReviewState extends State<CompanionReview>
     if (disposed || !mounted) return;
     final next = core.invalidate(reason: reason);
     final work = active;
-    if (work != null) unawaited(activePlatform!.cancel(work.token));
+    if (work != null) {
+      cancelling = true;
+      unawaited(activePlatform!.cancel(work.token));
+    }
     if (mounted) setState(() => state = next);
   }
 
@@ -144,6 +150,7 @@ class _CompanionReviewState extends State<CompanionReview>
       return;
     }
     active = work;
+    cancelling = false;
     final platform = widget.platform;
     activePlatform = platform;
     setState(() {
@@ -158,7 +165,34 @@ class _CompanionReviewState extends State<CompanionReview>
     );
     active = null;
     activePlatform = null;
-    if (mounted) setState(() => state = next);
+    if (mounted) {
+      setState(() {
+        state = next;
+        lastCompleted = work;
+        lastOutcome = next.outcome;
+        cancelling = false;
+      });
+    }
+  }
+
+  String operationLabel(core.Work work) =>
+      work.operation == core.Operation.sign ||
+          work.operation == core.Operation.noInteraction
+      ? 'Request ${work.fixture}'
+      : 'Test key (${work.operation.name})';
+
+  String get resultLabel {
+    final work = active;
+    if (work != null) {
+      return cancelling
+          ? 'Cancelling ${operationLabel(work).toLowerCase()}…'
+          : '${operationLabel(work)}: in progress';
+    }
+    final completed = lastCompleted;
+    if (completed != null) {
+      return 'Last attempt — ${operationLabel(completed)}: ${lastOutcome!.name}';
+    }
+    return 'Result: ${state.outcome.name}';
   }
 
   @override
@@ -261,7 +295,7 @@ class _CompanionReviewState extends State<CompanionReview>
                 ],
               ),
               const SizedBox(height: 24),
-              Text('Result: ${state.outcome.name}', key: const Key('outcome')),
+              Text(resultLabel, key: const Key('outcome')),
               if (state.unsafeObserved)
                 const Text(
                   'Acceptance failed: unsafe signing observed in this session. Signing is disabled; delete the test key for cleanup. Restart begins a new session, not a passing hardware result.',

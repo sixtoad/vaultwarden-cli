@@ -68,10 +68,14 @@ void main() {
       await tester.tap(find.text('Sign with Touch ID'));
       await tester.pump();
       expect(core.snapshot().busy, true);
+      expect(find.text('Request 1: in progress'), findsOneWidget);
       await tester.tap(find.text('Review request 2'));
       await tester.pump();
       expect(platform.cancels, 1);
       expect(core.snapshot().busy, true);
+      expect(find.text('Synthetic request two'), findsOneWidget);
+      expect(find.text('Cancelling request 1…'), findsOneWidget);
+      expect(find.textContaining('Request 2: cancelled'), findsNothing);
       expect(
         tester
             .widget<FilledButton>(
@@ -91,6 +95,30 @@ void main() {
       expect(core.snapshot().busy, false);
       expect(core.snapshot().outcome, core.Outcome.cancelled);
       expect(core.snapshot().verified, 0);
+      expect(find.text('Last attempt — Request 1: cancelled'), findsOneWidget);
+      expect(find.text('Synthetic request two'), findsOneWidget);
+      expect(find.textContaining('Request 2: cancelled'), findsNothing);
+      // A fresh review cannot relabel the prior result, even for the same fixture.
+      await tester.tap(find.text('Review request 1'));
+      await tester.pump();
+      expect(find.text('Last attempt — Request 1: cancelled'), findsOneWidget);
+      await tester.tap(find.text('Sign with Touch ID'));
+      await tester.pump();
+      await tester.tap(find.text('Cancel attempt'));
+      await tester.pump();
+      expect(find.text('Cancelling request 1…'), findsOneWidget);
+      expect(core.snapshot().busy, true);
+      platform.pending!.complete(
+        core.Completion(
+          outcome: core.Outcome.cancelled,
+          publicKey: Uint8List(0),
+          signature: Uint8List(0),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(core.snapshot().busy, false);
+      expect(core.snapshot().verified, 0);
+      expect(find.text('Last attempt — Request 1: cancelled'), findsOneWidget);
       // A late noninteractive signature fails acceptance for the entire session.
       await tester.tap(find.text('Review request 2'));
       await tester.pump();
@@ -107,6 +135,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('unsafe-warning')), findsOneWidget);
+      expect(find.text('Last attempt — Request 2: unsafe'), findsOneWidget);
       expect(find.byKey(const Key('key-fingerprint')), findsOneWidget);
       await tester.ensureVisible(find.text('Review request 1'));
       await tester.tap(find.text('Review request 1'));

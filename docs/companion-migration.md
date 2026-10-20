@@ -94,6 +94,13 @@ callbacks cannot create a second result. Native sleep/close handling also
 invalidates its current context before notifying Dart, so a delayed UI event
 cannot preserve a signing success.
 
+Pending and completed UI results retain the original operation's request number,
+independently of the currently selected request. Switching to request 2 while
+request 1 is pending shows `Cancelling request 1…`, then
+`Last attempt — Request 1: cancelled`. Request 2's card remains selected; the
+old result is not presented as its outcome. Signing stays disabled while the
+original native operation is outstanding.
+
 The noninteractive probe passes only for the specific interaction-required
 errors `NSOSStatusErrorDomain/-25308` or
 `com.apple.LocalAuthentication/-1004`. Missing keys, generic failures and
@@ -130,6 +137,21 @@ The Mac adapter uses Secure Enclave P-256, device-only unlocked accessibility,
 the context is invalidated on completion/cancellation. Key management and the
 negative probe disallow authentication UI. Private-key bytes are never exported.
 Checking availability on launch uses `canEvaluatePolicy`, not authentication.
+
+Interactive signing first reads the existing key's access-control object without
+UI, then explicitly calls `LAContext.evaluateAccessControl` with `.useKeySign`.
+The cancellation callback invalidates this same context, targeting the explicit
+evaluation rather than an implicit prompt inside `SecKeyCreateSignature`. Once
+evaluation returns, the context disallows UI again and the worker re-queries the
+key with that context before signing. A successful evaluation alone never
+constitutes approval: the protected key must sign and Rust must verify the bound,
+unexpired, non-cancelled transcript. This follows Apple's
+[access-control evaluation API](https://developer.apple.com/documentation/localauthentication/lacontext/evaluateaccesscontrol(_:operation:localizedreason:reply:))
+and [authorize-then-sign sequence](https://developer.apple.com/videos/play/wwdc2022/10108/).
+Automated tests cover callback/cancellation ordering, noninteractive signing
+mode, and result attribution. Prompt dismissal without a touch and fresh-touch
+behavior after this correction still require a physical retest; prior hardware
+evidence applies only to the earlier build.
 
 Explicitly create the disposable key, review request 1, and sign. Review request
 2 and sign separately. Reopen only after an explicit action following relaunch.
