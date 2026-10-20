@@ -6,6 +6,11 @@ import Security
 enum NativeTestKey {
     static let tag = Data("dev.vaultwarden.companionSlice.test-key.v1".utf8)
 
+    enum AccessControlLookup {
+        case found(SecAccessControl)
+        case failure(SignerReply)
+    }
+
     static func availability() -> Bool {
         let context = LAContext()
         defer { context.invalidate() }
@@ -34,11 +39,32 @@ enum NativeTestKey {
     }
 
     static func perform(_ work: SyntheticWork, context: LAContext,
-                        worker: DispatchQueue, completion: @escaping (SignerReply) -> Void) {
+                        worker: DispatchQueue,
+                        lookupAccessControl: (LAContext) -> AccessControlLookup = storedAccessControl,
+                        completion: @escaping (SignerReply) -> Void) {
         guard work.operation == .sign else {
             completion(performWithoutInteraction(work, context: context))
             return
         }
+        switch lookupAccessControl(context) {
+        case .failure(let failure):
+            context.invalidate()
+            completion(failure)
+        case .found(let access):
+            authorize(work, access: access, context: context, worker: worker) { failure in
+                if let failure {
+                    context.invalidate()
+                    completion(failure)
+                } else {
+                    // Re-query with this authenticated context after evaluation, so
+                    // the SecKey captures its credential. Signing must not prompt again.
+                    completion(performWithoutInteraction(work, context: context))
+                }
+            }
+        }
+    }
+
+    private static func storedAccessControl(_ context: LAContext) -> AccessControlLookup {
         // Fetch the stored key's ACL without prompting. Authorize that actual ACL,
         // not a separate device-owner boolean, on the context we can invalidate.
         var attributes = query(context)
@@ -47,28 +73,15 @@ enum NativeTestKey {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(attributes as CFDictionary, &item)
         guard status == errSecSuccess else {
-            context.invalidate()
-            completion(status == errSecItemNotFound ? SignerReply(outcome: .missingKey)
-                       : classify(.sign, domain: NSOSStatusErrorDomain, code: Int(status)))
-            return
+            return .failure(status == errSecItemNotFound ? SignerReply(outcome: .missingKey)
+                            : classify(.sign, domain: NSOSStatusErrorDomain, code: Int(status)))
         }
         guard let dictionary = item as? [String: Any],
               let access = dictionary[kSecAttrAccessControl as String],
               CFGetTypeID(access as CFTypeRef) == SecAccessControlGetTypeID() else {
-            context.invalidate()
-            completion(SignerReply(outcome: .failed))
-            return
+            return .failure(SignerReply(outcome: .failed))
         }
-        authorize(work, access: access as! SecAccessControl, context: context, worker: worker) { failure in
-            if let failure {
-                context.invalidate()
-                completion(failure)
-            } else {
-                // Re-query with this authenticated context after evaluation, so
-                // the SecKey captures its credential. Signing must not prompt again.
-                completion(performWithoutInteraction(work, context: context))
-            }
-        }
+        return .found(access as! SecAccessControl)
     }
 
     /// Callback runs on the worker only after evaluation actually returns.

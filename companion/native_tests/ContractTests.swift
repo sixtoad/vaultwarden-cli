@@ -120,6 +120,9 @@ final class ContractTests: XCTestCase {
         // Invalidated before calling LA: cannot display UI or require enrollment.
         // This is callback/admission evidence, not a real prompt-dismissal test.
         slot.invalidate(token: request.token)
+        // Test-safety guard independent of the slot under test: a mutation that
+        // removes slot cancellation must never turn this into a biometric prompt.
+        context.invalidate()
         XCTAssertTrue(slot.isBusy)
         let returned = expectation(description: "Invalid context returns without a touch")
         NativeTestKey.authorize(request, access: access, context: context,
@@ -191,6 +194,46 @@ final class ContractTests: XCTestCase {
             returned.fulfill()
         }
         try XCTUnwrap(context.pending)(true, nil)
+        wait(for: [returned], timeout: 5)
+    }
+
+    func testPerformForwardsCancellationAndReleasesAdmissionOnlyAfterCompletion() throws {
+        let context = ControlledAuthorizationContext()
+        context.interactionNotAllowed = true
+        let access = try XCTUnwrap(SecAccessControlCreateWithFlags(nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly, [.privateKeyUsage, .biometryCurrentSet], nil))
+        let request = try SyntheticWork(token: 1, epoch: 3, operation: .sign, fixture: 1,
+            expiresUnixMs: UInt64(Date().timeIntervalSince1970 * 1000) + 30_000,
+            nonce: Data(repeating: 0, count: 32), keyID: Data(repeating: 0, count: 32))
+        var slot = NativeAttemptSlot()
+        XCTAssertTrue(slot.begin(request, cancel: { context.invalidate() }))
+        let returned = expectation(description: "Production perform forwards cancellation")
+        let next = try work(token: 2)
+        var completions = 0
+        NativeTestKey.perform(request, context: context,
+                              worker: DispatchQueue(label: "test.perform-cancel"),
+                              lookupAccessControl: { supplied in
+                                  XCTAssertTrue(supplied === context)
+                                  XCTAssertTrue(supplied.interactionNotAllowed)
+                                  return .found(access)
+                              }) { reply in
+            DispatchQueue.main.async {
+                completions += 1
+                XCTAssertEqual(completions, 1)
+                XCTAssertEqual(reply.outcome, .cancelled)
+                XCTAssertTrue(reply.signature.isEmpty)
+                XCTAssertTrue(slot.isBusy)
+                XCTAssertEqual(slot.finish(token: request.token, epoch: request.epoch,
+                                           reply: reply)?.outcome, .cancelled)
+                XCTAssertFalse(slot.isBusy)
+                XCTAssertTrue(slot.begin(next, cancel: {}))
+                returned.fulfill()
+            }
+        }
+        XCTAssertNotNil(context.pending)
+        slot.invalidate(token: request.token)
+        XCTAssertTrue(slot.isBusy)
+        XCTAssertFalse(slot.begin(next, cancel: {}))
         wait(for: [returned], timeout: 5)
     }
 }
