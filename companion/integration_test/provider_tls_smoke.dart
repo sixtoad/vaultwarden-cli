@@ -25,6 +25,7 @@ enum ProbePhase {
   nativeSend,
   finish,
   settle,
+  shutdown,
 }
 
 enum ProbeCheck {
@@ -48,13 +49,25 @@ enum ProbeCheck {
 
 var phase = ProbePhase.startup;
 var failedCheck = ProbeCheck.none;
+Future<void> progress(ProbePhase next, {bool complete = false}) async {
+  phase = next;
+  stderr.writeln(
+    'COMPANION_PROVIDER_TLS_PROGRESS:${next.name}:${complete ? 'complete' : 'enter'}',
+  );
+  // Flush before crossing the boundary so a killed process retains its last
+  // reached operation. Only enum labels, never configuration or error contents.
+  await stderr.flush();
+}
+
 void check(bool value, ProbeCheck label) {
   if (!value) failedCheck = label;
   if (!value) throw StateError('Packaged provider assertion');
 }
 
 Future<void> main() async {
+  await progress(ProbePhase.startup);
   WidgetsFlutterBinding.ensureInitialized();
+  await progress(ProbePhase.startup, complete: true);
   try {
     check(kReleaseMode && Platform.isMacOS, ProbeCheck.releaseMac);
     final scenario = Platform.environment['COMPANION_PROVIDER_CASE'];
@@ -62,8 +75,9 @@ Future<void> main() async {
       scenario != null && Platform.environment['CI'] == 'true',
       ProbeCheck.ciEnvironment,
     );
-    phase = ProbePhase.initializeCore;
+    await progress(ProbePhase.initializeCore);
     await initializePackagedCore();
+    await progress(ProbePhase.initializeCore, complete: true);
     runApp(
       const MaterialApp(
         home: Scaffold(body: Text('Packaged provider TLS fixture')),
@@ -71,9 +85,11 @@ Future<void> main() async {
     );
     final native = NativeProviderPlatform();
     Future<ProviderConfiguration> configuration() async {
-      phase = ProbePhase.configuration;
+      await progress(ProbePhase.configuration);
       try {
-        return await native.configuration();
+        final value = await native.configuration();
+        await progress(ProbePhase.configuration, complete: true);
+        return value;
       } on PlatformException catch (error) {
         phase = switch (error.code) {
           'provider_configuration_unreadable' =>
@@ -93,8 +109,9 @@ Future<void> main() async {
     }
 
     Future<void> settle() async {
-      phase = ProbePhase.settle;
+      await progress(ProbePhase.settle);
       await native.settle(id);
+      await progress(ProbePhase.settle, complete: true);
     }
 
     final config = await configuration();
@@ -107,23 +124,25 @@ Future<void> main() async {
           Platform.environment['COMPANION_EXPECT_CLIENT_SHA256'],
       ProbeCheck.fingerprint,
     );
-    phase = ProbePhase.configureCore;
+    await progress(ProbePhase.configureCore);
     core.providerConfigure(uncertainId: config.uncertainId);
+    await progress(ProbePhase.configureCore, complete: true);
 
     Future<void> send(
       core.ProviderCommand command, {
       String requestId = '',
       String password = '',
     }) async {
-      phase = ProbePhase.begin;
+      await progress(ProbePhase.begin);
       final work = core.providerBegin(
         command: command,
         requestId: requestId,
         password: password,
       );
+      await progress(ProbePhase.begin, complete: true);
       Uint8List reply;
       try {
-        phase = ProbePhase.nativeSend;
+        await progress(ProbePhase.nativeSend);
         reply = await native.send(work.body);
       } catch (_) {
         // Enum name only, never the error or request body.
@@ -134,8 +153,10 @@ Future<void> main() async {
       } finally {
         work.body.fillRange(0, work.body.length, 0);
       }
-      phase = ProbePhase.finish;
+      await progress(ProbePhase.nativeSend, complete: true);
+      await progress(ProbePhase.finish);
       core.providerFinish(token: work.token, response: reply);
+      await progress(ProbePhase.finish, complete: true);
     }
 
     if (scenario == 'recover' || scenario == 'recover-pending') {
@@ -222,9 +243,10 @@ Future<void> main() async {
         }
       }
     }
+    await progress(ProbePhase.shutdown);
     stdout.writeln('COMPANION_PROVIDER_TLS_OK');
     await stdout.flush();
-    await stderr.flush();
+    await progress(ProbePhase.shutdown, complete: true);
     exit(0);
   } catch (_) {
     stderr.writeln(

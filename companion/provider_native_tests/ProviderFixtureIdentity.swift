@@ -9,9 +9,21 @@ import Security
         case saveConfiguration, savedConfiguration, savedIdentity, savedFingerprint, savedMetadata
     }
     static var phase = Phase.input
+    static func progress(_ phase: Phase, complete: Bool = false) {
+        // Direct write: buffered print output can be lost if the helper times out.
+        let event = complete ? "complete" : "enter"
+        FileHandle.standardError.write(Data("COMPANION_PROVIDER_PROVISION_PROGRESS:\(phase.rawValue):\(event)\n".utf8))
+    }
+    static func step(_ next: Phase) {
+        progress(phase, complete: true)
+        phase = next
+        progress(phase)
+    }
     static func main() {
+        progress(.input)
         do {
             try provision()
+            progress(phase, complete: true)
             print("COMPANION_PROVIDER_PROVISION_OK")
         } catch {
             print("COMPANION_PROVIDER_PROVISION_FAILED:\(phase.rawValue)")
@@ -27,12 +39,12 @@ import Security
               ["ca", "other-ca"].contains(args[4]),
               let endpoint = URL(string: args[5]), endpoint.host == "127.0.0.1" else { throw CompanionError.configuration }
         var keychain: SecKeychain?
-        phase = .openKeychain
+        step(.openKeychain)
         guard SecKeychainOpen(args[7], &keychain) == errSecSuccess, let keychain else { throw CompanionError.configuration }
-        phase = .readCertificate
+        step(.readCertificate)
         let certificate = try Data(contentsOf: fixture.appendingPathComponent("\(args[3]).der"))
         var result: CFTypeRef?
-        phase = .findIdentity
+        step(.findIdentity)
         guard SecItemCopyMatching([kSecClass as String: kSecClassIdentity,
                                    kSecMatchSearchList as String: [keychain],
                                    kSecMatchLimit as String: kSecMatchLimitAll,
@@ -44,7 +56,7 @@ import Security
             guard SecIdentityCopyCertificate(identity, &candidate) == errSecSuccess, let candidate,
                   SecCertificateCopyData(candidate) as Data == certificate else { continue }
             var persistent: CFTypeRef?
-            phase = .persistentReference
+            step(.persistentReference)
             guard SecItemCopyMatching([kSecClass as String: kSecClassIdentity,
                                        kSecMatchSearchList as String: [keychain],
                                        kSecMatchItemList as String: [identity],
@@ -53,7 +65,7 @@ import Security
             reference = data
         }
         guard let reference else { throw CompanionError.configuration }
-        phase = .saveConfiguration
+        step(.saveConfiguration)
         let configuration = try ProviderConfiguration(endpoint: endpoint,
             trustedCA: Data(contentsOf: fixture.appendingPathComponent("\(args[4]).der")),
             leafSHA256: args[6], identityReference: reference)
@@ -66,19 +78,19 @@ import Security
         // not just the explicit-keychain search used above. This is still an
         // external helper: success alone does not prove sandboxed app access.
         let settings = ProviderSettings(directory: destination.deletingLastPathComponent())
-        phase = .savedConfiguration
+        step(.savedConfiguration)
         let loaded = try settings.configuration()
         guard loaded.endpoint == configuration.endpoint,
               loaded.trustedCA == configuration.trustedCA,
               loaded.leafSHA256 == configuration.leafSHA256,
               loaded.identityReference == reference,
               try settings.pendingID() == nil else { throw CompanionError.configuration }
-        phase = .savedIdentity
+        step(.savedIdentity)
         _ = try KeychainIdentity.resolve(loaded.identityReference)
-        phase = .savedFingerprint
+        step(.savedFingerprint)
         let expectedFingerprint = KeychainIdentity.fingerprintDER(certificate)
         guard try KeychainIdentity.fingerprint(loaded.identityReference) == expectedFingerprint else { throw CompanionError.configuration }
-        phase = .savedMetadata
+        step(.savedMetadata)
         let metadata = try settings.metadata()
         guard metadata["configured"] as? Bool == true,
               metadata["fingerprint"] as? String == expectedFingerprint,

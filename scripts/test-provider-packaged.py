@@ -19,11 +19,25 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
-PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle".split())
+PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle shutdown".split())
 PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity persistentReference saveConfiguration savedConfiguration savedIdentity savedFingerprint savedMetadata".split())
 CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus".split())
 COMMANDS = frozenset("session unlock review decision status".split())
 NATIVE_COMMANDS = frozenset("session unlock review approve deny status".split())
+
+
+def progress_diagnostics(stdout, stderr, prefix, phases):
+    """Retain the most recent fixed boundaries on failure, never raw output."""
+    progress = []
+    for line in (stdout[-65536:] + b"\n" + stderr[-65536:]).splitlines():
+        parts = line.split(b":")
+        if len(parts) != 3 or parts[0] != prefix:
+            continue
+        phase, event = (part.decode("ascii", errors="replace") for part in parts[1:])
+        if phase in phases and event in {"enter", "complete"}:
+            progress.append({"phase": phase, "event": event})
+            progress = progress[-32:]
+    return progress
 
 
 def app_diagnostics(code, stdout, stderr, timed_out=False):
@@ -42,6 +56,8 @@ def app_diagnostics(code, stdout, stderr, timed_out=False):
     result["passed"] = (code == 0 and not timed_out
                         and stdout.splitlines().count(b"COMPANION_PROVIDER_TLS_OK") == 1
                         and not result["failures"])
+    if not result["passed"]:
+        result["progress"] = progress_diagnostics(stdout, stderr, b"COMPANION_PROVIDER_TLS_PROGRESS", PHASES)
     return result
 
 
@@ -56,6 +72,8 @@ def provision_diagnostics(code, stdout, stderr, timed_out=False):
     result["passed"] = (code == 0 and not timed_out
                         and stdout.splitlines().count(b"COMPANION_PROVIDER_PROVISION_OK") == 1
                         and not result["failures"])
+    if not result["passed"]:
+        result["progress"] = progress_diagnostics(stdout, stderr, b"COMPANION_PROVIDER_PROVISION_PROGRESS", PROVISION_PHASES)
     return result
 
 

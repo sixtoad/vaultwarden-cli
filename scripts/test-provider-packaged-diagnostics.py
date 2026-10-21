@@ -21,6 +21,44 @@ SECRET = b"password identity-reference PRIVATE KEY raw-request raw-response"
 
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_progress_keeps_only_fixed_boundaries_on_failure(self):
+        for diagnostics, prefix, phase, success in [
+            (PROBE.app_diagnostics, b"COMPANION_PROVIDER_TLS", b"nativeSend", b"COMPANION_PROVIDER_TLS_OK\n"),
+            (PROBE.provision_diagnostics, b"COMPANION_PROVIDER_PROVISION", b"savedIdentity", b"COMPANION_PROVIDER_PROVISION_OK\n"),
+        ]:
+            output = (SECRET + b"\n" + prefix + b"_PROGRESS:" + phase + b":enter\n"
+                      + prefix + b"_PROGRESS:password:enter\n"
+                      + prefix + b"_PROGRESS:" + phase + b":raw-response\n"
+                      + prefix + b"_PROGRESS:" + phase + b":complete:identity-reference\n")
+            result = diagnostics(None, b"", output, timed_out=True)
+            self.assertFalse(result["passed"])
+            self.assertEqual(result["progress"], [{"phase": phase.decode(), "event": "enter"}])
+            for secret in SECRET.decode().split():
+                self.assertNotIn(secret, json.dumps(result))
+            self.assertNotIn("progress", diagnostics(0, success, output))
+
+    def test_progress_keeps_latest_bounded_events_and_no_marker_is_explicit(self):
+        old = b"COMPANION_PROVIDER_TLS_PROGRESS:startup:enter\n" * 10000
+        last = b"COMPANION_PROVIDER_TLS_PROGRESS:nativeSend:enter\n"
+        result = PROBE.app_diagnostics(None, b"", old + last, timed_out=True)
+        self.assertEqual(len(result["progress"]), 32)
+        self.assertEqual(result["progress"][-1], {"phase": "nativeSend", "event": "enter"})
+        self.assertEqual(PROBE.app_diagnostics(None, b"", SECRET, timed_out=True)["progress"], [])
+
+    def test_actual_timed_out_child_preserves_flushed_progress_without_raw_output(self):
+        child = ("import sys,time; "
+                 "sys.stderr.write('COMPANION_PROVIDER_TLS_PROGRESS:startup:enter\\n'); "
+                 "sys.stderr.write('password identity-reference\\n'); "
+                 "sys.stderr.flush(); time.sleep(30)")
+        def bounded_run(argv, **options):
+            return subprocess.run(argv, check=True, timeout=2, capture_output=True, **options)
+        with patch.object(PROBE, "run", side_effect=bounded_run):
+            result = PROBE.run_diagnosed([sys.executable, "-c", child], PROBE.app_diagnostics)
+        self.assertTrue(result["timed_out"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["progress"], [{"phase": "startup", "event": "enter"}])
+        self.assertNotIn("password", json.dumps(result))
+
     def test_keychain_is_fresh_private_and_inside_app_container(self):
         with tempfile.TemporaryDirectory() as directory:
             container = Path(directory) / "Data"
