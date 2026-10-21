@@ -102,6 +102,15 @@ def search_list():
     return shlex.split(run(["security", "list-keychains", "-d", "user"]).stdout.decode())
 
 
+def keychain_directory(container):
+    # The app's sandbox may not read the external helper's system temp directory.
+    # Keep only this disposable file-based Keychain inside its own container;
+    # neither the app entitlement nor the exact-executable Keychain ACL changes.
+    if container.is_symlink() or not container.is_dir():
+        raise RuntimeError("Missing or redirected app sandbox container.")
+    return Path(tempfile.mkdtemp(prefix="provider-fixture-keychain-", dir=container))
+
+
 def stop(process):
     if process is None:
         return
@@ -130,18 +139,21 @@ def main():
     configuration = container / "Library/Application Support/dev.vaultwarden.companionSlice.provider/configuration-v1.json"
     if configuration.exists() or configuration.is_symlink():
         raise SystemExit("Refusing to replace existing development provider configuration.")
-    if not container.is_dir():
+    if container.is_symlink() or not container.is_dir():
         raise SystemExit("Run the ordinary packaged smoke first to create the isolated app sandbox.")
     args.evidence.mkdir(parents=True, exist_ok=True)
     original_search = search_list()
     temporary = Path(tempfile.mkdtemp(prefix="flutter-provider-packaged-"))
-    keychain = temporary / "fixture.keychain-db"
+    keychain_temporary = None
+    keychain = None
     helper = temporary / "identity-helper"
     created_keychain = False
     created_configuration = False
     server = None
     report = {"kind": "packaged-aot-real-tls-synthetic-backend", "cases": {}, "cleanup_passed": False}
     try:
+        keychain_temporary = keychain_directory(container)
+        keychain = keychain_temporary / "fixture.keychain-db"
         run([sys.executable, FIXTURE, "provision", temporary])
         run(["swiftc", "-parse-as-library", ROOT / "macos/Sources/CompanionCore/Protocol.swift",
              ROOT / "macos/Sources/CompanionCore/Trust.swift",
@@ -234,6 +246,12 @@ def main():
                 run(["security", "delete-keychain", keychain])
             except Exception:
                 cleanup_errors.append("fixture Keychain removal")
+        if keychain_temporary is not None:
+            try:
+                # Only the fresh 0700 fixture directory, never the app container.
+                shutil.rmtree(keychain_temporary)
+            except Exception:
+                cleanup_errors.append("fixture Keychain directory removal")
         # temporary was allocated by this process; it contains only fixture files.
         shutil.rmtree(temporary)
         report["cleanup_passed"] = not cleanup_errors

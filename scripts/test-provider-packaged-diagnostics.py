@@ -2,8 +2,11 @@
 """Portable tests of the closed, non-sensitive packaged probe diagnostics."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -18,6 +21,39 @@ SECRET = b"password identity-reference PRIVATE KEY raw-request raw-response"
 
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_keychain_is_fresh_private_and_inside_app_container(self):
+        with tempfile.TemporaryDirectory() as directory:
+            container = Path(directory) / "Data"
+            container.mkdir()
+            existing = container / "existing-development-state"
+            existing.write_text("untouched")
+            first = PROBE.keychain_directory(container)
+            second = PROBE.keychain_directory(container)
+            self.assertEqual(first.parent, container)
+            self.assertEqual(second.parent, container)
+            self.assertNotEqual(first, second)
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o700)
+            self.assertEqual(list(first.iterdir()), [])
+            # Mirror the exact directory-only cleanup used by the runner.
+            shutil.rmtree(first)
+            self.assertFalse(first.exists())
+            self.assertTrue(second.is_dir())
+            self.assertEqual(existing.read_text(), "untouched")
+
+    def test_keychain_refuses_missing_or_redirected_container(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            missing = root / "missing"
+            with self.assertRaisesRegex(RuntimeError, "Missing or redirected"):
+                PROBE.keychain_directory(missing)
+            # Windows CI need not grant symlink creation privileges for this
+            # macOS-only refusal guard to be covered on every desktop runner.
+            with patch.object(Path, "is_symlink", return_value=True):
+                with self.assertRaisesRegex(RuntimeError, "Missing or redirected"):
+                    PROBE.keychain_directory(root)
+            self.assertEqual(list(root.iterdir()), [])
+
     def test_success_requires_zero_exit_and_exact_single_marker(self):
         marker = b"COMPANION_PROVIDER_TLS_OK\n"
         for code, output, expected in [(0, marker, True), (1, marker, False),
