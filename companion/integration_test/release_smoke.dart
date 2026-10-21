@@ -10,6 +10,10 @@ import 'package:companion_slice/main.dart';
 import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/platform/signer.dart';
 import 'package:companion_slice/src/rust/api.dart' as core;
+import 'package:companion_slice/platform/provider.dart';
+import 'package:companion_slice/provider/page.dart';
+
+import 'provider_checks.dart';
 
 class SmokeFailure implements Exception {
   const SmokeFailure(this.check);
@@ -25,6 +29,13 @@ Future<void> main() async {
   try {
     require(kReleaseMode, 'release mode required');
     await initializePackagedCore();
+    checkProviderBridge(require);
+    final providerPlatform = NativeProviderPlatform();
+    if (!Platform.isMacOS) {
+      require(!providerPlatform.available, 'unsupported provider transport');
+    } else {
+      await providerPlatform.configuration();
+    }
     final platform = NativeApprovalPlatform();
     final availability = await platform.availability();
     if (!Platform.isMacOS) {
@@ -93,6 +104,32 @@ Future<void> main() async {
       core.snapshot().verified == 0 && !core.snapshot().busy,
       'no startup approval or worker',
     );
+    runApp(
+      MaterialApp(
+        home: ProviderPage(
+          platform: providerPlatform,
+          syntheticBuilder: (_) => CompanionReview(platform: platform),
+        ),
+      ),
+    );
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    WidgetsBinding.instance.scheduleFrame();
+    await WidgetsBinding.instance.endOfFrame;
+    text.clear();
+    inspect(WidgetsBinding.instance.rootElement!);
+    require(
+      text.contains('Companion · provider approvals'),
+      'release provider screen',
+    );
+    if (!Platform.isMacOS) {
+      require(
+        text.contains(
+          'Provider transport unavailable on this platform. Provider approvals require macOS.',
+        ),
+        'release unsupported provider screen',
+      );
+    }
     if (Platform.isWindows) {
       // A Windows GUI runner has no reliable redirected console. The smoke-only
       // entrypoint receives a task-owned result path; the normal app ignores it.

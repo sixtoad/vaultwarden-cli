@@ -8,6 +8,9 @@ import 'package:companion_slice/main.dart';
 import 'package:companion_slice/platform/signer.dart';
 import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/src/rust/api.dart' as core;
+import 'package:companion_slice/platform/provider.dart';
+
+import 'provider_checks.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +18,20 @@ void main() {
     'packaged Rust bridge loads and unsupported adapter cannot approve',
     (tester) async {
       await initializePackagedCore();
+      checkProviderBridge(
+        (condition, check) => expect(condition, true, reason: check),
+      );
+      final providerPlatform = NativeProviderPlatform();
+      if (!Platform.isMacOS) {
+        expect(providerPlatform.available, false);
+        await expectLater(
+          providerPlatform.send(Uint8List(0)),
+          throwsUnsupportedError,
+        );
+      } else {
+        // Reads only this development app's configuration; no identity import.
+        await providerPlatform.configuration();
+      }
       if (Platform.isMacOS) {
         const channel = MethodChannel('dev.vaultwarden.companionSlice/signer');
         expect(

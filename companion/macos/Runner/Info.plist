@@ -28,5 +28,14 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- Private CA evaluation is performed by PinnedTransport's mandatory
+	     CA/hostname/validity/leaf-pin checks. ATS otherwise rejects private roots
+	     before that delegate can apply the enrolled trust policy. HTTPS and TLS
+	     1.2+ remain enforced by ProviderConfiguration and PinnedTransport. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

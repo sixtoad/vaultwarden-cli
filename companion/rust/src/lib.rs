@@ -3,3 +3,4 @@ pub mod api;
 #[allow(unknown_lints)]
 mod frb_generated;
 pub mod lifecycle;
+pub mod provider;

@@ -21,6 +21,10 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		A20000000000000000000001 /* ProviderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011; };
+		A20000000000000000000002 /* ProviderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012; };
+		A20000000000000000000003 /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013; };
+		A20000000000000000000004 /* Trust.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014; };
 		A10000000000000000000001 /* ApprovalSigner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* ApprovalSigner.swift */; };
 		A10000000000000000000002 /* ApprovalContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ApprovalContract.swift */; };
 		A10000000000000000000003 /* NativeTestKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* NativeTestKey.swift */; };
@@ -64,6 +68,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A20000000000000000000011 /* ProviderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAdapter.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* ProviderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSettings.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Protocol.swift; path = ../../macos/Sources/CompanionCore/Protocol.swift; sourceTree = SOURCE_ROOT; };
+		A20000000000000000000014 /* Trust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Trust.swift; path = ../../macos/Sources/CompanionCore/Trust.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000011 /* ApprovalSigner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalSigner.swift; sourceTree = "<group>"; };
 		A10000000000000000000012 /* ApprovalContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalContract.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* NativeTestKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTestKey.swift; sourceTree = "<group>"; };
@@ -172,6 +180,10 @@
 		33FAB671232836740065AC1E /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				A20000000000000000000011 /* ProviderAdapter.swift */,
+				A20000000000000000000012 /* ProviderSettings.swift */,
+				A20000000000000000000013 /* Protocol.swift */,
+				A20000000000000000000014 /* Trust.swift */,
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				A10000000000000000000011 /* ApprovalSigner.swift */,
@@ -375,6 +387,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000001 /* ProviderAdapter.swift in Sources */,
+				A20000000000000000000002 /* ProviderSettings.swift in Sources */,
+				A20000000000000000000003 /* Protocol.swift in Sources */,
+				A20000000000000000000004 /* Trust.swift in Sources */,
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				A10000000000000000000001 /* ApprovalSigner.swift in Sources */,
 				A10000000000000000000002 /* ApprovalContract.swift in Sources */,

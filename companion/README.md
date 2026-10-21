@@ -1,8 +1,11 @@
-# Companion synthetic slice
+# Companion development application
 
-Separate Flutter UI and Rust core with a macOS Secure Enclave test-key adapter.
-Windows and Linux run the shared shell and report biometrics unavailable.
-No provider, vault, password, enrollment or execution access is implemented.
+Foreground Flutter UI and Rust lifecycle for existing Linux provider approvals.
+macOS explicitly imports a dedicated development PKCS#12 and private CA, validates
+the exact server leaf pin, and keeps the client identity in native Keychain code.
+Windows and Linux report provider transport unavailable. The synthetic Secure
+Enclave signing demonstration remains a separate, explicitly opened mode.
+This application does not replace or adopt settings from the installed Swift app.
 
 See [migration contract and evidence](../docs/companion-migration.md).
 Run `bash ../scripts/test-desktop-companion.sh` on a matching desktop host.
