@@ -19,6 +19,59 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
+PHASES = frozenset("startup initializeCore configuration configureCore begin nativeSend finish settle".split())
+CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus".split())
+COMMANDS = frozenset("session unlock review decision status".split())
+NATIVE_COMMANDS = frozenset("session unlock review approve deny status".split())
+
+
+def app_diagnostics(code, stdout, stderr, timed_out=False):
+    """Keep only exact, bounded test markers; discard all arbitrary app output."""
+    result = {"exit_code": code, "timed_out": timed_out, "failures": [], "native_rejections": []}
+    for line in (stdout[-65536:] + b"\n" + stderr[-65536:]).splitlines():
+        parts = line.split(b":")
+        if len(parts) == 3 and parts[0] == b"COMPANION_PROVIDER_TLS_FAILED":
+            phase, check = (part.decode("ascii", errors="replace") for part in parts[1:])
+            if phase in PHASES and check in CHECKS and len(result["failures"]) < 16:
+                result["failures"].append({"phase": phase, "check": check})
+        if len(parts) == 2 and parts[0] == b"COMPANION_PROVIDER_TLS_NATIVE_REJECTED":
+            command = parts[1].decode("ascii", errors="replace")
+            if command in NATIVE_COMMANDS and len(result["native_rejections"]) < 16:
+                result["native_rejections"].append(command)
+    result["passed"] = (code == 0 and not timed_out
+                        and stdout.splitlines().count(b"COMPANION_PROVIDER_TLS_OK") == 1
+                        and not result["failures"])
+    return result
+
+
+def launch_app(executable, environment):
+    try:
+        result = run([executable], env=environment)
+        return app_diagnostics(result.returncode, result.stdout, result.stderr)
+    except subprocess.CalledProcessError as error:
+        return app_diagnostics(error.returncode, error.stdout or b"", error.stderr or b"")
+    except subprocess.TimeoutExpired as error:
+        return app_diagnostics(None, error.stdout or b"", error.stderr or b"", timed_out=True)
+
+
+def command_counts(path):
+    # A command name is the fixture's only recorded field; still allowlist it.
+    result = dict.fromkeys(sorted(COMMANDS), 0)
+    if not path.is_file():
+        return result
+    with path.open("rb") as source:
+        content = source.read(16385)
+    if len(content) > 16384:
+        raise RuntimeError("fixture command evidence exceeds bound")
+    try:
+        for line in content.splitlines():
+            command = json.loads(line)["command"]
+            if command not in COMMANDS:
+                raise ValueError()
+            result[command] += 1
+    except (ValueError, TypeError, KeyError):
+        raise RuntimeError("fixture command evidence invalid") from None
+    return result
 
 
 def run(argv, **kwargs):
@@ -87,9 +140,11 @@ def main():
         def launch(scenario, client):
             env = dict(os.environ, COMPANION_PROVIDER_CASE=scenario,
                        COMPANION_EXPECT_CLIENT_SHA256=hashlib.sha256((temporary / f"{client}.der").read_bytes()).hexdigest())
-            result = run([executable], env=env)
-            if result.stdout.count(b"COMPANION_PROVIDER_TLS_OK") != 1:
-                raise RuntimeError("packaged application did not report verified completion")
+            result = launch_app(executable, env)
+            report["cases"][name]["launches"].append(result)
+            report["cases"][name]["observed_command_counts"] = command_counts(temporary / "requests.jsonl")
+            if not result["passed"]:
+                raise RuntimeError("packaged application failed; see sanitized packaged-tls.json")
 
         cases = [
             ("approve", "normal", "client", "ca", "approve", ["session", "review", "decision"]),
@@ -108,6 +163,8 @@ def main():
             ("pending-relaunch", "drop-pending", "client", "ca", "drop", ["session", "review", "decision", "status"]),
         ]
         for name, mode, client, ca, scenario, expected_commands in cases:
+            report["cases"][name] = {"passed": False, "launches": [],
+                                     "expected_command_counts": {command: expected_commands.count(command) for command in sorted(COMMANDS)}}
             server = subprocess.Popen([sys.executable, str(FIXTURE), "serve", str(temporary), "--mode", mode],
                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
             with selectors.DefaultSelector() as selector:
@@ -127,7 +184,7 @@ def main():
             commands = [json.loads(line)["command"] for line in (temporary / "requests.jsonl").read_text().splitlines()]
             if commands != expected_commands:
                 raise RuntimeError(f"{name}: wrong command count/order")
-            report["cases"][name] = {"passed": True, "commands": commands}
+            report["cases"][name].update(passed=True, commands=commands)
             stop(server)
             server = None
             configuration.unlink()

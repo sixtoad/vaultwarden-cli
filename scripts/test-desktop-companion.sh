@@ -17,6 +17,7 @@ flutter pub get --enforce-lockfile
 flutter analyze
 flutter test
 python3 "$repo/scripts/test-desktop-companion-artifact.py"
+python3 "$repo/scripts/test-provider-packaged-diagnostics.py"
 
 case "$(uname -s)" in
   Linux*)
@@ -28,7 +29,6 @@ case "$(uname -s)" in
     swift test --package-path .
     bash "$repo/scripts/test-provider-native.sh" "$evidence/provider-native"
     swift test --package-path "$repo/macos-touch-id-probe"
-    flutter test integration_test/bridge_test.dart -d macos
     ;;
   MINGW*|MSYS*|CYGWIN*)
     target=windows
@@ -50,6 +50,10 @@ fi
 if [[ "$target" == macos && "${CI:-}" == true ]]; then
   flutter build macos --release --target integration_test/provider_tls_smoke.dart
   python3 "$repo/scripts/test-provider-packaged.py" "$repo/companion/build/macos/Build/Products/Release/companion_slice.app" "$evidence/provider-packaged"
+fi
+if [[ "$target" == macos ]]; then
+  # Keep the expensive debug build after TLS evidence, then restore release below.
+  flutter test integration_test/bridge_test.dart -d macos
 fi
 # Never publish the self-exiting smoke harness as the operator's application.
 flutter build "$target" --release --target lib/main.dart
