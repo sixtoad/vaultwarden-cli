@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15-intel, windows-latest]
+        os: [ubuntu-24.04, macos-26-intel, windows-latest]
     defaults:
       run:
         shell: bash
@@ -80,7 +80,7 @@ jobs:
 
   macos-companion:
     name: Native macOS approval companion
-    runs-on: macos-15-intel
+    runs-on: macos-26-intel
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -109,7 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-24.04", "macos-15-intel"]
+        os: ["ubuntu-24.04", "macos-26-intel"]
         rust: ["stable", "beta"]
         include:
           - os: ubuntu-24.04
@@ -293,9 +293,9 @@ jobs:
             os: ubuntu-latest
             cross: true
           - target: x86_64-apple-darwin
-            os: macos-15-intel
+            os: macos-26-intel
           - target: aarch64-apple-darwin
-            os: macos-15-intel
+            os: macos-26-intel
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-pc-windows-msvc
