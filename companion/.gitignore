@@ -1,0 +1,14 @@
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+rust/target/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Runner.xcworkspace/xcuserdata/
+.idea/
+*.iml
+.build/
+.swiftpm/
