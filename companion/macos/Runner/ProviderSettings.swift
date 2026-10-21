@@ -1,6 +1,18 @@
 import Foundation
 import Security
 
+/// Closed operational categories; never retain underlying errors or file contents.
+enum ProviderSettingsError: Error, Equatable {
+    case unreadable, invalid, identityUnavailable
+    var code: String {
+        switch self {
+        case .unreadable: return "provider_configuration_unreadable"
+        case .invalid: return "provider_configuration_invalid"
+        case .identityUnavailable: return "provider_identity_unavailable"
+        }
+    }
+}
+
 /// Stored in this sandbox's Application Support, never the Swift app's defaults.
 /// The durable marker has no password/ticket/review; it binds recovery to the
 /// exact saved configuration by forbidding replacement while unresolved.
@@ -16,12 +28,16 @@ final class ProviderSettings {
         file = base.appendingPathComponent("configuration-v1.json")
     }
     private func load() throws -> Saved {
-        let data = try Data(contentsOf: file)
-        guard data.count <= 131_072 else { throw CompanionError.configuration }
-        let saved = try JSONDecoder().decode(Saved.self, from: data)
-        _ = try saved.configuration.validated()
-        if let id = saved.pendingID, !validRequestID(id) { throw CompanionError.configuration }
-        return saved
+        let data: Data
+        do { data = try Data(contentsOf: file) }
+        catch { throw ProviderSettingsError.unreadable }
+        do {
+            guard data.count <= 131_072 else { throw ProviderSettingsError.invalid }
+            let saved = try JSONDecoder().decode(Saved.self, from: data)
+            _ = try saved.configuration.validated()
+            if let id = saved.pendingID, !validRequestID(id) { throw ProviderSettingsError.invalid }
+            return saved
+        } catch { throw ProviderSettingsError.invalid }
     }
     private func save(_ value: Saved) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
@@ -37,9 +53,12 @@ final class ProviderSettings {
     func metadata() throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: file.path) else { return ["configured": false] }
         let saved = try load()
+        let fingerprint: String
+        do { fingerprint = try KeychainIdentity.fingerprint(saved.configuration.identityReference) }
+        catch { throw ProviderSettingsError.identityUnavailable }
         return ["configured": true, "endpoint": saved.configuration.endpoint.absoluteString,
                 "pin": saved.configuration.leafSHA256,
-                "fingerprint": try KeychainIdentity.fingerprint(saved.configuration.identityReference),
+                "fingerprint": fingerprint,
                 "uncertainId": saved.pendingID ?? ""]
     }
     func install(endpoint: URL, ca: Data, pin: String, pkcs12: Data, passphrase: String) throws {

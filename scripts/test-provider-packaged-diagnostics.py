@@ -81,6 +81,43 @@ class DiagnosticsTests(unittest.TestCase):
             body = re.search(r"enum " + name + r"\s*\{([^}]+)\}", source, re.S).group(1)
             self.assertEqual({value.strip() for value in body.split(",") if value.strip()}, expected)
 
+    def test_provision_diagnostics_accept_only_fixed_phases(self):
+        marker = b"COMPANION_PROVIDER_PROVISION_OK\n"
+        self.assertTrue(PROBE.provision_diagnostics(0, marker, SECRET)["passed"])
+        self.assertFalse(PROBE.provision_diagnostics(1, marker, b"")["passed"])
+        self.assertFalse(PROBE.provision_diagnostics(0, marker * 2, b"")["passed"])
+        output = (b"COMPANION_PROVIDER_PROVISION_FAILED:savedIdentity\n"
+                  b"COMPANION_PROVIDER_PROVISION_FAILED:password\n"
+                  b"COMPANION_PROVIDER_PROVISION_FAILED:savedIdentity:identity-reference\n")
+        result = PROBE.provision_diagnostics(1, output * 10000, SECRET)
+        self.assertEqual(result["failures"], ["savedIdentity"] * 16)
+        for secret in SECRET.decode().split():
+            self.assertNotIn(secret, json.dumps(result))
+
+    def test_provision_subprocess_errors_are_sanitized(self):
+        for error in [subprocess.CalledProcessError(1, [SECRET], output=SECRET, stderr=SECRET),
+                      subprocess.TimeoutExpired([SECRET], 45, output=SECRET, stderr=SECRET)]:
+            with patch.object(PROBE, "run", side_effect=error):
+                result = PROBE.run_diagnosed(["helper", SECRET], PROBE.provision_diagnostics)
+            self.assertFalse(result["passed"])
+            self.assertNotIn(SECRET.decode(), json.dumps(result))
+
+    def test_swift_provision_phases_match_allowlist(self):
+        source = (PROBE.ROOT / "companion/provider_native_tests/ProviderFixtureIdentity.swift").read_text()
+        body = re.search(r"enum Phase: String\s*\{([^}]+)\}", source, re.S).group(1)
+        values = re.findall(r"[A-Za-z]+", body)
+        self.assertEqual(set(values) - {"case"}, PROBE.PROVISION_PHASES)
+
+    def test_native_error_codes_are_closed_and_mapped_without_error_content(self):
+        settings = (PROBE.ROOT / "companion/macos/Runner/ProviderSettings.swift").read_text()
+        codes = set(re.findall(r'return "(provider_[a-z_]+)"', settings))
+        self.assertEqual(codes, {"provider_configuration_unreadable", "provider_configuration_invalid", "provider_identity_unavailable"})
+        dart = (PROBE.ROOT / "companion/integration_test/provider_tls_smoke.dart").read_text()
+        self.assertEqual(set(re.findall(r"'(provider_[a-z_]+)' =>", dart)), codes)
+        adapter = (PROBE.ROOT / "companion/macos/Runner/ProviderAdapter.swift").read_text()
+        handler = adapter.split("catch let error as ProviderSettingsError {", 1)[1].split("} catch {", 1)[0]
+        self.assertIn('code: error.code, message: "Provider setup, trust or transport unavailable.", details: nil', handler)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,11 @@ final class ProviderSettingsTests: XCTestCase {
         let file = directory.appendingPathComponent("configuration-v1.json")
         try JSONSerialization.data(withJSONObject: ["configuration": object]).write(to: file)
         let settings = ProviderSettings(directory: directory)
+        // Valid saved configuration with a deliberately nonexistent opaque ref.
+        XCTAssertNoThrow(try settings.configuration())
+        XCTAssertThrowsError(try settings.metadata()) { error in
+            XCTAssertEqual(error as? ProviderSettingsError, .identityUnavailable)
+        }
         let id = String(repeating: "A", count: 43)
         try settings.beforeSend(Data(#"{"version":1,"command":"session"}"#.utf8))
         XCTAssertNil(try settings.pendingID())
@@ -46,6 +51,29 @@ final class ProviderSettingsTests: XCTestCase {
         let settings = ProviderSettings(directory: directory)
         XCTAssertEqual(try settings.metadata()["configured"] as? Bool, false)
         XCTAssertNil(try settings.pendingID())
-        XCTAssertThrowsError(try settings.configuration())
+        XCTAssertThrowsError(try settings.configuration()) { error in
+            XCTAssertEqual(error as? ProviderSettingsError, .unreadable)
+        }
+    }
+    func testInvalidSavedConfigurationHasClosedNonSecretError() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("flutter-invalid-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("configuration-v1.json")
+        let settings = ProviderSettings(directory: directory)
+        for bytes in [Data("private-path password identity-reference".utf8),
+                      Data(#"{"configuration":{"identityReference":"secret"}}"#.utf8),
+                      Data(repeating: 65, count: 131_073)] {
+            try bytes.write(to: file)
+            XCTAssertThrowsError(try settings.metadata()) { error in
+                XCTAssertEqual(error as? ProviderSettingsError, .invalid)
+                XCTAssertEqual((error as? ProviderSettingsError)?.code, "provider_configuration_invalid")
+            }
+        }
+    }
+    func testSettingsErrorVocabularyIsClosed() {
+        XCTAssertEqual(ProviderSettingsError.unreadable.code, "provider_configuration_unreadable")
+        XCTAssertEqual(ProviderSettingsError.invalid.code, "provider_configuration_invalid")
+        XCTAssertEqual(ProviderSettingsError.identityUnavailable.code, "provider_identity_unavailable")
     }
 }

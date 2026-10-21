@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/src/rust/api/provider.dart' as core;
@@ -14,6 +15,11 @@ enum ProbePhase {
   startup,
   initializeCore,
   configuration,
+  configurationNative,
+  configurationDecode,
+  configurationUnreadable,
+  configurationInvalid,
+  configurationIdentity,
   configureCore,
   begin,
   nativeSend,
@@ -66,7 +72,24 @@ Future<void> main() async {
     final native = NativeProviderPlatform();
     Future<ProviderConfiguration> configuration() async {
       phase = ProbePhase.configuration;
-      return native.configuration();
+      try {
+        return await native.configuration();
+      } on PlatformException catch (error) {
+        phase = switch (error.code) {
+          'provider_configuration_unreadable' =>
+            ProbePhase.configurationUnreadable,
+          'provider_configuration_invalid' => ProbePhase.configurationInvalid,
+          'provider_identity_unavailable' => ProbePhase.configurationIdentity,
+          _ => ProbePhase.configurationNative,
+        };
+        rethrow;
+      } on MissingPluginException {
+        phase = ProbePhase.configurationNative;
+        rethrow;
+      } on FormatException {
+        phase = ProbePhase.configurationDecode;
+        rethrow;
+      }
     }
 
     Future<void> settle() async {

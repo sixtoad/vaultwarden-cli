@@ -105,6 +105,41 @@ void main() {
     },
   );
 
+  test(
+    'fixed native settings errors keep UI generic and fail closed',
+    () async {
+      const channel = MethodChannel('test/provider-settings-errors');
+      for (final code in [
+        'provider_configuration_unreadable',
+        'provider_configuration_invalid',
+        'provider_identity_unavailable',
+      ]) {
+        var calls = 0;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (_) async {
+              calls++;
+              throw PlatformException(
+                code: code,
+                message: 'private-path password identity-reference',
+                details: 'raw-response PRIVATE KEY',
+              );
+            });
+        final controller = ProviderController(
+          NativeProviderPlatform(macOS: true, channel: channel),
+        );
+        await controller.initialize();
+        expect(
+          controller.diagnostic,
+          'Saved provider setup is unavailable. Check the dedicated client identity.',
+        );
+        expect(controller.configuration.configured, false);
+        expect(controller.state.canDecide, false);
+        expect(calls, 1);
+        controller.dispose();
+      }
+    },
+  );
+
   testWidgets(
     'provider review is complete, password clears on deny and context changes',
     (tester) async {

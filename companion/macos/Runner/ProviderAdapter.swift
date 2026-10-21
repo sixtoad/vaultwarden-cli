@@ -64,6 +64,8 @@ import Security
                 result(nil)
             default: result(FlutterMethodNotImplemented)
             }
+        } catch let error as ProviderSettingsError {
+            result(FlutterError(code: error.code, message: "Provider setup, trust or transport unavailable.", details: nil))
         } catch {
             // Never return NSError descriptions, keychain paths, request bodies or passwords.
             result(FlutterError(code: "provider_unavailable", message: "Provider setup, trust or transport unavailable.", details: nil))

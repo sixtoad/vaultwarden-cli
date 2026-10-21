@@ -19,7 +19,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
-PHASES = frozenset("startup initializeCore configuration configureCore begin nativeSend finish settle".split())
+PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle".split())
+PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity persistentReference saveConfiguration savedConfiguration savedIdentity savedFingerprint savedMetadata".split())
 CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus".split())
 COMMANDS = frozenset("session unlock review decision status".split())
 NATIVE_COMMANDS = frozenset("session unlock review approve deny status".split())
@@ -44,14 +45,32 @@ def app_diagnostics(code, stdout, stderr, timed_out=False):
     return result
 
 
-def launch_app(executable, environment):
+def provision_diagnostics(code, stdout, stderr, timed_out=False):
+    result = {"exit_code": code, "timed_out": timed_out, "failures": []}
+    for line in (stdout[-65536:] + b"\n" + stderr[-65536:]).splitlines():
+        parts = line.split(b":")
+        if len(parts) == 2 and parts[0] == b"COMPANION_PROVIDER_PROVISION_FAILED":
+            phase = parts[1].decode("ascii", errors="replace")
+            if phase in PROVISION_PHASES and len(result["failures"]) < 16:
+                result["failures"].append(phase)
+    result["passed"] = (code == 0 and not timed_out
+                        and stdout.splitlines().count(b"COMPANION_PROVIDER_PROVISION_OK") == 1
+                        and not result["failures"])
+    return result
+
+
+def run_diagnosed(argv, diagnostics, **options):
     try:
-        result = run([executable], env=environment)
-        return app_diagnostics(result.returncode, result.stdout, result.stderr)
+        result = run(argv, **options)
+        return diagnostics(result.returncode, result.stdout, result.stderr)
     except subprocess.CalledProcessError as error:
-        return app_diagnostics(error.returncode, error.stdout or b"", error.stderr or b"")
+        return diagnostics(error.returncode, error.stdout or b"", error.stderr or b"")
     except subprocess.TimeoutExpired as error:
-        return app_diagnostics(None, error.stdout or b"", error.stderr or b"", timed_out=True)
+        return diagnostics(None, error.stdout or b"", error.stderr or b"", timed_out=True)
+
+
+def launch_app(executable, environment):
+    return run_diagnosed([executable], app_diagnostics, env=environment)
 
 
 def command_counts(path):
@@ -126,6 +145,7 @@ def main():
         run([sys.executable, FIXTURE, "provision", temporary])
         run(["swiftc", "-parse-as-library", ROOT / "macos/Sources/CompanionCore/Protocol.swift",
              ROOT / "macos/Sources/CompanionCore/Trust.swift",
+             ROOT / "companion/macos/Runner/ProviderSettings.swift",
              ROOT / "companion/provider_native_tests/ProviderFixtureIdentity.swift", "-o", helper])
         run(["security", "create-keychain", "-p", "synthetic-fixture-only", keychain])
         created_keychain = True
@@ -175,7 +195,13 @@ def main():
             leaf = mode if mode in ["wrong-host", "expired"] else "server"
             pin = "0" * 64 if name == "pin" else hashlib.sha256((temporary / f"{leaf}.der").read_bytes()).hexdigest()
             created_configuration = True
-            run([helper, temporary, configuration, client, ca, f"https://127.0.0.1:{port}", pin, keychain])
+            provision = run_diagnosed(
+                [helper, temporary, configuration, client, ca, f"https://127.0.0.1:{port}", pin, keychain],
+                provision_diagnostics)
+            report["cases"][name]["provision"] = provision
+            report["cases"][name]["observed_command_counts"] = command_counts(temporary / "requests.jsonl")
+            if not provision["passed"]:
+                raise RuntimeError("fixture provisioning failed; see sanitized packaged-tls.json")
             launch(scenario, client)
             if mode in ["drop", "drop-pending"]:
                 # A separate AOT process reads the native durable marker and sends
