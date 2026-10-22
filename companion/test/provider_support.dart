@@ -1,0 +1,146 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:companion_slice/platform/provider.dart';
+import 'package:companion_slice/src/rust/api/provider.dart' as core;
+
+const providerId = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+Uint8List encoded(Object value) =>
+    Uint8List.fromList(utf8.encode(jsonEncode(value)));
+Map<String, dynamic> providerReview() => jsonDecode(
+  File('../tests/fixtures/companion/review.json').readAsStringSync(),
+) as Map<String, dynamic>;
+
+void resetProvider() {
+  final state = core.providerSnapshot();
+  if (state.uncertainId.isNotEmpty) {
+    final work = core.providerBegin(
+      command: core.ProviderCommand.status,
+      requestId: state.uncertainId,
+      password: '',
+    );
+    core.providerFinish(
+      token: work.token,
+      response: encoded({
+        'version': 1,
+        'status': {'status': 'expired'},
+      }),
+    );
+  }
+  core.providerConfigure(uncertainId: '');
+}
+
+class FixtureProviderPlatform implements ProviderPlatform {
+  @override
+  bool available = true;
+  final List<Map<String, dynamic>> commands = [];
+  final List<String> settled = [];
+  final List<String> settlementAttempts = [];
+  Completer<Uint8List>? heldReview, heldDecision, heldSession;
+  Completer<ProviderConfiguration>? heldConfiguration, heldSetup;
+  Completer<void>? heldSettlement;
+  bool failSettlement = false, failConfiguration = false;
+  bool clearThenFailSettlement = false;
+  Uint8List? sessionReply;
+  ProviderConfiguration saved = ProviderConfiguration(
+    configured: true,
+    endpoint: 'https://fixture.example/v1/companion',
+    pin: 'a' * 64,
+    fingerprint: 'b' * 64,
+  );
+  bool loseDecision = false, wrongPassword = false;
+  String status = 'pending';
+  void Function()? invalidate;
+  @override
+  Future<ProviderConfiguration> configuration() async {
+    if (failConfiguration) throw StateError('Synthetic metadata failure');
+    return heldConfiguration == null ? saved : heldConfiguration!.future;
+  }
+
+  @override
+  Future<ProviderConfiguration> setup(
+    String endpoint,
+    String pin,
+    String passphrase,
+  ) async {
+    if (heldSetup != null) saved = await heldSetup!.future;
+    return saved;
+  }
+
+  @override
+  Future<Uint8List> send(Uint8List body) async {
+    final command = jsonDecode(utf8.decode(body)) as Map<String, dynamic>;
+    // Fixtures use synthetic strings only; production adapter never records bodies.
+    commands.add(command);
+    switch (command['command']) {
+      case 'session':
+        if (heldSession != null) return heldSession!.future;
+        if (sessionReply != null) return sessionReply!;
+        return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
+      case 'unlock':
+        return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
+      case 'list':
+        return encoded({
+          'version': 1,
+          'requests': [providerId],
+        });
+      case 'review':
+        return heldReview == null
+            ? encoded(providerReview())
+            : heldReview!.future;
+      case 'decision':
+        savePending(command['request_id'] as String);
+        if (heldDecision != null) return heldDecision!.future;
+        if (wrongPassword) {
+          return encoded({'version': 1, 'error': 'authentication_failed'});
+        }
+        if (loseDecision) throw StateError('Synthetic lost response');
+        status = command['decision'] == 'deny' ? 'denied' : 'approved';
+        return encoded({
+          'version': 1,
+          'status': {'status': status},
+        });
+      case 'status':
+        return encoded({
+          'version': 1,
+          'status': {
+            'status': status,
+            if (status == 'completed') 'exit_code': 0,
+          },
+        });
+      default:
+        throw StateError('Unexpected command');
+    }
+  }
+
+  @override
+  Future<void> settle(String id) async {
+    settlementAttempts.add(id);
+    if (heldSettlement != null) await heldSettlement!.future;
+    if (failSettlement) throw StateError('Synthetic settlement failure');
+    if (saved.uncertainId != id) throw StateError('Synthetic marker mismatch');
+    settled.add(id);
+    savePending('');
+    if (clearThenFailSettlement) {
+      throw StateError('Synthetic permissions failure after atomic save');
+    }
+  }
+
+  void savePending(String id) {
+    saved = ProviderConfiguration(
+      configured: saved.configured,
+      endpoint: saved.endpoint,
+      pin: saved.pin,
+      fingerprint: saved.fingerprint,
+      uncertainId: id,
+    );
+  }
+
+  @override
+  void Function() onInvalidation(void Function() callback) {
+    invalidate = callback;
+    return () => invalidate = null;
+  }
+}

@@ -8,7 +8,7 @@ let package = Package(
     targets: [
         .target(name: "NativeContract", path: "macos/Runner",
                 // Flutter/Xcode owns these app sources and resources, including Base.lproj.
-                exclude: ["AppDelegate.swift", "ApprovalSigner.swift", "MainFlutterWindow.swift",
+                exclude: ["AppDelegate.swift", "ApprovalSigner.swift", "MainFlutterWindow.swift", "ProviderAdapter.swift", "ProviderSettings.swift",
                           "Assets.xcassets", "Base.lproj", "Configs", "Info.plist",
                           "DebugProfile.entitlements", "Release.entitlements"],
                 sources: ["ApprovalContract.swift", "NativeTestKey.swift"]),

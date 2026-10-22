@@ -1,12 +1,136 @@
-# Flutter and Rust companion: first synthetic slice
+# Flutter and Rust companion: development provider flow
 
 This is a separate development application, not a replacement for the existing
 Swift companion. It shares a Flutter UI and an independent Rust core across
-macOS, Windows and Linux. Only macOS has a native signing adapter. Windows and
-Linux report biometric signing unavailable and cannot produce an approval.
-There is no vault, provider, password, enrollment, network, or execution API in
-this application. Existing CLI, Linux-only authority, Swift sources and release
-publishing remain unchanged.
+macOS, Windows and Linux. macOS now connects to the existing Linux provider using
+the unchanged v1 protocol. Windows and Linux clearly report provider transport
+unavailable. The previous synthetic signing demonstration remains available as a
+separate mode. Existing CLI, Linux secret custody/execution, restricted agent
+identity and production provider sources are unchanged.
+
+## Foreground provider flow
+
+The normal entrypoint opens development provider setup/inbox. Supply an HTTPS
+endpoint and independently verified lowercase server leaf SHA-256, confirm the
+client identity is dedicated to this development application, then select the
+private CA DER and dedicated PKCS#12 through native file dialogs. The PKCS#12
+passphrase is used only for import. The identity must be separately enrolled on
+Linux through the existing trusted operator procedure; this application cannot
+enroll itself and never looks up the installed Swift app's settings or identity.
+
+The native adapter compiles the existing `macos/Sources/CompanionCore/Trust.swift`
+and `Protocol.swift` directly. Private keys never cross the platform channel.
+Public configuration and an opaque Keychain identity reference are saved in this
+sandbox's `Application Support/dev.vaultwarden.companionSlice.provider/` directory.
+The client certificate fingerprint is visible for enrollment comparison and
+relaunch checks. Import does not delete any existing Keychain material. Replacing
+setup while a decision is unresolved is prohibited, preserving its original
+provider identity. No system CA trust is installed or changed.
+
+The Mac sandbox retains file selection and outbound-network entitlements. The
+packaged ATS private-CA allowance lets the native delegate perform mandatory
+private CA, hostname, certificate-validity and exact leaf-pin verification.
+`ProviderConfiguration` still accepts only HTTPS and `PinnedTransport` requires
+TLS 1.2+, enrolled client identity, bounded response framing and no redirects.
+The ATS entry is not an alternate trust path or an HTTP transport option.
+
+Rust validates closed v1 objects and every canonical review field, preserves
+argument boundaries, quotes strings and escapes all non-ASCII/control scalars.
+The UI shows the provider's 256-request cap explicitly. Authority/inbox reads
+poll every five seconds while foregrounded, backing off to at most 30 seconds
+after transport or typed protocol failures; failed session authority never starts
+an inbox read. Valid locked authority is not treated as a transport failure.
+Setup, selection, inactive/hidden state, sleep, close and disconnect retire
+reviews; stale read completions cannot restore authority. Tickets are usable for
+at most 55 monotonic seconds measured from the review request start and before
+the request's wall-clock deadline. Authority generation changes retire reviews.
+
+Foreground and current-route eligibility are independent: returning focus while
+the synthetic route is visible cannot restart provider polling. Native setup
+dialogs may finish importing while inactive, but the controller reloads saved
+metadata before admitting work. Interrupted startup and failed metadata reads
+can be recovered with Refresh/Reload saved setup; a completed replacement never
+uses the old displayed provider metadata for new transport work.
+
+Operation admission remains closed through durable native settlement. If clearing
+the saved marker fails, Refresh original request status retries status/settlement
+against the same configuration and request ID, never decision or unlock. Native
+settlement already in flight is completed even after page disposal. Authoritative
+approved/running resolves delivery uncertainty but is not terminal execution:
+foreground polling follows that original status ID until completion/failure.
+Configuration replacement clears completed-status tracking, not unresolved work.
+
+Correction regressions use the real Rust bridge in `test/provider_test.dart`.
+`scripts/mutate-provider-controller.py` exercises metadata reconciliation,
+settlement admission, route eligibility, saved-ID restoration, typed refresh and
+status following, restoring exact source bytes and retesting. Native CI tests
+production identity install/reload and failures using only a verified disposable
+default Keychain, then restore the original default/search list and remove it;
+an install-save mutation must be caught. Packaged CI retains the original 14 TLS
+cases and adds controller unlock/inbox/terminal status and two controller relaunch
+recovery cases with exact command counts. These additions require matching native
+CI execution; earlier operator acceptance does not certify corrected code.
+Near-limit rendering/FFI performance remains unmeasured and deferred.
+
+Approve-once requires a fresh password; deny sends no password. Starting either
+consumes the review before transport. Wrong-password rejection requires explicit
+new review. Unlock is a separate single POST followed by authority reads; old
+requests never revive and the agent must submit new work after unlock. Password
+fields clear on submission and context changes, transient Rust password storage
+is zeroized, and Dart clears the outgoing byte buffer after the native call.
+No password, ticket, review or secret is persisted or logged.
+
+Before a decision POST, native code atomically records its request ID beside its
+bound configuration. Close/relaunch restores that uncertainty. A lost, malformed,
+stale or unavailable decision reply permits only status reads for that original
+request; no decision/unlock retry occurs. Pending remains uncertain. Terminal or
+committed status resolves it; definite pre-commit rejection permits a fresh
+review. Durable recovery is cleared only after Rust validates that resolution.
+Unlike the older Swift UI's explicit pending re-review option, this flow follows
+the approved status-only recovery policy until authoritative resolution.
+
+## Provider verification and remaining acceptance gates
+
+`companion/rust/tests/provider.rs` plus core unit tests cover schema closure,
+full escaped review, limits, ticket consumption, both expiry clocks, generation
+changes, stale/duplicate completions, wrong passwords, separate unlock and
+request-scoped uncertainty. Flutter tests exercise the generated FFI library,
+controller lifecycle, password-field invalidation and unavailable-platform UI.
+Debug desktop integration and the AOT release smoke include bounded protocol
+fixtures through the packaged library. These fixtures do not execute protected
+operations and do not establish real provider acceptance.
+
+Run `python3 scripts/mutate-provider-companion.py <evidence-dir>` without other
+companion edits/builds: schema, escaped text, ticket admission, stale reads,
+pending uncertainty, request binding, duplicate completions and both expiry clocks
+must fail tests individually, restore exact bytes and pass a final baseline.
+On Mac, `scripts/test-provider-native.sh` stages the actual shared TLS sources and
+new recovery storage together with the existing real URLSession/Keychain TLS
+fixture tests. It also mutates leaf-pin and trust evaluation in that isolated
+copy. The normal desktop script runs this native suite; CI preserves its logs.
+
+Matching macOS/Windows builds and release archives remain required. Mac CI also
+builds `integration_test/provider_tls_smoke.dart` as an AOT application and runs
+`scripts/test-provider-packaged.py` against that actual sandboxed Flutter/Rust/native
+adapter. It refuses an existing development configuration, imports only synthetic
+identities into a new disposable Keychain restricted to that executable, and
+restores the original Keychain search list. Fourteen loopback cases cover approval,
+denial, wrong password, wrong pin/CA/client/hostname, expired leaf, redirect,
+oversize/schema rejection and lost-response/pending recovery across separate app
+processes. Command counters must show exactly one decision and status-only
+recovery. This is authored verification, not passing evidence until Mac CI runs it.
+It is still a transport fixture with no protected execution. Coordinate the exact
+Mac release artifact against the isolated
+Linux `tests/companion-acceptance.py` fixture and a distinct-UID, non-TTY
+`vw-access` agent: approve executes exactly once, denial executes nothing, and
+the agent receives only redacted status. Exercise wrong CA/pin/hostname/client,
+expired certificate, redirect, malformed reply, lost decision response, relaunch
+and fingerprint continuity in the packaged app; count transmitted decision
+bodies to demonstrate single-send behavior. This coordinated fixture uses
+synthetic backend/authentication despite real transport, state and execution.
+Live Vaultwarden smoke requires separately approved configuration. No live
+enrollment, deployment, installed-app replacement or physical Touch ID acceptance
+is implied by these automated checks. Hardware work remains outside this change.
 
 ## Development
 
@@ -42,7 +166,7 @@ hash. The app loads the library beside its own executable, not from the current
 working directory. The plain Dart FFI test deliberately loads the development
 library in `rust/target/release`.
 
-## Contract and lifecycle
+## Preserved synthetic contract and lifecycle
 
 The UI can select only synthetic fixture 1 or 2. Rust supplies their complete
 display text and starts a 55-second review window using both monotonic and wall
@@ -123,7 +247,7 @@ Rust review. A completed worker still returns to Rust after its old widget is
 disposed. Malformed returned channel values yield bounded failure completions,
 while a noninteractive signature is classified unsafe before other metadata.
 
-## Native identity and operation
+## Synthetic native identity and operation
 
 Application ID/preferences namespace: `dev.vaultwarden.companionSlice`.
 Keychain application tag: `dev.vaultwarden.companionSlice.test-key.v1`.

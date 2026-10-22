@@ -25,11 +25,11 @@ jobs:
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: ${{ matrix.os == 'macos-26-intel' && 90 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-26-intel, windows-latest]
     defaults:
       run:
         shell: bash
@@ -71,6 +71,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
       - run: cargo test --locked --manifest-path companion/rust/Cargo.toml
       - run: python3 scripts/mutate-desktop-companion.py "$RUNNER_TEMP/companion-mutations"
+      - run: python3 scripts/mutate-provider-companion.py "$RUNNER_TEMP/companion-mutations/provider"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -79,7 +80,7 @@ jobs:
 
   macos-companion:
     name: Native macOS approval companion
-    runs-on: macos-latest
+    runs-on: macos-26-intel
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -108,7 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-24.04", "macos-latest"]
+        os: ["ubuntu-24.04", "macos-26-intel"]
         rust: ["stable", "beta"]
         include:
           - os: ubuntu-24.04
@@ -292,9 +293,9 @@ jobs:
             os: ubuntu-latest
             cross: true
           - target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-26-intel
           - target: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-26-intel
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-pc-windows-msvc

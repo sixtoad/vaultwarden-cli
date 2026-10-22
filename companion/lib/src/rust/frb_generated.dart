@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api.dart';
+import 'api/provider.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -67,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1197597240;
+  int get rustContentHash => -584985841;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -88,6 +89,30 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Snapshot crateApiInvalidate({required Invalidation reason});
+
+  ProviderWork crateApiProviderProviderBegin({
+    required ProviderCommand command,
+    required String requestId,
+    required String password,
+  });
+
+  ProviderSnapshot crateApiProviderProviderConfigure({
+    required String uncertainId,
+  });
+
+  ProviderSnapshot crateApiProviderProviderFinish({
+    required int token,
+    required List<int> response,
+  });
+
+  ProviderSnapshot crateApiProviderProviderInvalidate();
+
+  Future<ProviderOutcome> crateApiProviderProviderOutcomeDefault();
+
+  ProviderSnapshot crateApiProviderProviderSnapshot();
+
+  Future<ProviderStatusProgress>
+  crateApiProviderProviderStatusProgressDefault();
 
   Snapshot crateApiSelectFixture({required int id});
 
@@ -180,13 +205,205 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "invalidate", argNames: ["reason"]);
 
   @override
+  ProviderWork crateApiProviderProviderBegin({
+    required ProviderCommand command,
+    required String requestId,
+    required String password,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_provider_command(command, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_String(password, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiProviderProviderBeginConstMeta,
+        argValues: [command, requestId, password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderBeginConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_begin",
+        argNames: ["command", "requestId", "password"],
+      );
+
+  @override
+  ProviderSnapshot crateApiProviderProviderConfigure({
+    required String uncertainId,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(uncertainId, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiProviderProviderConfigureConstMeta,
+        argValues: [uncertainId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderConfigureConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_configure",
+        argNames: ["uncertainId"],
+      );
+
+  @override
+  ProviderSnapshot crateApiProviderProviderFinish({
+    required int token,
+    required List<int> response,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(token, serializer);
+          sse_encode_list_prim_u_8_loose(response, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderFinishConstMeta,
+        argValues: [token, response],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderFinishConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_finish",
+        argNames: ["token", "response"],
+      );
+
+  @override
+  ProviderSnapshot crateApiProviderProviderInvalidate() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderInvalidateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderInvalidateConstMeta =>
+      const TaskConstMeta(debugName: "provider_invalidate", argNames: []);
+
+  @override
+  Future<ProviderOutcome> crateApiProviderProviderOutcomeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_outcome,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderOutcomeDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderOutcomeDefaultConstMeta =>
+      const TaskConstMeta(debugName: "provider_outcome_default", argNames: []);
+
+  @override
+  ProviderSnapshot crateApiProviderProviderSnapshot() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "provider_snapshot", argNames: []);
+
+  @override
+  Future<ProviderStatusProgress>
+  crateApiProviderProviderStatusProgressDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_status_progress,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderStatusProgressDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderStatusProgressDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_status_progress_default",
+        argNames: [],
+      );
+
+  @override
   Snapshot crateApiSelectFixture({required int id}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -208,7 +425,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -281,6 +498,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<String> dco_decode_list_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as List<int>;
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
@@ -296,6 +525,59 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Outcome dco_decode_outcome(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Outcome.values[raw as int];
+  }
+
+  @protected
+  ProviderCommand dco_decode_provider_command(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderCommand.values[raw as int];
+  }
+
+  @protected
+  ProviderOutcome dco_decode_provider_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderOutcome.values[raw as int];
+  }
+
+  @protected
+  ProviderSnapshot dco_decode_provider_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
+    return ProviderSnapshot(
+      outcome: dco_decode_provider_outcome(arr[0]),
+      statusProgress: dco_decode_provider_status_progress(arr[1]),
+      configured: dco_decode_bool(arr[2]),
+      busy: dco_decode_bool(arr[3]),
+      locked: dco_decode_bool(arr[4]),
+      requests: dco_decode_list_String(arr[5]),
+      reviewText: dco_decode_String(arr[6]),
+      reviewId: dco_decode_String(arr[7]),
+      canDecide: dco_decode_bool(arr[8]),
+      uncertainId: dco_decode_String(arr[9]),
+      statusId: dco_decode_String(arr[10]),
+      statusText: dco_decode_String(arr[11]),
+      message: dco_decode_String(arr[12]),
+    );
+  }
+
+  @protected
+  ProviderStatusProgress dco_decode_provider_status_progress(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderStatusProgress.values[raw as int];
+  }
+
+  @protected
+  ProviderWork dco_decode_provider_work(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ProviderWork(
+      token: dco_decode_u_32(arr[0]),
+      body: dco_decode_list_prim_u_8_strict(arr[1]),
+    );
   }
 
   @protected
@@ -413,6 +695,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <String>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -431,6 +732,70 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return Outcome.values[inner];
+  }
+
+  @protected
+  ProviderCommand sse_decode_provider_command(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderCommand.values[inner];
+  }
+
+  @protected
+  ProviderOutcome sse_decode_provider_outcome(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderOutcome.values[inner];
+  }
+
+  @protected
+  ProviderSnapshot sse_decode_provider_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_outcome = sse_decode_provider_outcome(deserializer);
+    var var_statusProgress = sse_decode_provider_status_progress(deserializer);
+    var var_configured = sse_decode_bool(deserializer);
+    var var_busy = sse_decode_bool(deserializer);
+    var var_locked = sse_decode_bool(deserializer);
+    var var_requests = sse_decode_list_String(deserializer);
+    var var_reviewText = sse_decode_String(deserializer);
+    var var_reviewId = sse_decode_String(deserializer);
+    var var_canDecide = sse_decode_bool(deserializer);
+    var var_uncertainId = sse_decode_String(deserializer);
+    var var_statusId = sse_decode_String(deserializer);
+    var var_statusText = sse_decode_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return ProviderSnapshot(
+      outcome: var_outcome,
+      statusProgress: var_statusProgress,
+      configured: var_configured,
+      busy: var_busy,
+      locked: var_locked,
+      requests: var_requests,
+      reviewText: var_reviewText,
+      reviewId: var_reviewId,
+      canDecide: var_canDecide,
+      uncertainId: var_uncertainId,
+      statusId: var_statusId,
+      statusText: var_statusText,
+      message: var_message,
+    );
+  }
+
+  @protected
+  ProviderStatusProgress sse_decode_provider_status_progress(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderStatusProgress.values[inner];
+  }
+
+  @protected
+  ProviderWork sse_decode_provider_work(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_token = sse_decode_u_32(deserializer);
+    var var_body = sse_decode_list_prim_u_8_strict(deserializer);
+    return ProviderWork(token: var_token, body: var_body);
   }
 
   @protected
@@ -552,6 +917,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_prim_u_8_loose(
+    List<int> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint8List(
+      self is Uint8List ? self : Uint8List.fromList(self),
+    );
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -571,6 +957,61 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_outcome(Outcome self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_command(
+    ProviderCommand self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_outcome(
+    ProviderOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_snapshot(
+    ProviderSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_provider_outcome(self.outcome, serializer);
+    sse_encode_provider_status_progress(self.statusProgress, serializer);
+    sse_encode_bool(self.configured, serializer);
+    sse_encode_bool(self.busy, serializer);
+    sse_encode_bool(self.locked, serializer);
+    sse_encode_list_String(self.requests, serializer);
+    sse_encode_String(self.reviewText, serializer);
+    sse_encode_String(self.reviewId, serializer);
+    sse_encode_bool(self.canDecide, serializer);
+    sse_encode_String(self.uncertainId, serializer);
+    sse_encode_String(self.statusId, serializer);
+    sse_encode_String(self.statusText, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_status_progress(
+    ProviderStatusProgress self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_work(ProviderWork self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.token, serializer);
+    sse_encode_list_prim_u_8_strict(self.body, serializer);
   }
 
   @protected

@@ -4,13 +4,28 @@ import 'package:flutter/material.dart';
 
 import 'platform/signer.dart';
 import 'platform/core_loader.dart';
+import 'platform/provider.dart';
+import 'provider/page.dart';
 import 'src/rust/api.dart' as core;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await initializePackagedCore();
-    runApp(CompanionApp(platform: NativeApprovalPlatform()));
+    runApp(
+      MaterialApp(
+        title: 'Companion development',
+        theme: ThemeData(
+          colorSchemeSeed: const Color(0xff315b65),
+          useMaterial3: true,
+        ),
+        home: ProviderPage(
+          platform: NativeProviderPlatform(),
+          syntheticBuilder: (_) =>
+              CompanionReview(platform: NativeApprovalPlatform()),
+        ),
+      ),
+    );
   } catch (_) {
     runApp(
       const MaterialApp(

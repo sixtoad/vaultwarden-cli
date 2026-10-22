@@ -1,5 +1,6 @@
 use crate::lifecycle::Core;
 use std::sync::{Mutex, OnceLock};
+pub mod provider;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {

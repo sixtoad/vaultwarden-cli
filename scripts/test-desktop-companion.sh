@@ -17,17 +17,20 @@ flutter pub get --enforce-lockfile
 flutter analyze
 flutter test
 python3 "$repo/scripts/test-desktop-companion-artifact.py"
+python3 "$repo/scripts/test-provider-packaged-diagnostics.py"
 
 case "$(uname -s)" in
   Linux*)
     target=linux
+    python3 "$repo/scripts/test-provider-fixture.py"
+    python3 "$repo/scripts/mutate-provider-controller.py" "$evidence/controller-mutations"
     xvfb-run -a flutter test integration_test/bridge_test.dart -d linux
     ;;
   Darwin*)
     target=macos
     swift test --package-path .
+    bash "$repo/scripts/test-provider-native.sh" "$evidence/provider-native"
     swift test --package-path "$repo/macos-touch-id-probe"
-    flutter test integration_test/bridge_test.dart -d macos
     ;;
   MINGW*|MSYS*|CYGWIN*)
     target=windows
@@ -43,6 +46,16 @@ if [[ "$target" == linux ]]; then
   xvfb-run -a python3 "$repo/scripts/desktop-companion-artifact.py" smoke "$target" "$evidence"
 else
   python3 "$repo/scripts/desktop-companion-artifact.py" smoke "$target" "$evidence"
+fi
+# Actual AOT Flutter -> Rust -> native TLS path, using only fresh disposable CI
+# identity/configuration and a bounded loopback transport fixture. No live enroll.
+if [[ "$target" == macos && "${CI:-}" == true ]]; then
+  flutter build macos --release --target integration_test/provider_tls_smoke.dart
+  python3 "$repo/scripts/test-provider-packaged.py" "$repo/companion/build/macos/Build/Products/Release/companion_slice.app" "$evidence/provider-packaged"
+fi
+if [[ "$target" == macos ]]; then
+  # Keep the expensive debug build after TLS evidence, then restore release below.
+  flutter test integration_test/bridge_test.dart -d macos
 fi
 # Never publish the self-exiting smoke harness as the operator's application.
 flutter build "$target" --release --target lib/main.dart
