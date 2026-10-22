@@ -26,7 +26,7 @@ mutations = {
 
 def run(name):
     with (evidence / f"{name}.log").open("wb") as log:
-        return subprocess.run(["flutter", "test", "test/provider_test.dart"], cwd=root / "companion",
+        return subprocess.run(["flutter", "test", "--reporter=expanded", "test/provider_test.dart"], cwd=root / "companion",
                               stdout=log, stderr=subprocess.STDOUT, timeout=180).returncode
 
 report = {"source_sha256": hashlib.sha256(original).hexdigest(), "mutations": {}}
