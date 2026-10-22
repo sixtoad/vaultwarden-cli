@@ -30,9 +30,10 @@ private struct WireKey: CodingKey {
     init?(stringValue: String) { self.stringValue = stringValue }
     init?(intValue: Int) { return nil }
 }
-private func requireKeys(_ decoder: Decoder, _ expected: Set<String>) throws {
+private func requireKeys(_ decoder: Decoder, _ expected: Set<String>, optional: Set<String> = []) throws {
     let container = try decoder.container(keyedBy: WireKey.self)
-    guard Set(container.allKeys.map(\.stringValue)) == expected else { throw CompanionError.invalidResponse }
+    let actual = Set(container.allKeys.map(\.stringValue))
+    guard expected.isSubset(of: actual), actual.isSubset(of: expected.union(optional)) else { throw CompanionError.invalidResponse }
 }
 
 public struct DirectStatus: Decodable, Equatable, Sendable {
@@ -75,11 +76,80 @@ public struct ReviewCredential: Decodable, Equatable, Sendable {
         useType = try c.decode(String.self, forKey: .useType)
     }
 }
+private func canonicalCreatePath(_ value: String) -> Bool {
+    let parts = value.split(separator: "/", omittingEmptySubsequences: false)
+    func alnum(_ byte: UInt8) -> Bool { (97...122).contains(byte) || (48...57).contains(byte) }
+    return !value.isEmpty && value.utf8.count <= 256 && parts.allSatisfy { part in
+        let bytes = Array(part.utf8)
+        return !bytes.isEmpty && bytes.count <= 64 && alnum(bytes[0]) && alnum(bytes[bytes.count - 1]) && bytes.allSatisfy { alnum($0) || $0 == 45 }
+    }
+}
+private func canonicalCreateID(_ value: String) -> Bool {
+    let bytes = Array(value.utf8)
+    return bytes.count == 36 && bytes.enumerated().allSatisfy { index, byte in
+        [8, 13, 18, 23].contains(index) ? byte == 45 : ((48...57).contains(byte) || (97...102).contains(byte))
+    }
+}
+private func validCreateField(_ field: String) -> Bool {
+    if field == "password" || field == "notes" { return true }
+    guard field.hasPrefix("custom:") else { return false }
+    let name = String(field.dropFirst(7))
+    return !name.isEmpty && name != "vw-access" && name.utf8.count <= 128 && name.utf8.allSatisfy {
+        (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || [45, 95, 46].contains($0)
+    }
+}
+private func validCreateMarker(_ value: String) -> Bool {
+    let bytes = Array(value.utf8)
+    return !bytes.isEmpty && bytes.count <= 64 && (97...122).contains(bytes[0]) && bytes.last != 45 && bytes.enumerated().allSatisfy { index, byte in
+        (97...122).contains(byte) || (index > 0 && ((48...57).contains(byte) || (byte == 45 && bytes[index - 1] != 45)))
+    }
+}
+public struct CreateDestination: Decodable, Equatable, Sendable {
+    public let accountID: String
+    public let folder: String
+    public let folderID: String
+    public let reference: String
+    enum CodingKeys: String, CodingKey { case accountID = "account_id", folder, folderID = "folder_id", reference }
+    public init(from decoder: Decoder) throws {
+        try requireKeys(decoder, ["account_id", "folder", "folder_id", "reference"])
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        accountID = try c.decode(String.self, forKey: .accountID)
+        folder = try c.decode(String.self, forKey: .folder)
+        folderID = try c.decode(String.self, forKey: .folderID)
+        reference = try c.decode(String.self, forKey: .reference)
+    }
+}
+public struct CreateEffect: Decodable, Equatable, Sendable {
+    public let server: String
+    public let destination: CreateDestination
+    public let fields: [String]
+    public let eligibilityMarker: String
+    enum CodingKeys: String, CodingKey { case server, destination, fields, eligibilityMarker = "eligibility_marker" }
+    public init(from decoder: Decoder) throws {
+        try requireKeys(decoder, ["server", "destination", "fields", "eligibility_marker"])
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        server = try c.decode(String.self, forKey: .server)
+        destination = try c.decode(CreateDestination.self, forKey: .destination)
+        fields = try c.decode([String].self, forKey: .fields)
+        eligibilityMarker = try c.decode(String.self, forKey: .eligibilityMarker)
+        guard server.hasPrefix("https://"), server.utf8.count <= 512,
+              !server.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }),
+              canonicalCreateID(destination.accountID), canonicalCreateID(destination.folderID),
+              canonicalCreatePath(destination.folder), canonicalCreatePath(destination.reference),
+              destination.reference.hasPrefix(destination.folder + "/"),
+              !fields.isEmpty, fields.count <= 34, Set(fields).count == fields.count,
+              fields.filter({ $0.hasPrefix("custom:") }).count <= 32,
+              fields.contains(where: { $0 == "password" || $0.hasPrefix("custom:") }),
+              fields.allSatisfy(validCreateField), validCreateMarker(eligibilityMarker)
+        else { throw CompanionError.invalidResponse }
+    }
+}
 public struct DirectReview: Decodable, Equatable, Sendable, Identifiable {
     public let id: String
     public let requester: String
     public let operation: String
     public let effect: String
+    public let create: CreateEffect?
     public let target: String
     public let arguments: [String]
     public let credentials: [ReviewCredential]
@@ -90,17 +160,18 @@ public struct DirectReview: Decodable, Equatable, Sendable, Identifiable {
     public let oneTime: String
     public let status: DirectStatus
     enum CodingKeys: String, CodingKey {
-        case id, requester, operation, effect, target, arguments, credentials, status
+        case id, requester, operation, effect, create, target, arguments, credentials, status
         case executableDigest = "executable_digest", policyDigest = "policy_digest"
         case argumentsDigest = "arguments_digest", expiresAtUnixSeconds = "expires_at_unix_seconds", oneTime = "one_time"
     }
     public init(from decoder: Decoder) throws {
-        try requireKeys(decoder, ["id", "requester", "operation", "effect", "target", "arguments", "credentials", "executable_digest", "policy_digest", "arguments_digest", "expires_at_unix_seconds", "one_time", "status"])
+        try requireKeys(decoder, ["id", "requester", "operation", "effect", "target", "arguments", "credentials", "executable_digest", "policy_digest", "arguments_digest", "expires_at_unix_seconds", "one_time", "status"], optional: ["create"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         requester = try c.decode(String.self, forKey: .requester)
         operation = try c.decode(String.self, forKey: .operation)
         effect = try c.decode(String.self, forKey: .effect)
+        create = try c.decodeIfPresent(CreateEffect.self, forKey: .create)
         target = try c.decode(String.self, forKey: .target)
         arguments = try c.decode([String].self, forKey: .arguments)
         credentials = try c.decode([ReviewCredential].self, forKey: .credentials)
@@ -112,6 +183,9 @@ public struct DirectReview: Decodable, Equatable, Sendable, Identifiable {
         status = try c.decode(DirectStatus.self, forKey: .status)
     }
     public func validate() throws {
+        if let create {
+            guard effect == "CREATE personal vault item (no update)", target == create.destination.reference else { throw CompanionError.invalidResponse }
+        }
         guard validRequestID(id), [executableDigest, policyDigest, argumentsDigest].allSatisfy({ validHex($0, count: 64) }) else { throw CompanionError.invalidResponse }
     }
 }

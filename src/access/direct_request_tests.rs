@@ -38,6 +38,7 @@ thread_local! {
     static EXECUTION_ELIGIBILITY_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static EXECUTION_RESOLUTION_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     pub(crate) static RESOLUTION_ACTION: ResolutionAction = std::cell::RefCell::new(None);
+    static SCOPED_BINDING: std::cell::RefCell<Option<(crate::secret_storage::Destination, crate::secret_storage::Destination)>> = const { std::cell::RefCell::new(None) };
     static BACKEND_UNLOCKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 struct Backend;
@@ -63,6 +64,44 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    fn reconcile_secret(&mut self, _: &CreateEffect, id: &str) -> Result<(), SessionError> {
+        if id == "33333333-3333-3333-3333-333333333333" {
+            Ok(())
+        } else {
+            Err(SessionError::BackendUnavailable)
+        }
+    }
+    fn create_eligible(&mut self, _: &CreateEffect) -> Result<(), SessionError> {
+        Ok(())
+    }
+    fn create_secret(
+        &mut self,
+        _: &CreateEffect,
+        input: &crate::secret_storage::SecretImport,
+        live: &dyn Fn() -> bool,
+    ) -> Result<String, crate::secret_storage::WriteStatus> {
+        assert!(live());
+        assert_eq!(input.password.as_deref(), Some("private-producer-sentinel"));
+        CREATE_CALLS.with(|c| c.set(c.get() + 1));
+        match CREATE_MODE.with(std::cell::Cell::get) {
+            1 => Err(crate::secret_storage::WriteStatus::Uncertain),
+            2 => panic!("simulated interrupted write"),
+            _ => Ok("33333333-3333-3333-3333-333333333333".into()),
+        }
+    }
+    fn verify_secret(
+        &mut self,
+        _: &CreateEffect,
+        _: &str,
+        _: &crate::secret_storage::SecretImport,
+    ) -> Result<(), SessionError> {
+        if CREATE_MODE.with(std::cell::Cell::get) == 3 {
+            Err(SessionError::BackendUnavailable)
+        } else {
+            Ok(())
+        }
+    }
+
     fn resolve_ssh(&mut self, _: &str) -> Result<SensitiveString, SessionError> {
         EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(calls.get() + 1));
         RESOLUTION_ACTION.with(|action| {
@@ -82,7 +121,10 @@ impl SecretBackend for Backend {
                 .map_or(Ok(true), |callback| callback())
         })
     }
-    fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
+    fn eligible(&mut self, binding: &CredentialBinding<'_>) -> Result<bool, SessionError> {
+        if let Some(valid) = scoped_binding_valid(binding) {
+            return Ok(valid);
+        }
         EXECUTION_ELIGIBILITY_CALLS.with(|calls| calls.set(calls.get() + 1));
         ELIGIBILITY_ACTION.with(|action| {
             action
@@ -91,7 +133,13 @@ impl SecretBackend for Backend {
                 .map_or(Ok(true), |callback| callback())
         })
     }
-    fn resolve(&mut self, _: &CredentialBinding<'_>) -> Result<Vec<SensitiveString>, SessionError> {
+    fn resolve(
+        &mut self,
+        binding: &CredentialBinding<'_>,
+    ) -> Result<Vec<SensitiveString>, SessionError> {
+        if scoped_binding_valid(binding) == Some(false) {
+            return Err(SessionError::BackendUnavailable);
+        }
         EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(calls.get() + 1));
         RESOLUTION_ACTION.with(|action| {
             action.borrow_mut().as_mut().map_or_else(
@@ -104,6 +152,18 @@ impl SecretBackend for Backend {
             )
         })
     }
+}
+fn scoped_binding_valid(binding: &CredentialBinding<'_>) -> Option<bool> {
+    SCOPED_BINDING.with(|state| {
+        state.borrow().as_ref().map(|(expected, current)| {
+            assert_eq!(
+                binding.namespace,
+                Some(expected),
+                "application must propagate the exact scoped binding"
+            );
+            expected == current
+        })
+    })
 }
 pub(crate) struct Fixture {
     pub dir: tempfile::TempDir,
@@ -155,6 +215,7 @@ fn fixture_with_lifetime(lifetime: Duration) -> Fixture {
 }
 pub(crate) fn operation_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        create: None,
         ssh: None,
         id: "deploy".into(),
         description: "Deploy <img src=x onerror=alert(1)>".into(),
@@ -171,6 +232,7 @@ pub(crate) fn operation_draft() -> OperationPolicyDraft {
             },
         ],
         credentials: vec![LoginCredentialDraft {
+            namespace: None,
             item_id: "11111111-1111-1111-1111-111111111111".into(),
             label: "Deployment <login>".into(),
             use_type: CredentialUse::Login,
@@ -7173,4 +7235,463 @@ fn companion_inbox_expires_and_locked_submission_never_creates_work() {
         Err(DirectRequestError::Locked)
     ));
     assert!(f.app.companion_pending().unwrap().is_empty());
+}
+
+thread_local! {
+    static CREATE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static CREATE_MODE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+}
+struct ProducerPreparation {
+    malformed: bool,
+}
+struct SyntheticProducerOutput {
+    malformed: bool,
+}
+impl ProducerOutput for SyntheticProducerOutput {
+    fn read(
+        &mut self,
+        evidence: CleanupEvidence,
+    ) -> Result<crate::secret_storage::SecretImport, ExecutionError> {
+        assert_eq!(evidence, CleanupEvidence::Reaped);
+        if self.malformed {
+            return Err(ExecutionError::ExecutionFailed);
+        }
+        crate::secret_storage::SecretImport::parse(br#"{"password":"private-producer-sentinel"}"#)
+            .map_err(|_error| ExecutionError::ExecutionFailed)
+    }
+}
+impl ProtectedExecution for ProducerPreparation {
+    type Prepared = ();
+    fn prepare(&self, _: ExecutionImage<'_>, argv: Vec<String>) -> Result<(), ExecutionError> {
+        assert_eq!(argv, ["create-secret"]);
+        Ok(())
+    }
+    fn prepare_producer(&self, (): &mut ()) -> Result<Box<dyn ProducerOutput>, ExecutionError> {
+        Ok(Box::new(SyntheticProducerOutput {
+            malformed: self.malformed,
+        }))
+    }
+}
+struct ProducerSupervisor;
+impl ProcessSupervisor<ProducerPreparation> for ProducerSupervisor {
+    fn available(&self) -> bool {
+        true
+    }
+    fn supervise(
+        &self,
+        (): (),
+        environment: ChildEnvironment,
+    ) -> Result<ExecutionOutcome, ExecutionError> {
+        assert_eq!(environment.entries().len(), 2); // No vault or provider authority reaches the producer.
+        Ok(ExecutionOutcome::ExitedZero)
+    }
+}
+fn create_pending(f: &Fixture) -> String {
+    let mut policy = operation_draft();
+    policy.id = "create-secret".into();
+    policy.description = "Store generated secret".into();
+    policy.targets.clear();
+    policy.arguments.clear();
+    policy.credentials.clear();
+    policy.create = Some(CreateEffect {
+        server: "https://vault.example".into(),
+        destination: crate::secret_storage::Destination {
+            account_id: "11111111-1111-1111-1111-111111111111".into(),
+            folder: "homelab/production".into(),
+            folder_id: "22222222-2222-2222-2222-222222222222".into(),
+            reference: "homelab/production/github/token".into(),
+        },
+        fields: vec!["password".into()],
+        eligibility_marker: "deploy".into(),
+    });
+    f.app.create_operation(f.app.human_owner(), policy).unwrap();
+    f.app
+        .submit_direct(
+            f.app.human_owner(),
+            DirectSubmission {
+                operation: "create-secret".into(),
+                revision: None,
+                values: vec![],
+            },
+            &Launcher::default(),
+        )
+        .unwrap()
+        .id
+}
+#[test]
+fn protected_create_requires_fresh_approval_and_keeps_private_values_out_of_history() {
+    CREATE_MODE.with(|c| c.set(0));
+    CREATE_CALLS.with(|c| c.set(0));
+    let f = fixture();
+    let id = create_pending(&f);
+    let review = f.app.review_direct(f.app.human_owner(), &id).unwrap();
+    assert_eq!(review.effect, "CREATE personal vault item (no update)");
+    assert!(review.create.is_some());
+    let prep = ProducerPreparation { malformed: false };
+    assert!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &prep, &ProducerSupervisor)
+            .is_err()
+    );
+    assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 0);
+    f.app.commit_approval(approval(&f, &id)).unwrap();
+    assert_eq!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &prep, &ProducerSupervisor)
+            .unwrap(),
+        DirectStatus::Completed { exit_code: 0 }
+    );
+    assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 1);
+    assert!(
+        f.app
+            .run_execution(f.app.human_owner(), &id, &prep, &ProducerSupervisor)
+            .is_err()
+    );
+    let raw = std::fs::read_to_string(f.dir.path().join("provider/provider-state.json")).unwrap();
+    assert!(!raw.contains("private-producer-sentinel"));
+    let state: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    let record = state["requests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == id)
+        .unwrap();
+    assert_eq!(record["direct"]["write_receipt"]["status"], "verified");
+    assert_eq!(
+        record["direct"]["audit"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["write_receipt"]["status"],
+        "verified"
+    );
+}
+#[test]
+fn protected_create_denied_expired_and_malformed_never_post() {
+    for case in ["denied", "expired", "locked", "cancelled", "malformed"] {
+        CREATE_MODE.with(|c| c.set(0));
+        CREATE_CALLS.with(|c| c.set(0));
+        let f = fixture();
+        let id = create_pending(&f);
+        if case == "denied" {
+            f.app.deny_direct(f.app.human_owner(), &id).unwrap();
+        } else {
+            f.app.commit_approval(approval(&f, &id)).unwrap();
+        }
+        if case == "expired" {
+            f.monotonic.store(400, Ordering::SeqCst);
+        }
+        if case == "locked" {
+            f.app.lock().unwrap();
+        }
+        if case == "cancelled" {
+            f.app.close_admission();
+        }
+        assert!(
+            f.app
+                .run_execution(
+                    f.app.human_owner(),
+                    &id,
+                    &ProducerPreparation {
+                        malformed: case == "malformed"
+                    },
+                    &ProducerSupervisor
+                )
+                .is_err()
+        );
+        assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 0, "{case}");
+    }
+}
+#[test]
+fn protected_create_retains_uncertain_and_created_unverified_without_repeating() {
+    for (mode, status) in [(1, "uncertain"), (3, "created_unverified")] {
+        CREATE_MODE.with(|c| c.set(mode));
+        CREATE_CALLS.with(|c| c.set(0));
+        let f = fixture();
+        let id = create_pending(&f);
+        f.app.commit_approval(approval(&f, &id)).unwrap();
+        assert!(
+            f.app
+                .run_execution(
+                    f.app.human_owner(),
+                    &id,
+                    &ProducerPreparation { malformed: false },
+                    &ProducerSupervisor
+                )
+                .is_err()
+        );
+        assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 1);
+        let raw =
+            std::fs::read_to_string(f.dir.path().join("provider/provider-state.json")).unwrap();
+        let state: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(
+            state["requests"][0]["direct"]["write_receipt"]["status"],
+            status
+        );
+        drop(f.app);
+        let _provider = Provider::start(f.dir.path().join("provider")).unwrap();
+        assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 1);
+    }
+}
+#[test]
+fn protected_create_restart_after_interrupted_post_retains_durable_uncertainty() {
+    CREATE_MODE.with(|c| c.set(2));
+    CREATE_CALLS.with(|c| c.set(0));
+    let f = fixture();
+    let id = create_pending(&f);
+    f.app.commit_approval(approval(&f, &id)).unwrap();
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ProducerPreparation { malformed: false },
+            &ProducerSupervisor
+        )))
+        .is_err()
+    );
+    drop(f.app);
+    let _provider = Provider::start(f.dir.path().join("provider")).unwrap();
+    let raw = std::fs::read_to_string(f.dir.path().join("provider/provider-state.json")).unwrap();
+    assert!(!raw.contains("private-producer-sentinel"));
+    let state: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(
+        state["requests"][0]["direct"]["write_receipt"]["status"],
+        "uncertain"
+    );
+    assert_eq!(
+        state["requests"][0]["direct"]["audit"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["write_receipt"]["status"],
+        "uncertain"
+    );
+    assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 1);
+}
+
+#[test]
+fn protected_create_reconciliation_is_read_only_and_never_retargets_or_replays() {
+    CREATE_MODE.with(|c| c.set(1));
+    CREATE_CALLS.with(|c| c.set(0));
+    let f = fixture();
+    let id = create_pending(&f);
+    f.app.commit_approval(approval(&f, &id)).unwrap();
+    assert!(
+        f.app
+            .run_execution(
+                f.app.human_owner(),
+                &id,
+                &ProducerPreparation { malformed: false },
+                &ProducerSupervisor
+            )
+            .is_err()
+    );
+    let receipt = f
+        .app
+        .reconcile_write(
+            f.app.human_owner(),
+            &id,
+            "33333333-3333-3333-3333-333333333333",
+        )
+        .unwrap();
+    assert_eq!(
+        receipt.status,
+        crate::secret_storage::WriteStatus::CreatedUnverified
+    );
+    assert_eq!(
+        f.app
+            .reconcile_write(
+                f.app.human_owner(),
+                &id,
+                "33333333-3333-3333-3333-333333333333"
+            )
+            .unwrap(),
+        receipt
+    );
+    assert!(
+        f.app
+            .reconcile_write(
+                f.app.human_owner(),
+                &id,
+                "44444444-4444-4444-4444-444444444444"
+            )
+            .is_err()
+    );
+    assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 1);
+    drop(f.app);
+    let _provider = Provider::start(f.dir.path().join("provider")).unwrap();
+}
+
+#[test]
+fn protected_create_cancelled_after_producer_completion_never_posts() {
+    struct CancelProducer(Arc<ProviderApplication>);
+    impl ProcessSupervisor<ProducerPreparation> for CancelProducer {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            (): (),
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            self.0.close_admission();
+            Ok(ExecutionOutcome::ExitedZero)
+        }
+    }
+    CREATE_MODE.with(|c| c.set(0));
+    CREATE_CALLS.with(|c| c.set(0));
+    let f = fixture();
+    let id = create_pending(&f);
+    f.app.commit_approval(approval(&f, &id)).unwrap();
+    assert!(
+        f.app
+            .run_execution(
+                f.app.human_owner(),
+                &id,
+                &ProducerPreparation { malformed: false },
+                &CancelProducer(f.app.clone())
+            )
+            .is_err()
+    );
+    assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 0);
+}
+
+#[test]
+fn scoped_credentials_propagate_and_reject_changed_folder_or_reference_before_execution() {
+    for change in ["none", "folder", "reference"] {
+        let f = fixture();
+        let namespace = crate::secret_storage::Destination {
+            account_id: "11111111-1111-1111-1111-111111111111".into(),
+            folder: "homelab/production".into(),
+            folder_id: "22222222-2222-2222-2222-222222222222".into(),
+            reference: "homelab/production/github/token".into(),
+        };
+        SCOPED_BINDING
+            .with(|state| *state.borrow_mut() = Some((namespace.clone(), namespace.clone())));
+        let mut policy = operation_draft();
+        policy.credentials[0].namespace = Some(namespace);
+        f.app.activate_operation(policy).unwrap();
+        let id = approved(&f);
+        SCOPED_BINDING.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = &mut state.as_mut().unwrap().1;
+            match change {
+                "folder" => current.folder_id = "33333333-3333-3333-3333-333333333333".into(),
+                "reference" => current.reference = "homelab/production/github/renamed".into(),
+                _ => {}
+            }
+        });
+        let supervisor = RecordingSupervisor::default();
+        let result = f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &supervisor,
+        );
+        assert_eq!(result.is_ok(), change == "none");
+        assert_eq!(supervisor.launches.get(), usize::from(change == "none"));
+        SCOPED_BINDING.with(|state| *state.borrow_mut() = None);
+    }
+}
+
+#[test]
+fn protected_create_fresh_approval_after_restart_cannot_replay_equivalent_destination() {
+    for trailing_slash in [false, true] {
+        CREATE_MODE.with(|c| c.set(1));
+        CREATE_CALLS.with(|c| c.set(0));
+        let mut f = fixture();
+        let original_id = create_pending(&f);
+        f.app.commit_approval(approval(&f, &original_id)).unwrap();
+        assert!(
+            f.app
+                .run_execution(
+                    f.app.human_owner(),
+                    &original_id,
+                    &ProducerPreparation { malformed: false },
+                    &ProducerSupervisor
+                )
+                .is_err()
+        );
+        let original = records(&f)["requests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == original_id)
+            .unwrap()["direct"]["write_receipt"]
+            .clone();
+        // Destroy the application before reconstructing from the durable state.
+        let Fixture {
+            dir,
+            app,
+            monotonic,
+            wall,
+            on_wall_read,
+        } = f;
+        drop(app);
+        let app = Arc::new(
+            ProviderApplication::new_with_request_lifetime(
+                Provider::start(dir.path().join("provider")).unwrap(),
+                Box::new(Backend),
+                Box::new(Clock {
+                    monotonic: monotonic.clone(),
+                    wall: wall.clone(),
+                    on_wall_read: on_wall_read.clone(),
+                }),
+                DEFAULT_REQUEST_LIFETIME,
+            )
+            .unwrap(),
+        );
+        app.authenticate(SensitiveString::new("synthetic-password".into()))
+            .unwrap();
+        f = Fixture {
+            dir,
+            app,
+            monotonic,
+            wall,
+            on_wall_read,
+        };
+        if trailing_slash {
+            let mut draft = f
+                .app
+                .show_operation(f.app.human_owner(), "create-secret")
+                .unwrap()
+                .policy;
+            draft.create.as_mut().unwrap().server.push('/');
+            f.app.activate_operation(draft).unwrap();
+        }
+        let next = f
+            .app
+            .submit_direct(
+                f.app.human_owner(),
+                DirectSubmission {
+                    operation: "create-secret".into(),
+                    revision: None,
+                    values: vec![],
+                },
+                &Launcher::default(),
+            )
+            .unwrap()
+            .id;
+        assert_ne!(next, original_id);
+        f.app.commit_approval(approval(&f, &next)).unwrap();
+        assert!(
+            f.app
+                .run_execution(
+                    f.app.human_owner(),
+                    &next,
+                    &ProducerPreparation { malformed: false },
+                    &ProducerSupervisor
+                )
+                .is_err()
+        );
+        assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 1);
+        let retained = records(&f)["requests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == original_id)
+            .unwrap()["direct"]["write_receipt"]
+            .clone();
+        assert_eq!(retained, original);
+    }
 }

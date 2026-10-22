@@ -507,6 +507,7 @@ pub const fn cipher_ssh_key_data(data: &CipherData) -> Option<&SshKeyData> {
 
 #[derive(Debug, Clone)]
 pub struct Cipher {
+    pub item_key: Option<String>,
     pub id: CipherId,
     pub organization_id: Option<OrgId>,
     pub deleted_date: Option<String>,
@@ -530,6 +531,8 @@ impl<'de> Deserialize<'de> for Cipher {
     {
         #[derive(Deserialize)]
         struct CipherHelper {
+            #[serde(rename = "key", alias = "Key")]
+            item_key: Option<String>,
             #[serde(alias = "Id", alias = "id")]
             id: CipherId,
             #[serde(alias = "OrganizationId", alias = "organizationId")]
@@ -597,6 +600,7 @@ impl<'de> Deserialize<'de> for Cipher {
             })),
         });
         Ok(Self {
+            item_key: h.item_key,
             id: h.id,
             organization_id: h.organization_id,
             deleted_date: h.deleted_date,
@@ -927,6 +931,7 @@ mod tests {
 
         fn create_test_cipher() -> Cipher {
             Cipher {
+                item_key: None,
                 id: CipherId::new("test-id".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -954,6 +959,7 @@ mod tests {
 
         fn create_cipher_with_nested_data() -> Cipher {
             Cipher {
+                item_key: None,
                 id: CipherId::new("test-id".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -1019,6 +1025,7 @@ mod tests {
         #[test]
         fn test_get_name_none() {
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("test".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -1077,6 +1084,7 @@ mod tests {
         #[test]
         fn test_get_uri_from_nested_uris_array() {
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("test".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -1474,6 +1482,28 @@ mod tests {
                     .as_ref()
                     .map(super::super::CipherData::cipher_type),
                 Some(CipherType::Login)
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod item_key_regressions {
+    use super::Cipher;
+    #[test]
+    fn one_shared_key_decoder_rejects_duplicates_and_malformed_keys() {
+        for key in [r#""key":"2.a|b|c","Key":"2.a|b|c""#, r#""key":123"#] {
+            let json = format!(r#"{{"id":"item","type":1,{key}}}"#);
+            assert!(serde_json::from_str::<Cipher>(&json).is_err());
+        }
+        for key in ["key", "Key"] {
+            let json = format!(r#"{{"id":"item","type":1,"{key}":"2.a|b|c"}}"#);
+            assert_eq!(
+                serde_json::from_str::<Cipher>(&json)
+                    .unwrap()
+                    .item_key
+                    .as_deref(),
+                Some("2.a|b|c")
             );
         }
     }

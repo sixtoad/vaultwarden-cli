@@ -558,7 +558,7 @@ fn find_cipher_output(
         let Ok(keys) = get_cipher_keys(config, cipher) else {
             continue;
         };
-        if let Ok(output) = decrypt_cipher(cipher, keys)
+        if let Ok(output) = decrypt_cipher(cipher, &keys)
             && predicate(&output)
         {
             return Some(output);
@@ -667,12 +667,12 @@ fn find_cipher_output_by_uri(
     matches_filters: impl Fn(&Cipher) -> bool,
     profile: CipherDecryptionProfile,
 ) -> Result<CipherOutput> {
-    let matches: Vec<(&Cipher, &CryptoKeys)> = ciphers
+    let matches: Vec<(&Cipher, CryptoKeys)> = ciphers
         .iter()
         .filter(|cipher| matches_filters(cipher))
         .filter_map(|cipher| {
             let keys = get_cipher_keys(config, cipher).ok()?;
-            if cipher_uri_matches(uri, keys, cipher) {
+            if cipher_uri_matches(uri, &keys, cipher) {
                 Some((cipher, keys))
             } else {
                 None
@@ -700,13 +700,19 @@ fn find_cipher_output_by_name_or_id(
     matches_filters: impl Fn(&Cipher) -> bool,
     profile: CipherDecryptionProfile,
 ) -> Result<CipherOutput> {
-    if let Some(cipher) = ciphers
+    let ids = ciphers
         .iter()
-        .find(|c| c.id == name_or_id && matches_filters(c))
-    {
+        .filter(|c| c.id == name_or_id && matches_filters(c))
+        .collect::<Vec<_>>();
+    anyhow::ensure!(ids.len() <= 1, "Duplicate item identity");
+    if let Some(cipher) = ids.first() {
         let keys = get_cipher_keys(config, cipher)?;
-        return decrypt_cipher_with_profile(cipher, keys, profile);
+        return decrypt_cipher_with_profile(cipher, &keys, profile);
     }
+    anyhow::ensure!(
+        !crate::secret_storage::valid_id(name_or_id),
+        "Item ID not found in the requested scope"
+    );
 
     let name_lower = name_or_id.to_lowercase();
     let mut matching_ciphers = Vec::new();
@@ -729,7 +735,7 @@ fn find_cipher_output_by_name_or_id(
     match matching_ciphers.as_slice() {
         [cipher] => {
             let keys = get_cipher_keys(config, cipher)?;
-            decrypt_cipher_with_profile(cipher, keys, profile)
+            decrypt_cipher_with_profile(cipher, &keys, profile)
         }
         [] => anyhow::bail!("Item '{name_or_id}' not found"),
         matches => anyhow::bail!("{}", ambiguous_item_name_message(name_or_id, matches.len())),
@@ -745,8 +751,12 @@ async fn fetch_cipher_output_by_id(
         .api
         .cipher_by_id(&api_ctx.access_token, cipher_id)
         .await?;
+    anyhow::ensure!(
+        cipher.id == cipher_id && cipher.deleted_date.is_none(),
+        "Returned item identity is invalid or deleted"
+    );
     let keys = get_cipher_keys(&api_ctx.config, &cipher)?;
-    decrypt_cipher_with_profile(&cipher, keys, profile)
+    decrypt_cipher_with_profile(&cipher, &keys, profile)
 }
 
 /// Optional filters applied when selecting ciphers to run.
@@ -782,7 +792,7 @@ async fn fetch_filtered_cipher_outputs(
         .filter(|cipher| cipher_matches_filters(cipher, org_id, collection_id, folder_id))
     {
         let output = get_cipher_keys(&ctx.config, cipher)
-            .and_then(|keys| decrypt_cipher_with_profile(cipher, keys, profile))
+            .and_then(|keys| decrypt_cipher_with_profile(cipher, &keys, profile))
             .with_context(|| {
                 format!(
                     "selected filtered item '{}' could not be decrypted",
@@ -806,9 +816,9 @@ async fn fetch_filtered_cipher_outputs(
     Ok(outputs)
 }
 
-fn get_cipher_keys<'a>(config: &'a Config, cipher: &Cipher) -> Result<&'a CryptoKeys> {
+fn get_cipher_keys(config: &Config, cipher: &Cipher) -> Result<CryptoKeys> {
     if let Some(keys) = config.get_keys_for_cipher(cipher.organization_id.as_deref()) {
-        Ok(keys)
+        keys.item_keys(cipher.item_key.as_deref())
     } else {
         if let Some(org_id) = &cipher.organization_id {
             anyhow::bail!("Organization key not available for org {org_id}. Try re-logging in.");
@@ -969,6 +979,7 @@ fn decrypt_cipher_with_profile(
     keys: &CryptoKeys,
     profile: CipherDecryptionProfile,
 ) -> Result<CipherOutput> {
+    anyhow::ensure!(cipher.deleted_date.is_none(), "Item is deleted");
     let name = cipher.get_name().context("Cipher has no name")?;
     let decrypted_name = keys.decrypt_to_string(name)?;
 
@@ -1043,6 +1054,14 @@ fn decrypt_cipher_with_profile(
     } else {
         None
     };
+
+    if let Some(fields) = &decrypted_fields {
+        let mut names = std::collections::HashSet::new();
+        anyhow::ensure!(
+            fields.iter().all(|field| names.insert(&field.name)),
+            "Duplicate custom field names"
+        );
+    }
 
     // Decrypt SSH key fields if present
     let ssh_key_data = cipher.cipher_data.as_ref().and_then(|cd| {
@@ -1295,7 +1314,7 @@ async fn list_with_json_empty_array(
         } else {
             CipherDecryptionProfile::list_env_names()
         };
-        match decrypt_cipher_with_profile(cipher, keys, profile) {
+        match decrypt_cipher_with_profile(cipher, &keys, profile) {
             Ok(output) => {
                 if let Some(ref term) = search_lower
                     && !output_matches_search(&output, term)
@@ -1368,9 +1387,16 @@ pub async fn get(
 ) -> Result<()> {
     if org_filter.is_none() && collection_filter.is_none() {
         let api_ctx = load_api_context(opts.allow_insecure_http).await?;
-        if let Ok(output) =
-            fetch_cipher_output_by_id(&api_ctx, item, CipherDecryptionProfile::full()).await
-        {
+        let fetched =
+            fetch_cipher_output_by_id(&api_ctx, item, CipherDecryptionProfile::full()).await;
+        if crate::secret_storage::valid_id(item) {
+            let output = fetched?;
+            if format == OutputFormat::Json {
+                ensure_plaintext_json_allowed(opts)?;
+            }
+            return print_cipher_output(&output, format);
+        }
+        if let Ok(output) = fetched {
             if format == OutputFormat::Json {
                 ensure_plaintext_json_allowed(opts)?;
             }
@@ -1458,8 +1484,8 @@ pub async fn get_totp(query: &str, opts: &CommandOptions) -> Result<()> {
             let Ok(keys) = get_cipher_keys(&ctx.config, cipher) else {
                 continue;
             };
-            if cipher_matches_totp_search(cipher, keys, query, &query_lower)
-                && cipher_has_usable_totp(cipher, keys)
+            if cipher_matches_totp_search(cipher, &keys, query, &query_lower)
+                && cipher_has_usable_totp(cipher, &keys)
             {
                 matches.push(cipher);
             }
@@ -1615,7 +1641,7 @@ fn build_interpolation_indexes<'a>(
             continue;
         };
         if let Ok(output) =
-            decrypt_cipher_with_profile(cipher, keys, CipherDecryptionProfile::list_env_names())
+            decrypt_cipher_with_profile(cipher, &keys, CipherDecryptionProfile::list_env_names())
         {
             by_id.insert(output.id.clone(), cipher);
             by_name
@@ -1639,7 +1665,7 @@ fn resolve_interpolation_placeholder(
         let keys = get_cipher_keys(config, cipher)?;
         let output = decrypt_cipher_with_profile(
             cipher,
-            keys,
+            &keys,
             CipherDecryptionProfile::interpolation(&component.to_lowercase()),
         )?;
         return resolve_component(&output, component);
@@ -1651,7 +1677,7 @@ fn resolve_interpolation_placeholder(
             let keys = get_cipher_keys(config, cipher)?;
             let output = decrypt_cipher_with_profile(
                 cipher,
-                keys,
+                &keys,
                 CipherDecryptionProfile::interpolation(&component.to_lowercase()),
             )?;
             resolve_component(&output, component)
@@ -1902,6 +1928,13 @@ fn format_cipher_output(output: &CipherOutput, format: OutputFormat) -> Result<S
     match format {
         OutputFormat::Json => Ok(serde_json::to_string_pretty(output)?),
         OutputFormat::Env => {
+            let mut names = std::collections::HashSet::new();
+            anyhow::ensure!(
+                cipher_env_var_names(output)
+                    .into_iter()
+                    .all(|name| names.insert(name)),
+                "Ambiguous environment variable"
+            );
             let lines = cipher_to_env_vars(output)
                 .into_iter()
                 .map(|(name, value)| {
@@ -2051,13 +2084,15 @@ async fn run_with_secrets_with_output(
         let mut outputs = Vec::with_capacity(requested_items.len());
         let mut all_items_found_by_id = true;
         for item in requested_items {
-            if let Ok(output) =
-                fetch_cipher_output_by_id(&api_ctx, item, CipherDecryptionProfile::run_env()).await
-            {
-                outputs.push(output);
-            } else {
-                all_items_found_by_id = false;
-                break;
+            let fetched =
+                fetch_cipher_output_by_id(&api_ctx, item, CipherDecryptionProfile::run_env()).await;
+            match fetched {
+                Ok(output) => outputs.push(output),
+                Err(error) if crate::secret_storage::valid_id(item) => return Err(error),
+                Err(_error) => {
+                    all_items_found_by_id = false;
+                    break;
+                }
             }
         }
         if all_items_found_by_id {
@@ -2076,17 +2111,18 @@ async fn run_with_secrets_with_output(
             Some(f.id.clone())
         } else {
             let user_keys = ctx.config.crypto_keys.as_ref().context("Vault locked")?;
-            let matched = ctx.sync_response.folders.iter().find(|f| {
-                user_keys
-                    .decrypt_to_string(&f.name)
-                    .is_ok_and(|n| n.eq_ignore_ascii_case(folder))
-            });
-            Some(
-                matched
-                    .with_context(|| format!("Folder '{folder}' not found"))?
-                    .id
-                    .clone(),
-            )
+            let matched = ctx
+                .sync_response
+                .folders
+                .iter()
+                .filter(|f| {
+                    user_keys
+                        .decrypt_to_string(&f.name)
+                        .is_ok_and(|n| n.eq_ignore_ascii_case(folder))
+                })
+                .collect::<Vec<_>>();
+            anyhow::ensure!(matched.len() == 1, "Folder is missing or ambiguous");
+            Some(matched[0].id.clone())
         }
     } else {
         None
@@ -2165,7 +2201,7 @@ async fn run_with_secrets_with_output(
         {
             let output = get_cipher_keys(&ctx.config, cipher)
                 .and_then(|keys| {
-                    decrypt_cipher_with_profile(cipher, keys, CipherDecryptionProfile::run_env())
+                    decrypt_cipher_with_profile(cipher, &keys, CipherDecryptionProfile::run_env())
                 })
                 .with_context(|| {
                     format!(
@@ -2208,6 +2244,14 @@ fn run_with_decrypted_outputs(
     for output in outputs {
         env_vars.extend(cipher_to_env_vars(&output));
     }
+
+    let mut names = std::collections::HashSet::new();
+    anyhow::ensure!(
+        env_vars
+            .iter()
+            .all(|(name, _)| names.insert(name) && std::env::var_os(name).is_none()),
+        "Ambiguous or existing environment variable"
+    );
 
     // If --info flag, just print variable names
     if info_only {
@@ -2297,6 +2341,231 @@ fn logout_loaded_config(mut config: Config) -> Result<()> {
 
     config.clear()?;
     println!("Logged out successfully.");
+    Ok(())
+}
+
+/// Trusted terminal import; every invocation requires a fresh interactive decision.
+/// # Errors
+/// Returns an error when validation, authorization, cryptography or backend access fails.
+#[allow(clippy::too_many_lines)] // Keep the single-attempt authorization and durable write sequence together.
+pub async fn create_secret(
+    account: &str,
+    folder: &str,
+    reference: &str,
+    prompt: bool,
+    opts: &CommandOptions,
+) -> Result<()> {
+    use crate::secret_storage::{
+        Destination, MAX_IMPORT_BYTES, SecretImport, WriteReceipt, WriteStatus, canonical_path,
+        encrypt_create, valid_id, verify_created,
+    };
+    use crate::write_journal::WriteJournal;
+    use std::io::Read;
+    use zeroize::Zeroizing;
+    anyhow::ensure!(
+        valid_id(account) && canonical_path(folder) && canonical_path(reference),
+        "noncanonical storage destination"
+    );
+    let ctx = load_sync_context(opts.allow_insecure_http).await?;
+    let keys = ctx
+        .config
+        .get_keys_for_cipher(None)
+        .context("vault locked")?;
+    let mut folder_ids = Vec::new();
+    for f in &ctx.sync_response.folders {
+        if keys.decrypt_to_string(&f.name)? == folder {
+            folder_ids.push(f.id.to_string());
+        }
+    }
+    anyhow::ensure!(folder_ids.len() == 1, "folder is missing or ambiguous");
+    let destination = Destination {
+        account_id: account.to_owned(),
+        folder: folder.to_owned(),
+        folder_id: folder_ids.remove(0),
+        reference: reference.to_owned(),
+    };
+    destination.check_sync(&ctx.sync_response, keys, true)?;
+    let input = if prompt {
+        let password = rpassword::prompt_password("Secret password: ")
+            .map_err(|_error| anyhow::anyhow!("secret prompt unavailable"))?;
+        SecretImport {
+            password: Some(password),
+            notes: None,
+            fields: Vec::new(),
+        }
+    } else {
+        let mut bytes = Zeroizing::new(Vec::new());
+        std::io::stdin()
+            .take((MAX_IMPORT_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|_error| anyhow::anyhow!("secret input unavailable"))?;
+        SecretImport::parse(&bytes)?
+    };
+    input.validate()?;
+    let mut nonce = [0u8; 16];
+    getrandom::fill(&mut nonce).map_err(|_error| anyhow::anyhow!("randomness unavailable"))?;
+    let attempt = nonce.iter().fold(String::new(), |mut output, byte| {
+        use std::fmt::Write;
+        write!(output, "{byte:02x}").expect("writing to String cannot fail");
+        output
+    });
+    let server = ctx.config.server.clone().context("server unavailable")?;
+    let review = format!(
+        "CREATE personal vault item\nAccount: {account} at {server}\nFolder: {folder} ({})\nReference: {reference}\nFields: {}",
+        destination.folder_id,
+        input.selectors().join(", ")
+    );
+    let expected = format!("create {attempt}");
+    let answer = rpassword::prompt_password(format!(
+        "{review}\nAuthorize this single attempt by typing '{expected}': "
+    ))
+    .map_err(|_error| anyhow::anyhow!("human write authorization unavailable"))?;
+    anyhow::ensure!(answer == expected, "creation denied");
+    // Recheck the namespace after human review and before recording/sending the attempt.
+    let fresh = ctx
+        .api
+        .sync(&ctx.access_token)
+        .await
+        .map_err(|_error| anyhow::anyhow!("creation preflight failed"))?;
+    destination.check_sync(&fresh, keys, true)?;
+    let encrypted = encrypt_create(keys, &destination, &input, None)?;
+    let mut journal = WriteJournal {
+        server,
+        destination,
+        fields: input.selectors(),
+        receipt: WriteReceipt {
+            attempt_id: attempt,
+            item_id: None,
+            status: WriteStatus::Uncertain,
+        },
+    };
+    let path = journal.begin(&Config::config_dir()?.join("write-attempts"))?;
+    match ctx.api.create_cipher(&ctx.access_token, &encrypted).await {
+        Ok(created) => {
+            journal.receipt.item_id = Some(created.id.to_string());
+            journal.receipt.status = WriteStatus::CreatedUnverified;
+            journal.save(&path)?;
+            if let Ok(fresh) = ctx.api.sync(&ctx.access_token).await
+                && journal.destination.check_sync(&fresh, keys, false).is_ok()
+                && let Ok(fetched) = ctx
+                    .api
+                    .cipher_by_id(&ctx.access_token, created.id.as_str())
+                    .await
+                && verify_created(
+                    keys,
+                    &journal.destination,
+                    created.id.as_str(),
+                    &fetched,
+                    &input,
+                    None,
+                )
+                .is_ok()
+            {
+                journal.receipt.status = WriteStatus::Verified;
+            }
+        }
+        Err(status) => journal.receipt.status = status,
+    }
+    journal.save(&path)?;
+    println!("{}", serde_json::to_string(&journal.receipt)?);
+    anyhow::ensure!(
+        journal.receipt.status == WriteStatus::Verified,
+        "write is not verified; inspect durable receipt and reconcile; do not repeat creation"
+    );
+    Ok(())
+}
+
+/// Explicit ID never falls back to a name. Selected bytes are written without a newline.
+/// # Errors
+/// Returns an error when validation, authorization, cryptography or backend access fails.
+pub async fn get_selected(
+    id: &str,
+    field: &str,
+    journal_path: Option<&std::path::Path>,
+    opts: &CommandOptions,
+) -> Result<()> {
+    use std::io::Write;
+    anyhow::ensure!(crate::secret_storage::valid_id(id), "invalid item ID");
+    let ctx = load_api_context(opts.allow_insecure_http).await?;
+    let cipher = ctx.api.cipher_by_id(&ctx.access_token, id).await?;
+    anyhow::ensure!(
+        cipher.id == id && cipher.deleted_date.is_none(),
+        "returned item identity is invalid or deleted"
+    );
+    let keys = get_cipher_keys(&ctx.config, &cipher)?;
+    if let Some(path) = journal_path {
+        let journal = crate::write_journal::WriteJournal::read(path)?;
+        anyhow::ensure!(
+            journal.receipt.item_id.as_deref() == Some(id)
+                && journal.fields.iter().any(|f| f == field),
+            "item or field binding mismatch"
+        );
+        anyhow::ensure!(
+            ctx.config.server.as_deref() == Some(journal.server.as_str()),
+            "server binding mismatch"
+        );
+        let parent = ctx
+            .config
+            .get_keys_for_cipher(None)
+            .context("vault locked")?;
+        journal
+            .destination
+            .check_sync(&ctx.api.sync(&ctx.access_token).await?, parent, false)?;
+        journal.destination.check_item(&cipher, id, parent)?;
+    }
+    let value = crate::secret_storage::selected_value(&cipher, &keys, field)?;
+    std::io::stdout().lock().write_all(value.as_bytes())?;
+    Ok(())
+}
+
+/// Recovery only binds an explicitly selected existing item; it never POSTs.
+/// # Errors
+/// Returns an error when validation, authorization, cryptography or backend access fails.
+pub async fn reconcile_secret(
+    journal_path: &std::path::Path,
+    id: Option<&str>,
+    opts: &CommandOptions,
+) -> Result<()> {
+    use crate::{
+        secret_storage::{WriteStatus, selected_value, valid_id},
+        write_journal::WriteJournal,
+    };
+    let mut journal = WriteJournal::read(journal_path)?;
+    if let Some(id) = id {
+        anyhow::ensure!(valid_id(id), "invalid item ID");
+        anyhow::ensure!(
+            journal
+                .receipt
+                .item_id
+                .as_deref()
+                .is_none_or(|bound| bound == id),
+            "cannot retarget a receipt"
+        );
+        let ctx = load_sync_context(opts.allow_insecure_http).await?;
+        anyhow::ensure!(
+            ctx.config.server.as_deref() == Some(journal.server.as_str()),
+            "server binding mismatch"
+        );
+        let keys = ctx
+            .config
+            .get_keys_for_cipher(None)
+            .context("vault locked")?;
+        journal
+            .destination
+            .check_sync(&ctx.sync_response, keys, false)?;
+        let cipher = ctx.api.cipher_by_id(&ctx.access_token, id).await?;
+        let item_keys = journal.destination.check_item(&cipher, id, keys)?;
+        for field in &journal.fields {
+            let _value = selected_value(&cipher, &item_keys, field)?;
+        }
+        journal.receipt.item_id = Some(id.to_owned());
+        // Original private values are deliberately unavailable after a restart.
+        if journal.receipt.status != WriteStatus::Verified {
+            journal.receipt.status = WriteStatus::CreatedUnverified;
+        }
+        journal.save(journal_path)?;
+    }
+    println!("{}", serde_json::to_string(&journal.receipt)?);
     Ok(())
 }
 
@@ -2692,6 +2961,7 @@ mod tests {
         #[test]
         fn test_cipher_matches_filters_allows_no_filters() {
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: Some(OrgId::new("org-1".to_string()).unwrap()),
                 deleted_date: None,
@@ -2715,6 +2985,7 @@ mod tests {
         #[test]
         fn test_cipher_matches_filters_checks_org_and_collection() {
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: Some(OrgId::new("org-1".to_string()).unwrap()),
                 deleted_date: None,
@@ -2758,6 +3029,7 @@ mod tests {
         #[test]
         fn test_cipher_matches_filters_rejects_nonmatching_folder() {
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -2884,6 +3156,7 @@ mod tests {
 
         fn create_test_cipher(id: &str, cipher_type: CipherType) -> Cipher {
             Cipher {
+                item_key: None,
                 id: CipherId::new(id.to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -4137,6 +4410,7 @@ mod tests {
                 );
 
             let ciphers = vec![Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -4177,6 +4451,7 @@ mod tests {
                 );
 
             let ciphers = vec![Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -6442,6 +6717,7 @@ mod tests {
 
         fn create_minimal_cipher(org_id: Option<&str>) -> Cipher {
             Cipher {
+                item_key: None,
                 id: CipherId::new("test".to_string()).unwrap(),
                 organization_id: org_id.map(|s| OrgId::new(s.to_string()).unwrap()),
                 deleted_date: None,
@@ -7179,6 +7455,7 @@ mod tests {
 
         fn minimal_cipher(id: &str) -> Cipher {
             Cipher {
+                item_key: None,
                 id: CipherId::new(id.to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -7232,6 +7509,7 @@ mod tests {
             };
 
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("test-id".to_string()).unwrap(),
                 name: Some(encrypted_name),
                 organization_id: None,
@@ -7295,6 +7573,7 @@ mod tests {
 
         fn cipher_with_login_uris(keys: &CryptoKeys, uris: &[&str]) -> Cipher {
             Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -7331,6 +7610,7 @@ mod tests {
         fn returns_false_when_no_uris_present() {
             let keys = keys();
             let cipher = Cipher {
+                item_key: None,
                 id: CipherId::new("cipher-1".to_string()).unwrap(),
                 organization_id: None,
                 deleted_date: None,
@@ -7405,6 +7685,36 @@ mod tests {
 
     mod run_with_decrypted_outputs_tests {
         use super::*;
+
+        #[test]
+        fn normalized_environment_collisions_fail_closed() {
+            let output = CipherOutput {
+                id: "id".into(),
+                cipher_type: "login".into(),
+                name: "Collision".into(),
+                username: None,
+                password: Some("sentinel".into()),
+                uri: None,
+                notes: None,
+                fields: None,
+                ssh_public_key: None,
+                ssh_private_key: None,
+                ssh_fingerprint: None,
+            };
+            let mut duplicate = output.clone();
+            duplicate.name = "collision".into();
+            assert!(
+                run_with_decrypted_outputs(vec![output.clone(), duplicate], true, &[], false)
+                    .is_err()
+            );
+            let mut custom = output;
+            custom.fields = Some(vec![FieldOutput {
+                name: "password".into(),
+                value: "sentinel".into(),
+                hidden: true,
+            }]);
+            assert!(format_cipher_output(&custom, OutputFormat::Env).is_err());
+        }
 
         #[test]
         fn info_only_prints_env_var_names() {

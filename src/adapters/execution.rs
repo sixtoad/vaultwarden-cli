@@ -40,6 +40,8 @@ pub(crate) struct PreparedExecutable {
     argv: Vec<CString>,
     #[cfg(target_os = "linux")]
     cwd: Option<std::fs::File>,
+    #[cfg(target_os = "linux")]
+    producer: Option<std::fs::File>,
 }
 impl fmt::Debug for PreparedExecutable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -49,6 +51,40 @@ impl fmt::Debug for PreparedExecutable {
 
 impl ProtectedExecution for LinuxExecutablePreparer {
     type Prepared = PreparedExecutable;
+    #[cfg(target_os = "linux")]
+    fn prepare_producer(
+        &self,
+        prepared: &mut PreparedExecutable,
+    ) -> Result<Box<dyn crate::access::ports::ProducerOutput>, ExecutionError> {
+        use std::os::fd::{AsRawFd, FromRawFd};
+        let raw = unsafe {
+            libc::memfd_create(
+                c"vw-private-producer".as_ptr(),
+                libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING,
+            )
+        };
+        if raw < 0 {
+            return Err(ExecutionError::Unavailable);
+        }
+        let file = unsafe { std::fs::File::from_raw_fd(raw) };
+        file.set_len((crate::secret_storage::MAX_IMPORT_BYTES + 4) as u64)
+            .map_err(|_error| ExecutionError::Unavailable)?;
+        if unsafe {
+            libc::fcntl(
+                file.as_raw_fd(),
+                libc::F_ADD_SEALS,
+                libc::F_SEAL_GROW | libc::F_SEAL_SHRINK,
+            )
+        } < 0
+        {
+            return Err(ExecutionError::Unavailable);
+        }
+        prepared.producer = Some(
+            file.try_clone()
+                .map_err(|_error| ExecutionError::Unavailable)?,
+        );
+        Ok(Box::new(PrivateProducerOutput(file)))
+    }
     #[cfg(target_os = "linux")]
     fn prepare_ssh(
         &self,
@@ -102,6 +138,45 @@ impl ProtectedExecution for LinuxExecutablePreparer {
     }
 }
 
+#[cfg(target_os = "linux")]
+struct PrivateProducerOutput(std::fs::File);
+#[cfg(target_os = "linux")]
+impl crate::access::ports::ProducerOutput for PrivateProducerOutput {
+    fn read(
+        &mut self,
+        evidence: crate::access::ports::CleanupEvidence,
+    ) -> Result<crate::secret_storage::SecretImport, ExecutionError> {
+        use std::os::{fd::AsRawFd, unix::fs::FileExt};
+        if evidence != crate::access::ports::CleanupEvidence::Reaped {
+            return Err(ExecutionError::CleanupUncertain);
+        }
+        if unsafe {
+            libc::fcntl(
+                self.0.as_raw_fd(),
+                libc::F_ADD_SEALS,
+                libc::F_SEAL_WRITE | libc::F_SEAL_SEAL,
+            )
+        } < 0
+        {
+            return Err(ExecutionError::ExecutionFailed);
+        }
+        let mut header = [0u8; 4];
+        self.0
+            .read_exact_at(&mut header, 0)
+            .map_err(|_error| ExecutionError::ExecutionFailed)?;
+        let len = u32::from_le_bytes(header) as usize;
+        if len == 0 || len > crate::secret_storage::MAX_IMPORT_BYTES {
+            return Err(ExecutionError::ExecutionFailed);
+        }
+        let mut bytes = zeroize::Zeroizing::new(vec![0u8; len]);
+        self.0
+            .read_exact_at(&mut bytes, 4)
+            .map_err(|_error| ExecutionError::ExecutionFailed)?;
+        crate::secret_storage::SecretImport::parse(&bytes)
+            .map_err(|_error| ExecutionError::ExecutionFailed)
+    }
+}
+
 fn checked_arguments(argv: Vec<String>) -> Result<Vec<CString>, ExecutionError> {
     if argv.is_empty() || argv.len() > MAX_ARGS || argv[0].is_empty() {
         return Err(ExecutionError::InvalidArguments);
@@ -121,6 +196,12 @@ fn checked_arguments(argv: Vec<String>) -> Result<Vec<CString>, ExecutionError> 
 }
 
 impl PreparedExecutable {
+    #[cfg(target_os = "linux")]
+    pub(crate) fn producer_output(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+        use std::os::fd::AsFd;
+        self.producer.as_ref().map(std::fs::File::as_fd)
+    }
+
     #[cfg(target_os = "linux")]
     pub(crate) fn working_directory(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
         use std::os::fd::AsFd;
@@ -159,6 +240,17 @@ impl PreparedExecutable {
 #[cfg(all(test, not(target_os = "linux")))]
 mod unsupported_platform_tests {
     use super::*;
+
+    #[test]
+    fn producer_preparation_defaults_to_unavailable_without_linux() {
+        let mut prepared = PreparedExecutable {
+            argv: checked_arguments(vec!["fixture".into()]).unwrap(),
+        };
+        assert!(matches!(
+            LinuxExecutablePreparer.prepare_producer(&mut prepared),
+            Err(ExecutionError::Unavailable)
+        ));
+    }
 
     #[test]
     fn valid_preparation_is_unavailable_without_linux() {
@@ -431,6 +523,7 @@ mod linux {
             file: sealed,
             argv,
             cwd: None,
+            producer: None,
         })
     }
 

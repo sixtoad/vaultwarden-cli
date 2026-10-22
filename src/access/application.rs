@@ -975,6 +975,34 @@ impl ProviderApplication {
             status: review.status,
         })
     }
+    /// Human-only read reconciliation; this path has no creation capability.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn reconcile_write(
+        &self,
+        owner: AuthenticatedHuman,
+        request_id: &str,
+        item_id: &str,
+    ) -> Result<crate::secret_storage::WriteReceipt, DirectRequestError> {
+        self.check_owner(owner)?;
+        if !crate::secret_storage::valid_id(item_id) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        let (effect, receipt) = authority.provider.write_reconciliation(request_id)?;
+        if receipt.item_id.as_ref().is_some_and(|old| old != item_id) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        authority.backend.probe_compatibility()?;
+        self.admit(&mut authority)?;
+        authority.backend.reconcile_secret(&effect, item_id)?;
+        self.admit(&mut authority)?;
+        authority.provider.reconcile_write(request_id, item_id)
+    }
     pub fn history(
         &self,
         owner: AuthenticatedHuman,
@@ -1240,8 +1268,19 @@ impl ProviderApplication {
             .lock()
             .map_err(|_error| DirectRequestError::Unavailable)?;
         let mut material: Option<Box<dyn SshMaterial>> = None;
+        let mut producer: Option<Box<dyn ProducerOutput>> = None;
+        let mut create_effect = None;
         let result = (|| {
             let (policy, mut prepared) = preparation?;
+            if let Some(effect) = policy.create() {
+                producer = Some(
+                    preparer
+                        .prepare_producer(&mut prepared)
+                        .map_err(|_error| DirectRequestError::Unavailable)?,
+                );
+                authority.backend.create_eligible(effect)?;
+                create_effect = Some(effect.clone());
+            }
             self.execution_authority_current(
                 &mut authority,
                 owner,
@@ -1297,6 +1336,7 @@ impl ProviderApplication {
             let mut mappings = Vec::new();
             for login in policy.login_bindings() {
                 let credential = CredentialBinding {
+                    namespace: login.namespace,
                     immutable_item_id: login.item_id,
                     fields: &login.required_fields,
                     marker: &marker,
@@ -1361,6 +1401,76 @@ impl ProviderApplication {
         let _helper_reaping_observed = report.helper_reaped;
         if report.outcome == Err(ExecutionError::ManagerUnavailable) {
             self.close_admission();
+        }
+        // Producer memory stays provider-private; POST is possible only after successful,
+        // fully reaped execution and a second check of this exact one-shot approval.
+        if let Some(effect) = create_effect {
+            let write = (|| -> Result<(), DirectRequestError> {
+                use crate::secret_storage::WriteStatus;
+                if report.outcome != Ok(ExecutionOutcome::ExitedZero)
+                    || report.cleanup != CleanupEvidence::Reaped
+                    || !control.live()
+                {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                let input = producer
+                    .as_mut()
+                    .ok_or(DirectRequestError::Unavailable)?
+                    .read(report.cleanup)
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                let mut expected = effect.fields.clone();
+                expected.sort();
+                if input.selectors() != expected {
+                    return Err(DirectRequestError::InvalidRequest);
+                }
+                let mut authority = self
+                    .gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                if !authority.provider.execution_matches(&binding)? {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                authority.backend.create_eligible(&effect)?;
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                authority.provider.begin_write(&binding)?;
+                let result = authority
+                    .backend
+                    .create_secret(&effect, &input, &|| control.live_fast());
+                match result {
+                    Ok(item_id) => {
+                        authority.provider.record_write(
+                            &binding,
+                            Some(item_id.clone()),
+                            WriteStatus::CreatedUnverified,
+                        )?;
+                        if !control.live_fast()
+                            || authority
+                                .backend
+                                .verify_secret(&effect, &item_id, &input)
+                                .is_err()
+                        {
+                            return Err(DirectRequestError::Unavailable);
+                        }
+                        authority.provider.record_write(
+                            &binding,
+                            Some(item_id),
+                            WriteStatus::Verified,
+                        )?;
+                        drop(authority);
+                        Ok(())
+                    }
+                    Err(status) => {
+                        authority.provider.record_write(&binding, None, status)?;
+                        drop(authority);
+                        Err(DirectRequestError::Unavailable)
+                    }
+                }
+            })();
+
+            if write.is_err() {
+                report.outcome = Err(ExecutionError::ExecutionFailed);
+            }
         }
         let finish = (|| {
             let durable_live = control.live();
@@ -1432,7 +1542,7 @@ impl ProviderApplication {
             .lock()
             .map_err(|_error| DirectRequestError::Unavailable)?;
         let (binding, policy, argv) = self.execution_authority(&mut authority, owner, id, None)?;
-        if policy.ssh().is_some() {
+        if policy.ssh().is_some() || policy.create().is_some() {
             return Err(DirectRequestError::Unavailable);
         }
         let preparation = preparer.prepare(policy.execution_image(), argv);
@@ -1447,6 +1557,7 @@ impl ProviderApplication {
         for login in policy.login_bindings() {
             self.execution_live(&mut authority, id)?;
             let eligible = authority.backend.eligible(&CredentialBinding {
+                namespace: login.namespace,
                 immutable_item_id: login.item_id,
                 fields: &login.required_fields,
                 marker: &marker,
@@ -1536,6 +1647,7 @@ impl ProviderApplication {
         }
         Ok(())
     }
+    #[allow(clippy::too_many_lines)] // Keep the atomic approval checks and commit in one auditable sequence.
     fn commit_decision(
         &self,
         prepared: PreparedApproval,
@@ -1571,6 +1683,14 @@ impl ProviderApplication {
                 return Err(DirectRequestError::Unauthorized);
             }
             probe?;
+            if let Some(effect) = policy.create() {
+                authority.backend.create_eligible(effect)?;
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
+            }
             if let Some(ssh) = policy.ssh() {
                 let eligible = authority.backend.ssh_eligible(&ssh.credential.item_id);
                 self.admit(&mut authority)?;
@@ -1585,6 +1705,7 @@ impl ProviderApplication {
             let marker = format!("vw-access={}", policy.id());
             for login in policy.login_bindings() {
                 let eligible = authority.backend.eligible(&CredentialBinding {
+                    namespace: login.namespace,
                     immutable_item_id: login.item_id,
                     fields: &login.required_fields,
                     marker: &marker,
@@ -1802,6 +1923,7 @@ impl ProviderApplication {
         )
     }
 
+    #[allow(clippy::too_many_lines)] // Keep provisioning and its temporary backend verifier under one authority scope.
     fn provision_operation(
         &self,
         draft: OperationPolicyDraft,
@@ -1815,6 +1937,10 @@ impl ProviderApplication {
         let probe = authority.backend.probe_compatibility();
         self.admit(&mut authority)?;
         probe?;
+        if let Some(effect) = &draft.create {
+            authority.backend.create_eligible(effect)?;
+            self.admit(&mut authority)?;
+        }
         let deadline = authority.deadline.ok_or(SessionError::Locked)?;
         let epoch = authority.session_epoch;
         if epoch != self.revocation_epoch.load(Ordering::Acquire) {
@@ -1829,6 +1955,37 @@ impl ProviderApplication {
             revocation_epoch: &'a AtomicU64,
         }
         impl LoginEligibilityVerifier for Verifier<'_> {
+            fn is_scoped_login_eligible(
+                &self,
+                id: &str,
+                fields: &[super::policy::LoginField],
+                marker: &str,
+                namespace: &crate::secret_storage::Destination,
+            ) -> Result<bool, LoginEligibilityError> {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                let result = self
+                    .backend
+                    .borrow_mut()
+                    .eligible(&CredentialBinding {
+                        namespace: Some(namespace),
+                        immutable_item_id: id,
+                        fields,
+                        marker,
+                    })
+                    .map_err(|_error| LoginEligibilityError);
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                result
+            }
             fn is_ssh_eligible(&self, id: &str) -> Result<bool, LoginEligibilityError> {
                 if self.closing.load(Ordering::Acquire)
                     || self.clock.now() >= self.deadline
@@ -1865,6 +2022,7 @@ impl ProviderApplication {
                     .backend
                     .borrow_mut()
                     .eligible(&CredentialBinding {
+                        namespace: None,
                         immutable_item_id: id,
                         fields,
                         marker,
@@ -2081,6 +2239,7 @@ mod tests {
     }
     fn binding() -> CredentialBinding<'static> {
         CredentialBinding {
+            namespace: None,
             immutable_item_id: "11111111-1111-1111-1111-111111111111",
             fields: &[LoginField::Password],
             marker: "vw-access=test",
@@ -2159,6 +2318,7 @@ mod tests {
             }
             let result = if operation == "activate_probe" {
                 app.activate_operation(super::super::policy::OperationPolicyDraft {
+                    create: None,
                     ssh: None,
                     id: "deploy".into(),
                     description: "Deploy".into(),
@@ -2231,6 +2391,7 @@ mod tests {
                 serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
             std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
             let draft = OperationPolicyDraft {
+                create: None,
                 ssh: None,
                 id: "deploy".into(),
                 description: "Deploy".into(),
@@ -2239,6 +2400,7 @@ mod tests {
                 arguments: vec![ArgumentSpec::Target],
                 credentials: (0..count)
                     .map(|i| LoginCredentialDraft {
+                        namespace: None,
                         item_id: if i == 0 {
                             binding().immutable_item_id.into()
                         } else {
@@ -2581,6 +2743,7 @@ mod tests {
             std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
             let credentials = (0..if expire_at == 899 { 1 } else { 2 })
                 .map(|i| LoginCredentialDraft {
+                    namespace: None,
                     item_id: if i == 0 {
                         binding().immutable_item_id.into()
                     } else {
@@ -2595,6 +2758,7 @@ mod tests {
                 })
                 .collect();
             let draft = OperationPolicyDraft {
+                create: None,
                 ssh: None,
                 id: "deploy".into(),
                 description: "Deploy".into(),
@@ -2620,6 +2784,7 @@ mod tests {
         let observed = Arc::new(Observed::default());
         let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
         let draft = || OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy".into(),
             description: "Deploy".into(),
@@ -2627,6 +2792,7 @@ mod tests {
             targets: vec!["test".into()],
             arguments: vec![ArgumentSpec::Target],
             credentials: vec![LoginCredentialDraft {
+                namespace: None,
                 item_id: binding().immutable_item_id.into(),
                 label: "Login".into(),
                 use_type: CredentialUse::Login,

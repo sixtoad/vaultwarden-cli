@@ -31,6 +31,7 @@ pub enum HistoryOutcome {
     Invalidated,
     Recovered,
     LegacyUnknown,
+    Reconciled,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "HistoryEventWire")]
@@ -41,6 +42,10 @@ pub struct HistoryEvent {
     pub requester: RequesterSnapshot,
     pub policy_revision: String,
     pub credentials: Vec<ReviewCredential>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create: Option<super::policy::CreateEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_receipt: Option<crate::secret_storage::WriteReceipt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh: Option<super::policy::SshReview>,
     pub created_at_unix_seconds: u64,
@@ -61,6 +66,10 @@ struct HistoryEventWire {
     policy_revision: String,
     credentials: Vec<ReviewCredential>,
     #[serde(default)]
+    create: Option<super::policy::CreateEffect>,
+    #[serde(default)]
+    write_receipt: Option<crate::secret_storage::WriteReceipt>,
+    #[serde(default)]
     ssh: Option<super::policy::SshReview>,
     created_at_unix_seconds: u64,
     expires_at_unix_seconds: u64,
@@ -79,6 +88,8 @@ impl TryFrom<HistoryEventWire> for HistoryEvent {
             requester: w.requester,
             policy_revision: w.policy_revision,
             credentials: w.credentials,
+            create: w.create,
+            write_receipt: w.write_receipt,
             ssh: w.ssh,
             created_at_unix_seconds: w.created_at_unix_seconds,
             expires_at_unix_seconds: w.expires_at_unix_seconds,
@@ -118,6 +129,8 @@ impl HistoryEvent {
             },
             policy_revision: record.review.policy_digest.clone(),
             credentials: record.review.credentials.clone(),
+            create: record.review.create.clone(),
+            write_receipt: record.write_receipt.clone(),
             ssh: record.review.ssh.clone(),
             created_at_unix_seconds: record.created_at_unix_seconds,
             expires_at_unix_seconds: record.review.expires_at_unix_seconds,
@@ -150,61 +163,63 @@ impl HistoryEvent {
     fn consistent_outcome(&self) -> bool {
         use DirectStatus as S;
         use HistoryOutcome as O;
-        matches!(
-            (&self.outcome, &self.status),
-            (O::Submitted, Some(S::Pending))
-                | (O::Approved, Some(S::Approved))
-                | (O::Denied, Some(S::Denied))
-                | (
-                    O::Expired | O::ReviewUnavailable | O::Invalidated,
-                    Some(S::Expired)
-                )
-                | (O::ExecutionStarted, Some(S::Running))
-                | (O::Succeeded, Some(S::Completed { exit_code: 0 }))
-                | (
-                    O::ExecutionNonzero,
-                    Some(S::Failed {
-                        reason: DirectFailure::ExecutionNonzero
-                    })
-                )
-                | (
-                    O::ExecutionSignaled,
-                    Some(S::Failed {
-                        reason: DirectFailure::ExecutionSignaled
-                    })
-                )
-                | (
-                    O::ExecutionRejected,
-                    Some(S::Failed {
-                        reason: DirectFailure::ExecutionRejected
-                    })
-                )
-                | (
-                    O::ExecutionUnavailable,
-                    Some(
-                        S::Expired
-                            | S::Failed {
-                                reason: DirectFailure::ExecutionUnavailable
-                            }
+        (self.outcome == O::Reconciled && self.status.as_ref().is_some_and(S::is_terminal))
+            || matches!(
+                (&self.outcome, &self.status),
+                (O::Submitted, Some(S::Pending))
+                    | (O::Approved, Some(S::Approved))
+                    | (O::Denied, Some(S::Denied))
+                    | (
+                        O::Expired | O::ReviewUnavailable | O::Invalidated,
+                        Some(S::Expired)
                     )
-                )
-                | (
-                    O::ReviewUnavailable,
-                    Some(S::Failed {
-                        reason: DirectFailure::ReviewUnavailable
-                    })
-                )
-                | (
-                    O::Recovered,
-                    Some(
-                        S::Expired
-                            | S::Failed {
-                                reason: DirectFailure::ExecutionUnavailable
-                            }
+                    | (O::ExecutionStarted, Some(S::Running))
+                    | (O::Succeeded, Some(S::Completed { exit_code: 0 }))
+                    | (
+                        O::ExecutionNonzero,
+                        Some(S::Failed {
+                            reason: DirectFailure::ExecutionNonzero
+                        })
                     )
-                )
-                | (O::LegacyUnknown, _)
-        ) || matches!((&self.outcome, &self.status), (O::ExecutionNonzero, Some(S::Completed { exit_code })) if (1..=255).contains(exit_code))
+                    | (
+                        O::ExecutionSignaled,
+                        Some(S::Failed {
+                            reason: DirectFailure::ExecutionSignaled
+                        })
+                    )
+                    | (
+                        O::ExecutionRejected,
+                        Some(S::Failed {
+                            reason: DirectFailure::ExecutionRejected
+                        })
+                    )
+                    | (
+                        O::ExecutionUnavailable,
+                        Some(
+                            S::Expired
+                                | S::Failed {
+                                    reason: DirectFailure::ExecutionUnavailable
+                                }
+                        )
+                    )
+                    | (
+                        O::ReviewUnavailable,
+                        Some(S::Failed {
+                            reason: DirectFailure::ReviewUnavailable
+                        })
+                    )
+                    | (
+                        O::Recovered,
+                        Some(
+                            S::Expired
+                                | S::Failed {
+                                    reason: DirectFailure::ExecutionUnavailable
+                                }
+                        )
+                    )
+                    | (O::LegacyUnknown, _)
+            )
+            || matches!((&self.outcome, &self.status), (O::ExecutionNonzero, Some(S::Completed { exit_code })) if (1..=255).contains(exit_code))
     }
     pub(crate) fn matches_record(&self, record: &DirectRecord) -> bool {
         let mut expected = Self::snapshot(
@@ -215,6 +230,20 @@ impl HistoryEvent {
             self.status.clone(),
         );
         expected.at_unix_seconds = self.at_unix_seconds;
+        // Earlier snapshots precede the POST; only the terminal snapshot must
+        // carry the latest durable certainty. Historical events never change.
+        expected.write_receipt.clone_from(&self.write_receipt);
+        if self.write_receipt.as_ref().is_some_and(|receipt| {
+            record.write_receipt.as_ref().is_none_or(|latest| {
+                receipt.attempt_id != latest.attempt_id
+                    || receipt
+                        .item_id
+                        .as_ref()
+                        .is_some_and(|id| latest.item_id.as_ref() != Some(id))
+            })
+        }) {
+            return false;
+        }
         self.valid() && *self == expected
     }
 }

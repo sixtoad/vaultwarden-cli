@@ -23,6 +23,7 @@ use zeroize::Zeroizing;
 const MAGIC: &[u8; 5] = b"VWEX\x01";
 const TRANSFER: u8 = 1;
 const TRANSFER_SSH: u8 = 10;
+const TRANSFER_PRODUCER: u8 = 11;
 const RELEASE: u8 = 2;
 const READY: u8 = 3;
 const EXEC: u8 = 4;
@@ -162,7 +163,12 @@ impl Bridge {
         let mut bytes = Zeroizing::new(Vec::with_capacity(MAX_PACKET));
         bytes.extend_from_slice(MAGIC);
         let cwd = prepared.working_directory();
-        bytes.push(if cwd.is_some() {
+        bytes.push(if prepared.producer_output().is_some() {
+            if cwd.is_some() {
+                return Err(BridgeError);
+            }
+            TRANSFER_PRODUCER
+        } else if cwd.is_some() {
             TRANSFER_SSH
         } else {
             TRANSFER
@@ -184,6 +190,10 @@ impl Bridge {
         if let Some(cwd) = cwd {
             validate_directory(cwd.as_raw_fd())?;
             descriptors.push(cwd.as_raw_fd());
+        }
+        if let Some(output) = prepared.producer_output() {
+            validate_producer_output(output.as_raw_fd())?;
+            descriptors.push(output.as_raw_fd());
         }
         send_descriptors(self.socket.as_raw_fd(), &bytes, &descriptors)?;
         self.state = State::Transferred;
@@ -532,6 +542,23 @@ fn validate_directory(fd: RawFd) -> Result<(), BridgeError> {
     }
     Ok(())
 }
+fn validate_producer_output(fd: RawFd) -> Result<(), BridgeError> {
+    let mut metadata: libc::stat = unsafe { mem::zeroed() };
+    let seals = unsafe { libc::fcntl(fd, libc::F_GET_SEALS) };
+    let required = libc::F_SEAL_GROW | libc::F_SEAL_SHRINK;
+    if unsafe { libc::fstat(fd, &raw mut metadata) } != 0
+        || metadata.st_mode & libc::S_IFMT != libc::S_IFREG
+        || metadata.st_size
+            != i64::try_from(crate::secret_storage::MAX_IMPORT_BYTES + 4)
+                .map_err(|_error| BridgeError)?
+        || seals < 0
+        || seals & required != required
+        || seals & (libc::F_SEAL_WRITE | libc::F_SEAL_SEAL) != 0
+    {
+        return Err(BridgeError);
+    }
+    Ok(())
+}
 struct Launch {
     packet: Packet,
     arguments: Vec<usize>,
@@ -540,15 +567,19 @@ struct Launch {
 impl Launch {
     fn parse(packet: Packet) -> Result<Self, BridgeError> {
         let ssh = packet.code()? == TRANSFER_SSH;
-        if (!ssh && packet.code()? != TRANSFER)
+        let producer = packet.code()? == TRANSFER_PRODUCER;
+        if (!ssh && !producer && packet.code()? != TRANSFER)
             || packet.bytes.len() < 10
-            || packet.fds.len() != if ssh { 2 } else { 1 }
+            || packet.fds.len() != if ssh || producer { 2 } else { 1 }
         {
             return Err(BridgeError);
         }
         validate_descriptor(packet.fds[0].as_raw_fd())?;
         if ssh {
             validate_directory(packet.fds[1].as_raw_fd())?;
+        }
+        if producer {
+            validate_producer_output(packet.fds[1].as_raw_fd())?;
         }
         let argc = u16::from_le_bytes([packet.bytes[6], packet.bytes[7]]) as usize;
         let envc = u16::from_le_bytes([packet.bytes[8], packet.bytes[9]]) as usize;
@@ -722,6 +753,8 @@ fn helper_session(socket: RawFd) -> Result<(), BridgeError> {
     {
         return Err(BridgeError);
     }
+    let producer = launch.packet.code()? == TRANSFER_PRODUCER;
+    let ssh = launch.packet.code()? == TRANSFER_SSH;
     let argv = launch.pointers(&launch.arguments);
     let envp = launch.pointers(&launch.environment);
     let mut pipe = [-1; 2];
@@ -789,13 +822,16 @@ fn helper_session(socket: RawFd) -> Result<(), BridgeError> {
             if libc::sigprocmask(libc::SIG_SETMASK, &previous, std::ptr::null_mut()) != 0 {
                 child_fail(write.as_raw_fd());
             }
-            if launch.packet.fds.len() == 2 && libc::fchdir(launch.packet.fds[1].as_raw_fd()) != 0 {
+            if ssh && libc::fchdir(launch.packet.fds[1].as_raw_fd()) != 0 {
                 child_fail(write.as_raw_fd());
             }
             for output in 0..=2 {
                 if libc::dup2(null.as_raw_fd(), output) < 0 {
                     child_fail(write.as_raw_fd());
                 }
+            }
+            if producer && libc::dup2(launch.packet.fds[1].as_raw_fd(), 3) < 0 {
+                child_fail(write.as_raw_fd());
             }
             // A kernel exec event rules out EOF caused by pre-exec SIGKILL.
             if libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0
@@ -1106,6 +1142,99 @@ mod tests {
             bytes: transfer_bytes(entries, 1),
             fds: vec![sealed()],
         }
+    }
+
+    #[test]
+    fn private_producer_frame_crosses_only_the_bounded_descriptor_and_requires_reaping() {
+        use crate::access::{
+            policy::{ApprovedImage, test_approved_image},
+            ports::{CleanupEvidence, ProtectedExecution},
+        };
+        use crate::adapters::execution::LinuxExecutablePreparer;
+        use sha2::{Digest, Sha256};
+        use std::os::unix::fs::PermissionsExt;
+        if !isolated_descriptor_test(
+            "adapters::supervisor::bridge::tests::private_producer_frame_crosses_only_the_bounded_descriptor_and_requires_reaping",
+        ) {
+            return;
+        }
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let base = test_approved_image(root.path(), "producer").metadata();
+        let mut bytes = std::fs::read(&base.path).unwrap();
+        bytes.truncate(120);
+        #[cfg(target_arch = "x86_64")]
+        let code =
+            include_bytes!("../../../tests/fixtures/protected-producer-x86_64.bin").as_slice();
+        #[cfg(target_arch = "aarch64")]
+        let code =
+            include_bytes!("../../../tests/fixtures/protected-producer-aarch64.bin").as_slice();
+        bytes[96..104].copy_from_slice(&(code.len() as u64).to_le_bytes());
+        bytes[104..112].copy_from_slice(&(code.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(code);
+        std::fs::set_permissions(&base.path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        std::fs::write(&base.path, &bytes).unwrap();
+        std::fs::set_permissions(&base.path, std::fs::Permissions::from_mode(0o500)).unwrap();
+        let digest = Sha256::digest(&bytes)
+            .iter()
+            .fold(String::new(), |mut output, byte| {
+                use std::fmt::Write;
+                write!(output, "{byte:02x}").expect("writing to String cannot fail");
+                output
+            });
+        let image = ApprovedImage::new(
+            base.id,
+            base.execution_root,
+            base.path,
+            digest,
+            base.profile,
+        )
+        .unwrap();
+        let mut prepared = LinuxExecutablePreparer
+            .prepare(image.execution_image(), vec!["producer".into()])
+            .unwrap();
+        let mut output = LinuxExecutablePreparer
+            .prepare_producer(&mut prepared)
+            .unwrap();
+        let descriptor = prepared.producer_output().unwrap().as_raw_fd();
+        assert_eq!(unsafe { libc::ftruncate(descriptor, 1_000_000) }, -1);
+        assert!(output.read(CleanupEvidence::NotStarted).is_err());
+        let (provider, helper) = pair();
+        let worker = std::thread::spawn(move || helper_session(helper.as_raw_fd()));
+        let mut bridge = Bridge {
+            socket: provider,
+            state: State::Connected,
+        };
+        bridge
+            .send(
+                &prepared,
+                &ChildEnvironment::from_mappings(Vec::new()).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            bridge.receive(Duration::from_secs(3)).unwrap(),
+            Some(Report::Ready)
+        );
+        bridge.release().unwrap();
+        assert_eq!(
+            bridge.receive(Duration::from_secs(3)).unwrap(),
+            Some(Report::ExecConfirmed)
+        );
+        assert_eq!(
+            bridge.receive(Duration::from_secs(3)).unwrap(),
+            Some(Report::Outcome(ExecutionOutcome::ExitedZero))
+        );
+        assert_eq!(
+            bridge.receive(Duration::from_secs(3)).unwrap(),
+            Some(Report::Reaped)
+        );
+        worker.join().unwrap().unwrap();
+        let input = output.read(CleanupEvidence::Reaped).unwrap();
+        assert_eq!(input.password.as_deref(), Some("private-producer-sentinel"));
+        assert_eq!(
+            unsafe { libc::pwrite(descriptor, b"x".as_ptr().cast(), 1, 0) },
+            -1
+        );
     }
 
     #[test]

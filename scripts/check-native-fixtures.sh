@@ -5,7 +5,7 @@ fixture_root="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 assembly_tmp="$(mktemp -d)"
 trap 'rm -rf -- "$assembly_tmp"' EXIT
 for architecture in x86_64 aarch64; do
-    for fixture in protected-exit protected-output; do
+    for fixture in protected-exit protected-output protected-producer; do
         clang -target "${architecture}-linux-gnu" -c \
             "$fixture_root/tests/fixtures/${fixture}.S" -o "$assembly_tmp/fixture.o"
         llvm-objcopy -O binary --only-section=.text "$assembly_tmp/fixture.o" "$assembly_tmp/fixture.bin"

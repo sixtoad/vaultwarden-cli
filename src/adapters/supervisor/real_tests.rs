@@ -432,6 +432,7 @@ fn application_scenario(
     let marker = root.join("app-tree-ready").to_str().unwrap().to_owned();
     f.app
         .activate_operation(OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy".into(),
             description: "Synthetic protected execution".into(),
@@ -451,6 +452,7 @@ fn application_scenario(
                 },
             ],
             credentials: vec![LoginCredentialDraft {
+                namespace: None,
                 item_id: "11111111-1111-1111-1111-111111111111".into(),
                 label: "Synthetic login".into(),
                 use_type: CredentialUse::Login,

@@ -8,7 +8,7 @@
 //!
 //! Once obtained, callers can decrypt data or decrypt their RSA private key.
 
-use aes::cipher::{BlockModeDecrypt, KeyIvInit, block_padding::Pkcs7};
+use aes::cipher::{BlockModeDecrypt, BlockModeEncrypt, KeyIvInit, block_padding::Pkcs7};
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use hmac::{Hmac, KeyInit, Mac};
@@ -74,6 +74,67 @@ impl CryptoKeys {
         Self::from_symmetric_key(&decrypted)
     }
 
+    /// Encrypt bytes with a fresh IV and authenticated AES-256-CBC.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn encrypt(&self, plaintext: &[u8]) -> Result<String> {
+        let mut iv = [0u8; 16];
+        getrandom::fill(&mut iv).map_err(|_error| anyhow::anyhow!("randomness unavailable"))?;
+        let mut buffer = Zeroizing::new(plaintext.to_vec());
+        buffer.resize(plaintext.len() + 16, 0);
+        let ciphertext = cbc::Encryptor::<aes::Aes256>::new_from_slices(&self.enc_key, &iv)
+            .map_err(|_error| anyhow::anyhow!("encryption unavailable"))?
+            .encrypt_padded::<Pkcs7>(&mut buffer, plaintext.len())
+            .map_err(|_error| anyhow::anyhow!("encryption unavailable"))?;
+        let mut mac = Hmac::<Sha256>::new_from_slice(&self.mac_key)
+            .map_err(|_error| anyhow::anyhow!("encryption unavailable"))?;
+        mac.update(&iv);
+        mac.update(ciphertext);
+        Ok(format!(
+            "2.{}|{}|{}",
+            BASE64.encode(iv),
+            BASE64.encode(ciphertext),
+            BASE64.encode(mac.finalize().into_bytes())
+        ))
+    }
+
+    /// Generate an independent item key and wrap it with this parent key.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn new_wrapped_item_key(&self) -> Result<(Self, String)> {
+        let mut bytes = Zeroizing::new([0u8; 64]);
+        getrandom::fill(bytes.as_mut())
+            .map_err(|_error| anyhow::anyhow!("randomness unavailable"))?;
+        Ok((
+            Self::from_symmetric_key(bytes.as_ref())?,
+            self.encrypt(bytes.as_ref())?,
+        ))
+    }
+
+    /// Item keys always require authenticated ciphertext, irrespective of legacy CLI flags.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn item_keys(&self, wrapped: Option<&str>) -> Result<Self> {
+        match wrapped {
+            None => Ok(self.clone()),
+            Some(value) => {
+                Self::require_authenticated(value)?;
+                let bytes = Zeroizing::new(self.decrypt(value)?);
+                Self::from_symmetric_key(&bytes)
+            }
+        }
+    }
+
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn require_authenticated(value: &str) -> Result<()> {
+        anyhow::ensure!(
+            value.starts_with("2.") && value.split('|').count() == 3,
+            "authenticated ciphertext required"
+        );
+        Ok(())
+    }
+
     // ── Decryption operations ───────────────────────────────────────────
 
     /// Decrypt the user's RSA private key using this symmetric key.
@@ -99,6 +160,14 @@ impl CryptoKeys {
     /// fails AES decryption.
     pub fn decrypt(&self, encrypted: &str) -> Result<Vec<u8>> {
         Self::decrypt_with_keys(&self.enc_key, &self.mac_key, encrypted)
+    }
+
+    /// Authenticated decryption for storage and bound reads, never legacy MAC opt-outs.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn decrypt_authenticated_to_string(&self, encrypted: &str) -> Result<String> {
+        Self::require_authenticated(encrypted)?;
+        self.decrypt_to_string(encrypted)
     }
 
     /// Decrypt to a UTF‑8 string.
@@ -148,6 +217,7 @@ impl CryptoKeys {
         let iv_b64 = parts.next();
         let ct_b64 = parts.next();
         let mac_b64 = parts.next();
+        anyhow::ensure!(parts.next().is_none(), "Invalid encrypted data format");
 
         let (Some(iv_b64), Some(ct_b64)) = (iv_b64, ct_b64) else {
             anyhow::bail!("Invalid encrypted data format");

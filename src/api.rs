@@ -109,6 +109,8 @@ impl ApiClient {
         );
 
         let client = Client::builder()
+            .retry(reqwest::retry::never())
+            .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!(
                 env!("CARGO_PKG_NAME"),
                 "/",
@@ -258,6 +260,53 @@ impl ApiClient {
             "Failed to parse cipher response",
         )
         .await
+    }
+
+    /// Create exactly once. Errors never include a server body or request payload.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub async fn create_cipher(
+        &self,
+        token: &str,
+        encrypted: &crate::secret_storage::EncryptedCreate,
+    ) -> std::result::Result<crate::models::Cipher, crate::secret_storage::WriteStatus> {
+        use crate::secret_storage::WriteStatus;
+        let response = self
+            .client
+            .post(format!("{}/api/ciphers", self.base_url))
+            .bearer_auth(token)
+            .json(encrypted)
+            .send()
+            .await
+            .map_err(|_error| WriteStatus::Uncertain)?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(
+                if matches!(status.as_u16(), 400 | 401 | 403 | 404 | 405 | 422) {
+                    WriteStatus::Failed
+                } else {
+                    WriteStatus::Uncertain
+                },
+            );
+        }
+        let mut response = response;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_error| WriteStatus::Uncertain)?
+        {
+            if bytes.len() + chunk.len() > 1_048_576 {
+                return Err(WriteStatus::Uncertain);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        let cipher: crate::models::Cipher =
+            serde_json::from_slice(&bytes).map_err(|_error| WriteStatus::Uncertain)?;
+        if !crate::secret_storage::valid_id(cipher.id.as_str()) {
+            return Err(WriteStatus::Uncertain);
+        }
+        Ok(cipher)
     }
 
     /// List ciphers filtered by organization, collection, and/or cipher type.

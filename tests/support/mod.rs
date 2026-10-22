@@ -400,6 +400,7 @@ pub fn folder(id: &str, name: &str) -> Folder {
 
 pub fn login_cipher(id: &str, name: &str, username: &str, password: &str, uri: &str) -> Cipher {
     Cipher {
+        item_key: None,
         id: CipherId::new(id.to_string()).unwrap(),
         organization_id: None,
         deleted_date: None,
@@ -429,6 +430,7 @@ pub fn nested_login_cipher(
     uri: &str,
 ) -> Cipher {
     Cipher {
+        item_key: None,
         id: CipherId::new(id.to_string()).unwrap(),
         organization_id: None,
         deleted_date: None,

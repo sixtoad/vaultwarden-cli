@@ -24,6 +24,12 @@ pub(crate) trait ImageVerifier {
 /// The adapter chooses its opaque resource type, keeping OS handles out of core.
 pub(crate) trait ProtectedExecution {
     type Prepared;
+    fn prepare_producer(
+        &self,
+        _prepared: &mut Self::Prepared,
+    ) -> Result<Box<dyn ProducerOutput>, ExecutionError> {
+        Err(ExecutionError::Unavailable)
+    }
     /// Default deny: only adapters with private material and explicit finalization support SSH.
     fn prepare_ssh(
         &self,
@@ -46,6 +52,14 @@ pub(crate) enum ExecutionOutcome {
     ExitedZero,
     ExitedNonZero,
     Signaled,
+}
+
+/// Private bounded producer output; no agent transport can obtain this capability.
+pub(crate) trait ProducerOutput {
+    fn read(
+        &mut self,
+        evidence: CleanupEvidence,
+    ) -> Result<crate::secret_storage::SecretImport, ExecutionError>;
 }
 
 /// Material never cleans itself in Drop: only independent containment evidence authorizes removal.
@@ -251,6 +265,18 @@ impl std::error::Error for ExecutionError {}
 /// backend.  It names an immutable backend item and standard login fields; it
 /// never transports an item object or a secret value.
 pub trait LoginEligibilityVerifier {
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    fn is_scoped_login_eligible(
+        &self,
+        _id: &str,
+        _fields: &[LoginField],
+        _marker: &str,
+        _namespace: &crate::secret_storage::Destination,
+    ) -> Result<bool, LoginEligibilityError> {
+        Ok(false)
+    }
+
     /// Metadata-only SSH eligibility. Unsupported adapters deny by default.
     fn is_ssh_eligible(&self, _immutable_item_id: &str) -> Result<bool, LoginEligibilityError> {
         Ok(false)
@@ -326,12 +352,52 @@ pub trait ProviderSession: Send {
 }
 
 pub struct CredentialBinding<'a> {
+    pub namespace: Option<&'a crate::secret_storage::Destination>,
     pub immutable_item_id: &'a str,
     pub fields: &'a [LoginField],
     pub marker: &'a str,
 }
 /// Only the provider application owns and invokes this capability.
 pub trait SecretBackend: ProviderSession {
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    fn reconcile_secret(
+        &mut self,
+        _effect: &super::policy::CreateEffect,
+        _id: &str,
+    ) -> Result<(), SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    fn create_eligible(
+        &mut self,
+        _effect: &super::policy::CreateEffect,
+    ) -> Result<(), SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    fn create_secret(
+        &mut self,
+        _effect: &super::policy::CreateEffect,
+        _input: &crate::secret_storage::SecretImport,
+        _live: &dyn Fn() -> bool,
+    ) -> Result<String, crate::secret_storage::WriteStatus> {
+        Err(crate::secret_storage::WriteStatus::Failed)
+    }
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    fn verify_secret(
+        &mut self,
+        _effect: &super::policy::CreateEffect,
+        _id: &str,
+        _input: &crate::secret_storage::SecretImport,
+    ) -> Result<(), SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+
     fn resolve_ssh(&mut self, _immutable_item_id: &str) -> Result<SensitiveString, SessionError> {
         Err(SessionError::BackendUnavailable)
     }

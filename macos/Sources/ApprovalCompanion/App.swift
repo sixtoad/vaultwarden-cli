@@ -268,6 +268,14 @@ private struct ReviewView: View {
                         field("Operation", review.operation)
                         field("Effect", review.effect)
                         field("Target", review.target)
+                        if let create = review.create {
+                            field("Mutation", "CREATE personal vault item; one attempt")
+                            field("Account", create.destination.accountID + " at " + create.server)
+                            field("Folder", create.destination.folder + " (" + create.destination.folderID + ")")
+                            field("Canonical reference", create.destination.reference)
+                            field("Fields", create.fields.joined(separator: ", "))
+                            field("Eligibility marker", create.eligibilityMarker)
+                        }
                         Text("Arguments (\(review.arguments.count))").bold()
                         ForEach(Array(review.arguments.enumerated()), id: \.offset) { index, argument in
                             field("Argument \(index)", argument)

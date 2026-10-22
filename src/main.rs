@@ -41,11 +41,48 @@ enum Commands {
     Logout(LogoutCommand),
     List(ListCommand),
     Get(GetCommand),
+    Create(CreateCommand),
+    ReadField(ReadFieldCommand),
+    Reconcile(ReconcileCommand),
     GetUri(GetUriCommand),
     Run(RunCommand),
     RunUri(RunUriCommand),
     Status(StatusCommand),
     Interpolate(InterpolateCommand),
+}
+
+#[derive(Args)]
+/// Create a personal login item from bounded JSON stdin, after fresh terminal approval.
+struct CreateCommand {
+    #[arg(long)]
+    account: String,
+    #[arg(long)]
+    folder: String,
+    #[arg(long)]
+    reference: String,
+    /// Read one password using a hidden terminal prompt instead of JSON stdin.
+    #[arg(long)]
+    prompt: bool,
+}
+#[derive(Args)]
+/// Read exactly one field by immutable ID, preserving bytes.
+struct ReadFieldCommand {
+    /// Enforce a durable account/folder/reference/item/field binding.
+    #[arg(long)]
+    journal: Option<std::path::PathBuf>,
+    #[arg(long)]
+    id: String,
+    /// password, notes, or custom:NAME
+    #[arg(long)]
+    field: String,
+}
+#[derive(Args)]
+/// Inspect a durable creation receipt or reconcile it with an explicit item ID.
+struct ReconcileCommand {
+    #[arg(long)]
+    journal: std::path::PathBuf,
+    #[arg(long)]
+    id: Option<String>,
 }
 
 #[derive(Args)]
@@ -353,6 +390,9 @@ async fn run_cli(cli: Cli, raw_args: &[&str]) -> Result<commands::CommandOutcome
             }
             .map(|()| commands::CommandOutcome::Success)
         }
+        Commands::Create(CreateCommand { account, folder, reference, prompt }) => commands::create_secret(&account, &folder, &reference, prompt, &opts).await.map(|()| commands::CommandOutcome::Success),
+        Commands::ReadField(ReadFieldCommand { id, field, journal }) => commands::get_selected(&id,&field,journal.as_deref(),&opts).await.map(|()| commands::CommandOutcome::Success),
+        Commands::Reconcile(ReconcileCommand { journal, id }) => commands::reconcile_secret(&journal,id.as_deref(),&opts).await.map(|()| commands::CommandOutcome::Success),
         Commands::Get(GetCommand {
             item,
             query,
