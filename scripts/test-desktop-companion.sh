@@ -22,6 +22,8 @@ python3 "$repo/scripts/test-provider-packaged-diagnostics.py"
 case "$(uname -s)" in
   Linux*)
     target=linux
+    python3 "$repo/scripts/test-provider-fixture.py"
+    python3 "$repo/scripts/mutate-provider-controller.py" "$evidence/controller-mutations"
     xvfb-run -a flutter test integration_test/bridge_test.dart -d linux
     ;;
   Darwin*)

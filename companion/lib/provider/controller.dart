@@ -15,13 +15,21 @@ class ProviderController extends ChangeNotifier {
     configured: false,
   );
   bool settingUp = false, suspended = false, _disposed = false;
+  bool _routeCurrent = true, _ready = false, _loaded = false;
+  bool _reconciling = false, _operation = false;
+  String _settlementId = '';
   String diagnostic = '';
   int _context = 0, _backoff = 5;
   Timer? _poll, _expiry;
   void Function()? _unsubscribe;
   VoidCallback? clearPasswords;
-  bool get busy => state.busy || settingUp;
-  bool get canSetup => platform.available && !busy && state.uncertainId.isEmpty;
+  bool get eligible => !_disposed && !suspended && _routeCurrent;
+  bool get busy => state.busy || settingUp || _reconciling || _operation;
+  String get recoveryId =>
+      _settlementId.isNotEmpty ? _settlementId : state.uncertainId;
+  bool get canSetup =>
+      platform.available && eligible && _ready && !busy && recoveryId.isEmpty;
+  int get refreshDelaySeconds => _backoff;
 
   void _publish() {
     if (!_disposed) notifyListeners();
@@ -29,25 +37,61 @@ class ProviderController extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (!platform.available) return;
-    final context = ++_context;
-    _unsubscribe = platform.onInvalidation(invalidate);
+    _unsubscribe = platform.onInvalidation(suspend);
     _expiry = Timer.periodic(const Duration(milliseconds: 250), (_) {
       final previous = state.reviewId;
       state = core.providerSnapshot();
       if (previous != state.reviewId) clearPasswords?.call();
       _publish();
     });
+    await refresh();
+  }
+
+  bool _sameProvider(ProviderConfiguration value) =>
+      value.configured == configuration.configured &&
+      value.endpoint == configuration.endpoint &&
+      value.pin == configuration.pin &&
+      value.fingerprint == configuration.fingerprint;
+
+  Future<void> _reconcile() async {
+    if (_reconciling || settingUp || _operation || _disposed) return;
+    final context = _context;
+    _reconciling = true;
+    _publish();
     try {
       final loaded = await platform.configuration();
       if (_disposed || context != _context) return;
-      configuration = loaded;
-      if (loaded.configured && !state.busy && state.uncertainId.isEmpty) {
+      final same = _loaded && _sameProvider(loaded);
+      if (recoveryId.isNotEmpty &&
+          (!same ||
+              (loaded.uncertainId.isNotEmpty &&
+                  loaded.uncertainId != recoveryId))) {
+        throw StateError('Original provider recovery required');
+      }
+      // Atomic marker removal may have succeeded before a later permissions
+      // update threw. Only matching configured native metadata can prove that
+      // settlement is already durable; it cannot resolve Rust uncertainty.
+      if (same &&
+          loaded.configured &&
+          loaded.uncertainId.isEmpty &&
+          _settlementId.isNotEmpty &&
+          state.uncertainId.isEmpty) {
+        _settlementId = '';
+      }
+      if (!same) {
+        state = core.providerConfigure(uncertainId: loaded.uncertainId);
+      } else if (loaded.uncertainId.isNotEmpty && recoveryId.isEmpty) {
         state = core.providerConfigure(uncertainId: loaded.uncertainId);
       }
-      _publish();
-      if (loaded.configured) await refresh();
+      configuration = loaded;
+      _loaded = true;
+      _ready = true;
+      diagnostic = '';
     } catch (_) {
+      _ready = false;
       diagnostic = 'Saved provider setup is unavailable. Check the dedicated client identity.';
+    } finally {
+      _reconciling = false;
       _publish();
     }
   }
@@ -63,6 +107,7 @@ class ProviderController extends ChangeNotifier {
     suspended = true;
     _poll?.cancel();
     invalidate();
+    _ready = false;
   }
 
   void resume() {
@@ -70,19 +115,27 @@ class ProviderController extends ChangeNotifier {
     unawaited(refresh());
   }
 
+  void setRouteCurrent(bool current) {
+    _routeCurrent = current;
+    if (!current) {
+      _poll?.cancel();
+      invalidate();
+      _ready = false;
+    } else if (eligible) {
+      unawaited(refresh());
+    }
+  }
+
   Future<void> setup(String endpoint, String pin, String passphrase) async {
     if (!canSetup) return;
     invalidate();
-    final context = _context;
+    _ready = false;
     settingUp = true;
     _poll?.cancel();
     diagnostic = '';
     _publish();
     try {
-      final loaded = await platform.setup(endpoint, pin, passphrase);
-      if (_disposed || context != _context) return;
-      configuration = loaded;
-      state = core.providerConfigure(uncertainId: loaded.uncertainId);
+      await platform.setup(endpoint, pin, passphrase);
     } catch (_) {
       diagnostic = 'Setup cancelled or unavailable. Check HTTPS, CA, leaf pin and dedicated PKCS#12.';
     } finally {
@@ -90,7 +143,10 @@ class ProviderController extends ChangeNotifier {
       clearPasswords?.call();
       _publish();
     }
-    if (!_disposed && configuration.configured) await refresh();
+    // Native import/save may succeed while its dialogs make the app inactive.
+    // Always reload persisted metadata; never keep the old label with new TLS.
+    await _reconcile();
+    if (eligible) await refresh();
   }
 
   Future<bool> perform(
@@ -98,11 +154,13 @@ class ProviderController extends ChangeNotifier {
     String id = '',
     String password = '',
   }) async {
-    if (_disposed ||
+    if (!eligible ||
+        !_ready ||
         !platform.available ||
         !configuration.configured ||
         busy ||
-        suspended) {
+        (recoveryId.isNotEmpty &&
+            (command != core.ProviderCommand.status || id != recoveryId))) {
       return false;
     }
     core.ProviderWork work;
@@ -128,16 +186,15 @@ class ProviderController extends ChangeNotifier {
       clearPasswords?.call();
     }
     diagnostic = '';
+    _operation = true;
     state = core.providerSnapshot();
-    final pendingId = state.uncertainId;
+    final pendingId = recoveryId;
     _publish();
     Uint8List response;
-    bool connected = true;
     try {
       response = await platform.send(work.body);
     } catch (_) {
       response = Uint8List(0);
-      connected = false;
     } finally {
       work.body.fillRange(0, work.body.length, 0);
     }
@@ -146,33 +203,52 @@ class ProviderController extends ChangeNotifier {
     final previousReview = state.reviewId;
     state = core.providerFinish(token: work.token, response: response);
     if (previousReview != state.reviewId) clearPasswords?.call();
-    if (pendingId.isNotEmpty && state.uncertainId.isEmpty) {
+    final accepted = state.outcome == core.ProviderOutcome.accepted;
+    final rejectedDecision =
+        [
+          core.ProviderCommand.approve,
+          core.ProviderCommand.deny,
+        ].contains(command) &&
+        state.outcome == core.ProviderOutcome.rejected;
+    if (pendingId.isNotEmpty &&
+        state.uncertainId.isEmpty &&
+        (accepted || rejectedDecision) &&
+        state.statusProgress != core.ProviderStatusProgress.pending) {
+      _settlementId = pendingId;
       try {
         await platform.settle(pendingId);
+        _settlementId = '';
       } catch (_) {
-        diagnostic = 'Status received, but recovery storage could not be cleared. Reconnect before further decisions.';
-        configuration = const ProviderConfiguration(configured: false);
+        _ready = false;
+        diagnostic = 'Status received, but recovery storage could not be cleared. Refresh the original request status to retry settlement.';
       }
     }
+    _operation = false;
     _publish();
-    return connected;
+    return accepted && _settlementId.isEmpty;
   }
 
   Future<void> refresh() async {
     _poll?.cancel();
-    if (_disposed || suspended || busy || !configuration.configured) {
+    if (!eligible || busy) {
+      _schedule();
+      return;
+    }
+    if (!_ready) await _reconcile();
+    if (!eligible || busy || !_ready || !configuration.configured) {
       _schedule();
       return;
     }
     bool success;
-    if (state.uncertainId.isNotEmpty) {
+    if (recoveryId.isNotEmpty ||
+        state.statusProgress == core.ProviderStatusProgress.committed) {
       success = await perform(
         core.ProviderCommand.status,
-        id: state.uncertainId,
+        id: recoveryId.isNotEmpty ? recoveryId : state.statusId,
       );
     } else {
       success = await perform(core.ProviderCommand.session);
-      if (success && !_disposed && !suspended) {
+      if (success && eligible && !state.locked) {
         success = await perform(core.ProviderCommand.list);
       }
     }
@@ -181,7 +257,8 @@ class ProviderController extends ChangeNotifier {
   }
 
   void _schedule() {
-    if (!_disposed && !suspended && configuration.configured) {
+    _poll?.cancel();
+    if (eligible && platform.available) {
       _poll = Timer(Duration(seconds: _backoff), refresh);
     }
   }
@@ -196,7 +273,8 @@ class ProviderController extends ChangeNotifier {
       approve ? core.ProviderCommand.approve : core.ProviderCommand.deny,
       password: password,
     );
-    if (state.uncertainId.isNotEmpty) await refresh();
+    if (recoveryId.isNotEmpty) await refresh();
+    _schedule();
   }
 
   Future<void> unlock(String password) async {

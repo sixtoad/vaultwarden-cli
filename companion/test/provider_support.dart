@@ -37,23 +37,38 @@ class FixtureProviderPlatform implements ProviderPlatform {
   bool available = true;
   final List<Map<String, dynamic>> commands = [];
   final List<String> settled = [];
-  Completer<Uint8List>? heldReview, heldDecision;
-  bool loseDecision = false, wrongPassword = false;
-  String status = 'pending';
-  void Function()? invalidate;
-  @override
-  Future<ProviderConfiguration> configuration() async => ProviderConfiguration(
+  final List<String> settlementAttempts = [];
+  Completer<Uint8List>? heldReview, heldDecision, heldSession;
+  Completer<ProviderConfiguration>? heldConfiguration, heldSetup;
+  Completer<void>? heldSettlement;
+  bool failSettlement = false, failConfiguration = false;
+  bool clearThenFailSettlement = false;
+  Uint8List? sessionReply;
+  ProviderConfiguration saved = ProviderConfiguration(
     configured: true,
     endpoint: 'https://fixture.example/v1/companion',
     pin: 'a' * 64,
     fingerprint: 'b' * 64,
   );
+  bool loseDecision = false, wrongPassword = false;
+  String status = 'pending';
+  void Function()? invalidate;
+  @override
+  Future<ProviderConfiguration> configuration() async {
+    if (failConfiguration) throw StateError('Synthetic metadata failure');
+    return heldConfiguration == null ? saved : heldConfiguration!.future;
+  }
+
   @override
   Future<ProviderConfiguration> setup(
     String endpoint,
     String pin,
     String passphrase,
-  ) => configuration();
+  ) async {
+    if (heldSetup != null) saved = await heldSetup!.future;
+    return saved;
+  }
+
   @override
   Future<Uint8List> send(Uint8List body) async {
     final command = jsonDecode(utf8.decode(body)) as Map<String, dynamic>;
@@ -61,6 +76,9 @@ class FixtureProviderPlatform implements ProviderPlatform {
     commands.add(command);
     switch (command['command']) {
       case 'session':
+        if (heldSession != null) return heldSession!.future;
+        if (sessionReply != null) return sessionReply!;
+        return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
       case 'unlock':
         return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
       case 'list':
@@ -73,6 +91,7 @@ class FixtureProviderPlatform implements ProviderPlatform {
             ? encoded(providerReview())
             : heldReview!.future;
       case 'decision':
+        savePending(command['request_id'] as String);
         if (heldDecision != null) return heldDecision!.future;
         if (wrongPassword) {
           return encoded({'version': 1, 'error': 'authentication_failed'});
@@ -86,7 +105,10 @@ class FixtureProviderPlatform implements ProviderPlatform {
       case 'status':
         return encoded({
           'version': 1,
-          'status': {'status': status},
+          'status': {
+            'status': status,
+            if (status == 'completed') 'exit_code': 0,
+          },
         });
       default:
         throw StateError('Unexpected command');
@@ -95,7 +117,25 @@ class FixtureProviderPlatform implements ProviderPlatform {
 
   @override
   Future<void> settle(String id) async {
+    settlementAttempts.add(id);
+    if (heldSettlement != null) await heldSettlement!.future;
+    if (failSettlement) throw StateError('Synthetic settlement failure');
+    if (saved.uncertainId != id) throw StateError('Synthetic marker mismatch');
     settled.add(id);
+    savePending('');
+    if (clearThenFailSettlement) {
+      throw StateError('Synthetic permissions failure after atomic save');
+    }
+  }
+
+  void savePending(String id) {
+    saved = ProviderConfiguration(
+      configured: saved.configured,
+      endpoint: saved.endpoint,
+      pin: saved.pin,
+      fingerprint: saved.fingerprint,
+      uncertainId: id,
+    );
   }
 
   @override

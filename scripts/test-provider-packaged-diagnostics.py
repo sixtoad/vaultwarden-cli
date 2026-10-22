@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Portable tests of the closed, non-sensitive packaged probe diagnostics."""
 import importlib.util
+import ast
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,21 @@ SECRET = b"password identity-reference PRIVATE KEY raw-request raw-response"
 
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_controller_cases_extend_existing_matrix_and_use_production_controller(self):
+        source = (PROBE.ROOT / "scripts/test-provider-packaged.py").read_text()
+        tree = ast.parse(source)
+        cases = next(ast.literal_eval(node.value) for node in ast.walk(tree)
+                     if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "cases" for target in node.targets))
+        self.assertEqual([case[0] for case in cases[:14]], ["approve", "deny", "wrong-password", "pin", "ca", "foreign-client", "unenrolled-client", "hostname", "expired", "redirect", "oversized", "schema", "lost-response-relaunch", "pending-relaunch"])
+        self.assertEqual(len(cases), 17)
+        self.assertEqual(cases[14][-1], ["session", "unlock", "session", "list", "review", "decision", "status", "status"])
+        for case in cases[15:]:
+            self.assertEqual(case[-1], ["session", "review", "decision", "status"])
+        dart = (PROBE.ROOT / "companion/integration_test/provider_tls_smoke.dart").read_text()
+        for call in ["ProviderController(native)", "await controller.initialize()", "await controller.unlock(", "await controller.refresh()"]:
+            self.assertIn(call, dart)
+        self.assertIn("check=True, timeout=45", source)
+
     def test_progress_keeps_only_fixed_boundaries_on_failure(self):
         for diagnostics, prefix, phase, success in [
             (PROBE.app_diagnostics, b"COMPANION_PROVIDER_TLS", b"nativeSend", b"COMPANION_PROVIDER_TLS_OK\n"),

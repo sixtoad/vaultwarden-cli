@@ -10,6 +10,8 @@ stage = Path(sys.argv[1]).resolve()
 evidence = Path(sys.argv[2]).resolve()
 source = stage / "Sources/CompanionCore/Trust.swift"
 original = source.read_bytes()
+settings = stage / "Sources/CompanionCore/ProviderSettings.swift"
+original_settings = settings.read_bytes()
 evidence.mkdir(parents=True, exist_ok=True)
 mutations = {
     "leaf-pin": ("KeychainIdentity.fingerprintDER(SecCertificateCopyData(leaf) as Data) == configuration.leafSHA256", "(SecCertificateCopyData(leaf) as Data) != Data()"),
@@ -35,8 +37,22 @@ try:
         source.write_bytes(original)
         if not caught:
             raise RuntimeError(f"{name}: escaped or did not reach tests")
+    old = "try save(Saved(configuration: configuration, pendingID: nil))"
+    if original_settings.decode().count(old) != 1:
+        raise RuntimeError("install-save: mutation anchor not unique")
+    settings.write_text(original_settings.decode().replace(old, "_ = configuration"))
+    code = run("install-save")
+    log = (evidence / "install-save.log").read_text()
+    caught = code != 0 and "Test Suite" in log and "failed" in log and "error: emit-module" not in log
+    report["mutations"]["install-save"] = {"exit_code": code, "caught_by_test": caught}
+    settings.write_bytes(original_settings)
+    if not caught:
+        raise RuntimeError("install-save: escaped or did not reach tests")
 finally:
     source.write_bytes(original)
+    settings.write_bytes(original_settings)
+    report["settings_source_sha256"] = hashlib.sha256(original_settings).hexdigest()
+    report["settings_restored_sha256"] = hashlib.sha256(settings.read_bytes()).hexdigest()
     report["restored_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
     report["restored_test_exit"] = run("restored")
     (evidence / "report.json").write_text(json.dumps(report, indent=2) + "\n")

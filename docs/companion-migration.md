@@ -38,10 +38,39 @@ Rust validates closed v1 objects and every canonical review field, preserves
 argument boundaries, quotes strings and escapes all non-ASCII/control scalars.
 The UI shows the provider's 256-request cap explicitly. Authority/inbox reads
 poll every five seconds while foregrounded, backing off to at most 30 seconds
-after transport failures. Setup, selection, sleep, close and disconnect retire
+after transport or typed protocol failures; failed session authority never starts
+an inbox read. Valid locked authority is not treated as a transport failure.
+Setup, selection, inactive/hidden state, sleep, close and disconnect retire
 reviews; stale read completions cannot restore authority. Tickets are usable for
 at most 55 monotonic seconds measured from the review request start and before
 the request's wall-clock deadline. Authority generation changes retire reviews.
+
+Foreground and current-route eligibility are independent: returning focus while
+the synthetic route is visible cannot restart provider polling. Native setup
+dialogs may finish importing while inactive, but the controller reloads saved
+metadata before admitting work. Interrupted startup and failed metadata reads
+can be recovered with Refresh/Reload saved setup; a completed replacement never
+uses the old displayed provider metadata for new transport work.
+
+Operation admission remains closed through durable native settlement. If clearing
+the saved marker fails, Refresh original request status retries status/settlement
+against the same configuration and request ID, never decision or unlock. Native
+settlement already in flight is completed even after page disposal. Authoritative
+approved/running resolves delivery uncertainty but is not terminal execution:
+foreground polling follows that original status ID until completion/failure.
+Configuration replacement clears completed-status tracking, not unresolved work.
+
+Correction regressions use the real Rust bridge in `test/provider_test.dart`.
+`scripts/mutate-provider-controller.py` exercises metadata reconciliation,
+settlement admission, route eligibility, saved-ID restoration, typed refresh and
+status following, restoring exact source bytes and retesting. Native CI tests
+production identity install/reload and failures using only a verified disposable
+default Keychain, then restore the original default/search list and remove it;
+an install-save mutation must be caught. Packaged CI retains the original 14 TLS
+cases and adds controller unlock/inbox/terminal status and two controller relaunch
+recovery cases with exact command counts. These additions require matching native
+CI execution; earlier operator acceptance does not certify corrected code.
+Near-limit rendering/FFI performance remains unmeasured and deferred.
 
 Approve-once requires a fresh password; deny sends no password. Starting either
 consumes the review before transport. Wrong-password rejection requires explicit

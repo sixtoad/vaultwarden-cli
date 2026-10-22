@@ -19,11 +19,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
-PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle shutdown".split())
+PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle shutdown controller".split())
 PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity persistentReference saveConfiguration savedConfiguration savedIdentity savedFingerprint savedMetadata".split())
-CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus".split())
-COMMANDS = frozenset("session unlock review decision status".split())
-NATIVE_COMMANDS = frozenset("session unlock review approve deny status".split())
+CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus".split())
+COMMANDS = frozenset("session list unlock review decision status".split())
+NATIVE_COMMANDS = frozenset("session list unlock review approve deny status".split())
 
 
 def progress_diagnostics(stdout, stderr, prefix, phases):
@@ -211,6 +211,9 @@ def main():
             ("schema", "invalid-schema", "client", "ca", "negative", ["session"]),
             ("lost-response-relaunch", "drop", "client", "ca", "drop", ["session", "review", "decision", "status"]),
             ("pending-relaunch", "drop-pending", "client", "ca", "drop", ["session", "review", "decision", "status"]),
+            ("controller-unlock", "controller", "client", "ca", "controller-unlock", ["session", "unlock", "session", "list", "review", "decision", "status", "status"]),
+            ("controller-recovery", "drop", "client", "ca", "drop", ["session", "review", "decision", "status"]),
+            ("controller-pending", "drop-pending", "client", "ca", "drop", ["session", "review", "decision", "status"]),
         ]
         for name, mode, client, ca, scenario, expected_commands in cases:
             report["cases"][name] = {"passed": False, "launches": [],
@@ -236,7 +239,8 @@ def main():
             if mode in ["drop", "drop-pending"]:
                 # A separate AOT process reads the native durable marker and sends
                 # only status. Count bodies across both processes to catch replay.
-                launch("recover-pending" if mode == "drop-pending" else "recover", client)
+                recovery = "recover-pending" if mode == "drop-pending" else "recover"
+                launch("controller-" + recovery if name.startswith("controller-") else recovery, client)
             commands = [json.loads(line)["command"] for line in (temporary / "requests.jsonl").read_text().splitlines()]
             if commands != expected_commands:
                 raise RuntimeError(f"{name}: wrong command count/order")

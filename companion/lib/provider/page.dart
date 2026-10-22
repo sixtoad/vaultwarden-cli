@@ -49,6 +49,7 @@ class _ProviderPageState extends State<ProviderPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) controller.resume();
     if ([
+      AppLifecycleState.inactive,
       AppLifecycleState.hidden,
       AppLifecycleState.paused,
       AppLifecycleState.detached,
@@ -238,9 +239,9 @@ class _ProviderPageState extends State<ProviderPage>
                 ],
               ],
               const SizedBox(height: 20),
-              if (state.uncertainId.isNotEmpty) ...[
+              if (controller.recoveryId.isNotEmpty) ...[
                 SelectableText(
-                  'Uncertain decision for request: ${state.uncertainId}',
+                  'Uncertain decision for request: ${controller.recoveryId}',
                   key: const Key('provider-uncertain'),
                 ),
                 const Text(
@@ -257,19 +258,24 @@ class _ProviderPageState extends State<ProviderPage>
                 ),
               Text(state.message, key: const Key('provider-status')),
               if (controller.diagnostic.isNotEmpty) Text(controller.diagnostic),
+              if (!config.configured)
+                OutlinedButton(
+                  onPressed: controller.busy ? null : controller.refresh,
+                  child: const Text('Reload saved provider setup'),
+                ),
               if (controller.busy) const LinearProgressIndicator(),
               const Divider(height: 40),
               OutlinedButton(
                 onPressed: controller.busy || state.uncertainId.isNotEmpty
                     ? null
                     : () async {
-                        controller.suspend();
+                        controller.setRouteCurrent(false);
                         await Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: widget.syntheticBuilder,
                           ),
                         );
-                        if (mounted) controller.resume();
+                        if (mounted) controller.setRouteCurrent(true);
                       },
                 child: const Text(
                   'Open separate synthetic signing demonstration',

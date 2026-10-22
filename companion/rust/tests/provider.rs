@@ -1,4 +1,6 @@
-use companion_core::api::provider::ProviderCommand as Command;
+use companion_core::api::provider::{
+    ProviderCommand as Command, ProviderOutcome, ProviderStatusProgress,
+};
 use companion_core::provider::{protocol::*, session::ProviderSession};
 use serde_json::{json, Value};
 
@@ -186,6 +188,12 @@ fn consumes_ticket_before_send_wrong_password_requires_explicit_new_review() {
     assert!(session
         .begin(Command::Approve, ID.into(), "fresh".into())
         .is_err());
+    reply(
+        &mut session,
+        Command::Session,
+        "",
+        json!({"version":1,"state":"unlocked","generation":1}),
+    );
     reply(&mut session, Command::Review, ID, fixture());
     assert!(session.snapshot().can_decide);
 }
@@ -352,4 +360,95 @@ fn restored_marker_only_allows_original_status() {
         json!({"version":1,"error":"unavailable"}),
     );
     assert_eq!(session.snapshot().uncertain_id, ID);
+}
+
+#[test]
+fn failed_authority_replies_retire_cached_authority_and_inbox_with_typed_outcomes() {
+    for body in [
+        br#"{"version":1,"error":"rate_limited"}"#.as_slice(),
+        br#"{"version":1,"error":"unavailable"}"#,
+        br#"{"version":1,"error":"unauthorized"}"#,
+        br#"{"version":1,"error":"stale"}"#,
+        b"malformed",
+    ] {
+        let mut session = reviewed();
+        reply(
+            &mut session,
+            Command::List,
+            "",
+            json!({"version":1,"requests":[ID]}),
+        );
+        let work = session
+            .begin(Command::Session, "".into(), "".into())
+            .unwrap();
+        session.finish(work.token, body);
+        let state = session.snapshot();
+        assert!(state.locked && state.requests.is_empty() && !state.can_decide);
+        assert!(matches!(
+            state.outcome,
+            ProviderOutcome::Rejected | ProviderOutcome::Invalid
+        ));
+    }
+    let mut session = connected();
+    reply(
+        &mut session,
+        Command::Session,
+        "",
+        json!({"version":1,"state":"locked","generation":2}),
+    );
+    assert_eq!(session.snapshot().outcome, ProviderOutcome::Accepted);
+    let work = session
+        .begin(Command::Session, "".into(), "".into())
+        .unwrap();
+    session.invalidate();
+    session.finish(
+        work.token,
+        br#"{"version":1,"state":"unlocked","generation":2}"#,
+    );
+    assert_eq!(session.snapshot().outcome, ProviderOutcome::Stale);
+    assert!(session.snapshot().locked);
+}
+
+#[test]
+fn commitment_is_distinct_from_terminal_status_and_configuration_clears_tracking() {
+    let mut session = reviewed();
+    let work = session
+        .begin(Command::Approve, "".into(), "fresh".into())
+        .unwrap();
+    session.finish(
+        work.token,
+        br#"{"version":1,"status":{"status":"approved"}}"#,
+    );
+    assert_eq!(
+        session.snapshot().status_progress,
+        ProviderStatusProgress::Committed
+    );
+    assert!(session.snapshot().uncertain_id.is_empty());
+    reply(
+        &mut session,
+        Command::Status,
+        ID,
+        json!({"version":1,"status":{"status":"running"}}),
+    );
+    assert_eq!(
+        session.snapshot().status_progress,
+        ProviderStatusProgress::Committed
+    );
+    reply(
+        &mut session,
+        Command::Status,
+        ID,
+        json!({"version":1,"status":{"status":"completed","exit_code":0}}),
+    );
+    assert_eq!(
+        session.snapshot().status_progress,
+        ProviderStatusProgress::Terminal
+    );
+    assert_eq!(session.snapshot().status_id, ID);
+    session.configure("").unwrap();
+    assert_eq!(
+        session.snapshot().status_progress,
+        ProviderStatusProgress::None
+    );
+    assert!(session.snapshot().status_id.is_empty());
 }

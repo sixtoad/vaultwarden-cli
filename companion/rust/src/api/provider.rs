@@ -12,6 +12,25 @@ pub enum ProviderCommand {
     Status,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ProviderOutcome {
+    #[default]
+    None,
+    Accepted,
+    Rejected,
+    Invalid,
+    Stale,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ProviderStatusProgress {
+    #[default]
+    None,
+    Pending,
+    Committed,
+    Terminal,
+}
+
 /// Transient wire bytes are handed directly to the native TLS adapter. Do not log.
 pub struct ProviderWork {
     pub token: u32,
@@ -19,6 +38,8 @@ pub struct ProviderWork {
 }
 #[derive(Clone, Debug)]
 pub struct ProviderSnapshot {
+    pub outcome: ProviderOutcome,
+    pub status_progress: ProviderStatusProgress,
     pub configured: bool,
     pub busy: bool,
     pub locked: bool,

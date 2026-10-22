@@ -28,6 +28,7 @@ def serve(directory, mode):
     counters.write_text("")
     lock = threading.Lock()
     status = {"status": "pending"}
+    locked = mode == "controller"
 
     class Handler(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -36,7 +37,7 @@ def serve(directory, mode):
             pass
 
         def do_POST(self):
-            nonlocal status
+            nonlocal status, locked
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 16384:
                 self.close_connection = True
@@ -62,7 +63,12 @@ def serve(directory, mode):
             if mode == "oversized":
                 return self.reply(200, {"version": 1, "padding": "x" * 1048576})
             if command == "session":
+                return self.reply(200, {"version": 1, "state": "locked" if locked else "unlocked", "generation": 1})
+            if command == "unlock":
+                locked = False
                 return self.reply(200, {"version": 1, "state": "unlocked", "generation": 1})
+            if command == "list":
+                return self.reply(200, {"version": 1, "requests": [] if locked else [review["review"]["id"]]})
             if command == "review":
                 return self.reply(200, review)
             if command == "decision":
@@ -80,6 +86,9 @@ def serve(directory, mode):
                     return
                 return self.reply(200, {"version": 1, "status": status})
             if command == "status":
+                if mode == "controller":
+                    status = ({"status": "running"} if status["status"] == "approved"
+                              else {"status": "completed", "exit_code": 0})
                 return self.reply(200, {"version": 1, "status": status})
             return self.reply(400, {"version": 1, "error": "invalid_request"})
 

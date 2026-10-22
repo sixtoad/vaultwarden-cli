@@ -5,6 +5,7 @@ Run without concurrent edits or builds. Each mutation must compile and fail a
 test; a compiler error is not a caught mutation. No passwords/bodies are logged.
 """
 import hashlib
+import argparse
 import json
 from pathlib import Path
 import subprocess
@@ -13,7 +14,11 @@ import sys
 root = Path(__file__).resolve().parents[1]
 base = root / "companion/rust/src/provider"
 originals = {name: (base / name).read_bytes() for name in ["protocol.rs", "session.rs"]}
-evidence = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "companion/build/provider-mutations"
+parser = argparse.ArgumentParser()
+parser.add_argument("evidence", nargs="?", type=Path, default=root / "companion/build/provider-mutations")
+parser.add_argument("--only", nargs="+")
+args = parser.parse_args()
+evidence = args.evidence.resolve()
 evidence.mkdir(parents=True, exist_ok=True)
 command = ["cargo", "test", "--locked", "--offline", "--manifest-path", str(root / "companion/rust/Cargo.toml")]
 mutations = {
@@ -26,11 +31,20 @@ mutations = {
     "duplicate-completion": ("session.rs", [("struct Flight {", "#[derive(Clone)]\nstruct Flight {"), ('self.flight.take().expect("matched flight")', 'self.flight.clone().expect("matched flight")')]),
     "monotonic-expiry": ("session.rs", [("r.started.elapsed() < Duration::from_secs(55)", "true"), ("r.started.elapsed() >= Duration::from_secs(55)", "false")]),
     "wall-expiry": ("session.rs", [("unix_seconds() < r.response.review.expires_at_unix_seconds", "true"), ("unix_seconds() >= r.response.review.expires_at_unix_seconds", "false")]),
+    "rejected-authority": ("session.rs", [("self.authority = None;\n                self.requests.clear();\n                self.outcome = ProviderOutcome::Rejected;", "self.outcome = ProviderOutcome::Rejected;")]),
+    "typed-rejection": ("session.rs", [("self.outcome = ProviderOutcome::Rejected;", "self.outcome = ProviderOutcome::Accepted;")]),
+    "committed-terminality": ("session.rs", [("Status::Approved {} | Status::Running {} => ProviderStatusProgress::Committed,", "Status::Approved {} | Status::Running {} => ProviderStatusProgress::Terminal,")]),
 }
+if args.only:
+    mutations = {name: mutations[name] for name in args.only}
 
 def run(name):
     with (evidence / f"{name}.log").open("wb") as log:
-        return subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=180).returncode
+        for selection in [["--test", "provider"], ["--lib", "provider::session::tests"]]:
+            code = subprocess.run(command + selection, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=180).returncode
+            if code != 0:
+                return code
+        return 0
 
 report = {"source_sha256": {n: hashlib.sha256(b).hexdigest() for n, b in originals.items()}, "mutations": {}}
 try:

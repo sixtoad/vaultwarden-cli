@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `session`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `eq`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
 ProviderSnapshot providerSnapshot() =>
     RustLib.instance.api.crateApiProviderProviderSnapshot();
@@ -41,7 +41,20 @@ ProviderSnapshot providerFinish({
 
 enum ProviderCommand { session, list, review, approve, deny, unlock, status }
 
+enum ProviderOutcome {
+  none,
+  accepted,
+  rejected,
+  invalid,
+  stale;
+
+  static Future<ProviderOutcome> default_() =>
+      RustLib.instance.api.crateApiProviderProviderOutcomeDefault();
+}
+
 class ProviderSnapshot {
+  final ProviderOutcome outcome;
+  final ProviderStatusProgress statusProgress;
   final bool configured;
   final bool busy;
   final bool locked;
@@ -55,6 +68,8 @@ class ProviderSnapshot {
   final String message;
 
   const ProviderSnapshot({
+    required this.outcome,
+    required this.statusProgress,
     required this.configured,
     required this.busy,
     required this.locked,
@@ -70,6 +85,8 @@ class ProviderSnapshot {
 
   @override
   int get hashCode =>
+      outcome.hashCode ^
+      statusProgress.hashCode ^
       configured.hashCode ^
       busy.hashCode ^
       locked.hashCode ^
@@ -87,6 +104,8 @@ class ProviderSnapshot {
       identical(this, other) ||
       other is ProviderSnapshot &&
           runtimeType == other.runtimeType &&
+          outcome == other.outcome &&
+          statusProgress == other.statusProgress &&
           configured == other.configured &&
           busy == other.busy &&
           locked == other.locked &&
@@ -98,6 +117,16 @@ class ProviderSnapshot {
           statusId == other.statusId &&
           statusText == other.statusText &&
           message == other.message;
+}
+
+enum ProviderStatusProgress {
+  none,
+  pending,
+  committed,
+  terminal;
+
+  static Future<ProviderStatusProgress> default_() =>
+      RustLib.instance.api.crateApiProviderProviderStatusProgressDefault();
 }
 
 /// Transient wire bytes are handed directly to the native TLS adapter. Do not log.

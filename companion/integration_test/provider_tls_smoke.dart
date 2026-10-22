@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/platform/provider.dart';
+import 'package:companion_slice/provider/controller.dart';
 import 'package:companion_slice/src/rust/api/provider.dart' as core;
 
 const id = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -26,6 +27,7 @@ enum ProbePhase {
   finish,
   settle,
   shutdown,
+  controller,
 }
 
 enum ProbeCheck {
@@ -45,6 +47,8 @@ enum ProbeCheck {
   reviewDecidable,
   completeArguments,
   decisionStatus,
+  inbox,
+  terminalStatus,
 }
 
 var phase = ProbePhase.startup;
@@ -62,6 +66,14 @@ Future<void> progress(ProbePhase next, {bool complete = false}) async {
 void check(bool value, ProbeCheck label) {
   if (!value) failedCheck = label;
   if (!value) throw StateError('Packaged provider assertion');
+}
+
+Future<void> succeed() async {
+  await progress(ProbePhase.shutdown);
+  stdout.writeln('COMPANION_PROVIDER_TLS_OK');
+  await stdout.flush();
+  await progress(ProbePhase.shutdown, complete: true);
+  exit(0);
 }
 
 Future<void> main() async {
@@ -124,6 +136,73 @@ Future<void> main() async {
           Platform.environment['COMPANION_EXPECT_CLIENT_SHA256'],
       ProbeCheck.fingerprint,
     );
+    if (scenario!.startsWith('controller-')) {
+      await progress(ProbePhase.controller);
+      final controller = ProviderController(native);
+      try {
+        await controller.initialize();
+        check(
+          controller.configuration.configured,
+          ProbeCheck.configuredLoopback,
+        );
+        if (scenario == 'controller-unlock') {
+          check(controller.state.locked, ProbeCheck.negativeClosed);
+          await controller.unlock('synthetic-only');
+          check(!controller.state.locked, ProbeCheck.sessionUnlocked);
+          check(
+            controller.state.requests.length == 1 &&
+                controller.state.requests.single == id,
+            ProbeCheck.inbox,
+          );
+          await controller.review(id);
+          check(controller.state.canDecide, ProbeCheck.reviewDecidable);
+          await controller.decide(true, 'synthetic-only');
+          check(
+            controller.state.statusProgress ==
+                core.ProviderStatusProgress.committed,
+            ProbeCheck.approvedStatus,
+          );
+          await controller.refresh();
+          check(
+            controller.state.statusProgress ==
+                core.ProviderStatusProgress.committed,
+            ProbeCheck.approvedStatus,
+          );
+          await controller.refresh();
+          check(
+            controller.state.statusProgress ==
+                    core.ProviderStatusProgress.terminal &&
+                controller.state.statusId == id,
+            ProbeCheck.terminalStatus,
+          );
+        } else {
+          check(config.uncertainId == id, ProbeCheck.recoveryMarker);
+          if (scenario == 'controller-recover-pending') {
+            check(controller.recoveryId == id, ProbeCheck.pendingCoreMarker);
+            check(
+              (await configuration()).uncertainId == id,
+              ProbeCheck.pendingNativeMarker,
+            );
+          } else {
+            check(controller.recoveryId.isEmpty, ProbeCheck.terminalCoreMarker);
+            check(
+              controller.state.statusProgress ==
+                  core.ProviderStatusProgress.committed,
+              ProbeCheck.approvedStatus,
+            );
+            check(
+              (await configuration()).uncertainId.isEmpty,
+              ProbeCheck.settledNativeMarker,
+            );
+          }
+        }
+      } finally {
+        controller.dispose();
+      }
+      await progress(ProbePhase.controller, complete: true);
+      await succeed();
+      return;
+    }
     await progress(ProbePhase.configureCore);
     core.providerConfigure(uncertainId: config.uncertainId);
     await progress(ProbePhase.configureCore, complete: true);
@@ -243,11 +322,7 @@ Future<void> main() async {
         }
       }
     }
-    await progress(ProbePhase.shutdown);
-    stdout.writeln('COMPANION_PROVIDER_TLS_OK');
-    await stdout.flush();
-    await progress(ProbePhase.shutdown, complete: true);
-    exit(0);
+    await succeed();
   } catch (_) {
     stderr.writeln(
       'COMPANION_PROVIDER_TLS_FAILED:${phase.name}:${failedCheck.name}',

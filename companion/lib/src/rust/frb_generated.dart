@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1709791231;
+  int get rustContentHash => -584985841;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -107,7 +107,12 @@ abstract class RustLibApi extends BaseApi {
 
   ProviderSnapshot crateApiProviderProviderInvalidate();
 
+  Future<ProviderOutcome> crateApiProviderProviderOutcomeDefault();
+
   ProviderSnapshot crateApiProviderProviderSnapshot();
+
+  Future<ProviderStatusProgress>
+  crateApiProviderProviderStatusProgressDefault();
 
   Snapshot crateApiSelectFixture({required int id});
 
@@ -312,12 +317,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "provider_invalidate", argNames: []);
 
   @override
+  Future<ProviderOutcome> crateApiProviderProviderOutcomeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_outcome,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderOutcomeDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderOutcomeDefaultConstMeta =>
+      const TaskConstMeta(debugName: "provider_outcome_default", argNames: []);
+
+  @override
   ProviderSnapshot crateApiProviderProviderSnapshot() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -334,13 +366,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "provider_snapshot", argNames: []);
 
   @override
+  Future<ProviderStatusProgress>
+  crateApiProviderProviderStatusProgressDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_status_progress,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderStatusProgressDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderStatusProgressDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_status_progress_default",
+        argNames: [],
+      );
+
+  @override
   Snapshot crateApiSelectFixture({required int id}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -362,7 +425,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -471,24 +534,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProviderOutcome dco_decode_provider_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderOutcome.values[raw as int];
+  }
+
+  @protected
   ProviderSnapshot dco_decode_provider_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
     return ProviderSnapshot(
-      configured: dco_decode_bool(arr[0]),
-      busy: dco_decode_bool(arr[1]),
-      locked: dco_decode_bool(arr[2]),
-      requests: dco_decode_list_String(arr[3]),
-      reviewText: dco_decode_String(arr[4]),
-      reviewId: dco_decode_String(arr[5]),
-      canDecide: dco_decode_bool(arr[6]),
-      uncertainId: dco_decode_String(arr[7]),
-      statusId: dco_decode_String(arr[8]),
-      statusText: dco_decode_String(arr[9]),
-      message: dco_decode_String(arr[10]),
+      outcome: dco_decode_provider_outcome(arr[0]),
+      statusProgress: dco_decode_provider_status_progress(arr[1]),
+      configured: dco_decode_bool(arr[2]),
+      busy: dco_decode_bool(arr[3]),
+      locked: dco_decode_bool(arr[4]),
+      requests: dco_decode_list_String(arr[5]),
+      reviewText: dco_decode_String(arr[6]),
+      reviewId: dco_decode_String(arr[7]),
+      canDecide: dco_decode_bool(arr[8]),
+      uncertainId: dco_decode_String(arr[9]),
+      statusId: dco_decode_String(arr[10]),
+      statusText: dco_decode_String(arr[11]),
+      message: dco_decode_String(arr[12]),
     );
+  }
+
+  @protected
+  ProviderStatusProgress dco_decode_provider_status_progress(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderStatusProgress.values[raw as int];
   }
 
   @protected
@@ -665,8 +742,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProviderOutcome sse_decode_provider_outcome(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderOutcome.values[inner];
+  }
+
+  @protected
   ProviderSnapshot sse_decode_provider_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_outcome = sse_decode_provider_outcome(deserializer);
+    var var_statusProgress = sse_decode_provider_status_progress(deserializer);
     var var_configured = sse_decode_bool(deserializer);
     var var_busy = sse_decode_bool(deserializer);
     var var_locked = sse_decode_bool(deserializer);
@@ -679,6 +765,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_statusText = sse_decode_String(deserializer);
     var var_message = sse_decode_String(deserializer);
     return ProviderSnapshot(
+      outcome: var_outcome,
+      statusProgress: var_statusProgress,
       configured: var_configured,
       busy: var_busy,
       locked: var_locked,
@@ -691,6 +779,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       statusText: var_statusText,
       message: var_message,
     );
+  }
+
+  @protected
+  ProviderStatusProgress sse_decode_provider_status_progress(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderStatusProgress.values[inner];
   }
 
   @protected
@@ -872,11 +969,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_provider_outcome(
+    ProviderOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_provider_snapshot(
     ProviderSnapshot self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_provider_outcome(self.outcome, serializer);
+    sse_encode_provider_status_progress(self.statusProgress, serializer);
     sse_encode_bool(self.configured, serializer);
     sse_encode_bool(self.busy, serializer);
     sse_encode_bool(self.locked, serializer);
@@ -888,6 +996,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.statusId, serializer);
     sse_encode_String(self.statusText, serializer);
     sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_status_progress(
+    ProviderStatusProgress self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected

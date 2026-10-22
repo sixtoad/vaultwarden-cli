@@ -1,5 +1,8 @@
 use super::protocol::*;
-use crate::api::provider::{ProviderCommand as Command, ProviderSnapshot, ProviderWork};
+use crate::api::provider::{
+    ProviderCommand as Command, ProviderOutcome, ProviderSnapshot, ProviderStatusProgress,
+    ProviderWork,
+};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
 
@@ -30,6 +33,8 @@ pub struct ProviderSession {
     status_id: String,
     status_text: String,
     message: String,
+    outcome: ProviderOutcome,
+    status_progress: ProviderStatusProgress,
 }
 impl ProviderSession {
     pub fn configure(&mut self, uncertain_id: &str) -> Result<(), &'static str> {
@@ -46,6 +51,8 @@ impl ProviderSession {
         self.requests.clear();
         self.status_id.clear();
         self.status_text.clear();
+        self.status_progress = ProviderStatusProgress::None;
+        self.outcome = ProviderOutcome::None;
         self.message = if self.unresolved.is_some() { "Restored an uncertain decision. Refresh its original status; no decision will be resent." }
             else { "Connect to refresh provider authority." }.into();
         Ok(())
@@ -74,6 +81,8 @@ impl ProviderSession {
             self.message = "Review expired. Select the request again.".into();
         }
         ProviderSnapshot {
+            outcome: self.outcome,
+            status_progress: self.status_progress,
             configured: self.configured,
             busy: self.flight.is_some(),
             locked: self.authority.map(|a| a.0) != Some(SessionState::Unlocked),
@@ -192,6 +201,7 @@ impl ProviderSession {
             started: Instant::now(),
         });
         self.message = "Contacting provider…".into();
+        self.outcome = ProviderOutcome::None;
         Ok(ProviderWork {
             token: self.serial,
             body,
@@ -199,20 +209,28 @@ impl ProviderSession {
     }
     pub fn finish(&mut self, token: u32, bytes: &[u8]) {
         if self.flight.as_ref().map(|f| f.token) != Some(token) {
+            self.outcome = ProviderOutcome::Stale;
             return;
         }
         let flight = self.flight.take().expect("matched flight");
         let decision = matches!(flight.command, Command::Approve | Command::Deny);
         if !decision && flight.epoch != self.epoch {
+            self.authority = None;
+            self.requests.clear();
+            self.outcome = ProviderOutcome::Stale;
             return;
         }
         if let Ok(error) = decode::<ErrorResponse>(bytes) {
             if error.version == 1 {
                 self.invalidate();
+                self.authority = None;
+                self.requests.clear();
+                self.outcome = ProviderOutcome::Rejected;
                 if decision && error.error.definite_rejection() {
                     self.unresolved = None;
                     self.message = "Decision rejected. Obtain a new review and fresh password before trying again.".into();
                     self.status_text = self.message.clone();
+                    self.status_progress = ProviderStatusProgress::Terminal;
                 } else if self.unresolved.is_some() {
                     self.message = "Outcome uncertain. Refresh original request status; no decision was resent.".into();
                 } else {
@@ -227,12 +245,15 @@ impl ProviderSession {
             self.invalidate();
             self.authority = None;
             self.requests.clear();
+            self.outcome = ProviderOutcome::Invalid;
             self.message = if self.unresolved.is_some() {
                 "Outcome uncertain: status unavailable. No decision was resent."
             } else {
                 "Provider unavailable, untrusted, or invalid response. Refresh to reconnect."
             }
             .into();
+        } else {
+            self.outcome = ProviderOutcome::Accepted;
         }
     }
     fn accept(&mut self, flight: &Flight, bytes: &[u8]) -> Result<(), &'static str> {
@@ -247,6 +268,9 @@ impl ProviderSession {
                     self.invalidate();
                 }
                 self.authority = Some(authority);
+                if reply.state == SessionState::Locked {
+                    self.requests.clear();
+                }
                 self.message = if reply.state == SessionState::Locked {
                     "Provider locked. Unlock separately; the agent must submit new work."
                 } else {
@@ -291,6 +315,11 @@ impl ProviderSession {
                     return Err("version");
                 }
                 self.status_id = flight.id.clone();
+                self.status_progress = match reply.status {
+                    Status::Pending {} => ProviderStatusProgress::Pending,
+                    Status::Approved {} | Status::Running {} => ProviderStatusProgress::Committed,
+                    _ => ProviderStatusProgress::Terminal,
+                };
                 if reply.status == (Status::Pending {})
                     && self.unresolved.as_deref() == Some(&flight.id)
                 {

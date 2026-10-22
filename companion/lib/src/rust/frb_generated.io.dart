@@ -62,7 +62,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProviderCommand dco_decode_provider_command(dynamic raw);
 
   @protected
+  ProviderOutcome dco_decode_provider_outcome(dynamic raw);
+
+  @protected
   ProviderSnapshot dco_decode_provider_snapshot(dynamic raw);
+
+  @protected
+  ProviderStatusProgress dco_decode_provider_status_progress(dynamic raw);
 
   @protected
   ProviderWork dco_decode_provider_work(dynamic raw);
@@ -125,7 +131,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProviderCommand sse_decode_provider_command(SseDeserializer deserializer);
 
   @protected
+  ProviderOutcome sse_decode_provider_outcome(SseDeserializer deserializer);
+
+  @protected
   ProviderSnapshot sse_decode_provider_snapshot(SseDeserializer deserializer);
+
+  @protected
+  ProviderStatusProgress sse_decode_provider_status_progress(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProviderWork sse_decode_provider_work(SseDeserializer deserializer);
@@ -197,8 +211,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_provider_outcome(
+    ProviderOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_provider_snapshot(
     ProviderSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_provider_status_progress(
+    ProviderStatusProgress self,
     SseSerializer serializer,
   );
 
