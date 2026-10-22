@@ -1,0 +1,21 @@
+{
+  "vault_item_count": 0,
+  "items": [],
+  "proxy": {
+    "requests": {
+      "GET /api/version": 5,
+      "GET /api/config": 5,
+      "POST /identity/connect/token": 2,
+      "GET /api/sync": 3
+    },
+    "cipher_posts": 0,
+    "committed_cipher_posts": 0,
+    "dropped_cipher_replies": 0,
+    "dropped_item_ids": []
+  },
+  "provider": {
+    "execution_started": [],
+    "requests": [],
+    "session": "unlocked"
+  }
+}

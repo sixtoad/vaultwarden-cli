@@ -1,0 +1,59 @@
+{
+  "baseline_commit": "88b6934f1b8cd6fcbc3462bd4cea41628eac1768",
+  "branch": "test/secret-storage-acceptance",
+  "harness_uncommitted": true,
+  "source_sha256": {
+    "src/adapters/companion.rs": "ddda9104f7c4bce0ebfd3e61859c40fa26e94d5a2a7fd57e76534a0624360bf3",
+    "src/adapters/companion_acceptance_tests.rs": "dd6daa8e191e403e07f3eb4e8421a027d20c317322f47988a8d4f86e49a58b62",
+    "src/adapters/storage_acceptance_tests.rs": "743251195bbc60219b9f301addac1327a14dcfc30390dce8543e73d75a7af711",
+    "tests/companion-acceptance.py": "993c197757569eead13ed88a26037b2586248926cbee7168d4df5fc1d0fe7115",
+    "tests/secret-storage-acceptance.py": "81695e873b72d49c85f5fbcb0f7134cfc31cad7fc7f535f877fcc93677b272be",
+    "tests/secret-storage-acceptance-test.py": "70726dbcbd4be6e0e1786edc8e124104b42e96f68996ca9db69e12228cd48d35",
+    "tests/fixtures/protected-producer.S": "08d4e988e1352f0e79d718e0bdcd6af96052c2df893b603bdcd70eb16572d14c",
+    "tests/fixtures/storage-credential-check.c": "78f2ba2355f916b0591b914992c1aa494ac941959827d803413f302897cb6efe",
+    "macos/Tests/Fixtures/StorageAcceptance.swift": "26898c702b6ef9b3009eff9eb6ab49d5a0804f4271500b3dac0b6ccc8684de72",
+    "macos/Sources/CompanionCore/Protocol.swift": "fd46fa5033c21f39101f1705c3c13e113c77c08b9a6abb31fa2522e42625178d",
+    "macos/Sources/CompanionCore/Trust.swift": "a3f22cfbc050ff8ddd709496b236ae4356c27d7e021a752975aaa60e36ebc864",
+    "macos/Sources/CompanionCore/DecisionController.swift": "4f7cdfbbb567a4e7975d811744e8cc3522b7ce22261d83bc7d57ac5f2268cc9e"
+  },
+  "installed_binary_sha256": {
+    "provider_fixture": "7c88c4ce0c035466bb0c2e6d7df92299fdfd5b9ebb1071490aaf5683cdb99a2e",
+    "execution_helper": "183cf649605d40edaeb2e8e1033d4fac58e09d9e0dde2dceb12f8c99d7ffb11b",
+    "agent_cli": "608e9162f28e4213ef73a9bde8239569b77b5601b6f9e506dd6516957634fba9",
+    "producer_image": "896b6a405ef3fae1da228dfd04325d408086fe9889f44a658526802c73b996b2",
+    "consumer_image": "9536bb650cad7aa7dd036d8aef76d6b4923820972e3d51e61637dc56f110dad0",
+    "mac_native_driver": "104f15392d430d919ecef64a37b7c0437c2d1b486949cde3b06ffbc3a81b67bc"
+  },
+  "agent_uid": 100007,
+  "agent_gid": 1000,
+  "fixture_root_basename": ".vw-companion-acceptance-3nmundgs",
+  "campaign_hash_scope": "source_sha256 and installed_binary_sha256 are preserved at-run hashes for the completed campaign; post_review_harness was not used in that campaign.",
+  "post_review_harness": {
+    "scope": "Test-only cleanup and native-driver validation/reporting guards; historical captures unchanged; completed external campaign not rerun.",
+    "source_sha256": {
+      "tests/secret-storage-acceptance.py": "8e48acd64d24631c58c618041cf74816792b4d4f9552d5cf6365ff66bb3c257c",
+      "tests/secret-storage-acceptance-test.py": "94d1f93d2a9cfef23441a489f8c7eec07bf4bab3e5f5a66e3c1c89b9a037140a",
+      "macos/Tests/Fixtures/StorageAcceptance.swift": "e95694b12c20f75f4ad98bdf2ffef53f759d4edf8873823223eebb993383b2e9",
+      "macos/Tests/Fixtures/StorageAcceptanceTests.swift": "7b5b490e9f15b2139a4efb845c0d0f0b8f35eac5f0aa60744e7f0067017a50fc"
+    },
+    "focused_validation": {
+      "python_helper_regressions": {
+        "command": "python3 tests/secret-storage-acceptance-test.py",
+        "passed": 5,
+        "elapsed_seconds": 1.051
+      },
+      "native_driver_regressions": {
+        "passed": true,
+        "platform": "authorized Mac mini, production CompanionCore compilation",
+        "command": "swiftc -D STORAGE_ACCEPTANCE_TESTS -parse-as-library macos/Sources/CompanionCore/*.swift macos/Tests/Fixtures/StorageAcceptance.swift macos/Tests/Fixtures/StorageAcceptanceTests.swift -o storage-acceptance-tests; ./storage-acceptance-tests",
+        "checks": [
+          "required configuration validation",
+          "scenario-specific outcomes",
+          "poll exhaustion rejection",
+          "failed request counts and timing",
+          "real temporary keychain deletion and search-list restoration"
+        ]
+      }
+    }
+  }
+}

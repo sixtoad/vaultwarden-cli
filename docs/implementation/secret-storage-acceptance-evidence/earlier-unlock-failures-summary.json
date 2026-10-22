@@ -1,0 +1,20 @@
+{
+  "provenance": "Summary transcribed from the acceptance tool transcript; not raw output captures. The initial controller discarded native stdout when SSH returned nonzero.",
+  "first_restart_unlock": {
+    "controller_exit": 1,
+    "provider_later_observed_unlocked": true,
+    "native_error_payload_not_retained": true
+  },
+  "subsequent_direct_unlock_retry": {
+    "native_exit": 1,
+    "output": {
+      "approval_mode": "automated_native_client",
+      "cleanup_verified": true,
+      "error": "Provider unavailable or TLS authentication failed.",
+      "initial_session": "unlocked",
+      "success": false
+    }
+  },
+  "cause": "Unresolved. Native five-second timeout is a hypothesis, not an established cause.",
+  "followup": "Second restart native unlock passed unchanged in2.297seconds; measured-restart-unlock.json."
+}

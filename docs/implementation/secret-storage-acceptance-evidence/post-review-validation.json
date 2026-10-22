@@ -1,0 +1,29 @@
+{
+  "campaign_rerun": false,
+  "scope": "Focused regressions of test-only review fixes; historical campaign captures and source hashes are unchanged.",
+  "python_helper_tests": {
+    "passed": 5,
+    "failed": 0,
+    "elapsed_seconds": 1.075
+  },
+  "native_regressions": {
+    "result": "passed",
+    "checks": [
+      "required config validation",
+      "scenario terminal outcomes",
+      "poll exhaustion",
+      "attempted and completed counts on errors",
+      "failed request and operation timing",
+      "real temporary-keychain deletion and final search-list restoration"
+    ]
+  },
+  "normal_driver_compile": "passed",
+  "normal_driver_malformed_config": {
+    "exit_code": 1,
+    "success": false,
+    "cleanup_verified": true,
+    "attempted_requests": 0
+  },
+  "final_keychain_audit": "no acceptance entries or directories",
+  "owned_review_directory_removed": true
+}

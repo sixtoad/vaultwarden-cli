@@ -1,0 +1,19 @@
+{
+  "capture_phase": "After completed campaign and disposable-container removal. These are observed installed tool versions and the currently cached image identity; the removed container image ID was not captured before cleanup.",
+  "cached_backend": {
+    "tag": "vaultwarden/server:1.36.0",
+    "image_id": "sha256:d626d04934cd1192ad8ced1adb975099fca78cec33ab467d2d3c923cde7f3b0c",
+    "repo_digest": "vaultwarden/server@sha256:d626d04934cd1192ad8ced1adb975099fca78cec33ab467d2d3c923cde7f3b0c"
+  },
+  "tools": {
+    "rustc": "1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "1.98.1 (797e8a9bc 2026-08-05)",
+    "python": "3.12.3",
+    "openssl": "3.6.2 7 Apr 2026",
+    "cc": "Ubuntu 13.3.0-6ubuntu2~24.04.1",
+    "swift": "6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)",
+    "swift_driver": "1.168.6",
+    "target": "arm64-apple-macosx27.0.0",
+    "macos": "27.0.1 (26A434)"
+  }
+}

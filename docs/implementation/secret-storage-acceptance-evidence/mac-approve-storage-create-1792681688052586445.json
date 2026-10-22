@@ -1,0 +1,18 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "complete_create_effect_validated": true,
+  "exit_code": 0,
+  "initial_session": "unlocked",
+  "native_request_counts": {
+    "decision": 1,
+    "list": 1,
+    "review": 1,
+    "session": 1,
+    "status": 2
+  },
+  "operation": "storage-create",
+  "request_id": "J9V6_XBKeM6Jn0a_8ZpEwHOF0UAEaIEStl7ob91jZRw",
+  "status": "completed",
+  "success": true
+}
