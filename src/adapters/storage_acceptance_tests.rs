@@ -83,7 +83,7 @@ fn storage_acceptance_fixture() {
     let backend = VaultwardenBackend::from_setup(&control.join("private/setup.json")).unwrap();
     let approval = Arc::new(backend.approval_authenticator());
     let provider =
-        Provider::start_with_cleanup(&root, || supervisor.recover().map_err(|_| ())).unwrap();
+        Provider::start_with_cleanup(&root, || supervisor.recover().map_err(|_error| ())).unwrap();
     let app = Arc::new(
         ProviderApplication::new_with_request_lifetime(
             provider,
