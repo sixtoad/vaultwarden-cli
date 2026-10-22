@@ -14,16 +14,6 @@ use reqwest::{
 use std::{io::Read, path::Path, time::Duration};
 use zeroize::Zeroizing;
 
-// Keep provider-specific wire fields inside this adapter; the CLI model remains
-// unchanged. Serde rejects duplicate aliases and malformed non-string keys.
-#[derive(serde::Deserialize)]
-struct ProviderCipher {
-    #[serde(default, rename = "key", alias = "Key")]
-    item_key: Option<String>,
-    #[serde(flatten)]
-    cipher: Cipher,
-}
-
 // Unlike the legacy CLI decoder this wire view accepts only real type 5 SSH
 // items. Encrypted values are consumed by a shape visitor, never retained.
 #[derive(serde::Deserialize)]
@@ -97,6 +87,17 @@ pub struct VaultwardenBackend {
     compatible: bool,
 }
 impl VaultwardenBackend {
+    fn storage_sync(&self) -> Result<crate::models::SyncResponse, SessionError> {
+        let (token, _) = self.session.as_ref().ok_or(SessionError::Locked)?;
+        let response = self
+            .client
+            .get(self.url("api/sync")?)
+            .bearer_auth(token.expose())
+            .send()
+            .map_err(|_error| SessionError::BackendUnavailable)?;
+        serde_json::from_slice(&Self::body(response)?)
+            .map_err(|_error| SessionError::BackendUnavailable)
+    }
     fn ssh_response(&self, immutable_item_id: &str) -> Result<Zeroizing<Vec<u8>>, SessionError> {
         let (token, _) = self.session.as_ref().ok_or(SessionError::Locked)?;
         if !self.compatible {
@@ -149,6 +150,7 @@ impl VaultwardenBackend {
             return Err(SessionError::BackendUnavailable);
         }
         let client = Client::builder()
+            .retry(reqwest::retry::never())
             .redirect(Policy::none())
             .timeout(Duration::from_secs(10))
             .connect_timeout(Duration::from_secs(3))
@@ -217,19 +219,29 @@ impl VaultwardenBackend {
             return Err(SessionError::InvalidRequest);
         }
         let (token, keys) = self.session.as_ref().ok_or(SessionError::Locked)?;
+        if let Some(namespace) = binding.namespace {
+            namespace
+                .check_sync(&self.storage_sync()?, keys, false)
+                .map_err(|_error| SessionError::BackendUnavailable)?;
+        }
         let response = self
             .client
             .get(self.url(&format!("api/ciphers/{}", binding.immutable_item_id))?)
             .bearer_auth(token.expose())
             .send()
             .map_err(|_error| SessionError::BackendUnavailable)?;
-        let ProviderCipher { cipher, item_key } = serde_json::from_slice(&Self::body(response)?)
+        let cipher: Cipher = serde_json::from_slice(&Self::body(response)?)
             .map_err(|_error| SessionError::BackendUnavailable)?;
         if cipher.id.as_str() != binding.immutable_item_id
             || cipher.deleted_date.is_some()
             || !matches!(cipher.cipher_data, Some(CipherData::Login(_)))
         {
             return Err(SessionError::BackendUnavailable);
+        }
+        if let Some(namespace) = binding.namespace {
+            namespace
+                .check_item(&cipher, binding.immutable_item_id, keys)
+                .map_err(|_error| SessionError::BackendUnavailable)?;
         }
         let organization_keys = if let Some(id) = &cipher.organization_id {
             let private = self
@@ -256,7 +268,8 @@ impl VaultwardenBackend {
             None
         };
         let parent_keys = organization_keys.as_ref().unwrap_or(keys);
-        let item_keys = item_key
+        let item_keys = cipher
+            .item_key
             .as_deref()
             .map(|encrypted| {
                 if !encrypted.starts_with("2.") || encrypted.split('|').count() != 3 {
@@ -282,6 +295,7 @@ impl VaultwardenBackend {
         };
         let mut marker_matches = 0;
         let mut custom = Vec::new();
+        let mut names = std::collections::HashSet::new();
         for field in cipher.get_fields().into_iter().flatten() {
             let name = decrypt(
                 field
@@ -289,6 +303,9 @@ impl VaultwardenBackend {
                     .as_deref()
                     .ok_or(SessionError::BackendUnavailable)?,
             )?;
+            if !names.insert(name.expose().to_owned()) {
+                return Err(SessionError::BackendUnavailable);
+            }
             if name.expose() == "vw-access" {
                 let value = decrypt(
                     field
@@ -314,6 +331,7 @@ impl VaultwardenBackend {
                 let encrypted = match field {
                     LoginField::Username => cipher.get_username(),
                     LoginField::Password => cipher.get_password(),
+                    LoginField::Notes => cipher.get_notes(),
                     LoginField::Custom { name } => {
                         let matches: Vec<_> =
                             custom.iter().filter(|(n, _)| n.expose() == name).collect();
@@ -407,6 +425,140 @@ impl ProviderSession for VaultwardenBackend {
     }
 }
 impl SecretBackend for VaultwardenBackend {
+    fn reconcile_secret(
+        &mut self,
+        effect: &crate::access::policy::CreateEffect,
+        id: &str,
+    ) -> Result<(), SessionError> {
+        if self
+            .config
+            .server
+            .as_deref()
+            .map(|s| s.trim_end_matches('/'))
+            != Some(effect.server.trim_end_matches('/'))
+        {
+            return Err(SessionError::InvalidRequest);
+        }
+        let fields = effect
+            .fields
+            .iter()
+            .map(|field| match field.as_str() {
+                "password" => Ok(LoginField::Password),
+                "notes" => Ok(LoginField::Notes),
+                custom => custom
+                    .strip_prefix("custom:")
+                    .map(|name| LoginField::Custom {
+                        name: name.to_owned(),
+                    })
+                    .ok_or(SessionError::InvalidRequest),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        self.selected(&CredentialBinding {
+            immutable_item_id: id,
+            fields: &fields,
+            marker: &format!("vw-access={}", effect.eligibility_marker),
+            namespace: Some(&effect.destination),
+        })
+        .map(drop)
+    }
+
+    fn create_eligible(
+        &mut self,
+        effect: &crate::access::policy::CreateEffect,
+    ) -> Result<(), SessionError> {
+        if !self.compatible
+            || !effect.valid()
+            || self
+                .config
+                .server
+                .as_deref()
+                .map(|s| s.trim_end_matches('/'))
+                != Some(effect.server.trim_end_matches('/'))
+        {
+            return Err(SessionError::InvalidRequest);
+        }
+        let (_, keys) = self.session.as_ref().ok_or(SessionError::Locked)?;
+        effect
+            .destination
+            .check_sync(&self.storage_sync()?, keys, true)
+            .map_err(|_error| SessionError::BackendUnavailable)
+    }
+    fn create_secret(
+        &mut self,
+        effect: &crate::access::policy::CreateEffect,
+        input: &crate::secret_storage::SecretImport,
+        live: &dyn Fn() -> bool,
+    ) -> Result<String, crate::secret_storage::WriteStatus> {
+        use crate::secret_storage::{WriteStatus, encrypt_create, valid_id};
+        self.create_eligible(effect)
+            .map_err(|_error| WriteStatus::Failed)?;
+        let mut expected = effect.fields.clone();
+        expected.sort();
+        if input.selectors() != expected {
+            return Err(WriteStatus::Failed);
+        }
+        let (token, keys) = self.session.as_ref().ok_or(WriteStatus::Failed)?;
+        let encrypted = encrypt_create(
+            keys,
+            &effect.destination,
+            input,
+            Some(&effect.eligibility_marker),
+        )
+        .map_err(|_error| WriteStatus::Failed)?;
+        let url = self
+            .url("api/ciphers")
+            .map_err(|_error| WriteStatus::Failed)?;
+        if !live() {
+            return Err(WriteStatus::Failed);
+        }
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(token.expose())
+            .json(&encrypted)
+            .send()
+            .map_err(|_error| WriteStatus::Uncertain)?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(
+                if matches!(status.as_u16(), 400 | 401 | 403 | 404 | 405 | 422) {
+                    WriteStatus::Failed
+                } else {
+                    WriteStatus::Uncertain
+                },
+            );
+        }
+        let cipher: Cipher =
+            serde_json::from_slice(&Self::body(response).map_err(|_error| WriteStatus::Uncertain)?)
+                .map_err(|_error| WriteStatus::Uncertain)?;
+        if !valid_id(cipher.id.as_str()) {
+            return Err(WriteStatus::Uncertain);
+        }
+        Ok(cipher.id.to_string())
+    }
+    fn verify_secret(
+        &mut self,
+        effect: &crate::access::policy::CreateEffect,
+        id: &str,
+        input: &crate::secret_storage::SecretImport,
+    ) -> Result<(), SessionError> {
+        let (_, keys) = self.session.as_ref().ok_or(SessionError::Locked)?;
+        effect
+            .destination
+            .check_sync(&self.storage_sync()?, keys, false)
+            .map_err(|_error| SessionError::BackendUnavailable)?;
+        let cipher: Cipher = serde_json::from_slice(&self.ssh_response(id)?)
+            .map_err(|_error| SessionError::BackendUnavailable)?;
+        crate::secret_storage::verify_created(
+            keys,
+            &effect.destination,
+            id,
+            &cipher,
+            input,
+            Some(&effect.eligibility_marker),
+        )
+        .map_err(|_error| SessionError::BackendUnavailable)
+    }
     fn resolve_ssh(&mut self, immutable_item_id: &str) -> Result<SensitiveString, SessionError> {
         // Recheck exact metadata on the same response that supplies the selected encrypted key.
         let bytes = self.ssh_response(immutable_item_id)?;
@@ -983,6 +1135,7 @@ mod tests {
     const ITEM: &str = "11111111-1111-1111-1111-111111111111";
     fn binding() -> CredentialBinding<'static> {
         CredentialBinding {
+            namespace: None,
             immutable_item_id: ITEM,
             fields: &[LoginField::Password],
             marker: "vw-access=deploy",
@@ -1149,6 +1302,7 @@ mod tests {
         assert!(
             backend
                 .resolve(&CredentialBinding {
+                    namespace: None,
                     immutable_item_id: "../../sync",
                     ..binding
                 })
@@ -1338,6 +1492,7 @@ mod tests {
             serde_json::json!([test_approved_image(dir.path(), "contract-image")]);
         std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
         let credential = |id: &str, fields: Vec<(LoginField, &str)>| LoginCredentialDraft {
+            namespace: None,
             item_id: id.into(),
             label: "Contract login".into(),
             use_type: CredentialUse::Login,
@@ -1350,6 +1505,7 @@ mod tests {
                 .collect(),
         };
         app.activate_operation(OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy-contract".into(),
             description: "Credential contract fixture".into(),
@@ -1548,6 +1704,7 @@ mod tests {
             assert_eq!(
                 backend
                     .resolve(&CredentialBinding {
+                        namespace: None,
                         immutable_item_id: id,
                         ..binding()
                     })
@@ -1780,6 +1937,143 @@ mod tests {
         }
     }
     #[test]
+    #[allow(clippy::too_many_lines)] // Keep the HTTP lifecycle and authenticated mutation cases in one shared fixture.
+    fn production_storage_http_contract_verifies_values_and_scoped_namespace() {
+        use crate::{
+            access::policy::CreateEffect,
+            secret_storage::{Destination, SecretImport, WriteStatus},
+        };
+        use std::sync::{Arc, Mutex};
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let server = rt.block_on(MockServer::start());
+        let mut backend = VaultwardenBackend::new(setup(server.uri()), true).unwrap();
+        // Keep the production HTTPS identity; only the test transport is loopback HTTP.
+        backend.config.server = Some("https://vault.example/".into());
+        backend.compatible = true;
+        let keys = CryptoKeys::from_key_bytes([42; 32], [42; 32]);
+        backend.session = Some((
+            SensitiveString::new("session-sentinel".into()),
+            keys.clone(),
+        ));
+        let effect = CreateEffect {
+            server: "https://vault.example".into(),
+            destination: Destination {
+                account_id: "11111111-1111-1111-1111-111111111111".into(),
+                folder: "homelab/production".into(),
+                folder_id: "22222222-2222-2222-2222-222222222222".into(),
+                reference: "homelab/production/github/token".into(),
+            },
+            fields: vec!["password".into(), "notes".into(), "custom:api-key".into()],
+            eligibility_marker: "deploy".into(),
+        };
+        let sync = serde_json::json!({"profile":{"id":effect.destination.account_id,"email":"synthetic@example.invalid"},
+            "folders":[{"id":effect.destination.folder_id,"name":keys.encrypt(effect.destination.folder.as_bytes()).unwrap()}],"ciphers":[]});
+        let current_sync = Arc::new(Mutex::new(sync.clone()));
+        let current_item = Arc::new(Mutex::new(serde_json::Value::Null));
+        rt.block_on(async {
+            let state = current_sync.clone();
+            Mock::given(method("GET"))
+                .and(path("/api/sync"))
+                .respond_with(move |_: &wiremock::Request| {
+                    ResponseTemplate::new(200).set_body_json(state.lock().unwrap().clone())
+                })
+                .mount(&server)
+                .await;
+            let state = current_item.clone();
+            Mock::given(method("POST"))
+                .and(path("/api/ciphers"))
+                .respond_with(move |request: &wiremock::Request| {
+                    let mut cipher: serde_json::Value =
+                        serde_json::from_slice(&request.body).unwrap();
+                    assert!(
+                        !String::from_utf8_lossy(&request.body).contains("private-value-sentinel")
+                    );
+                    assert_eq!(cipher["type"], 1);
+                    assert!(cipher["key"].as_str().unwrap().starts_with("2."));
+                    cipher["id"] = serde_json::json!(ITEM);
+                    *state.lock().unwrap() = cipher.clone();
+                    ResponseTemplate::new(200).set_body_json(cipher)
+                })
+                .expect(1)
+                .mount(&server)
+                .await;
+            let state = current_item.clone();
+            Mock::given(method("GET"))
+                .and(path(format!("/api/ciphers/{ITEM}")))
+                .respond_with(move |_: &wiremock::Request| {
+                    ResponseTemplate::new(200).set_body_json(state.lock().unwrap().clone())
+                })
+                .mount(&server)
+                .await;
+        });
+        let input = SecretImport::parse(br#"{"password":"private-value-sentinel","notes":"notes\n","fields":[{"name":"api-key","value":"custom-private-value-sentinel"}]}"#).unwrap();
+        assert_eq!(
+            backend.create_secret(&effect, &input, &|| false),
+            Err(WriteStatus::Failed)
+        );
+        assert_eq!(
+            backend.create_secret(&effect, &input, &|| true).unwrap(),
+            ITEM
+        );
+        backend.verify_secret(&effect, ITEM, &input).unwrap();
+        backend.reconcile_secret(&effect, ITEM).unwrap();
+        let field = [LoginField::Password];
+        let binding = CredentialBinding {
+            namespace: Some(&effect.destination),
+            immutable_item_id: ITEM,
+            fields: &field,
+            marker: "vw-access=deploy",
+        };
+        assert_eq!(
+            backend.resolve(&binding).unwrap()[0].expose(),
+            "private-value-sentinel"
+        );
+        let original = current_item.lock().unwrap().clone();
+        let item_keys = keys.item_keys(original["key"].as_str()).unwrap();
+        // Valid authenticated replacement must fail private equality, not merely MAC parsing.
+        for pointer in ["/login/password", "/notes", "/fields/0/value"] {
+            let mut changed = original.clone();
+            *changed.pointer_mut(pointer).unwrap() =
+                serde_json::json!(item_keys.encrypt(b"changed-authenticated-value").unwrap());
+            *current_item.lock().unwrap() = changed;
+            assert!(
+                backend.verify_secret(&effect, ITEM, &input).is_err(),
+                "{pointer}"
+            );
+        }
+        *current_item.lock().unwrap() = original.clone();
+        for change in ["account", "folder", "reference"] {
+            *current_sync.lock().unwrap() = sync.clone();
+            *current_item.lock().unwrap() = original.clone();
+            match change {
+                "account" => {
+                    current_sync.lock().unwrap()["profile"]["id"] =
+                        serde_json::json!("33333333-3333-3333-3333-333333333333");
+                }
+                "folder" => {
+                    current_sync.lock().unwrap()["folders"][0]["name"] =
+                        serde_json::json!(keys.encrypt(b"homelab/renamed").unwrap());
+                }
+                _ => {
+                    current_item.lock().unwrap()["name"] =
+                        serde_json::json!(item_keys.encrypt(b"github/renamed").unwrap());
+                }
+            }
+            assert!(
+                backend.verify_secret(&effect, ITEM, &input).is_err(),
+                "{change}"
+            );
+            assert!(backend.reconcile_secret(&effect, ITEM).is_err(), "{change}");
+            assert!(backend.resolve(&binding).is_err(), "{change}");
+        }
+        *current_sync.lock().unwrap() = sync;
+        *current_item.lock().unwrap() = original;
+        backend.verify_secret(&effect, ITEM, &input).unwrap();
+        backend.reconcile_secret(&effect, ITEM).unwrap();
+        rt.block_on(server.verify());
+    }
+
+    #[test]
     fn personal_and_organization_item_keys_authenticate_before_selected_fields() {
         use base64::{Engine, engine::general_purpose::STANDARD};
         use rsa::{Oaep, RsaPrivateKey, RsaPublicKey, pkcs8::EncodePrivateKey};
@@ -1880,6 +2174,7 @@ mod tests {
                     CryptoKeys::from_key_bytes([42; 32], [42; 32]),
                 ));
                 let selected = CredentialBinding {
+                    namespace: None,
                     immutable_item_id: ITEM,
                     fields: &[
                         LoginField::Username,

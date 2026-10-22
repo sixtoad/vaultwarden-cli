@@ -657,6 +657,7 @@ mod tests {
     fn operation(image: &ApprovedImage, target: &str) -> OperationPolicy {
         OperationPolicy::from_draft(
             OperationPolicyDraft {
+                create: None,
                 ssh: None,
                 id: "deploy-homelab".into(),
                 description: "Deploy homelab".into(),
@@ -664,6 +665,7 @@ mod tests {
                 targets: vec![target.into()],
                 arguments: vec![ArgumentSpec::Target],
                 credentials: vec![LoginCredentialDraft {
+                    namespace: None,
                     item_id: "11111111-1111-1111-1111-111111111111".into(),
                     label: "deployment login".into(),
                     use_type: CredentialUse::Login,

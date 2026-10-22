@@ -847,6 +847,7 @@ mod tests {
         state["approved_images"] = serde_json::json!([{"id":"image","execution_root":dir.path(),"path":image,"sha256":digest,"profile":"reviewed_self_contained_elf64_v1"}]);
         std::fs::write(state_path, serde_json::to_vec(&state).unwrap()).unwrap();
         app.activate_operation(OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy".into(),
             description: "Synthetic".into(),
@@ -854,6 +855,7 @@ mod tests {
             targets: vec!["staging".into()],
             arguments: vec![ArgumentSpec::Target],
             credentials: vec![LoginCredentialDraft {
+                namespace: None,
                 item_id: "11111111-1111-1111-1111-111111111111".into(),
                 label: "Synthetic login".into(),
                 use_type: CredentialUse::Login,

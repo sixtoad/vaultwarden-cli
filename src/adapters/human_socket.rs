@@ -54,6 +54,7 @@ pub enum HumanCommand {
     Request { submission: DirectSubmission },
     Status { id: String },
     History { limit: Option<u32> },
+    ReconcileWrite { request_id: String, item_id: String },
     AgentPair { pairing: AgentPairing },
     AgentList {},
     AgentRevoke { id: String },
@@ -61,20 +62,51 @@ pub enum HumanCommand {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HumanResponse {
-    ImageRegistered { image: ImageRegistration },
-    Images { images: Vec<ImageRegistration> },
-    Image { image: ImageRegistration },
-    OperationCreated { operation: OperationSummary },
-    Operations { operations: Vec<OperationSummary> },
-    Operation { operation: Box<OperationMetadata> },
-    ProvisioningRejected { reason: ProvisioningError },
-    Submitted { receipt: SubmissionReceipt },
-    Status { state: DirectStatus },
-    History { events: Vec<HistoryEvent> },
-    AgentPaired { agent: AgentBindingView },
-    Agents { agents: Vec<AgentBindingView> },
-    AgentRevoked { agent: AgentBindingView },
-    Rejected { reason: DirectRequestError },
+    ImageRegistered {
+        image: ImageRegistration,
+    },
+    Images {
+        images: Vec<ImageRegistration>,
+    },
+    Image {
+        image: ImageRegistration,
+    },
+    OperationCreated {
+        operation: OperationSummary,
+    },
+    Operations {
+        operations: Vec<OperationSummary>,
+    },
+    Operation {
+        operation: Box<OperationMetadata>,
+    },
+    ProvisioningRejected {
+        reason: ProvisioningError,
+    },
+    Submitted {
+        receipt: SubmissionReceipt,
+    },
+    Status {
+        state: DirectStatus,
+    },
+    History {
+        events: Vec<HistoryEvent>,
+    },
+    WriteReconciled {
+        receipt: crate::secret_storage::WriteReceipt,
+    },
+    AgentPaired {
+        agent: AgentBindingView,
+    },
+    Agents {
+        agents: Vec<AgentBindingView>,
+    },
+    AgentRevoked {
+        agent: AgentBindingView,
+    },
+    Rejected {
+        reason: DirectRequestError,
+    },
     InvalidRequest,
     Unauthorized,
     Unavailable,
@@ -426,6 +458,13 @@ fn serve_one(
                     Err(reason) => HumanResponse::Rejected { reason },
                 }
             }
+            HumanCommand::ReconcileWrite {
+                request_id,
+                item_id,
+            } => match app.reconcile_write(owner, &request_id, &item_id) {
+                Ok(receipt) => HumanResponse::WriteReconciled { receipt },
+                Err(reason) => HumanResponse::Rejected { reason },
+            },
             HumanCommand::History { limit } => match app.history(owner, limit) {
                 Ok(events) => HumanResponse::History { events },
                 Err(reason) => HumanResponse::Rejected { reason },
@@ -834,6 +873,8 @@ mod tests {
     fn history_frames_fail_closed_before_writing_oversized_output() {
         use crate::access::history::{HistoryEvent, HistoryOutcome, RequesterSnapshot};
         let event = HistoryEvent {
+            create: None,
+            write_receipt: None,
             ssh: None,
             version: 1,
             request_id: "a".repeat(64),

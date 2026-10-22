@@ -147,6 +147,7 @@ fn command_args() -> Vec<Vec<&'static str>> {
 fn fixture_ciphers(count: usize) -> Vec<Cipher> {
     (0..count)
         .map(|i| Cipher {
+            item_key: None,
             id: CipherId::new(format!("cipher-{i:04}")).unwrap(),
             organization_id: Some(OrgId::new(format!("org-{}", i % 4)).unwrap()),
             deleted_date: None,

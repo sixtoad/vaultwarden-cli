@@ -35,6 +35,52 @@ actor HeldReviewTransport: CompanionTransport {
     func fail() { pending?.resume(throwing: CompanionError.transport); pending = nil }
 }
 final class ProtocolTests: XCTestCase {
+    func testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields() throws {
+        var response = try JSONSerialization.jsonObject(with: sharedReviewData()) as! [String: Any]
+        var review = response["review"] as! [String: Any]
+        let destination: [String: Any] = ["account_id": "11111111-1111-1111-1111-111111111111", "folder": "homelab/production", "folder_id": "22222222-2222-2222-2222-222222222222", "reference": "homelab/production/github/token"]
+        var effect: [String: Any] = ["server": "https://vault.example", "destination": destination, "fields": ["password", "custom:api-key"], "eligibility_marker": "deploy"]
+        review["effect"] = "CREATE personal vault item (no update)"
+        review["target"] = destination["reference"]
+        review["create"] = effect
+        response["review"] = review
+        let decoded = try JSONDecoder().decode(ReviewResponse.self, from: JSONSerialization.data(withJSONObject: response))
+        try decoded.review.validate()
+        XCTAssertEqual(decoded.review.create?.destination.accountID, destination["account_id"] as? String)
+        XCTAssertEqual(decoded.review.create?.fields, ["password", "custom:api-key"])
+        for field in ["password", "update", "value"] {
+            effect[field] = "sentinel"
+            review["create"] = effect; response["review"] = review
+            XCTAssertThrowsError(try JSONDecoder().decode(ReviewResponse.self, from: JSONSerialization.data(withJSONObject: response)))
+            effect.removeValue(forKey: field)
+        }
+        effect["fields"] = ["password", "password"]
+        review["create"] = effect; response["review"] = review
+        XCTAssertThrowsError(try JSONDecoder().decode(ReviewResponse.self, from: JSONSerialization.data(withJSONObject: response)))
+    }
+    func testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries() throws {
+        let destination: [String: Any] = ["account_id": "11111111-1111-1111-1111-111111111111", "folder": "homelab/production", "folder_id": "22222222-2222-2222-2222-222222222222", "reference": "homelab/production/github/token"]
+        let baseline: [String: Any] = ["server": "https://vault.example", "destination": destination, "fields": ["password"], "eligibility_marker": "deploy"]
+        func decode(_ value: [String: Any]) throws -> CreateEffect {
+            try JSONDecoder().decode(CreateEffect.self, from: JSONSerialization.data(withJSONObject: value))
+        }
+        for fields in [["notes"], ["custom:"], ["custom:vw-access"], ["custom:bad/name"], ["custom:" + String(repeating: "a", count: 129)], (0..<33).map { "custom:key\($0)" }] {
+            var value = baseline; value["fields"] = fields
+            XCTAssertThrowsError(try decode(value))
+        }
+        for marker in ["", "Deploy", "deploy--token", "deploy-", String(repeating: "a", count: 65)] {
+            var value = baseline; value["eligibility_marker"] = marker
+            XCTAssertThrowsError(try decode(value))
+        }
+        for (key, invalid) in [("folder", "Homelab/production"), ("folder", "homelab//production"), ("reference", "homelab/production/../token"), ("reference", "homelab/production/"), ("reference", "homelab/production/" + String(repeating: "a", count: 65)), ("account_id", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")] {
+            var value = baseline; var bad = destination; bad[key] = invalid; value["destination"] = bad
+            XCTAssertThrowsError(try decode(value))
+        }
+        var largest = baseline
+        largest["fields"] = ["password", "notes"] + (0..<32).map { "custom:key\($0)" }
+        largest["eligibility_marker"] = String(repeating: "a", count: 64)
+        XCTAssertNoThrow(try decode(largest))
+    }
     func testSharedCanonicalReviewIncludesEveryField() throws {
         let response = try fixtureReview()
         let review = response.review

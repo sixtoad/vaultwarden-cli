@@ -10,7 +10,9 @@ pub mod commands;
 pub mod config;
 pub mod crypto;
 pub mod models;
+pub mod secret_storage;
 mod totp;
+pub mod write_journal;
 
 pub fn install_rustls_crypto_provider() {
     match rustls::crypto::ring::default_provider().install_default() {

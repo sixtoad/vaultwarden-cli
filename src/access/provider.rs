@@ -528,6 +528,7 @@ impl Provider {
             review.requester = owner.review_requester();
         }
         let mut direct = DirectRecord {
+            write_receipt: None,
             owner_uid: uid,
             agent_owner,
             replay_digest,
@@ -791,6 +792,167 @@ impl Provider {
             DecisionOutcome::ExecutionUnavailable,
             super::provider_store::provider_wall_time()?,
         )?;
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(())
+    }
+
+    pub(crate) fn write_reconciliation(
+        &self,
+        id: &str,
+    ) -> Result<
+        (
+            super::policy::CreateEffect,
+            crate::secret_storage::WriteReceipt,
+        ),
+        super::direct_request::DirectRequestError,
+    > {
+        use super::direct_request::DirectRequestError as E;
+        let state = self.store.read_state()?;
+        let direct = state
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .ok_or(E::NotFound)?;
+        if !direct.review.status.is_terminal() {
+            return Err(E::InvalidRequest);
+        }
+        Ok((
+            direct.review.create.clone().ok_or(E::InvalidRequest)?,
+            direct.write_receipt.clone().ok_or(E::InvalidRequest)?,
+        ))
+    }
+    pub(crate) fn reconcile_write(
+        &mut self,
+        id: &str,
+        item_id: &str,
+    ) -> Result<crate::secret_storage::WriteReceipt, super::direct_request::DirectRequestError>
+    {
+        use super::direct_request::DirectRequestError as E;
+        use crate::secret_storage::WriteStatus;
+        let mut state = self.store.read_state()?;
+        let direct = state
+            .requests
+            .iter_mut()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_mut())
+            .ok_or(E::NotFound)?;
+        if !direct.review.status.is_terminal() {
+            return Err(E::InvalidRequest);
+        }
+        let receipt = direct.write_receipt.as_mut().ok_or(E::InvalidRequest)?;
+        if receipt.item_id.as_ref().is_some_and(|old| old != item_id) {
+            return Err(E::InvalidRequest);
+        }
+        if direct
+            .audit
+            .last()
+            .is_some_and(|event| event.outcome == super::history::HistoryOutcome::Reconciled)
+        {
+            return Ok(receipt.clone());
+        }
+        receipt.item_id = Some(item_id.to_owned());
+        if receipt.status != WriteStatus::Verified {
+            receipt.status = WriteStatus::CreatedUnverified;
+        }
+        let receipt = receipt.clone();
+        direct.audit.push(super::history::HistoryEvent::snapshot(
+            direct,
+            u32::try_from(direct.audit.len())
+                .map_err(|_error| super::direct_request::DirectRequestError::InvalidRequest)?,
+            super::provider_store::provider_wall_time()?,
+            super::history::HistoryOutcome::Reconciled,
+            Some(direct.review.status.clone()),
+        ));
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(receipt)
+    }
+
+    /// Persist before any POST; no prior attempt for the destination can be replayed.
+    pub(crate) fn begin_write(
+        &mut self,
+        binding: &super::direct_request::ApprovalBinding,
+    ) -> Result<(), super::direct_request::DirectRequestError> {
+        use super::direct_request::{DirectRequestError, DirectStatus};
+        use crate::secret_storage::{WriteReceipt, WriteStatus};
+        let mut state = self.store.read_state()?;
+        let direct = state
+            .requests
+            .iter()
+            .find(|r| r.id == binding.request_id)
+            .and_then(|r| r.direct.as_ref())
+            .ok_or(DirectRequestError::NotFound)?;
+        if !direct.execution_claimed
+            || direct.review.status != DirectStatus::Running
+            || direct.approval.as_ref() != Some(binding)
+            || direct.write_receipt.is_some()
+        {
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        let effect = direct
+            .review
+            .create
+            .as_ref()
+            .ok_or(DirectRequestError::InvalidRequest)?;
+        if state
+            .requests
+            .iter()
+            .filter(|r| r.id != binding.request_id)
+            .filter_map(|r| r.direct.as_ref())
+            .any(|r| {
+                r.write_receipt.is_some()
+                    && r.review.create.as_ref().is_some_and(|c| {
+                        c.server.trim_end_matches('/') == effect.server.trim_end_matches('/')
+                            && c.destination == effect.destination
+                    })
+            })
+        {
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        let direct = state
+            .requests
+            .iter_mut()
+            .find(|r| r.id == binding.request_id)
+            .and_then(|r| r.direct.as_mut())
+            .ok_or(DirectRequestError::NotFound)?;
+        direct.write_receipt = Some(WriteReceipt {
+            attempt_id: binding.request_id.clone(),
+            item_id: None,
+            status: WriteStatus::Uncertain,
+        });
+        self.store.write_state(&state)?;
+        self.state = state;
+        Ok(())
+    }
+    pub(crate) fn record_write(
+        &mut self,
+        binding: &super::direct_request::ApprovalBinding,
+        item: Option<String>,
+        status: crate::secret_storage::WriteStatus,
+    ) -> Result<(), super::direct_request::DirectRequestError> {
+        use super::direct_request::DirectRequestError;
+        let mut state = self.store.read_state()?;
+        let direct = state
+            .requests
+            .iter_mut()
+            .find(|r| r.id == binding.request_id)
+            .and_then(|r| r.direct.as_mut())
+            .ok_or(DirectRequestError::NotFound)?;
+        let receipt = direct
+            .write_receipt
+            .as_mut()
+            .ok_or(DirectRequestError::InvalidRequest)?;
+        if receipt
+            .item_id
+            .as_ref()
+            .is_some_and(|old| Some(old) != item.as_ref())
+        {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        receipt.item_id = item;
+        receipt.status = status;
         self.store.write_state(&state)?;
         self.state = state;
         Ok(())
@@ -1065,10 +1227,17 @@ impl Provider {
         }
         let marker = format!("vw-access={}", policy.id());
         for binding in policy.login_bindings() {
-            if !verifier
-                .is_login_eligible(binding.item_id, &binding.required_fields, &marker)
-                .unwrap_or(false)
-            {
+            let eligible = if let Some(namespace) = binding.namespace {
+                verifier.is_scoped_login_eligible(
+                    binding.item_id,
+                    &binding.required_fields,
+                    &marker,
+                    namespace,
+                )
+            } else {
+                verifier.is_login_eligible(binding.item_id, &binding.required_fields, &marker)
+            };
+            if !eligible.unwrap_or(false) {
                 return Err(ProviderError::new(ProviderDiagnostic::CredentialIneligible));
             }
         }
@@ -1203,6 +1372,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy-homelab".into(),
             description: "Deploy".into(),
@@ -1210,6 +1380,7 @@ mod tests {
             targets: vec!["staging".into()],
             arguments: vec![ArgumentSpec::Target],
             credentials: vec![LoginCredentialDraft {
+                namespace: None,
                 item_id: ITEM.into(),
                 label: "login".into(),
                 use_type: CredentialUse::Login,

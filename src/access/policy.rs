@@ -42,6 +42,46 @@ pub struct OperationPolicyDraft {
     pub credentials: Vec<LoginCredentialDraft>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh: Option<SshOperation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create: Option<CreateEffect>,
+}
+
+/// Operator-owned destination and exact producer schema. Updates have no variant.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateEffect {
+    pub server: String,
+    pub destination: crate::secret_storage::Destination,
+    pub fields: Vec<String>,
+    pub eligibility_marker: String,
+}
+impl CreateEffect {
+    pub fn valid(&self) -> bool {
+        self.destination.item_name().is_ok()
+            && self.server.starts_with("https://")
+            && self.server.len() <= 512
+            && !self.server.chars().any(char::is_control)
+            && valid_operation_id(&self.eligibility_marker)
+            && !self.fields.is_empty()
+            && self.fields.len() <= 34
+            && self
+                .fields
+                .iter()
+                .filter(|field| field.starts_with("custom:"))
+                .count()
+                <= 32
+            && self
+                .fields
+                .iter()
+                .any(|f| f == "password" || f.starts_with("custom:"))
+            && self.fields.iter().all(|f| {
+                matches!(f.as_str(), "password" | "notes")
+                    || f.strip_prefix("custom:").is_some_and(|n| {
+                        crate::secret_storage::valid_field_name(n) && n != "vw-access"
+                    })
+            })
+            && !has_duplicates(&self.fields)
+    }
 }
 
 /// Provider declaration that the pinned artifact was reviewed to contain no
@@ -177,6 +217,7 @@ pub enum ArgumentSpec {
 #[derive(Clone, Debug, Deserialize, Ord, PartialOrd, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum LoginField {
+    Notes,
     Username,
     Password,
     Custom { name: String },
@@ -203,6 +244,8 @@ pub struct LoginCredentialDraft {
     pub label: String,
     pub use_type: CredentialUse,
     pub field_mappings: Vec<LoginFieldMapping>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<crate::secret_storage::Destination>,
 }
 
 /// Closed provider policy: no command, key path, options, or caller selectors.
@@ -331,6 +374,8 @@ pub(crate) struct OperationPolicy {
     credentials: Vec<LoginCredentialDraft>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ssh: Option<SshOperation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    create: Option<CreateEffect>,
     revision: String,
 }
 
@@ -372,6 +417,7 @@ impl OperationPolicy {
                 arguments: self.arguments.clone(),
                 credentials: self.credentials.clone(),
                 ssh: self.ssh.clone(),
+                create: self.create.clone(),
             },
             revision: self.revision.clone(),
         }
@@ -402,6 +448,7 @@ impl OperationPolicy {
             arguments: draft.arguments,
             credentials: draft.credentials,
             ssh: draft.ssh,
+            create: draft.create,
             revision,
         })
     }
@@ -430,12 +477,16 @@ impl OperationPolicy {
             profile: self.image.profile,
         }
     }
+    pub(crate) const fn create(&self) -> Option<&CreateEffect> {
+        self.create.as_ref()
+    }
     pub(crate) fn ssh(&self) -> Option<&SshOperation> {
         self.ssh.as_ref()
     }
     pub(crate) fn login_bindings(&self) -> impl Iterator<Item = LoginBindingRef<'_>> {
         self.credentials.iter().map(|credential| LoginBindingRef {
             item_id: &credential.item_id,
+            namespace: credential.namespace.as_ref(),
             required_fields: credential
                 .field_mappings
                 .iter()
@@ -498,12 +549,20 @@ impl OperationPolicy {
             id,
             requester: "local human terminal".into(),
             operation: self.id.clone(),
-            effect: self.description.clone(),
-            target: self
-                .ssh
-                .as_ref()
-                .map(|ssh| ssh.review().target())
-                .unwrap_or(target),
+            effect: if self.create.is_some() {
+                "CREATE personal vault item (no update)".into()
+            } else {
+                self.description.clone()
+            },
+            create: self.create.clone(),
+            target: self.create.as_ref().map_or_else(
+                || {
+                    self.ssh
+                        .as_ref()
+                        .map_or(target, |ssh| ssh.review().target())
+                },
+                |c| c.destination.reference.clone(),
+            ),
             ssh: self.ssh.as_ref().map(SshOperation::review),
             arguments_digest: arguments_digest(&arguments),
             arguments,
@@ -514,6 +573,10 @@ impl OperationPolicy {
                     label: c.label.clone(),
                     use_type: c.use_type,
                 })
+                .chain(self.create.iter().map(|c| ReviewCredential {
+                    label: c.destination.reference.clone(),
+                    use_type: CredentialUse::Login,
+                }))
                 .chain(self.ssh.iter().map(|ssh| ReviewCredential {
                     label: ssh.credential.label.clone(),
                     use_type: ssh.credential.use_type,
@@ -543,6 +606,7 @@ impl OperationPolicy {
                 arguments: self.arguments.clone(),
                 credentials: self.credentials.clone(),
                 ssh: self.ssh.clone(),
+                create: self.create.clone(),
             },
             &image,
         )?;
@@ -555,6 +619,7 @@ impl OperationPolicy {
 }
 
 pub(crate) struct LoginBindingRef<'a> {
+    pub(crate) namespace: Option<&'a crate::secret_storage::Destination>,
     pub(crate) item_id: &'a str,
     pub(crate) required_fields: Vec<LoginField>,
     #[allow(dead_code)] // Consumed by supervised dispatch in Story 1.7.
@@ -572,6 +637,8 @@ struct StoredOperationPolicy {
     credentials: Vec<LoginCredentialDraft>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ssh: Option<SshOperation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    create: Option<CreateEffect>,
     revision: String,
 }
 
@@ -594,6 +661,7 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
                 arguments: stored.arguments,
                 credentials: stored.credentials,
                 ssh: stored.ssh,
+                create: stored.create,
             },
             &image,
         )?;
@@ -606,6 +674,21 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
 }
 
 fn validate_draft(draft: &OperationPolicyDraft) -> Result<(), PolicyValidationError> {
+    if let Some(create) = &draft.create {
+        return if valid_operation_id(&draft.id)
+            && valid_display_text(&draft.description, MAX_DESCRIPTION_LEN)
+            && valid_operation_id(&draft.image_id)
+            && draft.ssh.is_none()
+            && draft.credentials.is_empty()
+            && draft.targets.is_empty()
+            && draft.arguments.is_empty()
+            && create.valid()
+        {
+            Ok(())
+        } else {
+            Err(PolicyValidationError)
+        };
+    }
     if let Some(ssh) = &draft.ssh {
         return if valid_operation_id(&draft.id)
             && valid_display_text(&draft.description, MAX_DESCRIPTION_LEN)
@@ -775,6 +858,12 @@ fn valid_arguments(arguments: &[ArgumentSpec]) -> bool {
 }
 
 fn valid_credentials(credentials: &[LoginCredentialDraft]) -> bool {
+    if credentials
+        .iter()
+        .any(|c| c.namespace.as_ref().is_some_and(|d| d.item_name().is_err()))
+    {
+        return false;
+    }
     let ids: Vec<&str> = credentials
         .iter()
         .map(|credential| credential.item_id.as_str())
@@ -803,7 +892,7 @@ fn valid_item_id(value: &str) -> bool {
 }
 fn valid_login_field(value: &LoginField) -> bool {
     match value {
-        LoginField::Username | LoginField::Password => true,
+        LoginField::Username | LoginField::Password | LoginField::Notes => true,
         LoginField::Custom { name } => {
             valid_display_text(name, MAX_VALUE_LEN) && name != "vw-access"
         }
@@ -902,6 +991,11 @@ fn canonicalize_draft(draft: &mut OperationPolicyDraft) {
 }
 
 fn revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
+    if draft.create.is_some() || draft.credentials.iter().any(|c| c.namespace.is_some()) {
+        return hex_digest(
+            &serde_json::to_vec(&(4u8, draft, image)).expect("policy projection serializes"),
+        );
+    }
     if let Some(ssh) = &draft.ssh {
         #[derive(Serialize)]
         struct SshProjection<'a> {
@@ -1004,6 +1098,7 @@ pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
 #[cfg(test)]
 pub(crate) fn test_ssh_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        create: None,
         id: "ssh-backup".into(),
         description: "Back up the fixed resource".into(),
         image_id: "deploy-image".into(),
@@ -1354,6 +1449,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy-homelab".into(),
             description: "Deploy".into(),
@@ -1366,6 +1462,7 @@ mod tests {
                 },
             ],
             credentials: vec![LoginCredentialDraft {
+                namespace: None,
                 item_id: ITEM.into(),
                 label: "login".into(),
                 use_type: CredentialUse::Login,
@@ -1383,6 +1480,7 @@ mod tests {
 
     fn credential(item_id: String, environment: String) -> LoginCredentialDraft {
         LoginCredentialDraft {
+            namespace: None,
             item_id,
             label: "login".into(),
             use_type: CredentialUse::Login,
@@ -2062,5 +2160,58 @@ mod tests {
         ));
         std::fs::remove_file(&image.path).unwrap();
         std::fs::remove_dir(root.path()).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod create_boundary_tests {
+    use super::*;
+    #[test]
+    fn create_schema_and_maximum_reference_produce_valid_review() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let image = test_approved_image(root.path(), "producer");
+        for len in 250..=256 {
+            let reference = format!(
+                "a/{}/{}/{}/{}",
+                "b".repeat(64),
+                "c".repeat(64),
+                "d".repeat(64),
+                "e".repeat(len - 197)
+            );
+            assert_eq!(reference.len(), len);
+            let mut effect = CreateEffect {
+                server: "https://vault.example".into(),
+                destination: crate::secret_storage::Destination {
+                    account_id: "11111111-1111-1111-1111-111111111111".into(),
+                    folder: "a".into(),
+                    folder_id: "22222222-2222-2222-2222-222222222222".into(),
+                    reference,
+                },
+                fields: (0..32).map(|n| format!("custom:key{n}")).collect(),
+                eligibility_marker: "deploy".into(),
+            };
+            assert!(effect.valid());
+            effect.fields.extend(["password".into(), "notes".into()]);
+            assert!(effect.valid());
+            let draft = OperationPolicyDraft {
+                id: "create-secret".into(),
+                description: "Create".into(),
+                image_id: "producer".into(),
+                targets: vec![],
+                arguments: vec![],
+                credentials: vec![],
+                ssh: None,
+                create: Some(effect.clone()),
+            };
+            let policy = OperationPolicy::from_draft(draft, &image).unwrap();
+            let review = policy.direct_review("A".repeat(43), vec![], 2_000_000_000);
+            assert_eq!(review.credentials[0].label, effect.destination.reference);
+            assert!(review.credentials[0].label.len() <= 256);
+            for count in [33, 34] {
+                effect.fields = (0..count).map(|n| format!("custom:key{n}")).collect();
+                assert!(!effect.valid());
+            }
+        }
     }
 }

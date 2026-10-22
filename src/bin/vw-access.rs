@@ -110,6 +110,8 @@ enum Command {
         #[arg(allow_hyphen_values = true)]
         id: String,
     },
+    /// Reconcile an uncertain creation with an exact existing item; never creates or updates vault data.
+    ReconcileWrite { request_id: String, item_id: String },
     /// Read recent redacted lifecycle events, including while the provider is locked.
     History {
         /// Number of events (default 50; range 1–200).
@@ -465,6 +467,16 @@ fn run(args: Args) -> Result<(), String> {
             !no_wait,
         ),
         Command::Status { id } => (HumanCommand::Status { id }, false),
+        Command::ReconcileWrite {
+            request_id,
+            item_id,
+        } => (
+            HumanCommand::ReconcileWrite {
+                request_id,
+                item_id,
+            },
+            false,
+        ),
         Command::History { limit } => (HumanCommand::History { limit }, false),
         Command::Agent { command } => (
             match command {

@@ -203,6 +203,7 @@ fn companion_acceptance_fixture() {
             .unwrap();
         let revision = app
             .activate_operation(OperationPolicyDraft {
+                create: None,
                 ssh: None,
                 id: "synthetic-deploy".into(),
                 description: "Run synthetic protected Linux execution once".into(),
@@ -215,6 +216,7 @@ fn companion_acceptance_fixture() {
                     },
                 ],
                 credentials: vec![LoginCredentialDraft {
+                    namespace: None,
                     item_id: "11111111-1111-1111-1111-111111111111".into(),
                     label: "Synthetic acceptance login".into(),
                     use_type: CredentialUse::Login,

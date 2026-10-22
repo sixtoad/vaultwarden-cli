@@ -252,6 +252,7 @@ fn real_linux_peer_matrix_and_noninteractive_cli() {
     std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
     let revision = app
         .activate_operation(OperationPolicyDraft {
+            create: None,
             ssh: None,
             id: "deploy".into(),
             description: "Deploy <script>sentinel</script>".into(),
@@ -265,6 +266,7 @@ fn real_linux_peer_matrix_and_noninteractive_cli() {
                 },
             ],
             credentials: vec![LoginCredentialDraft {
+                namespace: None,
                 item_id: "11111111-1111-1111-1111-111111111111".into(),
                 label: "Deploy login".into(),
                 use_type: CredentialUse::Login,

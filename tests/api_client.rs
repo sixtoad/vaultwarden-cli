@@ -520,3 +520,39 @@ async fn api_client_sends_client_identification_headers() {
 
     assert!(is_alive);
 }
+
+#[tokio::test]
+async fn create_cipher_never_retries_or_echoes_server_body_and_retains_certainty() {
+    use vaultwarden_cli::secret_storage::*;
+    let keys = vaultwarden_cli::crypto::CryptoKeys::from_key_bytes([1; 32], [2; 32]);
+    let destination = Destination {
+        account_id: "11111111-1111-1111-1111-111111111111".into(),
+        folder: "homelab/production".into(),
+        folder_id: "22222222-2222-2222-2222-222222222222".into(),
+        reference: "homelab/production/github/token".into(),
+    };
+    let input = SecretImport::parse(br#"{"password":"private-create-sentinel"}"#).unwrap();
+    for (status, expected) in [
+        (400, WriteStatus::Failed),
+        (403, WriteStatus::Failed),
+        (500, WriteStatus::Uncertain),
+        (200, WriteStatus::Uncertain),
+    ] {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/ciphers"))
+            .respond_with(ResponseTemplate::new(status).set_body_string("private-create-sentinel"))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let api = ApiClient::new_with_flags(&server.uri(), true).unwrap();
+        let payload = encrypt_create(&keys, &destination, &input, None).unwrap();
+        assert_eq!(
+            api.create_cipher("token", &payload).await.err(),
+            Some(expected)
+        );
+        let requests = server.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(!String::from_utf8_lossy(&requests[0].body).contains("private-create-sentinel"));
+    }
+}

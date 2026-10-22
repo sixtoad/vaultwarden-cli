@@ -408,6 +408,7 @@ fn isolated_human_submission_https_child() {
         .collect();
     let state_path = root.join("provider-state.json");
     let policy = OperationPolicyDraft {
+        create: None,
         ssh: None,
         id: "deploy".into(),
         description: "Deploy <script>sentinel</script>".into(),
@@ -421,6 +422,7 @@ fn isolated_human_submission_https_child() {
             },
         ],
         credentials: vec![LoginCredentialDraft {
+            namespace: None,
             item_id: "11111111-1111-1111-1111-111111111111".into(),
             label: "Deploy login".into(),
             use_type: CredentialUse::Login,

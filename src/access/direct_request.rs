@@ -145,6 +145,8 @@ pub struct DirectReview {
     pub requester: String,
     pub operation: String,
     pub effect: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create: Option<super::policy::CreateEffect>,
     pub target: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh: Option<super::policy::SshReview>,
@@ -225,6 +227,8 @@ pub(crate) struct DirectRecord {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audit: Vec<super::history::HistoryEvent>,
     pub history_version: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_receipt: Option<crate::secret_storage::WriteReceipt>,
 }
 /// Internal durable authority; never projected into requester responses.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -262,8 +266,8 @@ struct LegacyDecisionAudit {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum StoredAudit {
-    Current(super::history::HistoryEvent),
-    Legacy(LegacyDecisionAudit),
+    Current(Box<super::history::HistoryEvent>),
+    Legacy(Box<LegacyDecisionAudit>),
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -284,6 +288,8 @@ struct DirectRecordWire {
     #[serde(default)]
     audit: Vec<StoredAudit>,
     history_version: Option<u8>,
+    #[serde(default)]
+    write_receipt: Option<crate::secret_storage::WriteReceipt>,
 }
 impl TryFrom<DirectRecordWire> for DirectRecord {
     type Error = &'static str;
@@ -304,6 +310,7 @@ impl TryFrom<DirectRecordWire> for DirectRecord {
             execution_claimed: w.execution_claimed,
             audit: Vec::new(),
             history_version: HISTORY_VERSION,
+            write_receipt: w.write_receipt,
         };
         match w.history_version {
             Some(HISTORY_VERSION) => {
@@ -311,7 +318,7 @@ impl TryFrom<DirectRecordWire> for DirectRecord {
                     let StoredAudit::Current(event) = event else {
                         return Err("invalid history format");
                     };
-                    record.audit.push(event);
+                    record.audit.push(*event);
                 }
             }
             None => {
@@ -455,7 +462,7 @@ impl DirectRecord {
     }
     fn validate_history(&self) -> bool {
         use super::history::{HISTORY_VERSION, HistoryOutcome as O};
-        if self.history_version != HISTORY_VERSION || self.audit.is_empty() || self.audit.len() > 4
+        if self.history_version != HISTORY_VERSION || self.audit.is_empty() || self.audit.len() > 5
         {
             return false;
         }
@@ -486,26 +493,37 @@ impl DirectRecord {
                 {
                     return false;
                 }
-            } else if !matches!(
-                (&previous, &event.status),
-                (
-                    Some(DirectStatus::Pending),
-                    Some(DirectStatus::Approved | DirectStatus::Denied | DirectStatus::Expired)
-                ) | (
-                    Some(DirectStatus::Approved),
-                    Some(
-                        DirectStatus::Running | DirectStatus::Expired | DirectStatus::Failed { .. }
+            } else if !((event.outcome == O::Reconciled
+                && previous.as_ref().is_some_and(DirectStatus::is_terminal)
+                && previous == event.status)
+                || matches!(
+                    (&previous, &event.status),
+                    (
+                        Some(DirectStatus::Pending),
+                        Some(DirectStatus::Approved | DirectStatus::Denied | DirectStatus::Expired)
+                    ) | (
+                        Some(DirectStatus::Approved),
+                        Some(
+                            DirectStatus::Running
+                                | DirectStatus::Expired
+                                | DirectStatus::Failed { .. }
+                        )
+                    ) | (
+                        Some(DirectStatus::Running),
+                        Some(DirectStatus::Completed { .. } | DirectStatus::Failed { .. })
                     )
-                ) | (
-                    Some(DirectStatus::Running),
-                    Some(DirectStatus::Completed { .. } | DirectStatus::Failed { .. })
-                )
-            ) {
+                ))
+            {
                 return false;
             }
             previous = event.status.clone();
         }
         previous.as_ref() == Some(&self.review.status)
+            && (!self.review.status.is_terminal()
+                || self
+                    .audit
+                    .last()
+                    .is_some_and(|event| event.write_receipt == self.write_receipt))
     }
     pub(crate) fn approval_binding(&self) -> ApprovalBinding {
         ApprovalBinding {
@@ -566,7 +584,20 @@ impl DirectRecord {
     pub(crate) fn validate(&self, id: &str, epoch: u64) -> bool {
         let r = &self.review;
         let text = |s: &str| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control);
-        self.binding_digest == self.digest()
+        self.write_receipt.as_ref().is_none_or(|receipt| {
+            r.create.is_some()
+                && self.execution_claimed
+                && receipt.attempt_id == r.id
+                && receipt
+                    .item_id
+                    .as_deref()
+                    .is_none_or(crate::secret_storage::valid_id)
+                && (!matches!(
+                    receipt.status,
+                    crate::secret_storage::WriteStatus::Verified
+                        | crate::secret_storage::WriteStatus::CreatedUnverified
+                ) || receipt.item_id.is_some())
+        }) && self.binding_digest == self.digest()
             && self
                 .replay_digest
                 .as_ref()
@@ -594,6 +625,12 @@ impl DirectRecord {
             }
             && valid_operation_id(&r.operation)
             && text(&r.effect)
+            && r.create.as_ref().is_none_or(|c| {
+                c.valid()
+                    && r.ssh.is_none()
+                    && r.effect == "CREATE personal vault item (no update)"
+                    && r.target == c.destination.reference
+            })
             && (if r.ssh.is_some() {
                 r.ssh.as_ref().is_some_and(|ssh| r.target == ssh.target())
             } else {

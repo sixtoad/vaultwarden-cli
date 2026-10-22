@@ -13,12 +13,17 @@ Additionally, this uses the system certificate store for TLS verification, not a
 - OAuth2 client credentials authentication
 - PBKDF2 key derivation (configurable iterations)
 - AES-256-CBC + HMAC-SHA256 decryption (Bitwarden-compatible)
+- Encrypted create-only personal secret storage with fresh human authorization
+- Exact password, notes, and custom-field reads, including wrapped item keys
 - RSA-OAEP decryption for organization vault items
 - Persistent sessions with secure credential storage
 - Multiple output formats: JSON, environment exports, raw values
 - Search and filter vault items
 - Run commands with secrets injected as environment variables
 - Interpolate secrets into YAML files
+
+See [secret storage](docs/secret-storage.md) for trusted imports, protected producer
+policies, namespace bindings, selected reads, and uncertain-write recovery.
 
 ## Installation
 

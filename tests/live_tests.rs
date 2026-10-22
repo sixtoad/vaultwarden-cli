@@ -26,3 +26,6 @@ mod run;
 
 #[path = "live/interpolate.rs"]
 mod interpolate;
+
+#[path = "live/secret_storage.rs"]
+mod secret_storage;
