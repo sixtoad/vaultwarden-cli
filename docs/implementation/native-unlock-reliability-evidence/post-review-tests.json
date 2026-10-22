@@ -1,0 +1,180 @@
+{
+  "command": "python3 scripts/run-native-check.py --report watchdog --timeout 240 -- swift test --package-path macos",
+  "passed": 39,
+  "failed": 1,
+  "failure": "revoked-client expected HTTP403 unauthorized; macOS returned typed transport failure. Exact one unlock assertion passed. Test-only correction awaits focused rerun.",
+  "cases": [
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend]",
+      "seconds": 0.004
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testBoundedInputAndVersion]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testClosedV1ResponseAndNestedReviewKeys]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries]",
+      "seconds": 0.002
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testExplicitSameRequestReviewCanRecoverPendingUncertainty]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testGenerationOrDisconnectInvalidationDisablesDecision]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testInvalidStatusesFailClosed]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testLateReviewCannotUndoAuthorityInvalidation]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testLateReviewErrorCannotMutateInvalidatedMessage]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testLostDecisionNeverResendsAndPendingRemainsUncertain]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testOnlyExactKnownUnlockGetsFiniteLongerTimeout]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testReviewTextExposesInvisibleAndDirectionalScalars]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testSharedCanonicalReviewIncludesEveryField]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testTimeoutClassificationUsesOnlySafeDomainAndCode]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.ProtocolTests testWrongPasswordConsumesVisibleTicket]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock]",
+      "seconds": 5.997
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testFixtureFailedLaunchLeavesNothingToStop]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testFixtureRestartAndShutdownAfterAsyncRequest]",
+      "seconds": 1.402
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testFixtureShutdownFailsAndCleansUpChildIgnoringTermination]",
+      "seconds": 0.134
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testFixtureShutdownObservesAlreadyExitedChild]",
+      "seconds": 0.004
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testIssuerSerialCollisionNeverSubstitutesExistingIdentity]",
+      "seconds": 2.399
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay]",
+      "seconds": 1.063
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testRealURLSessionAuthenticationAndSingleTransmission]",
+      "seconds": 1.68
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testRealURLSessionRejectsHTTPBodyStatusMismatch]",
+      "seconds": 1.383
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testSameSubjectRenewalReturnsExactImportedIdentity]",
+      "seconds": 2.193
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testSlowUnlockReceivesSuccessWithExactlyOneTransmission]",
+      "seconds": 7.213
+    },
+    {
+      "name": "-[CompanionCoreTests.TLSTests testStreamingUnlockCannotExtendTotalResourceDeadline]",
+      "seconds": 61.181
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect]",
+      "seconds": 0.003
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testFullInboxExplainsCapacity]",
+      "seconds": 0.0
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testLateNotificationSessionOrListCannotUndoLifecycleChange]",
+      "seconds": 0.002
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testLatePollCannotMutateReplacementOrSleepingState]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotMutateReplacementOrClearItsBusyFlag]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotUndoSleepOrRefresh]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testSleepDuringNotificationReviewLoadingCannotRestoreReview]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays]",
+      "seconds": 0.001
+    },
+    {
+      "name": "-[ApprovalCompanionTests.AppModelTests testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges]",
+      "seconds": 0.001
+    }
+  ],
+  "raw_log_sha256": "288eaacaddf21890dffab66b9ec2686594d576c3db839d58e3d07d0c0eb09489",
+  "focused_correction_rerun": {
+    "passed": 1,
+    "failed": 0,
+    "test": "TLSTests.testUnlockRejectionAndTrustFailuresNeverReplay",
+    "log_sha256": "5d3e32952e38d19b39a27a6091069c03165699cef1bf73dcb863af5a66f22398",
+    "scope": "Only revoked-client assertion changed; the39 passing cases, including streaming deadline, remain verified by prior run.",
+    "durable_log_sha256": "40fe1958c67c701061330accd7b9c388bf0e5f5d2ffa1d189d8be0d2474ec56c",
+    "durable_log_normalization": "Removed ANSI terminal styling and trailing line whitespace; historical raw log hash retained separately."
+  },
+  "final_native_case_coverage": {
+    "passed": 40,
+    "unresolved_failures": 0
+  },
+  "durable_log_sha256": "4793fc29327603ee2b5a832edd34c4ca4ed1ed821d53205470ca4b120872e068",
+  "durable_log_normalization": "Removed ANSI terminal styling and trailing line whitespace; historical raw log hash retained separately."
+}

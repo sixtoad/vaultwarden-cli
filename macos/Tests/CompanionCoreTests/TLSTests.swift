@@ -8,6 +8,93 @@ import XCTest
 /// These tests use real URLSession, Security.framework, Keychain, and a localhost
 /// TLS server requiring a client certificate. They are mandatory, not skipped.
 final class TLSTests: XCTestCase {
+    func testSlowUnlockReceivesSuccessWithExactlyOneTransmission() async throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        for mode in ["normal", "slow-unlock"] {
+            try fixture.start(mode: mode)
+            let start = DispatchTime.now().uptimeNanoseconds
+            let result = try await fixture.client().unlock("synthetic-only")
+            let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+            XCTAssertEqual(result.state, "unlocked")
+            if mode == "slow-unlock" { XCTAssertGreaterThanOrEqual(elapsed, 6) }
+            XCTAssertLessThan(elapsed, 60)
+            XCTAssertEqual(try fixture.commands(), ["unlock"])
+        }
+    }
+
+    func testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock() async throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        try fixture.start(mode: "slow-session")
+        let client = try fixture.client()
+        let start = DispatchTime.now().uptimeNanoseconds
+        do { _ = try await client.session(); XCTFail("Expected bounded read timeout") }
+        catch { XCTAssertEqual(error as? CompanionError, .timeout) }
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+        XCTAssertGreaterThanOrEqual(elapsed, 4)
+        XCTAssertLessThan(elapsed, 7)
+        XCTAssertEqual(try fixture.commands(), ["session"])
+    }
+
+    func testStreamingUnlockCannotExtendTotalResourceDeadline() async throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        try fixture.start(mode: "stream-unlock")
+        let client = try fixture.client()
+        let start = DispatchTime.now().uptimeNanoseconds
+        // Valid bounded JSON arrives one byte per second for 75 seconds. Each
+        // byte resets the idle timer, so only the total resource deadline wins.
+        do { _ = try await client.unlock("synthetic-only"); XCTFail("Expected total unlock deadline") }
+        catch { XCTAssertEqual(error as? CompanionError, .timeout) }
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+        XCTAssertGreaterThanOrEqual(elapsed, 58)
+        XCTAssertLessThan(elapsed, 65)
+        XCTAssertEqual(try fixture.commands(), ["unlock"])
+    }
+
+    func testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay() async throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        try fixture.start(mode: "lost-unlock")
+        let client = try fixture.client()
+        let initial = try await client.session()
+        XCTAssertEqual(initial.state, "locked")
+        do { _ = try await client.unlock("synthetic-only"); XCTFail("Expected lost unlock response") }
+        catch { XCTAssertEqual(error as? CompanionError, .transport) }
+        XCTAssertEqual(try fixture.commands(), ["session", "unlock"])
+        // This observes current state, not proof of which attempt authenticated.
+        let current = try await client.session()
+        XCTAssertEqual(current.state, "unlocked")
+        XCTAssertEqual(try fixture.commands(), ["session", "unlock", "session"])
+    }
+
+    func testUnlockRejectionAndTrustFailuresNeverReplay() async throws {
+        let fixture = try TLSFixture()
+        defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }
+        try fixture.start(mode: "authentication-unlock422")
+        do { _ = try await fixture.client().unlock("synthetic-wrong"); XCTFail("Expected rejection") }
+        catch { XCTAssertEqual(error as? CompanionError, .rejected("authentication_failed")) }
+        XCTAssertEqual(try fixture.commands(), ["unlock"])
+        for variant in ["pin", "ca", "foreign", "revoked"] {
+            try fixture.start()
+            do { _ = try await fixture.client(variant: variant).unlock("synthetic-only"); XCTFail("Accepted \(variant)") }
+            catch {
+                let failure = try XCTUnwrap(error as? CompanionError)
+                if variant == "revoked" {
+                    XCTAssertTrue([CompanionError.transport, .rejected("unauthorized")].contains(failure))
+                } else {
+                    XCTAssertEqual(failure, .transport)
+                }
+            }
+            XCTAssertEqual(try fixture.commands(), variant == "revoked" ? ["unlock"] : [])
+        }
+        try fixture.start(mode: "wrong-host")
+        do { _ = try await fixture.client(serverCertificate: "wrong-host").unlock("synthetic-only"); XCTFail("Accepted hostname mismatch") }
+        catch { XCTAssertEqual(error as? CompanionError, .transport) }
+        XCTAssertEqual(try fixture.commands(), [])
+    }
+
     func testFixtureRestartAndShutdownAfterAsyncRequest() async throws {
         let fixture = try TLSFixture()
         defer { XCTAssertEqual(fixture.close(), [], "Temporary Keychain cleanup must succeed") }

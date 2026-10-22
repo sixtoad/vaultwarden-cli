@@ -1,0 +1,11 @@
+{
+  "requests": {
+    "GET /api/version": 1,
+    "GET /api/config": 1,
+    "POST /identity/connect/token": 1
+  },
+  "cipher_posts": 0,
+  "committed_cipher_posts": 0,
+  "dropped_cipher_replies": 0,
+  "dropped_item_ids": []
+}

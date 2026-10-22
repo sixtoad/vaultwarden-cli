@@ -1,0 +1,22 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "error": "Provider unavailable or TLS authentication failed.",
+  "initial_session": "locked",
+  "native_request_attempted_counts": {
+    "session": 1,
+    "unlock": 1
+  },
+  "native_request_completed_counts": {
+    "session": 1
+  },
+  "native_request_counts": {
+    "session": 1
+  },
+  "native_request_elapsed_seconds": {
+    "session": 0.08286429173313081,
+    "unlock": 5.006715500028804
+  },
+  "operation_elapsed_seconds": 5.176886583445594,
+  "success": false
+}

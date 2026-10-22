@@ -1,0 +1,28 @@
+{
+  "files_checked": 17,
+  "known_secret_values": 9,
+  "matches": [],
+  "scope": "sanitized JSON evidence; current backend bearer, symmetric key, password, bootstrap secret and provider keyring session values",
+  "repository_files_at_scan": [
+    "baseline-normal.json",
+    "baseline-delayed.json",
+    "baseline-explicit-session.json",
+    "baseline-proxy.json",
+    "baseline-delay.json",
+    "updated-delayed.json",
+    "updated-final.json",
+    "updated-delay.json",
+    "provenance.json"
+  ],
+  "additional_private_run_files_at_scan": [
+    "baseline-proxy-observed.json",
+    "mac-session-session-1792685989841807223.json",
+    "mac-unlock-session-1792685976334065809.json",
+    "updated-final.json",
+    "mac-unlock-session-1792685835820436129.json",
+    "mac-unlock-session-1792686464144727560.json",
+    "mac-unlock-session-1792685896347632726.json",
+    "baseline-unlock-delay-observed.json"
+  ],
+  "coverage_limit": "Scan ran before cleanup.json, native-tests.json and native-logs were added. provenance.json subsequently gained native binary and source archive hashes. This record does not claim that every final committed artifact was included in that earlier credential-value scan."
+}
