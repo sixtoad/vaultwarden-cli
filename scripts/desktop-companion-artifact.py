@@ -114,8 +114,9 @@ def package(root, evidence, platform, revision, dirty, disposable_pilot=False):
         "sha256": checksum,
         "extraction_verified": True,
         "members": expected,
-        **({"disposable_test_only": True, "dart_define": "COMPANION_DISPOSABLE_PILOT=true",
-            "swift_condition": "COMPANION_DISPOSABLE_PILOT"} if disposable_pilot else {}),
+        **({"disposable_test_only": True,
+            "requested_build_flags": {"dart_define": "COMPANION_DISPOSABLE_PILOT=true",
+                                      "swift_condition": "COMPANION_DISPOSABLE_PILOT"}} if disposable_pilot else {}),
     }, indent=2) + "\n")
     print(f"{'Disposable test' if disposable_pilot else 'Normal-entry'} release archive verified: {archive.name}")
     return archive

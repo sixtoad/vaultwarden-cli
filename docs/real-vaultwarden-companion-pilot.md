@@ -133,11 +133,21 @@ in the exact Mac handoff ledger, separately from Linux teardown.
 
 Quick setup is absent from ordinary builds. Build the separate test artifact on
 a Mac build host in a fresh dedicated checkout (this command never installs or
-launches it):
+launches the operator application):
 
 ```sh
 bash scripts/build-disposable-pilot.sh /absolute/path/to/disposable-pilot-evidence
 ```
+
+On disposable CI runners only, the command first builds and launches a separate
+test entrypoint against the production native channel. It imports a fresh
+fixture identity into a temporary default Keychain, checks persisted metadata
+and exactly one unlock, then proves an inactive setup call cannot change the
+configuration. The harness stops the exact app before restoring the prior
+default Keychain/search list and removing its owned fixture state; uncertainty
+fails the job and retains recovery material. It then rebuilds `lib/main.dart`
+before packaging the operator app. These native checks must never run on the
+operator Mac. Sanitized CI results are in `pilot-channel/pilot-channel.json`.
 
 The script enables Dart `--dart-define=COMPANION_DISPOSABLE_PILOT=true` and native
 Swift `COMPANION_DISPOSABLE_PILOT` together through the explicit

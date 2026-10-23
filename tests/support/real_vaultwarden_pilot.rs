@@ -561,11 +561,15 @@ fn register_secret_file(run: &mut Rehearsal, path: &Path) -> Result<()> {
             .encode(&bytes)
             .into_bytes(),
     );
-    for line in bytes
-        .split(|b| *b == b'\n')
-        .filter(|l| !l.is_empty() && !l.starts_with(b"-----"))
-    {
-        run.secrets.push(line.to_vec());
+    // Only PEM has meaningful textual secret lines. Splitting a binary PKCS#12
+    // can register a single random punctuation byte and reject ordinary JSON.
+    if bytes.starts_with(b"-----BEGIN ") {
+        for line in bytes
+            .split(|b| *b == b'\n')
+            .filter(|l| !l.is_empty() && !l.starts_with(b"-----"))
+        {
+            run.secrets.push(line.to_vec());
+        }
     }
     run.secrets.push(bytes);
     Ok(())
@@ -1102,7 +1106,7 @@ fn execute(
     // explicit finish, then verify the whole history again before teardown.
     *observation = FailureObservation::new("finish");
     wait_ready(run, "finish")?;
-    check_history(&run.cli(&["history", "--limit", "200"])?, &completed)?;
+    verify_final_history(run.cli(&["history", "--limit", "200"]), &completed)?;
     println!(
         "PASS: four human Flutter decisions; two successful credential checks; two denials without execution"
     );
@@ -1235,6 +1239,11 @@ fn terminal(state: &Value, agent: bool, approve: bool) -> Result<bool> {
     }
 }
 
+fn verify_final_history(history: Result<Value>, completed: &[(String, bool)]) -> Result<()> {
+    let history = history.context("pilot history read failed")?;
+    check_history(&history, completed).context("pilot history verification failed")
+}
+
 fn check_history(history: &Value, completed: &[(String, bool)]) -> Result<()> {
     let events = history["events"]
         .as_array()
@@ -1268,6 +1277,63 @@ fn check_history(history: &Value, completed: &[(String, bool)]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pilot_binary_redaction_keeps_whole_material_without_short_fragments() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut run = cleanup_regression_fixture(temp.path().to_path_buf()).unwrap();
+        run.cleaned = true;
+        let path = temp.path().join("client.p12");
+        let bytes = b"\x30\x82\xff\n{\n\"\n:\n}\nsynthetic-binary-material";
+        fs::write(&path, bytes).unwrap();
+        register_secret_file(&mut run, &path).unwrap();
+        scan(
+            &run,
+            br#"{"events":[{"request_id":"public-id","outcome":"succeeded"}]}"#,
+        )
+        .unwrap();
+        assert!(scan(&run, bytes).is_err());
+        assert!(
+            scan(
+                &run,
+                base64::engine::general_purpose::STANDARD
+                    .encode(bytes)
+                    .as_bytes()
+            )
+            .is_err()
+        );
+        let pem =
+            b"-----BEGIN SYNTHETIC MATERIAL-----\nsynthetic-pem-secret-line\n-----END SYNTHETIC MATERIAL-----\n";
+        fs::write(&path, pem).unwrap();
+        register_secret_file(&mut run, &path).unwrap();
+        assert!(scan(&run, b"synthetic-pem-secret-line").is_err());
+        assert!(scan(&run, pem).is_err());
+        assert!(
+            scan(
+                &run,
+                base64::engine::general_purpose::STANDARD
+                    .encode(pem)
+                    .as_bytes()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn pilot_finish_history_failures_are_closed_without_invented_request_counts() {
+        let observation = FailureObservation::new("finish");
+        let read =
+            verify_final_history(Err(anyhow::anyhow!("private upstream data")), &[]).unwrap_err();
+        assert_eq!(failure_category(&read), "history_read_failed");
+        let verify =
+            verify_final_history(Ok(json!({"events":[{"outcome":"execution_started"}]})), &[])
+                .unwrap_err();
+        assert_eq!(failure_category(&verify), "history_verification_failed");
+        verify_final_history(Ok(json!({"events":[]})), &[]).unwrap();
+        let value = serde_json::to_value(&observation).unwrap();
+        assert!(value["request_id"].is_null());
+        assert_eq!(value["exact_request_counts"]["availability"], "unavailable");
+    }
 
     #[test]
     fn pilot_quick_bundle_is_bounded_owner_only_and_encoded_secrets_are_redacted() {

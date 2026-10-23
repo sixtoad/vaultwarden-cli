@@ -33,7 +33,13 @@ class ArtifactTests(unittest.TestCase):
             self.assertNotEqual(normal, pilot)
             self.assertEqual(normal.read_bytes(), original)
             self.assertEqual((evidence / "artifact.json").read_bytes(), metadata)
-            self.assertTrue(json.loads((evidence / "pilot-artifact.json").read_text())["disposable_test_only"])
+            pilot_metadata = json.loads((evidence / "pilot-artifact.json").read_text())
+            self.assertTrue(pilot_metadata["disposable_test_only"])
+            self.assertEqual(pilot_metadata["requested_build_flags"], {
+                "dart_define": "COMPANION_DISPOSABLE_PILOT=true",
+                "swift_condition": "COMPANION_DISPOSABLE_PILOT"})
+            self.assertNotIn("dart_define", pilot_metadata)
+            self.assertNotIn("swift_condition", pilot_metadata)
             with tarfile.open(pilot) as source:
                 self.assertIn("companion_disposable_pilot.app/synthetic", source.getnames())
             with self.assertRaises(ValueError):

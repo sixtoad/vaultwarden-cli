@@ -48,6 +48,48 @@ void main() {
   setUpAll(() async => RustLib.init());
   setUp(resetProvider);
 
+  testWidgets(
+    'failed first import can explicitly reload without replaying setup or unlock',
+    (tester) async {
+      if (!disposablePilotEnabled) return;
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final native = PilotFixture()
+        ..saved = const ProviderConfiguration(configured: false)
+        ..failImport = true;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderPage(
+            platform: native,
+            syntheticBuilder: (_) => const Text('synthetic'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('pilot-bundle'));
+      final configure = find.widgetWithText(
+        FilledButton,
+        'Configure and unlock',
+      );
+      await tester.enterText(field, jsonEncode(fixtureBundle()));
+      await tester.tap(configure);
+      await tester.pumpAndSettle();
+      expect(native.imports, 1);
+      expect(native.commands, isEmpty);
+      expect(tester.widget<FilledButton>(configure).onPressed, isNull);
+      await tester.ensureVisible(find.text('Reload saved provider setup'));
+      await tester.tap(find.text('Reload saved provider setup'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(configure).onPressed, isNotNull);
+      expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+      expect(native.imports, 1);
+      expect(native.commands, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   test(
     'bounded versioned parser rejects malformed and secret-bearing errors',
     () {

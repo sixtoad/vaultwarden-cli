@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Six scoped harness mutations; each must compile, fail tests, and restore.
+"""Seven scoped harness mutations; each must compile, fail tests, and restore.
 
 No services or ignored acceptance tests run. Do not edit/build concurrently.
 """
@@ -22,6 +22,7 @@ mutations = {
     "redaction": ('run.observe(bytes)?; // mutation: redaction', 'let _ = (run, bytes); // mutation: redaction disabled'),
     "cleanup": ('observation.verify()?; // mutation: cleanup', 'let _ = observation; // mutation: cleanup disabled'),
     "failure_evidence": ('observation.emit(run, error, writer) // mutation: failure evidence', 'let _ = (observation, error, writer); Ok::<(), anyhow::Error>(()) // mutation: failure evidence disabled'),
+    "binary_redaction_fragments": ('if bytes.starts_with(b"-----BEGIN ") {', 'if true { // deliberately split binary data into false-positive fragments'),
 }
 
 def run(name):
