@@ -24,7 +24,8 @@ permissions:
 jobs:
   disposable-companion-pilot:
     name: Disposable Mac companion pilot (opt-in build)
-    runs-on: macos-26-intel
+    # Match the working packaged GUI runner; still build both library slices.
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7

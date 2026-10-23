@@ -139,11 +139,15 @@ launches the operator application):
 bash scripts/build-disposable-pilot.sh /absolute/path/to/disposable-pilot-evidence
 ```
 
-On disposable CI runners only, the command first builds and launches a separate
+On disposable GitHub-hosted macOS CI runners only, the command first builds and launches a separate
 test entrypoint against the production native channel. It imports a fresh
 fixture identity into a temporary default Keychain, checks persisted metadata
-and exactly one unlock, then proves an inactive setup call cannot change the
-configuration. The harness stops the exact app before restoring the prior
+and exactly one unlock with the distinct expected password, then proves an
+inactive setup call cannot import a second identity or change configuration.
+The fixture forwards real lifecycle changes to the controller, verifies the
+saved identity belongs to the disposable Keychain, and verifies its persistent
+reference is unresolvable after Keychain deletion. Active-app admission with a
+non-Flutter key window remains outside this fixture's coverage. The harness stops the exact app before restoring the prior
 default Keychain/search list and removing its owned fixture state; uncertainty
 fails the job and retains recovery material. It then rebuilds `lib/main.dart`
 before packaging the operator app. These native checks must never run on the
@@ -454,3 +458,14 @@ Parent reran all six real-pilot harness mutations on that exact harness hash:
 readiness, duplicate submission, execution counts, redaction, cleanup and failure
 evidence all compiled and were caught; exact restoration and retest passed.
 Report: `/tmp/vw-quick-setup-harness-mutations/report.json`.
+
+### Polling contention
+
+The pilot retries a strictly parsed `busy` rejection only for read-only agent
+polls. It keeps the same request ID and the original 310-second deadline for
+starting polls; an already-running CLI call retains its 30-second bound.
+Submissions are never retried, and malformed responses, other rejections,
+transport failures and redaction failures stop the run. Busy does not replace
+the last observed lifecycle state or imply execution. This corrects a reachable
+harness failure during provider gate contention; the previous live run's generic
+`status_poll_failed` evidence cannot establish that Busy caused that failure.
