@@ -52,7 +52,7 @@ class NativeProviderPlatform
     }
     return _parse(
       await _channel.invokeMethod<Object?>(
-        'setupPilot',
+        'setupDisposablePilotV1',
         bundle.nativeArguments,
       ),
     );

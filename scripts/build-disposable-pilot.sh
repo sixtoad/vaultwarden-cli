@@ -18,5 +18,8 @@ flutter test --dart-define=COMPANION_DISPOSABLE_PILOT=true
 XCODE_XCCONFIG_FILE="$repo/scripts/disposable-pilot.xcconfig" \
   flutter build macos --release --target lib/main.dart --dart-define=COMPANION_DISPOSABLE_PILOT=true
 strings build/macos/Build/Products/Release/companion_slice.app/Contents/MacOS/companion_slice > "$evidence/native-build-strings.txt"
-grep -q 'setupPilot' "$evidence/native-build-strings.txt"
+# Short Swift strings may be stored inline rather than in the string table.
+# Keep the channel method longer than a small string, and require its actual
+# compiled entry point marker rather than an unrelated settings/parser symbol.
+grep -Fxq 'setupDisposablePilotV1' "$evidence/native-build-strings.txt"
 python3 "$repo/scripts/desktop-companion-artifact.py" package macos "$evidence" --disposable-pilot

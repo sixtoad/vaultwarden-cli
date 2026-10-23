@@ -36,7 +36,7 @@ import Security
             switch call.method {
             case "configuration": result(try settings.metadata())
             #if COMPANION_DISPOSABLE_PILOT
-            case "setupPilot":
+            case "setupDisposablePilotV1":
                 guard !active, NSApplication.shared.isActive,
                       let window = NSApplication.shared.keyWindow, window is MainFlutterWindow else { throw CompanionError.configuration }
                 active = true

@@ -134,7 +134,7 @@ void main() {
       expect(calls, isEmpty);
     } else {
       await native.setupPilot(bundle);
-      expect(calls.single.method, 'setupPilot');
+      expect(calls.single.method, 'setupDisposablePilotV1');
       expect(
         (calls.single.arguments as Map).containsKey('unlock_password'),
         false,
