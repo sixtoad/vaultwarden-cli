@@ -1,0 +1,189 @@
+Building for debugging...
+[Pre-planning 1 / 153]
+[Planning deferred tasks]
+[47 / 100]
+[48 / 101] CompanionCore
+[57 / 142]
+[60 / 142]
+[66 / 142]
+[68 / 142]
+[72 / 142]
+[74 / 142]
+[77 / 142]
+[81 / 142]
+[83 / 142]
+[84 / 142]
+[89 / 142] CompanionCore
+[101 / 144] ApprovalCompanion
+[107 / 183]
+[112 / 183]
+[115 / 183]
+[118 / 183]
+[122 / 183]
+[125 / 183] CompanionCore
+[126 / 183]
+[134 / 184]
+[136 / 184]
+[137 / 184]
+[138 / 184] CompanionCoreTests-product
+[142 / 196]
+[144 / 196]
+[145 / 196]
+[146 / 196]
+[147 / 196]
+[148 / 196]
+[149 / 196]
+[153 / 196] CompanionCoreTests-product
+[158 / 196] CompanionCoreTests-product
+/private/tmp/vw-unlock-review.n0DaMc/macos/Tests/CompanionCoreTests/TLSTests.swift:153:28: warning: instance method 'wait' is unavailable from asynchronous contexts; Use a TaskGroup instead; this is an error in the Swift 6 language mode
+151 |         XCTAssertEqual(child.stop(timeout: 0.1), ["TLS fixture child exit was not observed after SIGTERM"])
+152 |         XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000, 3)
+153 |         guard child.exited.wait(timeout: .now()) == .success else {
+    |                            `- warning: instance method 'wait' is unavailable from asynchronous contexts; Use a TaskGroup instead; this is an error in the Swift 6 language mode
+154 |             XCTFail("Forced cleanup must observe exit")
+155 |             return
+
+Dispatch.DispatchGroup.wait:2:13: note: 'wait(timeout:)' declared here
+1 | class DispatchGroup {
+2 | public func wait(timeout: DispatchTime) -> DispatchTimeoutResult}
+  |             `- note: 'wait(timeout:)' declared here
+3 |
+
+/private/tmp/vw-unlock-review.n0DaMc/macos/Tests/CompanionCoreTests/TLSTests.swift:325:49: warning: 'SecKeychainCreate' was deprecated in macOS 10.10: SecKeychain is deprecated [#]
+421 |             if status != errSecSuccess { failures.append("temporary Keychain delete: \(status)") }
+422 |             self.keychain = nil
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[160 / 196] CompanionCoreTests-product
+[164 / 196]
+[168 / 196] ApprovalCompanion-product
+[177 / 196] ApprovalCompanion-product
+[181 / 196] ApprovalCompanion-product
+[186 / 197] ApprovalCompanionTests-product
+[187 / 201]
+[190 / 201] ApprovalCompanionTests-product
+[195 / 201] ApprovalCompanionTests-product
+[197 / 201] ApprovalCompanionTests-product
+Build complete! (21.03 secs)
+Test Suite 'All tests' started at 2026-10-22 17:37:07.599.
+Test Suite 'CompanionCoreTests.xctest' started at 2026-10-22 17:37:07.601.
+Test Suite 'ProtocolTests' started at 2026-10-22 17:37:07.601.
+Test Case '-[CompanionCoreTests.ProtocolTests testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend]' passed (0.004 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testBoundedInputAndVersion]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testBoundedInputAndVersion]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testClosedV1ResponseAndNestedReviewKeys]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testClosedV1ResponseAndNestedReviewKeys]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testExplicitSameRequestReviewCanRecoverPendingUncertainty]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testExplicitSameRequestReviewCanRecoverPendingUncertainty]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testGenerationOrDisconnectInvalidationDisablesDecision]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testGenerationOrDisconnectInvalidationDisablesDecision]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testInvalidStatusesFailClosed]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testInvalidStatusesFailClosed]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewCannotUndoAuthorityInvalidation]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewCannotUndoAuthorityInvalidation]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewErrorCannotMutateInvalidatedMessage]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewErrorCannotMutateInvalidatedMessage]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testLostDecisionNeverResendsAndPendingRemainsUncertain]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testLostDecisionNeverResendsAndPendingRemainsUncertain]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testOnlyExactKnownUnlockGetsFiniteLongerTimeout]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testOnlyExactKnownUnlockGetsFiniteLongerTimeout]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testReviewTextExposesInvisibleAndDirectionalScalars]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testReviewTextExposesInvisibleAndDirectionalScalars]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testSharedCanonicalReviewIncludesEveryField]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testSharedCanonicalReviewIncludesEveryField]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testTimeoutClassificationUsesOnlySafeDomainAndCode]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testTimeoutClassificationUsesOnlySafeDomainAndCode]' passed (0.000 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testWrongPasswordConsumesVisibleTicket]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testWrongPasswordConsumesVisibleTicket]' passed (0.000 seconds).
+Test Suite 'ProtocolTests' passed at 2026-10-22 17:37:07.615.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.013 (0.014) seconds
+Test Suite 'TLSTests' started at 2026-10-22 17:37:07.615.
+Test Case '-[CompanionCoreTests.TLSTests testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock]' started.
+Test Case '-[CompanionCoreTests.TLSTests testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock]' passed (5.997 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureFailedLaunchLeavesNothingToStop]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureFailedLaunchLeavesNothingToStop]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureRestartAndShutdownAfterAsyncRequest]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureRestartAndShutdownAfterAsyncRequest]' passed (1.402 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownFailsAndCleansUpChildIgnoringTermination]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownFailsAndCleansUpChildIgnoringTermination]' passed (0.134 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownObservesAlreadyExitedChild]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownObservesAlreadyExitedChild]' passed (0.004 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testIssuerSerialCollisionNeverSubstitutesExistingIdentity]' started.
+Test Case '-[CompanionCoreTests.TLSTests testIssuerSerialCollisionNeverSubstitutesExistingIdentity]' passed (2.399 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay]' started.
+Test Case '-[CompanionCoreTests.TLSTests testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay]' passed (1.063 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionAuthenticationAndSingleTransmission]' started.
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionAuthenticationAndSingleTransmission]' passed (1.680 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionRejectsHTTPBodyStatusMismatch]' started.
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionRejectsHTTPBodyStatusMismatch]' passed (1.383 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testSameSubjectRenewalReturnsExactImportedIdentity]' started.
+Test Case '-[CompanionCoreTests.TLSTests testSameSubjectRenewalReturnsExactImportedIdentity]' passed (2.193 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testSlowUnlockReceivesSuccessWithExactlyOneTransmission]' started.
+Test Case '-[CompanionCoreTests.TLSTests testSlowUnlockReceivesSuccessWithExactlyOneTransmission]' passed (7.213 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testStreamingUnlockCannotExtendTotalResourceDeadline]' started.
+Test Case '-[CompanionCoreTests.TLSTests testStreamingUnlockCannotExtendTotalResourceDeadline]' passed (61.181 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]' started.
+/private/tmp/vw-unlock-review.n0DaMc/macos/Tests/CompanionCoreTests/TLSTests.swift:82: error: -[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay] : XCTAssertEqual failed: ("Optional(CompanionCore.CompanionError.transport)") is not equal to ("Optional(CompanionCore.CompanionError.rejected("unauthorized"))")
+Test Case '-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]' failed (1.427 seconds).
+Test Suite 'TLSTests' failed at 2026-10-22 17:38:33.692.
+	 Executed 13 tests, with 1 failure (0 unexpected) in 86.075 (86.077) seconds
+Test Suite 'CompanionCoreTests.xctest' failed at 2026-10-22 17:38:33.692.
+	 Executed 31 tests, with 1 failure (0 unexpected) in 86.088 (86.091) seconds
+Test Suite 'All tests' failed at 2026-10-22 17:38:33.692.
+	 Executed 31 tests, with 1 failure (0 unexpected) in 86.088 (86.093) seconds
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+Test Suite 'All tests' started at 2026-10-22 17:38:34.106.
+Test Suite 'ApprovalCompanionTests.xctest' started at 2026-10-22 17:38:34.107.
+Test Suite 'AppModelTests' started at 2026-10-22 17:38:34.107.
+Test Case '-[ApprovalCompanionTests.AppModelTests testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect]' passed (0.003 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testFullInboxExplainsCapacity]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testFullInboxExplainsCapacity]' passed (0.000 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateNotificationSessionOrListCannotUndoLifecycleChange]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateNotificationSessionOrListCannotUndoLifecycleChange]' passed (0.002 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLatePollCannotMutateReplacementOrSleepingState]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLatePollCannotMutateReplacementOrSleepingState]' passed (0.001 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotMutateReplacementOrClearItsBusyFlag]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotMutateReplacementOrClearItsBusyFlag]' passed (0.001 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotUndoSleepOrRefresh]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotUndoSleepOrRefresh]' passed (0.001 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testSleepDuringNotificationReviewLoadingCannotRestoreReview]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testSleepDuringNotificationReviewLoadingCannotRestoreReview]' passed (0.001 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays]' passed (0.001 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges]' passed (0.001 seconds).
+Test Suite 'AppModelTests' passed at 2026-10-22 17:38:34.117.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.009 (0.010) seconds
+Test Suite 'ApprovalCompanionTests.xctest' passed at 2026-10-22 17:38:34.117.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.009 (0.010) seconds
+Test Suite 'All tests' passed at 2026-10-22 17:38:34.117.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.009 (0.011) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+Note: Some test targets reported failures:
+  - CompanionCoreTests (XCTest)

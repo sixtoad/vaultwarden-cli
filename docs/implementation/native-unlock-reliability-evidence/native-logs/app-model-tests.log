@@ -1,0 +1,37 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+Build complete! (0.73 secs)
+Test Suite 'Selected tests' started at 2026-10-22 17:28:09.673.
+Test Suite 'CompanionCoreTests.xctest' started at 2026-10-22 17:28:09.677.
+Test Suite 'CompanionCoreTests.xctest' passed at 2026-10-22 17:28:09.677.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:28:09.677.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.004) seconds
+Test Suite 'Selected tests' started at 2026-10-22 17:28:09.842.
+Test Suite 'ApprovalCompanionTests.xctest' started at 2026-10-22 17:28:09.846.
+Test Suite 'AppModelTests' started at 2026-10-22 17:28:09.846.
+Test Case '-[ApprovalCompanionTests.AppModelTests testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect]' passed (0.016 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testFullInboxExplainsCapacity]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testFullInboxExplainsCapacity]' passed (0.001 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateNotificationSessionOrListCannotUndoLifecycleChange]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateNotificationSessionOrListCannotUndoLifecycleChange]' passed (0.009 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLatePollCannotMutateReplacementOrSleepingState]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLatePollCannotMutateReplacementOrSleepingState]' passed (0.003 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotMutateReplacementOrClearItsBusyFlag]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotMutateReplacementOrClearItsBusyFlag]' passed (0.003 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotUndoSleepOrRefresh]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotUndoSleepOrRefresh]' passed (0.005 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testSleepDuringNotificationReviewLoadingCannotRestoreReview]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testSleepDuringNotificationReviewLoadingCannotRestoreReview]' passed (0.003 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays]' passed (0.002 seconds).
+Test Case '-[ApprovalCompanionTests.AppModelTests testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges]' started.
+Test Case '-[ApprovalCompanionTests.AppModelTests testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges]' passed (0.002 seconds).
+Test Suite 'AppModelTests' passed at 2026-10-22 17:28:09.892.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.045 (0.046) seconds
+Test Suite 'ApprovalCompanionTests.xctest' passed at 2026-10-22 17:28:09.892.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.045 (0.047) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:28:09.892.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.045 (0.050) seconds

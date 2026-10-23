@@ -35,6 +35,61 @@ actor HeldReviewTransport: CompanionTransport {
     func fail() { pending?.resume(throwing: CompanionError.transport); pending = nil }
 }
 final class ProtocolTests: XCTestCase {
+    func testOnlyExactKnownUnlockGetsFiniteLongerTimeout() throws {
+        for password in ["synthetic-only", "quotes\"/\\\n café", String(repeating: "x", count: 4096)] {
+            XCTAssertEqual(RequestTimeoutPolicy.interval(for: try RequestTimeoutPolicy.encode(Command("unlock", password: password))), 60)
+        }
+        for command in [Command("session"), Command("list"), Command("review", requestID: String(repeating: "A", count: 43)),
+                        Command("status", requestID: String(repeating: "A", count: 43)),
+                        Command("decision", requestID: String(repeating: "A", count: 43), ticket: String(repeating: "d", count: 64), decision: "approve", password: "synthetic-only"),
+                        Command("unlock"), Command("unlock", password: ""), Command("unlock", password: String(repeating: "é", count: 2049))] {
+            XCTAssertEqual(RequestTimeoutPolicy.interval(for: try RequestTimeoutPolicy.encode(command)), 5)
+        }
+        for body in [
+            #"{"command":"unlock","password":"synthetic-only","version":2}"#,
+            #"{"command":"unlock","password":"synthetic-only","version":true}"#,
+            #"{"command":"unlock","password":"synthetic-only","version":"1"}"#,
+            #"{"command":"unlock","password":1,"version":1}"#,
+            #"{"command":"unlock","password":null,"version":1}"#,
+            #"{"command":"unlock","password":"synthetic-only","ticket":null,"version":1}"#,
+            #"{"command":"unlock","command":"unlock","password":"synthetic-only","version":1}"#,
+            #"{"command":"unlock","password":"synthetic-only","version":1,"version":1}"#,
+            #"{"command":"unlock","password":"synthetic-only","password":"synthetic-only","version":1}"#,
+            #"{"command":"UNLOCK","password":"synthetic-only","version":1}"#,
+            #"{"version":1,"command":"unlock","password":"synthetic-only"}"#,
+            #"[{"command":"unlock","password":"synthetic-only","version":1}]"#,
+            #"{"command":"unlock","password":"synthetic-only","version":1} trailing"#, "null", ""
+        ] {
+            XCTAssertEqual(RequestTimeoutPolicy.interval(for: Data(body.utf8)), 5)
+        }
+    }
+
+    func testTimeoutClassificationUsesOnlySafeDomainAndCode() {
+        let details: [String: Any] = [NSLocalizedDescriptionKey: "secret-sentinel", "password": "secret-sentinel"]
+        XCTAssertEqual(RequestTimeoutPolicy.classify(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: details)), .timeout)
+        for error in [NSError(domain: "other", code: NSURLErrorTimedOut, userInfo: details),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost, userInfo: details),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted, userInfo: details),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled, userInfo: [NSUnderlyingErrorKey: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)])] {
+            XCTAssertEqual(RequestTimeoutPolicy.classify(error), .transport)
+        }
+        XCTAssertFalse(CompanionError.timeout.localizedDescription.contains("secret-sentinel"))
+        XCTAssertTrue(CompanionError.timeout.localizedDescription.contains("may have completed"))
+    }
+
+    @MainActor func testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty() async throws {
+        let transport = ScriptedTransport([.success(try sharedReviewData()), .failure(.timeout),
+            .success(Data(#"{"version":1,"status":{"status":"pending"}}"#.utf8))])
+        let controller = DecisionController(client: CompanionClient(transport: transport))
+        await controller.load(try fixtureReview().review.id)
+        await controller.decide(approve: true, password: "synthetic-only")
+        XCTAssertTrue(controller.uncertain)
+        XCTAssertFalse(controller.canDecide)
+        await controller.decide(approve: true, password: "must-not-be-sent")
+        let commands = await transport.commands
+        XCTAssertEqual(commands, ["review", "decision", "status"])
+    }
+
     func testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields() throws {
         var response = try JSONSerialization.jsonObject(with: sharedReviewData()) as! [String: Any]
         var review = response["review"] as! [String: Any]

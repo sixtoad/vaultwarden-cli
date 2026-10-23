@@ -1,0 +1,17 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "exit_code": 0,
+  "initial_session": "unlocked",
+  "native_request_counts": {
+    "decision": 1,
+    "list": 1,
+    "review": 1,
+    "session": 1,
+    "status": 2
+  },
+  "operation": "storage-consume",
+  "request_id": "Y_ry_k9zOsUTw9gS5W3_JCrXOq9ZvXGe-Q73dOdHhrg",
+  "status": "completed",
+  "success": true
+}

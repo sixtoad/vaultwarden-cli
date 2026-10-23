@@ -1,0 +1,18 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "complete_create_effect_validated": true,
+  "initial_session": "unlocked",
+  "native_request_counts": {
+    "decision": 1,
+    "list": 1,
+    "review": 1,
+    "session": 1,
+    "status": 1
+  },
+  "operation": "storage-interrupt",
+  "reason": "execution_unavailable",
+  "request_id": "3lv_lmqTsR_cohm-dAtGIxAtbrAeCTpWnHJfa1dvGNg",
+  "status": "failed",
+  "success": true
+}

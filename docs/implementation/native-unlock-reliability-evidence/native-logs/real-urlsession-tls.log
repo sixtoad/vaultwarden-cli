@@ -1,0 +1,55 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 153]
+[Planning deferred tasks]
+[1 / 5]
+[3 / 4] ApprovalCompanionTests-product
+Build complete! (1.63 secs)
+Test Suite 'Selected tests' started at 2026-10-22 17:28:18.484.
+Test Suite 'CompanionCoreTests.xctest' started at 2026-10-22 17:28:18.486.
+Test Suite 'TLSTests' started at 2026-10-22 17:28:18.486.
+Test Case '-[CompanionCoreTests.TLSTests testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock]' started.
+Test Case '-[CompanionCoreTests.TLSTests testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock]' passed (8.326 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureFailedLaunchLeavesNothingToStop]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureFailedLaunchLeavesNothingToStop]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureRestartAndShutdownAfterAsyncRequest]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureRestartAndShutdownAfterAsyncRequest]' passed (5.349 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownFailsAndCleansUpChildIgnoringTermination]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownFailsAndCleansUpChildIgnoringTermination]' passed (0.193 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownObservesAlreadyExitedChild]' started.
+Test Case '-[CompanionCoreTests.TLSTests testFixtureShutdownObservesAlreadyExitedChild]' passed (0.011 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testIssuerSerialCollisionNeverSubstitutesExistingIdentity]' started.
+Test Case '-[CompanionCoreTests.TLSTests testIssuerSerialCollisionNeverSubstitutesExistingIdentity]' passed (5.705 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay]' started.
+Test Case '-[CompanionCoreTests.TLSTests testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay]' passed (3.122 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionAuthenticationAndSingleTransmission]' started.
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionAuthenticationAndSingleTransmission]' passed (5.876 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionRejectsHTTPBodyStatusMismatch]' started.
+Test Case '-[CompanionCoreTests.TLSTests testRealURLSessionRejectsHTTPBodyStatusMismatch]' passed (4.393 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testSameSubjectRenewalReturnsExactImportedIdentity]' started.
+Test Case '-[CompanionCoreTests.TLSTests testSameSubjectRenewalReturnsExactImportedIdentity]' passed (5.294 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testSlowUnlockReceivesSuccessWithExactlyOneTransmission]' started.
+Test Case '-[CompanionCoreTests.TLSTests testSlowUnlockReceivesSuccessWithExactlyOneTransmission]' passed (8.858 seconds).
+Test Case '-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]' started.
+Test Case '-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]' passed (5.123 seconds).
+Test Suite 'TLSTests' passed at 2026-10-22 17:29:10.742.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 52.253 (52.255) seconds
+Test Suite 'CompanionCoreTests.xctest' passed at 2026-10-22 17:29:10.742.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 52.253 (52.255) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:29:10.742.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 52.253 (52.257) seconds
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+Test Suite 'Selected tests' started at 2026-10-22 17:29:11.024.
+Test Suite 'ApprovalCompanionTests.xctest' started at 2026-10-22 17:29:11.026.
+Test Suite 'ApprovalCompanionTests.xctest' passed at 2026-10-22 17:29:11.026.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:29:11.026.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds

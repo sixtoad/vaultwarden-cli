@@ -1,0 +1,19 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "initial_session": "unlocked",
+  "native_request_attempted_counts": {
+    "session": 1
+  },
+  "native_request_completed_counts": {
+    "session": 1
+  },
+  "native_request_counts": {
+    "session": 1
+  },
+  "native_request_elapsed_seconds": {
+    "session": 0.08468016679398715
+  },
+  "operation_elapsed_seconds": 0.16423095832578838,
+  "success": true
+}

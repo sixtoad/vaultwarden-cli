@@ -1,0 +1,21 @@
+strict_ats_private_ca_rejected: PASS
+configured_private_ca_accepted: PASS
+wrong_ca_rejected: PASS
+wrong_pin_rejected: PASS
+wrong_hostname_rejected: PASS
+expired_leaf_rejected: PASS
+foreign_client_rejected: PASS
+revoked_client_rejected: PASS
+http_configuration_rejected: PASS
+tls11_rejected: PASS
+redirect_rejected: PASS
+oversized_response_rejected: PASS
+wrong_password_explicitly_rejected: PASS
+wrong_unlock_explicitly_rejected: PASS
+lost_decision_not_retried: PASS
+success_body_under_503_rejected: PASS
+error_body_under_200_rejected: PASS
+error_code_status_mismatch_rejected: PASS
+unknown_error_code_rejected: PASS
+extra_error_field_rejected: PASS
+Bundle TLS regression: 20 passed; 0 skipped.

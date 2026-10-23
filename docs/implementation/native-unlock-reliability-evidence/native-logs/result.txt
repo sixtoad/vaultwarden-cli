@@ -1,0 +1,1 @@
+Native checks passed. Logged-in Mac/Linux acceptance is still required; follow docs/companion-setup.md.

@@ -57,12 +57,12 @@ def systemd_env():
                 DBUS_SESSION_BUS_ADDRESS=f"unix:path=/run/user/{os.getuid()}/bus")
 
 
-def agent(root, mode):
+def agent(root, mode, operation="synthetic-deploy"):
     # Python reads the ready file and the complete helper before dropping uid.
     # Only the signing seed belongs to the mapped agent; no provider secret is read.
     program = r'''
 import base64,json,os,pathlib,subprocess,sys
-root=pathlib.Path(sys.argv[1]); mode=sys.argv[2]
+root=pathlib.Path(sys.argv[1]); mode=sys.argv[2]; operation=sys.argv[3]
 config=json.loads((root/"launcher.json").read_text()); transport=pathlib.Path(config["transport"])
 ready=json.loads((root/"ready.json").read_text()) if mode=="submit" else None
 mapping=[list(map(int,line.split())) for line in pathlib.Path("/proc/self/uid_map").read_text().splitlines()]
@@ -77,13 +77,14 @@ if mode=="prepare":
     public=subprocess.run(["openssl","pkey","-inform","DER","-pubout","-outform","DER"],input=der,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout[-32:]
     print(json.dumps({"uid":outer,"public_key":base64.urlsafe_b64encode(public).decode().rstrip("=")}))
 else:
-    args=[str(transport/"vw-access"),"submit","synthetic-deploy","--socket",ready["socket"],"--key-file",str(keyroot/"seed"),"--binding-id",ready["binding"]["id"],"--revision",ready["revision"],"--wait","--timeout-seconds","300","--","exit","synthetic"]
+    spec=ready.get("operations",{}).get(operation,{"revision":ready.get("revision"),"arguments":["exit","synthetic"]})
+    args=[str(transport/"vw-access"),"submit",operation,"--socket",ready["socket"],"--key-file",str(keyroot/"seed"),"--binding-id",ready["binding"]["id"],"--revision",spec["revision"],"--wait","--timeout-seconds","300","--",*spec["arguments"]]
     os.setsid()
     with open(os.devnull,"rb") as null: os.dup2(null.fileno(),0)
     os.execv(args[0],args)
 '''
     return subprocess.run(["unshare", "--user", "--map-auto", "--map-root-user",
-                           "python3", "-c", program, str(root), mode],
+                           "python3", "-c", program, str(root), mode, operation],
                           check=(mode == "prepare"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, timeout=315 if mode == "submit" else 15)
 
@@ -127,7 +128,9 @@ def prepare(hostname, prior=None):
                 issued_serials.add(serial)
                 openssl("req", "-newkey", "rsa:2048", "-nodes", "-keyout", tls / f"{name}-key.pem", "-out", tls / f"{name}.csr", "-subj", f"/CN=Synthetic companion {name}")
                 extensions = f"basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage={purpose}\n"
-                if name == "server": extensions += f"subjectAltName=DNS:{hostname},IP:127.0.0.1\n"
+                if name == "server":
+                    host_san = ("IP:" if all(c in "0123456789." for c in hostname) else "DNS:") + hostname
+                    extensions += f"subjectAltName={host_san},IP:127.0.0.1\n"
                 (tls / f"{name}.ext").write_text(extensions)
                 openssl("x509", "-req", "-in", tls / f"{name}.csr", "-CA", tls / "ca.pem", "-CAkey", tls / "ca-key.pem", "-set_serial", str(serial), "-out", tls / f"{name}.pem", "-days", "2", "-extfile", tls / f"{name}.ext")
             openssl("x509", "-in", tls / "ca.pem", "-outform", "DER", "-out", tls / "ca.der")
@@ -179,11 +182,12 @@ def start(root, client_revoked=False, drop_approval_reply=False, resume=False):
         save(root / "resume-ready.json", previous)
     elif (root / "provider").exists():
         raise ValueError("fixture already used; prepare a fresh one or explicitly resume")
+    fixture = config.get("fixture", FIXTURE)
     candidates = [p for p in (REPO / "target/debug/deps").glob("vaultwarden_cli-*") if p.is_file() and os.access(p, os.X_OK) and not p.suffix]
     binary = None
     for candidate in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
         probe = subprocess.run([candidate, "--list"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=10)
-        if probe.returncode == 0 and FIXTURE in probe.stdout:
+        if probe.returncode == 0 and fixture in probe.stdout:
             binary = candidate
             break
     if binary is None: raise ValueError("test binary does not yet contain acceptance fixture; await implementation build")
@@ -201,7 +205,8 @@ def start(root, client_revoked=False, drop_approval_reply=False, resume=False):
     if drop_approval_reply:
         settings["DROP_APPROVAL_REPLY"] = "1"
     command += [f"--setenv=VW_COMPANION_{key}={value}" for key, value in settings.items()]
-    command += [str(installed), "--exact", FIXTURE, "--ignored", "--nocapture"]
+    command += [f"--setenv={key}={value}" for key, value in config.get("fixture_environment", {}).items()]
+    command += [str(installed), "--exact", fixture, "--ignored", "--nocapture"]
     if resume:
         for path in reports:
             path.unlink()

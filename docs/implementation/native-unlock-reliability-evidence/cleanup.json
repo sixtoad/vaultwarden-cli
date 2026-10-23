@@ -1,0 +1,13 @@
+{
+  "owned_services_stopped": true,
+  "owned_container_absent": true,
+  "agent_material_removed": true,
+  "private_bootstrap_removed": true,
+  "execution_units_absent": true,
+  "execution_runtime_absent": true,
+  "temporary_mac_keychain_entries_absent": true,
+  "temporary_mac_fixture_directories_absent": true,
+  "owned_mac_workspace_removed": true,
+  "review_mac_workspace_removed": true,
+  "review_temporary_keychains_and_fixture_directories_absent": true
+}

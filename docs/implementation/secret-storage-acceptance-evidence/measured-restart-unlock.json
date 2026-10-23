@@ -1,0 +1,15 @@
+{
+  "elapsed_seconds": 2.297,
+  "exit_code": 0,
+  "native": {
+    "approval_mode": "automated_native_client",
+    "cleanup_verified": true,
+    "initial_session": "locked",
+    "native_request_counts": {
+      "session": 1,
+      "unlock": 1
+    },
+    "session": "unlocked",
+    "success": true
+  }
+}

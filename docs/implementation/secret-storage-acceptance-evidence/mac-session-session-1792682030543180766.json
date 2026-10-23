@@ -1,0 +1,9 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "initial_session": "unlocked",
+  "native_request_counts": {
+    "session": 1
+  },
+  "success": true
+}

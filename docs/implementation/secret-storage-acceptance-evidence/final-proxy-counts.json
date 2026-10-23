@@ -1,0 +1,17 @@
+{
+  "requests": {
+    "GET /api/version": 19,
+    "GET /api/config": 19,
+    "POST /identity/connect/token": 5,
+    "GET /api/sync": 20,
+    "POST /api/ciphers": 2,
+    "GET /api/ciphers/8a2262d5-a44b-4aa5-8be3-dbe2a7c4fdeb": 5,
+    "GET /api/ciphers/06f807a1-5ef8-4896-9be8-d9da30cb7d05": 2
+  },
+  "cipher_posts": 2,
+  "committed_cipher_posts": 2,
+  "dropped_cipher_replies": 1,
+  "dropped_item_ids": [
+    "06f807a1-5ef8-4896-9be8-d9da30cb7d05"
+  ]
+}

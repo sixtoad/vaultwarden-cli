@@ -1,0 +1,93 @@
+{
+  "vault_item_count": 2,
+  "items": [
+    {
+      "id": "06f807a1-5ef8-4896-9be8-d9da30cb7d05",
+      "name": "interrupt",
+      "reference": "storage-acceptance/interrupt",
+      "synthetic_value_matches": true,
+      "eligibility_marker_matches": true
+    },
+    {
+      "id": "8a2262d5-a44b-4aa5-8be3-dbe2a7c4fdeb",
+      "name": "create",
+      "reference": "storage-acceptance/create",
+      "synthetic_value_matches": true,
+      "eligibility_marker_matches": true
+    }
+  ],
+  "proxy": {
+    "requests": {
+      "GET /api/version": 12,
+      "GET /api/config": 12,
+      "POST /identity/connect/token": 2,
+      "GET /api/sync": 16,
+      "POST /api/ciphers": 2,
+      "GET /api/ciphers/8a2262d5-a44b-4aa5-8be3-dbe2a7c4fdeb": 5
+    },
+    "cipher_posts": 2,
+    "committed_cipher_posts": 2,
+    "dropped_cipher_replies": 1,
+    "dropped_item_ids": [
+      "06f807a1-5ef8-4896-9be8-d9da30cb7d05"
+    ]
+  },
+  "provider": {
+    "execution_started": [
+      {
+        "operation": "storage-interrupt",
+        "request_id": "3lv_lmqTsR_cohm-dAtGIxAtbrAeCTpWnHJfa1dvGNg"
+      },
+      {
+        "operation": "storage-consume",
+        "request_id": "Y_ry_k9zOsUTw9gS5W3_JCrXOq9ZvXGe-Q73dOdHhrg"
+      },
+      {
+        "operation": "storage-create",
+        "request_id": "J9V6_XBKeM6Jn0a_8ZpEwHOF0UAEaIEStl7ob91jZRw"
+      }
+    ],
+    "requests": [
+      {
+        "request_id": "mry_wbyw4nbp7ItzjKbzU3qkqMuHPzO-DU-F7XhTqIU",
+        "status": {
+          "status": "denied"
+        },
+        "write_receipt": null
+      },
+      {
+        "request_id": "J9V6_XBKeM6Jn0a_8ZpEwHOF0UAEaIEStl7ob91jZRw",
+        "status": {
+          "exit_code": 0,
+          "status": "completed"
+        },
+        "write_receipt": {
+          "attempt_id": "J9V6_XBKeM6Jn0a_8ZpEwHOF0UAEaIEStl7ob91jZRw",
+          "item_id": "8a2262d5-a44b-4aa5-8be3-dbe2a7c4fdeb",
+          "status": "verified"
+        }
+      },
+      {
+        "request_id": "Y_ry_k9zOsUTw9gS5W3_JCrXOq9ZvXGe-Q73dOdHhrg",
+        "status": {
+          "exit_code": 0,
+          "status": "completed"
+        },
+        "write_receipt": null
+      },
+      {
+        "request_id": "3lv_lmqTsR_cohm-dAtGIxAtbrAeCTpWnHJfa1dvGNg",
+        "status": {
+          "reason": "execution_unavailable",
+          "status": "failed"
+        },
+        "write_receipt": {
+          "attempt_id": "3lv_lmqTsR_cohm-dAtGIxAtbrAeCTpWnHJfa1dvGNg",
+          "item_id": null,
+          "status": "uncertain"
+        }
+      }
+    ],
+    "session": "unlocked"
+  }
+}

@@ -77,6 +77,7 @@ public actor PinnedTransport: CompanionTransport {
         activeRequests += 1
         defer { activeRequests -= 1 }
         let identity = try KeychainIdentity.resolve(configuration.identityReference)
+        let timeout = RequestTimeoutPolicy.interval(for: body)
         let delegate = RequestDelegate(configuration: configuration, identity: identity)
         let sessionConfiguration = URLSessionConfiguration.ephemeral
         sessionConfiguration.urlCache = nil
@@ -85,15 +86,15 @@ public actor PinnedTransport: CompanionTransport {
         sessionConfiguration.httpShouldSetCookies = false
         sessionConfiguration.httpShouldUsePipelining = false
         sessionConfiguration.httpMaximumConnectionsPerHost = 1
-        sessionConfiguration.timeoutIntervalForRequest = 5
-        sessionConfiguration.timeoutIntervalForResource = 5
+        sessionConfiguration.timeoutIntervalForRequest = timeout
+        sessionConfiguration.timeoutIntervalForResource = timeout
         sessionConfiguration.waitsForConnectivity = false
         sessionConfiguration.tlsMinimumSupportedProtocolVersion = .TLSv12
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
         let session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: queue)
         defer { session.invalidateAndCancel() }
-        var request = URLRequest(url: configuration.endpoint, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 5)
+        var request = URLRequest(url: configuration.endpoint, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -183,7 +184,7 @@ private final class RequestDelegate: NSObject, URLSessionDataDelegate, URLSessio
         let callback = continuation
         continuation = nil
         if let failure { callback?.resume(throwing: failure) }
-        else if error != nil { callback?.resume(throwing: CompanionError.transport) }
+        else if let error { callback?.resume(throwing: RequestTimeoutPolicy.classify(error)) }
         else {
             do {
                 // HTTP and JSON form one protocol response. Never treat an error
