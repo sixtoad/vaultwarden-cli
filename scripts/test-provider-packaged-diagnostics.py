@@ -270,7 +270,10 @@ class DiagnosticsTests(unittest.TestCase):
                                        dict(os.environ), timeout=0.2)
         self.assertTrue(result["timed_out"])
         self.assertFalse(result["passed"])
-        self.assertEqual(result["deadline_progress"], [{"phase": "startup", "event": "enter"}])
+        # Windows communicate() reader threads expose bytes only after EOF;
+        # POSIX (including this macOS-only runner) preserves partial output.
+        deadline_progress = [{"phase": "startup", "event": "enter"}] if os.name == "posix" else []
+        self.assertEqual(result["deadline_progress"], deadline_progress)
         self.assertEqual(result["progress"], [{"phase": "startup", "event": "enter"},
                                               {"phase": "shutdown", "event": "complete"}])
         self.assertEqual(result["exit_code_before_cleanup"], 0)

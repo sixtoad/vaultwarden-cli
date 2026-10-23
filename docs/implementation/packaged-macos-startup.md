@@ -18,6 +18,8 @@ The diagnostic PR also encountered a newly published security-audit failure: `RU
 
 Windows CI exposed an OS assumption in the inherited-pipe test. Python uses reader threads for Windows pipes, whereas the macOS-only packaged runner uses POSIX selectors. That regression now runs on Linux/macOS; the diagnostic parser and ordinary child-process tests remain portable.
 
+For the same reason, Windows does not expose partial pipe output in `communicate()` timeout exceptions. The late-completion regression still requires a failed deadline, exit zero after sampling, and complete final progress on every platform; it expects deadline-only partial progress on POSIX, where the packaged runner executes.
+
 ## Hosted GUI service readiness
 
 The failed job used macOS 26.6.1 (25G76), Intel image `20260824.0517.1`. This exactly matches [actions/runner-images#14751](https://github.com/actions/runner-images/issues/14751), which reports an IconServices crash loop that blocks GUI startup/focus, including on GitHub-hosted runners. This is a supported lead, not yet proof that every observed application timeout has that cause.
