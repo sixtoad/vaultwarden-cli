@@ -194,6 +194,9 @@ class DiagnosticsTests(unittest.TestCase):
                 child.kill()
                 child.wait(timeout=2)
 
+    # The packaged runner is macOS-only. Windows communicate() uses reader
+    # threads, whose pipe close can wait for descendants; POSIX uses selectors.
+    @unittest.skipUnless(os.name == "posix", "requires the packaged runner's POSIX pipe semantics")
     def test_inherited_pipe_does_not_remove_app_deadline(self):
         code = ("import subprocess,sys,time; "
                 "subprocess.Popen([sys.executable,'-c','import time; time.sleep(2)']); "
