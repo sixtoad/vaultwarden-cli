@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import selectors
 import shlex
 import shutil
@@ -24,6 +25,96 @@ PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity pe
 CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus".split())
 COMMANDS = frozenset("session list unlock review decision status".split())
 NATIVE_COMMANDS = frozenset("session list unlock review approve deny status".split())
+# Only these literal labels may leave a native sample. Never retain symbols,
+# addresses, thread names, binary paths, command lines or arbitrary diagnostics.
+STACK_LABELS = (
+    "SecItemCopyMatching", "SecIdentityCopyCertificate", "KeychainIdentity",
+    "ProviderSettings", "ProviderAdapter", "FlutterEngine", "FlutterViewController",
+    "FlutterView", "FlutterMethodChannel", "FlutterBinaryMessenger",
+    "NSApplication", "NSWindow", "CFRunLoop", "CA::Transaction", "CATransaction",
+    "CALayer", "Metal", "IOGPU", "swift_task", "dispatch_main",
+    "semaphore_wait", "mach_msg", "pthread_cond", "__semwait_signal",
+    "fml::", "flutter::", "dart::", "Dart_", "SecKeychain", "Security::",
+    "FlutterThreadSynchronizer", "FlutterSurfaceManager", "FlutterCompositor",
+    "Rasterizer::Draw", "WaitForFirstFrame", "waitUntilScheduled",
+    "blockUntilFrameAvailable", "performCommit", "waitUntilFrameAvailable",
+    "__psynch_cvwait", "__ulock_wait", "__workq_kernreturn",
+)
+STACK_IMAGES = ("Security", "FlutterMacOS", "AppKit", "QuartzCore", "Metal",
+                "libswift_Concurrency.dylib", "libdispatch.dylib", "libxpc.dylib")
+DRAIN_TIMEOUT = 2
+
+
+def stack_diagnostics(raw):
+    if len(raw) > 1_048_576:
+        return {"status": "oversized"}
+    threads = []
+    current = None
+    graph = False
+    for line in raw.decode("utf-8", errors="replace").splitlines():
+        if line == "Call graph:":
+            graph = True
+            continue
+        if not graph:
+            continue
+        if line and not line[0].isspace():
+            break
+        if re.match(r"\s+\d+ Thread_", line):
+            if len(threads) == 32:
+                break
+            current = {"main": "com.apple.main-thread" in line, "frames": []}
+            threads.append(current)
+        elif current is not None and len(current["frames"]) < 128:
+            frame = re.match(r"([\s+|!:]*)(\d+) (.*?)\s+\(in ([^)]+)\)", line)
+            if frame is None:
+                continue
+            indent, count, symbol, library = frame.groups()
+            labels = [label for label in STACK_LABELS if label in symbol]
+            if library in STACK_IMAGES:
+                labels.append("image:" + library)
+            if labels:
+                current["frames"].append({"depth": min(len(indent), 256),
+                    "samples": min(int(count[:7]), 1_000_000), "labels": labels})
+    return {"status": "captured" if threads else "unrecognized", "threads": threads}
+
+
+def sample_process(pid):
+    if sys.platform != "darwin":
+        return {"status": "unsupported"}
+    try:
+        result = subprocess.run(
+            ["/usr/bin/sample", str(pid), "1", "10", "-file", "/dev/stdout"],
+            check=True, timeout=5, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return stack_diagnostics(result.stdout)
+    except (OSError, subprocess.SubprocessError):
+        return {"status": "unavailable"}
+
+
+def run_app(argv, environment, timeout=45):
+    # subprocess.run kills on timeout before callers can inspect the live child.
+    # Own the process here, sample it once, then always kill/reap it. No relaunch.
+    with subprocess.Popen(list(map(str, argv)), env=environment,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                sample = sample_process(process.pid)
+            finally:
+                process.kill()
+                try:
+                    stdout, stderr = process.communicate(timeout=DRAIN_TIMEOUT)
+                except subprocess.TimeoutExpired as error:
+                    # A descendant may still hold an inherited pipe open. Keep
+                    # captured bytes and close our pipe ends instead of hanging.
+                    stdout, stderr = error.output or b"", error.stderr or b""
+                    process.stdout.close()
+                    process.stderr.close()
+                    process.wait(timeout=DRAIN_TIMEOUT)
+            result = app_diagnostics(None, stdout, stderr, timed_out=True)
+            result["native_sample"] = sample
+            return result
+        return app_diagnostics(process.returncode, stdout, stderr)
 
 
 def progress_diagnostics(stdout, stderr, prefix, phases):
@@ -88,7 +179,7 @@ def run_diagnosed(argv, diagnostics, **options):
 
 
 def launch_app(executable, environment):
-    return run_diagnosed([executable], app_diagnostics, env=environment)
+    return run_app([executable], environment)
 
 
 def command_counts(path):

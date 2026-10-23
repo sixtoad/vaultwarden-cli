@@ -1,0 +1,11 @@
+# Packaged macOS startup investigation
+
+The merge of PR #45 failed in [CI run 39904655601](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39904655601), at commit `4407fd5518578077a37317f08ac508125456e40d`. All other executed jobs passed.
+
+The first packaged provider case (`approve`) exceeded its 45-second process deadline. Sanitized progress reached `startup:complete`, `initializeCore:complete`, and `configuration:enter`. Fixture provisioning passed; the server observed zero commands, and cleanup passed. This places the failure before transport but does not distinguish channel delivery, native scheduling, or the synchronous Keychain lookup used by configuration metadata.
+
+An earlier [PR run](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39849654297) stopped before any Dart progress in a different case. The [intermediate PR run](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39857654375) passed. A passing rerun alone therefore does not establish a fix.
+
+The packaged runner now samples only its own timed-out app before terminating it. The macOS sampler runs for one second with a five-second command deadline. Only fixed frame labels, bounded sample counts/indentation and a main-thread boolean survive into `packaged-tls.json`; raw samples, paths, addresses and thread names are discarded. Labels come from symbol/library fields, never path annotations. Counts and indentation preserve the distinction between brief sampled branches and persistent waits, although a sample alone does not prove a deadlock. The application deadline remains 45 seconds, and a timeout remains a failure even if the success marker arrives during sampling. The process is killed and reaped, with a bounded pipe drain if descendants retain inherited handles; no application operation is retried. Existing command-count and cleanup checks remain active.
+
+This change supplies missing evidence; it does not yet establish the underlying startup cause. Portable tests cover real child timeout/cleanup, inherited pipe handles, success/nonzero exits, diagnostic redaction and sampler failure handling. A macOS-only test samples an owned live process with the actual OS tool; it also runs in the existing macOS CI job.

@@ -11,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -139,18 +140,106 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual(len(result["failures"]), 16)
         self.assertEqual(len(result["native_rejections"]), 16)
 
-    def test_subprocess_failure_and_timeout_keep_only_sanitized_evidence(self):
-        for error, code, timed_out in [
-            (subprocess.CalledProcessError(1, [SECRET], output=SECRET,
-                stderr=b"COMPANION_PROVIDER_TLS_FAILED:finish:sessionUnlocked\n"), 1, False),
-            (subprocess.TimeoutExpired([SECRET], 45, output=SECRET, stderr=SECRET), None, True),
-        ]:
-            with patch.object(PROBE, "run", side_effect=error):
-                result = PROBE.launch_app(Path("synthetic-app"), {})
+    def test_real_app_success_and_failure_do_not_sample(self):
+        for code in (0, 7):
+            with patch.object(PROBE, "sample_process") as sample:
+                result = PROBE.run_app([sys.executable, "-c",
+                    f"print('COMPANION_PROVIDER_TLS_OK'); raise SystemExit({code})"], dict(os.environ))
             self.assertEqual(result["exit_code"], code)
-            self.assertEqual(result["timed_out"], timed_out)
-            self.assertFalse(result["passed"])
-            self.assertNotIn(SECRET.decode(), json.dumps(result))
+            self.assertEqual(result["passed"], code == 0)
+            sample.assert_not_called()
+
+    def test_real_timeout_samples_live_child_then_reaps_without_retry(self):
+        children = []
+        original = subprocess.Popen
+        def start(*args, **kwargs):
+            process = original(*args, **kwargs)
+            children.append(process)
+            return process
+        def sample(pid):
+            self.assertEqual(pid, children[0].pid)
+            self.assertIsNone(children[0].poll())
+            return {"status": "unavailable"}
+        with patch.object(PROBE.subprocess, "Popen", side_effect=start), \
+                patch.object(PROBE, "sample_process", side_effect=sample) as sampled:
+            result = PROBE.run_app([sys.executable, "-c",
+                "import time; print('COMPANION_PROVIDER_TLS_OK', flush=True); "
+                "print('password PRIVATE KEY', flush=True); time.sleep(20)"], dict(os.environ), timeout=0.3)
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].returncode)
+        sampled.assert_called_once()
+        self.assertTrue(result["timed_out"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["native_sample"], {"status": "unavailable"})
+        self.assertNotIn("password", json.dumps(result))
+
+    def test_sample_errors_are_closed_and_bounded(self):
+        for error in (OSError(SECRET), subprocess.TimeoutExpired([SECRET], 5),
+                      subprocess.CalledProcessError(1, [SECRET], output=SECRET)):
+            with patch.object(PROBE.sys, "platform", "darwin"), \
+                    patch.object(PROBE.subprocess, "run", side_effect=error) as run:
+                self.assertEqual(PROBE.sample_process(123), {"status": "unavailable"})
+                self.assertEqual(run.call_args.kwargs["timeout"], 5)
+                self.assertEqual(run.call_args.args[0],
+                    ["/usr/bin/sample", "123", "1", "10", "-file", "/dev/stdout"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "requires native macOS sampler")
+    def test_native_sampler_recognizes_a_live_owned_process(self):
+        with subprocess.Popen(["/bin/sleep", "10"]) as child:
+            try:
+                result = PROBE.sample_process(child.pid)
+                self.assertEqual(result["status"], "captured")
+                self.assertTrue(any(thread["main"] and thread["frames"] for thread in result["threads"]))
+            finally:
+                child.kill()
+                child.wait(timeout=2)
+
+    def test_inherited_pipe_does_not_remove_app_deadline(self):
+        code = ("import subprocess,sys,time; "
+                "subprocess.Popen([sys.executable,'-c','import time; time.sleep(2)']); "
+                "print('COMPANION_PROVIDER_TLS_PROGRESS:startup:enter', flush=True); time.sleep(20)")
+        start = time.monotonic()
+        with patch.object(PROBE, "sample_process", return_value={"status": "unavailable"}), \
+                patch.object(PROBE, "DRAIN_TIMEOUT", 0.1):
+            result = PROBE.run_app([sys.executable, "-c", code], dict(os.environ), timeout=0.3)
+        self.assertLess(time.monotonic() - start, 1.5)
+        self.assertTrue(result["timed_out"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["progress"], [{"phase": "startup", "event": "enter"}])
+
+    def test_native_sample_retains_only_closed_frames_in_call_graph(self):
+        raw = (SECRET + b"\nCall graph:\n"
+               b"    99 Thread_123 DispatchQueue_1: com.apple.main-thread (serial)\n"
+               b"      99 ProviderSettings.metadata() (in companion_slice) /password\n"
+               b"        99 SecItemCopyMatching (in Security) + 12 [0xdeadbeef]\n"
+               b"          99 private-secret-frame (in secret-library)\n"
+               b"    99 Thread_234 secret-thread-name\n"
+               b"      99 semaphore_wait_trap (in libsystem_kernel.dylib)\n"
+               b"Binary Images:\nProviderAdapter /secret/path\n")
+        result = PROBE.stack_diagnostics(raw)
+        self.assertEqual(result, {"status": "captured", "threads": [
+            {"main": True, "frames": [
+                {"depth": 6, "samples": 99, "labels": ["ProviderSettings"]},
+                {"depth": 8, "samples": 99, "labels": ["SecItemCopyMatching", "image:Security"]}]},
+            {"main": False, "frames": [{"depth": 6, "samples": 99, "labels": ["semaphore_wait"]}]}]})
+        for secret in [*SECRET.decode().split(), "123", "234", "deadbeef", "secret", "ProviderAdapter"]:
+            self.assertNotIn(secret, json.dumps(result))
+        self.assertEqual(PROBE.stack_diagnostics(SECRET)["status"], "unrecognized")
+        self.assertEqual(PROBE.stack_diagnostics(b"x" * 1_048_577), {"status": "oversized"})
+        many = b"Call graph:\n" + b"    1 Thread_123 secret\n      1 Dart_ (in FlutterMacOS)\n" * 1000
+        self.assertEqual(len(PROBE.stack_diagnostics(many)["threads"]), 32)
+
+    def test_sample_ignores_misleading_paths_and_keeps_branch_counts(self):
+        raw = (b"Call graph:\n    85 Thread_1 DispatchQueue_1: com.apple.main-thread\n"
+               b"      1 unknown (in private) /tmp/SecItemCopyMatching/ProviderSettings\n"
+               b"      1 SecItemCopyMatching (in Security)\n"
+               b"      84 FlutterThreadSynchronizer (in FlutterMacOS)\n"
+               b"        84 semaphore_wait_trap (in libsystem_kernel.dylib)\n")
+        frames = PROBE.stack_diagnostics(raw)["threads"][0]["frames"]
+        self.assertEqual(len(frames), 3)
+        self.assertEqual([frame["samples"] for frame in frames], [1, 84, 84])
+        self.assertEqual([frame["depth"] for frame in frames], [6, 6, 8])
+        self.assertNotIn("ProviderSettings", json.dumps(frames))
 
     def test_command_counts_are_closed_and_bounded(self):
         with tempfile.TemporaryDirectory() as directory:
