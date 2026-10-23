@@ -213,6 +213,68 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertEqual(result["progress"], [{"phase": "startup", "event": "enter"}])
 
+    @unittest.skipUnless(os.name == "posix", "requires the packaged runner's POSIX pipe semantics")
+    def test_completed_app_with_inherited_pipe_uses_its_exit_and_deadline_output(self):
+        original = subprocess.Popen
+        def start_completed(*args, **kwargs):
+            process = original(*args, **kwargs)
+            process.wait(timeout=5)
+            return process
+        for code, marker, passed in [(0, "COMPANION_PROVIDER_TLS_OK", True),
+                                      (7, "COMPANION_PROVIDER_TLS_OK", False),
+                                      (0, "missing", False)]:
+            program = ("import subprocess,sys; "
+                       "subprocess.Popen([sys.executable,'-c','import time; time.sleep(5)']); "
+                       f"print({marker!r}, flush=True); sys.exit({code})")
+            with self.subTest(code=code, marker=marker), \
+                    patch.object(PROBE.subprocess, "Popen", side_effect=start_completed), \
+                    patch.object(PROBE, "sample_process") as sample:
+                start = time.monotonic()
+                result = PROBE.run_app([sys.executable, "-c", program], dict(os.environ), timeout=0.3)
+                self.assertLess(time.monotonic() - start, 1.5)
+                self.assertEqual(result["exit_code"], code)
+                self.assertEqual(result["passed"], passed)
+                self.assertFalse(result["timed_out"])
+                self.assertTrue(result["inherited_pipe_open"])
+                sample.assert_not_called()
+
+    def test_success_arriving_during_sampling_remains_a_timeout(self):
+        original = subprocess.Popen
+        children = []
+        with tempfile.TemporaryDirectory() as directory:
+            ready, release = Path(directory) / "ready", Path(directory) / "release"
+            program = ("from pathlib import Path\nimport sys,time\n"
+                       "print('COMPANION_PROVIDER_TLS_PROGRESS:startup:enter', flush=True)\n"
+                       "print('COMPANION_PROVIDER_TLS_OK', flush=True)\n"
+                       "Path(sys.argv[1]).touch()\n"
+                       "while not Path(sys.argv[2]).exists(): time.sleep(0.01)\n"
+                       "print('COMPANION_PROVIDER_TLS_PROGRESS:shutdown:complete', flush=True)\n")
+            def start_ready(*args, **kwargs):
+                process = original(*args, **kwargs)
+                children.append(process)
+                deadline = time.monotonic() + 5
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                if not ready.exists():
+                    process.kill()
+                    process.communicate(timeout=5)
+                    self.fail("child did not reach readiness handshake")
+                return process
+            def sample(_pid):
+                release.touch()
+                children[0].wait(timeout=5)
+                return {"status": "unrecognized"}
+            with patch.object(PROBE.subprocess, "Popen", side_effect=start_ready), \
+                    patch.object(PROBE, "sample_process", side_effect=sample):
+                result = PROBE.run_app([sys.executable, "-c", program, str(ready), str(release)],
+                                       dict(os.environ), timeout=0.2)
+        self.assertTrue(result["timed_out"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["deadline_progress"], [{"phase": "startup", "event": "enter"}])
+        self.assertEqual(result["progress"], [{"phase": "startup", "event": "enter"},
+                                              {"phase": "shutdown", "event": "complete"}])
+        self.assertEqual(result["exit_code_before_cleanup"], 0)
+
     def test_native_sample_retains_only_closed_frames_in_call_graph(self):
         raw = (SECRET + b"\nCall graph:\n"
                b"    99 Thread_123 DispatchQueue_1: com.apple.main-thread (serial)\n"

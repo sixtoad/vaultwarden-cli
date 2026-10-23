@@ -17,6 +17,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
@@ -98,26 +100,55 @@ def run_app(argv, environment, timeout=45):
     # Own the process here, sample it once, then always kill/reap it. No relaunch.
     with subprocess.Popen(list(map(str, argv)), env=environment,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        deadline = time.monotonic() + timeout
+        observed = []
+        observer = None
+        initial_exit = process.poll()
+        if initial_exit is not None:
+            observed.append((initial_exit, time.monotonic()))
+        else:
+            def observe_exit():
+                observed.append((process.wait(), time.monotonic()))
+            observer = threading.Thread(target=observe_exit, daemon=True)
+            observer.start()
         try:
-            stdout, stderr = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
             try:
-                sample = sample_process(process.pid)
-            finally:
-                process.kill()
-                try:
-                    stdout, stderr = process.communicate(timeout=DRAIN_TIMEOUT)
-                except subprocess.TimeoutExpired as error:
-                    # A descendant may still hold an inherited pipe open. Keep
-                    # captured bytes and close our pipe ends instead of hanging.
-                    stdout, stderr = error.output or b"", error.stderr or b""
+                stdout, stderr = process.communicate(timeout=max(0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired as error:
+                # Pipe EOF can outlive the app. Require an independent exit
+                # observation BEFORE the deadline; polling only now could accept
+                # a late exit if the timeout handler was delayed by scheduling.
+                if observed and observed[0][1] <= deadline and os.name == "posix":
                     process.stdout.close()
                     process.stderr.close()
-                    process.wait(timeout=DRAIN_TIMEOUT)
-            result = app_diagnostics(None, stdout, stderr, timed_out=True)
-            result["native_sample"] = sample
-            return result
-        return app_diagnostics(process.returncode, stdout, stderr)
+                    result = app_diagnostics(observed[0][0], error.output or b"", error.stderr or b"")
+                    result["inherited_pipe_open"] = True
+                    return result
+                deadline_progress = progress_diagnostics(
+                    error.output or b"", error.stderr or b"", b"COMPANION_PROVIDER_TLS_PROGRESS", PHASES)
+                try:
+                    sample = sample_process(process.pid) if process.poll() is None else {"status": "exited"}
+                finally:
+                    exit_before_cleanup = process.poll()
+                    process.kill()
+                    try:
+                        stdout, stderr = process.communicate(timeout=DRAIN_TIMEOUT)
+                    except subprocess.TimeoutExpired as drain_error:
+                        # A descendant may retain an inherited pipe. Preserve
+                        # captured bytes and close our ends instead of hanging.
+                        stdout, stderr = drain_error.output or b"", drain_error.stderr or b""
+                        process.stdout.close()
+                        process.stderr.close()
+                        process.wait(timeout=DRAIN_TIMEOUT)
+                result = app_diagnostics(None, stdout, stderr, timed_out=True)
+                result["deadline_progress"] = deadline_progress
+                result["exit_code_before_cleanup"] = exit_before_cleanup
+                result["native_sample"] = sample
+                return result
+            return app_diagnostics(process.returncode, stdout, stderr)
+        finally:
+            if observer is not None:
+                observer.join(timeout=DRAIN_TIMEOUT)
 
 
 def progress_diagnostics(stdout, stderr, prefix, phases):
