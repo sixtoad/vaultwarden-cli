@@ -16,6 +16,7 @@ cargo build --release --locked --manifest-path rust/Cargo.toml --target-dir "$re
 flutter pub get --enforce-lockfile
 flutter analyze
 flutter test
+flutter test --dart-define=COMPANION_DISPOSABLE_PILOT=true test/pilot_setup_test.dart
 python3 "$repo/scripts/test-desktop-companion-artifact.py"
 python3 "$repo/scripts/test-provider-packaged-diagnostics.py"
 
@@ -24,6 +25,7 @@ case "$(uname -s)" in
     target=linux
     python3 "$repo/scripts/test-provider-fixture.py"
     python3 "$repo/scripts/mutate-provider-controller.py" "$evidence/controller-mutations"
+    python3 "$repo/scripts/mutate-pilot-setup.py" "$evidence/pilot-setup-mutations"
     xvfb-run -a flutter test integration_test/bridge_test.dart -d linux
     ;;
   Darwin*)

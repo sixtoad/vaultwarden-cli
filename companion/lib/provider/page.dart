@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../platform/provider.dart';
 import 'controller.dart';
+import 'pilot_bundle.dart';
 
 class ProviderPage extends StatefulWidget {
   const ProviderPage({
@@ -24,6 +25,7 @@ class _ProviderPageState extends State<ProviderPage>
   final importPassword = TextEditingController(),
       approvalPassword = TextEditingController(),
       unlockPassword = TextEditingController();
+  final pilotBundle = TextEditingController();
   bool dedicated = false;
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _ProviderPageState extends State<ProviderPage>
     importPassword.clear();
     approvalPassword.clear();
     unlockPassword.clear();
+    pilotBundle.clear();
   }
 
   @override
@@ -69,6 +72,7 @@ class _ProviderPageState extends State<ProviderPage>
       importPassword,
       approvalPassword,
       unlockPassword,
+      pilotBundle,
     ]) {
       field.dispose();
     }
@@ -104,6 +108,37 @@ class _ProviderPageState extends State<ProviderPage>
                 'Linux keeps all secrets and executes approved operations. Each approval requires a fresh password.',
               ),
               const SizedBox(height: 20),
+              if (disposablePilotEnabled &&
+                  widget.platform is PilotProviderPlatform) ...[
+                const Text(
+                  'Disposable test only. This bundle contains a private identity and test passwords. Never paste real vault credentials.',
+                ),
+                TextField(
+                  key: const Key('pilot-bundle'),
+                  controller: pilotBundle,
+                  enabled: controller.canSetupPilot,
+                  obscureText: true,
+                  maxLength: PilotBundle.maximumLength,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  enableIMEPersonalizedLearning: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Paste disposable test bundle',
+                    counterText: '',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: controller.canSetupPilot
+                      ? () {
+                          final input = pilotBundle.text;
+                          clearPasswords();
+                          unawaited(controller.setupPilot(input));
+                        }
+                      : null,
+                  child: const Text('Configure and unlock'),
+                ),
+                const SizedBox(height: 20),
+              ],
               ExpansionTile(
                 title: const Text('Development provider setup'),
                 initiallyExpanded: !config.configured,
@@ -139,7 +174,7 @@ class _ProviderPageState extends State<ProviderPage>
                   FilledButton(
                     onPressed: controller.canSetup && dedicated
                         ? () {
-                            final secret = importPassword.text;
+                            final secret = importPassword.text; // secrets-ignore: runtime input, not a credential literal
                             clearPasswords();
                             unawaited(
                               controller.setup(endpoint.text, pin.text, secret),
@@ -174,7 +209,7 @@ class _ProviderPageState extends State<ProviderPage>
                     onPressed: controller.busy
                         ? null
                         : () {
-                            final secret = unlockPassword.text;
+                            final secret = unlockPassword.text; // secrets-ignore: runtime input, not a credential literal
                             clearPasswords();
                             unawaited(controller.unlock(secret));
                           },
@@ -218,7 +253,7 @@ class _ProviderPageState extends State<ProviderPage>
                       FilledButton(
                         onPressed: state.canDecide
                             ? () {
-                                final secret = approvalPassword.text;
+                                final secret = approvalPassword.text; // secrets-ignore: runtime input, not a credential literal
                                 clearPasswords();
                                 unawaited(controller.decide(true, secret));
                               }

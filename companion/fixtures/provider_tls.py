@@ -28,7 +28,7 @@ def serve(directory, mode):
     counters.write_text("")
     lock = threading.Lock()
     status = {"status": "pending"}
-    locked = mode == "controller"
+    locked = mode in ["controller", "pilot"]
 
     class Handler(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -65,6 +65,8 @@ def serve(directory, mode):
             if command == "session":
                 return self.reply(200, {"version": 1, "state": "locked" if locked else "unlocked", "generation": 1})
             if command == "unlock":
+                if mode == "pilot" and body.get("password") != "synthetic-pilot-unlock-only":
+                    return self.reply(422, {"version": 1, "error": "authentication_failed"})
                 locked = False
                 return self.reply(200, {"version": 1, "state": "unlocked", "generation": 1})
             if command == "list":
@@ -86,7 +88,7 @@ def serve(directory, mode):
                     return
                 return self.reply(200, {"version": 1, "status": status})
             if command == "status":
-                if mode == "controller":
+                if mode in ["controller", "pilot"]:
                     status = ({"status": "running"} if status["status"] == "approved"
                               else {"status": "completed", "exit_code": 0})
                 return self.reply(200, {"version": 1, "status": status})
