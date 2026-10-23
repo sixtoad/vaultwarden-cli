@@ -1,0 +1,209 @@
+{
+  "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\nApple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0\nPython 3.9.6\nLibreSSL 3.3.6\nSource snapshot without Git metadata or source-manifest.json.\n",
+  "suites": {
+    "protocol-tests.log": {
+      "passed": 18,
+      "cases": [
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend]",
+          "seconds": 0.011
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testBoundedInputAndVersion]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testClosedV1ResponseAndNestedReviewKeys]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testExplicitSameRequestReviewCanRecoverPendingUncertainty]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testGenerationOrDisconnectInvalidationDisablesDecision]",
+          "seconds": 0.001
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testInvalidStatusesFailClosed]",
+          "seconds": 0.001
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testLateReviewCannotUndoAuthorityInvalidation]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testLateReviewErrorCannotMutateInvalidatedMessage]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testLostDecisionNeverResendsAndPendingRemainsUncertain]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testOnlyExactKnownUnlockGetsFiniteLongerTimeout]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testReviewTextExposesInvisibleAndDirectionalScalars]",
+          "seconds": 0.005
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testSharedCanonicalReviewIncludesEveryField]",
+          "seconds": 0.001
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testTimeoutClassificationUsesOnlySafeDomainAndCode]",
+          "seconds": 0.001
+        },
+        {
+          "name": "-[CompanionCoreTests.ProtocolTests testWrongPasswordConsumesVisibleTicket]",
+          "seconds": 0.001
+        }
+      ],
+      "log_sha256": "09802a528db7749ce5a2f8e09c67a46f263cc0d07dc3a4edf16315f29f429383"
+    },
+    "app-model-tests.log": {
+      "passed": 9,
+      "cases": [
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect]",
+          "seconds": 0.016
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testFullInboxExplainsCapacity]",
+          "seconds": 0.001
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testLateNotificationSessionOrListCannotUndoLifecycleChange]",
+          "seconds": 0.009
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testLatePollCannotMutateReplacementOrSleepingState]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotMutateReplacementOrClearItsBusyFlag]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testLateUnlockCannotUndoSleepOrRefresh]",
+          "seconds": 0.005
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testSleepDuringNotificationReviewLoadingCannotRestoreReview]",
+          "seconds": 0.003
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[ApprovalCompanionTests.AppModelTests testUnlockPasswordClearsOnSessionProviderAndLifecycleChanges]",
+          "seconds": 0.002
+        }
+      ],
+      "log_sha256": "29ca5c936a4f1ec9036b150283821f914eb7e2a625c3e20e4da349685d322601"
+    },
+    "real-urlsession-tls.log": {
+      "passed": 12,
+      "cases": [
+        {
+          "name": "-[CompanionCoreTests.TLSTests testDelayedSessionRetainsShortTimeoutAndNeverSendsUnlock]",
+          "seconds": 8.326
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testFixtureFailedLaunchLeavesNothingToStop]",
+          "seconds": 0.002
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testFixtureRestartAndShutdownAfterAsyncRequest]",
+          "seconds": 5.349
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testFixtureShutdownFailsAndCleansUpChildIgnoringTermination]",
+          "seconds": 0.193
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testFixtureShutdownObservesAlreadyExitedChild]",
+          "seconds": 0.011
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testIssuerSerialCollisionNeverSubstitutesExistingIdentity]",
+          "seconds": 5.705
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testLostUnlockReplyRemainsUnknownAndExplicitSessionReadDoesNotReplay]",
+          "seconds": 3.122
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testRealURLSessionAuthenticationAndSingleTransmission]",
+          "seconds": 5.876
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testRealURLSessionRejectsHTTPBodyStatusMismatch]",
+          "seconds": 4.393
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testSameSubjectRenewalReturnsExactImportedIdentity]",
+          "seconds": 5.294
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testSlowUnlockReceivesSuccessWithExactlyOneTransmission]",
+          "seconds": 8.858
+        },
+        {
+          "name": "-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]",
+          "seconds": 5.123
+        }
+      ],
+      "log_sha256": "f2c028cadd61c1cd4321426a3cb325175d72b335df6fbf3fbb011f334860b1bc"
+    }
+  },
+  "bundled_tls": {
+    "passed": 20,
+    "skipped": 0,
+    "checks": [
+      "strict_ats_private_ca_rejected",
+      "configured_private_ca_accepted",
+      "wrong_ca_rejected",
+      "wrong_pin_rejected",
+      "wrong_hostname_rejected",
+      "expired_leaf_rejected",
+      "foreign_client_rejected",
+      "revoked_client_rejected",
+      "http_configuration_rejected",
+      "tls11_rejected",
+      "redirect_rejected",
+      "oversized_response_rejected",
+      "wrong_password_explicitly_rejected",
+      "wrong_unlock_explicitly_rejected",
+      "lost_decision_not_retried",
+      "success_body_under_503_rejected",
+      "error_body_under_200_rejected",
+      "error_code_status_mismatch_rejected",
+      "unknown_error_code_rejected",
+      "extra_error_field_rejected"
+    ]
+  },
+  "python_fixture_passed": 1,
+  "watchdog_passed": 8,
+  "release_bundle_built": true,
+  "initial_packaging_failure": "Initial transferred snapshot omitted unchanged tests/fixtures/companion/review.json; 12 dependent protocol cases failed. Complete snapshot rerun passed without code changes."
+}

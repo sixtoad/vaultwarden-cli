@@ -1,0 +1,35 @@
+{
+  "baseline_commit": "5c1a30e78ff2dea54471edb1ab33711f0d0cb126",
+  "source_sha256": {
+    "macos/Sources/CompanionCore/Protocol.swift": "3b046b412fdbc6a1bb2b0e33fea405325d6cba8ec8235b74d453219ec13419d5",
+    "macos/Sources/CompanionCore/Trust.swift": "1ddb850168d99d3246c2eea6128804def4aad6b6fe719a1e28a4356c3ddb50cf",
+    "macos/Sources/CompanionCore/DecisionController.swift": "4f7cdfbbb567a4e7975d811744e8cc3522b7ce22261d83bc7d57ac5f2268cc9e",
+    "macos/Sources/ApprovalCompanion/App.swift": "e2b5d079a8835e0cf9406b83f515f8f570f73b240a9b4087aa1f5222bf49d0d2",
+    "macos/Tests/Fixtures/StorageAcceptance.swift": "e95694b12c20f75f4ad98bdf2ffef53f759d4edf8873823223eebb993383b2e9",
+    "macos/Tests/Fixtures/tls_fixture.py": "190a6bdc5415a7b2ae60c177490d5b166eceef41704262ddbfeaefaeeb266357",
+    "tests/secret-storage-acceptance.py": "8e48acd64d24631c58c618041cf74816792b4d4f9552d5cf6365ff66bb3c257c",
+    "tests/fixtures/companion/review.json": "561f32fe6f17bfaad504746479bca877aa15644e5c1b6ccd2a50c90e9247910b",
+    "macos/Tests/CompanionCoreTests/ProtocolTests.swift": "5ee54950bc76a1d52b955f949009dab22928e23a0bc2ca7bae56fc2a8841101a",
+    "macos/Tests/CompanionCoreTests/TLSTests.swift": "0444831b43fd4e4e2601d4b0e4aaf6e337ec2f4827ad8cbe4dc618dda4977deb",
+    "macos/Tests/ApprovalCompanionTests/AppModelTests.swift": "831206ad6d955585c02f0e124029d104d77e0c9373ca7c8b37c863f19ecb27f3"
+  },
+  "provider_fixture_sha256": "7c88c4ce0c035466bb0c2e6d7df92299fdfd5b9ebb1071490aaf5683cdb99a2e",
+  "diagnostic_proxy_sha256": "dde93a64375295a87b27578172f372d4086555a02f6e1caed3dc17d548fd967a",
+  "native_binary_sha256": {
+    "baseline": "dfa8fa92f363991391d6b1a9467b987d46c51fac67b337a664dec80900134040",
+    "updated": "e46ab5614b6eb65b1cb984d0b02e2bf0db24c6144a83ff1b9044892c7a82cd01"
+  },
+  "mac_source_archive_sha256": "1ba47c6502a05cde452943ccc0ca66fe9d54c146d1049331bc15fd7a8c7546ab",
+  "hash_scope": "source_sha256 records the initial real-provider campaign and initial native suite; review added tests and durable evidence without changing production native sources.",
+  "post_review_source_sha256": {
+    "macos/Tests/ApprovalCompanionTests/AppModelTests.swift": "c762fe056879f211402cdeafe006ad01b5c1371ac57ff90650f8cddc9ff6c924",
+    "macos/Tests/CompanionCoreTests/TLSTests.swift": "5a9baaab0efeaef0bc5670c0c3db98a4272b42078825d5e4997a810d9c67815d",
+    "macos/Tests/Fixtures/tls_fixture.py": "173da7a7ecf07d8875dd976581f45eabc735e6bd0ff69dcc39b1959b917307a6",
+    "scripts/test-macos-companion.sh": "fd99098d8328d8cb39ca5efc33c69758849fecc7ce78605590d2428df0706f5d",
+    "tests/fixtures/unlock-delay-proxy.py": "347998ef2b56757fb01bc601b3400545e03de5032819da2116e8d31f3b61105c"
+  },
+  "post_review_mac_source_archive_sha256": "99dc43c41c846b2431543506e5dcb54b36acbba5d17130d47d8dd5b9fd37640c",
+  "final_test_assertion_sha256": {
+    "macos/Tests/CompanionCoreTests/TLSTests.swift": "ccbac9468a0cd39342d46e0512873ea7e6e1afedf87fc8f597e3af6ffbde7cab"
+  }
+}

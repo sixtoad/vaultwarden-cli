@@ -1,0 +1,43 @@
+Building for debugging...
+[1 / 4] ApprovalCompanion-product
+[2 / 6] CompanionCoreTests-product
+[4 / 8] CompanionCoreTests-product
+/private/tmp/vw-unlock-review.n0DaMc/macos/Tests/CompanionCoreTests/TLSTests.swift:160:28: warning: instance method 'wait' is unavailable from asynchronous contexts; Use a TaskGroup instead; this is an error in the Swift 6 language mode
+158 |         XCTAssertEqual(child.stop(timeout: 0.1), ["TLS fixture child exit was not observed after SIGTERM"])
+159 |         XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000, 3)
+160 |         guard child.exited.wait(timeout: .now()) == .success else {
+    |                            `- warning: instance method 'wait' is unavailable from asynchronous contexts; Use a TaskGroup instead; this is an error in the Swift 6 language mode
+161 |             XCTFail("Forced cleanup must observe exit")
+162 |             return
+
+Dispatch.DispatchGroup.wait:2:13: note: 'wait(timeout:)' declared here
+1 | class DispatchGroup {
+2 | public func wait(timeout: DispatchTime) -> DispatchTimeoutResult}
+  |             `- note: 'wait(timeout:)' declared here
+3 |
+
+/private/tmp/vw-unlock-review.n0DaMc/macos/Tests/CompanionCoreTests/TLSTests.swift:332:49: warning: 'SecKeychainCreate' was deprecated in macOS 10.10: SecKeychain is deprecated [#]
+428 |             if status != errSecSuccess { failures.append("temporary Keychain delete: \(status)") }
+429 |             self.keychain = nil
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[9 / 11] CompanionCoreTests-product
+Build complete! (1.81 secs)
+Test Suite 'Selected tests' started at 2026-10-22 17:39:59.939.
+Test Suite 'CompanionCoreTests.xctest' started at 2026-10-22 17:39:59.940.
+Test Suite 'TLSTests' started at 2026-10-22 17:39:59.940.
+Test Case '-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]' started.
+Test Case '-[CompanionCoreTests.TLSTests testUnlockRejectionAndTrustFailuresNeverReplay]' passed (1.723 seconds).
+Test Suite 'TLSTests' passed at 2026-10-22 17:40:01.664.
+	 Executed 1 test, with 0 failures (0 unexpected) in 1.723 (1.724) seconds
+Test Suite 'CompanionCoreTests.xctest' passed at 2026-10-22 17:40:01.664.
+	 Executed 1 test, with 0 failures (0 unexpected) in 1.723 (1.724) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:40:01.664.
+	 Executed 1 test, with 0 failures (0 unexpected) in 1.723 (1.724) seconds
+TLS fixture cleanup verified: original Keychain search list restored; temporary Keychain and certificates deleted.
+Test Suite 'Selected tests' started at 2026-10-22 17:40:01.746.
+Test Suite 'ApprovalCompanionTests.xctest' started at 2026-10-22 17:40:01.747.
+Test Suite 'ApprovalCompanionTests.xctest' passed at 2026-10-22 17:40:01.747.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:40:01.747.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds

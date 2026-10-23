@@ -1,0 +1,16 @@
+{
+  "approval_mode": "automated_native_client",
+  "cleanup_verified": true,
+  "complete_create_effect_validated": true,
+  "initial_session": "unlocked",
+  "native_request_counts": {
+    "decision": 1,
+    "list": 1,
+    "review": 1,
+    "session": 1
+  },
+  "operation": "storage-deny",
+  "request_id": "mry_wbyw4nbp7ItzjKbzU3qkqMuHPzO-DU-F7XhTqIU",
+  "status": "denied",
+  "success": true
+}

@@ -1,0 +1,6 @@
+{
+  "owned_services_stopped": true,
+  "owned_container_absent": true,
+  "agent_material_removed": true,
+  "private_bootstrap_removed": true
+}

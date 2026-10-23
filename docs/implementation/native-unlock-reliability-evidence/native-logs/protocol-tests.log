@@ -1,0 +1,55 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+Build complete! (1.01 secs)
+Test Suite 'Selected tests' started at 2026-10-22 17:28:05.958.
+Test Suite 'CompanionCoreTests.xctest' started at 2026-10-22 17:28:05.960.
+Test Suite 'ProtocolTests' started at 2026-10-22 17:28:05.960.
+Test Case '-[CompanionCoreTests.ProtocolTests testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testAmbiguousProviderErrorsUseOnlyStatusAndNeverResend]' passed (0.011 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testBoundedInputAndVersion]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testBoundedInputAndVersion]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testClosedV1ResponseAndNestedReviewKeys]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testClosedV1ResponseAndNestedReviewKeys]' passed (0.003 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateEffectRejectsInvalidSchemaNamespaceAndMarkerBoundaries]' passed (0.003 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testCreateReviewCarriesDestinationSchemaAndRejectsUnknownFields]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testDifferentSelectionPreservesUnresolvedDecisionUntilItsStatusIsKnown]' passed (0.003 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testExplicitSameRequestReviewCanRecoverPendingUncertainty]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testExplicitSameRequestReviewCanRecoverPendingUncertainty]' passed (0.003 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testGenerationOrDisconnectInvalidationDisablesDecision]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testGenerationOrDisconnectInvalidationDisablesDecision]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testInvalidStatusesFailClosed]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testInvalidStatusesFailClosed]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewCannotUndoAuthorityInvalidation]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewCannotUndoAuthorityInvalidation]' passed (0.003 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewErrorCannotMutateInvalidatedMessage]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testLateReviewErrorCannotMutateInvalidatedMessage]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testLostDecisionNeverResendsAndPendingRemainsUncertain]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testLostDecisionNeverResendsAndPendingRemainsUncertain]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testOnlyExactKnownUnlockGetsFiniteLongerTimeout]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testOnlyExactKnownUnlockGetsFiniteLongerTimeout]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testReviewTextExposesInvisibleAndDirectionalScalars]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testReviewTextExposesInvisibleAndDirectionalScalars]' passed (0.005 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testSharedCanonicalReviewIncludesEveryField]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testSharedCanonicalReviewIncludesEveryField]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testTimedOutDecisionOnlyReadsStatusAndPreservesUncertainty]' passed (0.002 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testTimeoutClassificationUsesOnlySafeDomainAndCode]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testTimeoutClassificationUsesOnlySafeDomainAndCode]' passed (0.001 seconds).
+Test Case '-[CompanionCoreTests.ProtocolTests testWrongPasswordConsumesVisibleTicket]' started.
+Test Case '-[CompanionCoreTests.ProtocolTests testWrongPasswordConsumesVisibleTicket]' passed (0.001 seconds).
+Test Suite 'ProtocolTests' passed at 2026-10-22 17:28:06.011.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.047 (0.051) seconds
+Test Suite 'CompanionCoreTests.xctest' passed at 2026-10-22 17:28:06.012.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.047 (0.051) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:28:06.012.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.047 (0.054) seconds
+Test Suite 'Selected tests' started at 2026-10-22 17:28:06.210.
+Test Suite 'ApprovalCompanionTests.xctest' started at 2026-10-22 17:28:06.214.
+Test Suite 'ApprovalCompanionTests.xctest' passed at 2026-10-22 17:28:06.214.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-10-22 17:28:06.214.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.004) seconds

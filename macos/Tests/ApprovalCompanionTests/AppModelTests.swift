@@ -46,6 +46,27 @@ private actor ModelTransport: CompanionTransport {
 }
 
 final class AppModelTests: XCTestCase {
+    @MainActor func testTimedOutUnlockStaysUnknownUntilExplicitReadAndNeverReplays() async {
+        let transport = ModelTransport([.success(session("locked")), .failure(.timeout), .success(session()), .success(inbox())])
+        let model = AppModel(client: CompanionClient(transport: transport))
+        let initiallyConnected = await model.pollOnce()
+        XCTAssertTrue(initiallyConnected)
+        XCTAssertEqual(model.sessionState, "locked")
+        model.unlockPassword = "synthetic-only"
+        await model.unlock(model.unlockPassword)
+        XCTAssertEqual(model.unlockPassword, "")
+        XCTAssertFalse(model.unlockBusy)
+        XCTAssertEqual(model.sessionState, "locked")
+        XCTAssertTrue(model.connection.contains("outcome is unknown"))
+        let beforeRead = await transport.commands
+        XCTAssertEqual(beforeRead, ["session", "unlock"])
+        let connected = await model.pollOnce()
+        XCTAssertTrue(connected)
+        XCTAssertEqual(model.sessionState, "unlocked")
+        let commands = await transport.commands
+        XCTAssertEqual(commands, ["session", "unlock", "session", "list"])
+    }
+
     @MainActor func testActualPollingInvalidatesReviewForGenerationChangeAndDisconnect() async throws {
         for disconnect in [false, true] {
             var replies: [Result<Data, CompanionError>] = [.success(session()), .success(inbox()), .success(try reviewData())]

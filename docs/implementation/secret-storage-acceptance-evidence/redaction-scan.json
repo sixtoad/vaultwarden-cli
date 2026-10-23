@@ -1,0 +1,15 @@
+{
+  "files_scanned": 39,
+  "known_secret_values_checked": 10,
+  "plaintext_or_auth_material_detected": false,
+  "failure_files": [],
+  "scope": [
+    "agent stdout/stderr",
+    "native output",
+    "provider journal",
+    "durable provider state",
+    "sanitized observations",
+    "private service logs"
+  ],
+  "source_configs_excluded": true
+}

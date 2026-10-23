@@ -1,13 +1,14 @@
 import Foundation
 
 public enum CompanionError: Error, Equatable, LocalizedError {
-    case configuration, invalidResponse, oversized, transport, rejected(String)
+    case configuration, invalidResponse, oversized, transport, timeout, rejected(String)
     public var errorDescription: String? {
         switch self {
         case .configuration: return "Trusted setup is incomplete or invalid."
         case .invalidResponse: return "Provider returned an invalid response."
         case .oversized: return "Provider response exceeded the size limit."
         case .transport: return "Provider unavailable or TLS authentication failed."
+        case .timeout: return "Provider response timed out. The request may have completed; refresh its state before an explicit new attempt."
         case .rejected(let code): return "Provider rejected the request: \(code)."
         }
     }
@@ -264,6 +265,31 @@ public struct Command: Encodable, Sendable {
     }
 }
 
+/// Only the exact v1 unlock emitted by this client gets the longer waiting bound.
+/// Canonical comparison also excludes duplicate keys, extra fields and coercions.
+enum RequestTimeoutPolicy {
+    static func encode(_ command: Command) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(command)
+    }
+    static func interval(for body: Data) -> TimeInterval {
+        guard body.count <= 16_384,
+              let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let password = object["password"] as? String,
+              !password.isEmpty, password.utf8.count <= 4096,
+              let knownUnlock = try? encode(Command("unlock", password: password)),
+              body == knownUnlock else { return 5 }
+        // Three sequential provider HTTP calls can each take 10s, plus KDF/keyring
+        // work. This bounds client waiting; it grants no additional authority.
+        return 60
+    }
+    static func classify(_ error: Error) -> CompanionError {
+        let value = error as NSError
+        return value.domain == NSURLErrorDomain && value.code == NSURLErrorTimedOut ? .timeout : .transport
+    }
+}
+
 public protocol CompanionTransport: Sendable {
     func send(_ body: Data) async throws -> Data
 }
@@ -279,7 +305,7 @@ public struct CompanionClient: CompanionServing {
     private let transport: any CompanionTransport
     public init(transport: any CompanionTransport) { self.transport = transport }
     private func request<T: Decodable>(_ command: Command, as: T.Type) async throws -> T {
-        let data = try JSONEncoder().encode(command)
+        let data = try RequestTimeoutPolicy.encode(command)
         guard data.count <= 16_384 else { throw CompanionError.oversized }
         let response = try await transport.send(data)
         guard response.count <= 1_048_576 else { throw CompanionError.oversized }

@@ -1,0 +1,9 @@
+{
+  "owned_execution_unit_count": 0,
+  "owned_execution_runtime_removed": true,
+  "provider_active_state": "inactive",
+  "mac_cleanup": {
+    "owned_mac_directory_removed": true,
+    "keychain_restoration_verified_by_each_driver": true
+  }
+}

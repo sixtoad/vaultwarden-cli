@@ -1352,3 +1352,7 @@ mod tests {
 #[cfg(test)]
 #[path = "companion_acceptance_tests.rs"]
 mod acceptance_tests;
+
+#[cfg(test)]
+#[path = "storage_acceptance_tests.rs"]
+mod storage_acceptance_tests;

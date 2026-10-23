@@ -10,6 +10,7 @@ import socketserver
 import ssl
 import subprocess
 import threading
+import time
 
 
 class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
@@ -60,6 +61,7 @@ def serve(root, mode):
     lock = threading.Lock()
     counters = root / "requests.jsonl"
     counters.write_text("")
+    unlocked = False
 
     class Handler(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -68,6 +70,7 @@ def serve(root, mode):
             pass
 
         def do_POST(self):
+            nonlocal unlocked
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 16384:
                 self.close_connection = True
@@ -80,6 +83,24 @@ def serve(root, mode):
             peer = hashlib.sha256(self.connection.getpeercert(binary_form=True)).hexdigest()
             if peer != expected_client:
                 return self.reply(403, {"version": 1, "error": "unauthorized"})
+            command = body.get("command")
+            if mode in ["slow-unlock", "lost-unlock"]:
+                if command == "unlock":
+                    with lock:
+                        unlocked = True
+                    if mode == "lost-unlock":
+                        self.close_connection = True
+                        self.connection.shutdown(2)
+                        self.connection.close()
+                        return
+                    time.sleep(6)
+                with lock:
+                    state = "unlocked" if unlocked else "locked"
+                return self.reply(200, {"version": 1, "state": state, "generation": 1})
+            if mode == "slow-session" and command == "session":
+                time.sleep(8)
+            if mode == "stream-unlock" and command == "unlock":
+                return self.reply(200, {"version": 1, "state": "unlocked", "generation": 1}, stream=True)
             if mode in ["authentication403", "authentication422", "authentication-unlock422"] and body.get("command") in ["decision", "unlock"]:
                 return self.reply(int(mode[-3:]), {"version": 1, "error": "authentication_failed"})
             if mode == "success503":
@@ -115,15 +136,26 @@ def serve(root, mode):
                 return self.reply(200, {"version": 1, "status": {"status": "pending"}})
             self.reply(200, {"version": 1, "state": "unlocked", "generation": 1})
 
-        def reply(self, code, value):
+        def reply(self, code, value, stream=False):
             body = json.dumps(value).encode()
+            if stream:
+                # Whitespace keeps the complete response valid JSON and bounded,
+                # while 76 bytes at one-second intervals require 75 seconds.
+                body = body.ljust(76, b" ")
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Connection", "close")
             self.end_headers()
             try:
-                self.wfile.write(body)
+                if stream:
+                    for index, byte in enumerate(body):
+                        if index:
+                            time.sleep(1)
+                        self.wfile.write(bytes([byte]))
+                        self.wfile.flush()
+                else:
+                    self.wfile.write(body)
             except OSError:
                 pass  # Expected when a bounded client cancels oversized output.
             self.close_connection = True

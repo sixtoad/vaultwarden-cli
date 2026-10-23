@@ -1,0 +1,7 @@
+{
+  "token_response_status": 200,
+  "upstream_elapsed_seconds": 0.006499314913526177,
+  "delay_seconds": 6.0,
+  "elapsed_seconds": 6.016395167913288,
+  "phase": "released"
+}

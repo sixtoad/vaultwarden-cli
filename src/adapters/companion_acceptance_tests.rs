@@ -53,13 +53,13 @@ impl ApprovalAuthenticator for SyntheticApproval {
         }
     }
 }
-fn setting(name: &str) -> String {
+pub(super) fn setting(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("missing fixture setting {name}"))
 }
-fn file_setting(name: &str) -> PathBuf {
+pub(super) fn file_setting(name: &str) -> PathBuf {
     PathBuf::from(setting(name))
 }
-fn save(path: &Path, value: &serde_json::Value) {
+pub(super) fn save(path: &Path, value: &serde_json::Value) {
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
