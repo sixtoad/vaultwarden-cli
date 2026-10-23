@@ -25,11 +25,11 @@ jobs:
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-26-intel' && 90 || 45 }}
+    timeout-minutes: ${{ matrix.os == 'macos-26' && 90 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26-intel, windows-latest]
+        os: [ubuntu-24.04, macos-26, windows-latest]
     defaults:
       run:
         shell: bash
