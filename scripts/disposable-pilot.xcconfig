@@ -1,0 +1,2 @@
+// Used only by build-disposable-pilot.sh's explicit Xcode override.
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) COMPANION_DISPOSABLE_PILOT

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import '../provider/pilot_bundle.dart';
+
 class ProviderConfiguration {
   const ProviderConfiguration({
     required this.configured,
@@ -27,7 +29,12 @@ abstract interface class ProviderPlatform {
   void Function() onInvalidation(void Function() callback);
 }
 
-class NativeProviderPlatform implements ProviderPlatform {
+abstract interface class PilotProviderPlatform {
+  Future<ProviderConfiguration> setupPilot(PilotBundle bundle);
+}
+
+class NativeProviderPlatform
+    implements ProviderPlatform, PilotProviderPlatform {
   NativeProviderPlatform({bool? macOS, MethodChannel? channel})
     : available = macOS ?? Platform.isMacOS,
       _channel =
@@ -37,6 +44,19 @@ class NativeProviderPlatform implements ProviderPlatform {
   final bool available;
   final MethodChannel _channel;
   static final Map<String, Object> _owners = {};
+
+  @override
+  Future<ProviderConfiguration> setupPilot(PilotBundle bundle) async {
+    if (!disposablePilotEnabled || !available) {
+      throw UnsupportedError('Disposable pilot setup unavailable');
+    }
+    return _parse(
+      await _channel.invokeMethod<Object?>(
+        'setupPilot',
+        bundle.nativeArguments,
+      ),
+    );
+  }
 
   ProviderConfiguration _parse(Object? value) {
     if (value is Map && value.length == 1 && value['configured'] == false) {

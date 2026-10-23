@@ -35,6 +35,15 @@ import Security
         do {
             switch call.method {
             case "configuration": result(try settings.metadata())
+            #if COMPANION_DISPOSABLE_PILOT
+            case "setupPilot":
+                guard !active, NSApplication.shared.isActive,
+                      let window = NSApplication.shared.keyWindow, window is MainFlutterWindow else { throw CompanionError.configuration }
+                active = true
+                defer { active = false }
+                try settings.installPilot(call.arguments)
+                result(try settings.metadata())
+            #endif
             case "setup":
                 guard !active, try settings.pendingID() == nil,
                       let args = call.arguments as? [String: Any], Set(args.keys) == ["endpoint", "pin", "passphrase"],

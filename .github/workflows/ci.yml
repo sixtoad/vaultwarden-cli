@@ -22,6 +22,28 @@ permissions:
   pull-requests: write
 
 jobs:
+  disposable-companion-pilot:
+    name: Disposable Mac companion pilot (opt-in build)
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Build separately named disposable test app without installing it
+        run: bash scripts/build-disposable-pilot.sh "$RUNNER_TEMP/disposable-pilot-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: companion-macOS-disposable-pilot
+          path: ${{ runner.temp }}/disposable-pilot-evidence
+
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -435,7 +457,7 @@ jobs:
   merge-ready:
     name: Merge Ready
     runs-on: ubuntu-latest
-    needs: [check, test, build, browser, agent-transport, systemd-integration, macos-companion, desktop-companion, desktop-companion-msrv, Lint, Security]
+    needs: [check, test, build, browser, agent-transport, systemd-integration, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, Lint, Security]
     if: github.event_name == 'pull_request'
     steps:
       - name: Confirm required CI jobs passed

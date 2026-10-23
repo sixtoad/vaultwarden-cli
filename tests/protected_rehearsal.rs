@@ -5,6 +5,17 @@
 mod support;
 
 #[test]
+#[ignore = "explicit scripts/pilot-real-vaultwarden-companion.sh only; real disposable backend and human Mac decisions"]
+fn real_vaultwarden_companion_pilot() {
+    if let Err(error) = support::pilot::run() {
+        eprintln!("FAIL: pilot {}", support::pilot::failure_category(&error));
+        panic!(
+            "real Vaultwarden pilot failed; inspect sanitized phase and retained-resource evidence; never resubmit automatically"
+        );
+    }
+}
+
+#[test]
 fn terminal_status_accepts_exact_outcome_and_rejects_every_terminal_mismatch() {
     use vaultwarden_cli::access::protocol::{AgentFailure, AgentStatus};
     let terminal = [

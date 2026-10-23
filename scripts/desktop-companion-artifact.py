@@ -87,10 +87,13 @@ def smoke(executable, evidence, use_file=False):
     print("Release AOT bridge, native contract and rendered fixture checks passed.")
 
 
-def package(root, evidence, platform, revision, dirty):
+def package(root, evidence, platform, revision, dirty, disposable_pilot=False):
+    if disposable_pilot and platform != "macos":
+        raise ValueError("disposable pilot artifacts require macOS")
     expected = inventory(root)
-    archive = evidence / f"companion-{platform}-development.tar.gz"
-    name = "companion_slice.app" if platform == "macos" else f"companion-{platform}"
+    variant = "disposable-pilot" if disposable_pilot else "development"
+    archive = evidence / f"companion-{platform}-{variant}.tar.gz"
+    name = ("companion_disposable_pilot.app" if disposable_pilot else "companion_slice.app") if platform == "macos" else f"companion-{platform}"
     with tarfile.open(archive, "w:gz", dereference=False) as output:
         output.add(root, arcname=name)
     # The archive was just produced from our own validated build tree, not an
@@ -102,7 +105,7 @@ def package(root, evidence, platform, revision, dirty):
             raise RuntimeError("archive extraction changed bundle content or metadata")
     checksum = digest(archive)
     (evidence / f"{archive.name}.sha256").write_text(f"{checksum}  {archive.name}\n")
-    (evidence / "artifact.json").write_text(json.dumps({
+    (evidence / ("pilot-artifact.json" if disposable_pilot else "artifact.json")).write_text(json.dumps({
         "source_revision": revision,
         "source_dirty": dirty,
         "entrypoint": "lib/main.dart",
@@ -111,8 +114,10 @@ def package(root, evidence, platform, revision, dirty):
         "sha256": checksum,
         "extraction_verified": True,
         "members": expected,
+        **({"disposable_test_only": True, "dart_define": "COMPANION_DISPOSABLE_PILOT=true",
+            "swift_condition": "COMPANION_DISPOSABLE_PILOT"} if disposable_pilot else {}),
     }, indent=2) + "\n")
-    print(f"Normal-entry release archive verified: {archive.name}")
+    print(f"{'Disposable test' if disposable_pilot else 'Normal-entry'} release archive verified: {archive.name}")
     return archive
 
 
@@ -123,7 +128,10 @@ def main():
     parser.add_argument("evidence", type=Path)
     parser.add_argument("--source-revision", help="Explicit provenance for an isolated build without Git metadata")
     parser.add_argument("--source-dirty", action="store_true")
+    parser.add_argument("--disposable-pilot", action="store_true", help="Separately named opt-in disposable Mac artifact")
     args = parser.parse_args()
+    if args.disposable_pilot and (args.action != "package" or args.platform != "macos"):
+        parser.error("--disposable-pilot requires package macos")
     repo = Path(__file__).resolve().parents[1]
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -138,7 +146,7 @@ def main():
         else:
             revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
             dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=repo))
-        package(root, evidence, args.platform, revision, dirty)
+        package(root, evidence, args.platform, revision, dirty, args.disposable_pilot)
 
 
 if __name__ == "__main__":
