@@ -1,35 +1,39 @@
-# Packaged macOS startup investigation
+# Hosted macOS GUI acceptance
 
-The merge of PR #45 failed in [CI run 39904655601](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39904655601), at commit `4407fd5518578077a37317f08ac508125456e40d`. All other executed jobs passed.
+The desktop acceptance job uses `macos-26` (Apple Silicon). Rust tests, native
+Swift tests and both macOS CLI builds continue to use `macos-26-intel`. The
+desktop job still builds the universal Mac application and runs the same full
+test script, including all 17 packaged TLS/controller scenarios, exact request
+counts/order, cleanup checks and the original 45-second application deadline.
+The packaged Flutter/native integration scenarios now execute only on Apple
+Silicon. An Intel build slice and native unit tests do not replace packaged
+Intel runtime validation; that coverage remains a limitation until the hosted
+Intel GUI image is repaired or another suitable Intel test host is available.
 
-The first packaged provider case (`approve`) exceeded its 45-second process deadline. Sanitized progress reached `startup:complete`, `initializeCore:complete`, and `configuration:enter`. Fixture provisioning passed; the server observed zero commands, and cleanup passed. This places the failure before transport but does not distinguish channel delivery, native scheduling, or the synchronous Keychain lookup used by configuration metadata.
+The Intel image `20260824.0517.1`, macOS 26.6.1 (25G76), has a documented
+[IconServices crash loop](https://github.com/actions/runner-images/issues/14751)
+that blocks GUI applications. Upstream reports Apple Silicon is unaffected.
+Our disposable CI probe reproduced the icon timeout and verified the documented
+service workaround, but the full Flutter application still intermittently
+stalled. Changing only the GUI job's runner avoids depending on that image's
+broken GUI services. This is an environment mitigation; it does not establish
+the exact cause of every observed delay.
 
-An earlier [PR run](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39849654297) stopped before any Dart progress in a different case. The [intermediate PR run](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39857654375) passed. A passing rerun alone therefore does not establish a fix.
+Evidence from the investigation:
 
-The packaged runner samples only its own app after 15 seconds if it is still running, and again at timeout before terminating it. The macOS sampler runs for one second with a five-second command deadline. Only fixed frame labels, bounded sample counts/indentation and a main-thread boolean survive into `packaged-tls.json`; raw samples, paths, addresses and thread names are discarded. Labels come from symbol/library fields, never path annotations. Counts and indentation preserve the distinction between brief sampled branches and persistent waits, although a sample alone does not prove a deadlock. The application deadline remains 45 seconds, and a timeout remains a failure even if the success marker arrives during sampling. The process is killed and reaped, with a bounded pipe drain if descendants retain inherited handles; no application operation is retried. Existing command-count and cleanup checks remain active.
+- [Original merged-head failure](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39904655601): the first packaged launch stalled at configuration before sending any provider request.
+- [Configuration-delay run](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39942673512): 15 scenarios passed, then a launch completed after its deadline. Request counts and cleanup passed; this was a real delay, not just inherited output pipes.
+- [Native startup sample](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39948188195): five scenarios passed, then the app remained blocked before any Dart progress. Both early and deadline samples showed its main thread waiting in AppKit/Mach messaging. Cleanup passed.
+- [Minimal AppKit comparison](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39954915017): separate fresh Intel VMs each passed 20 launches using abrupt or graceful termination. Abrupt exit alone did not reproduce the fault.
+- [Full Apple Silicon comparison](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39955654206): all 17 scenarios and 21 launches passed, with exact request counts/order and successful cleanup. No launch required slow-sample or inherited-pipe handling. The normal release archive checksum was verified; the app, Dart AOT binary and Rust library each contain ARM64 and x86_64 slices.
 
-This change supplies missing evidence; it does not yet establish the underlying startup cause. Portable tests cover real child timeout/cleanup, inherited pipe handles, success/nonzero exits, diagnostic redaction and sampler failure handling. A macOS-only test samples an owned live process with the actual OS tool; it also runs in the existing macOS CI job.
+Temporary samplers, native probes and service-control workarounds used for the
+investigation are removed from the final patch. The runner migration changes
+no application source or approval flow; the cryptographic dependency fix below
+is a separate production dependency change.
 
-The [diagnostic run 39934320921](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39934320921) passed 13 cases before the second `pending-relaunch` launch timed out. Request counts matched exactly and cleanup passed. Its final progress included `shutdown:complete`, but sampling found no recognizable stack. The retained [sanitized evidence](packaged-macos-startup-evidence/diagnostic-failure.json) does not establish whether the app finished before the deadline: progress was collected after sampling, and pipe EOF can outlive an exited app.
-
-The runner now observes application exit independently from pipe EOF. An exit observed before the original deadline, together with exit code zero and the exact success marker captured by that deadline, can pass even when an inherited pipe remains open. Missing success markers and nonzero exits still fail. A real application timeout still fails even if it exits successfully during sampling; evidence now separates deadline progress from final progress and records the exit code before cleanup. Regression tests use readiness handshakes to distinguish these cases without relying on child startup speed.
-
-The diagnostic PR also encountered a newly published security-audit failure: `RUSTSEC-2026-0385` affects the locked `ctutils 0.4.3`. The lockfile now selects `0.4.4`, which includes the upstream [constant-time fixes](https://github.com/RustCrypto/utils/pull/1569). `cargo audit` passes, and the all-feature/all-target Rust suite passes using `scripts/with-secure-test-tmpdir.sh`. The initial local run without that required harness failed executable-path safety checks; the secure-harness run resolved those environment failures.
-
-Windows CI exposed an OS assumption in the inherited-pipe test. Python uses reader threads for Windows pipes, whereas the macOS-only packaged runner uses POSIX selectors. That regression now runs on Linux/macOS; the diagnostic parser and ordinary child-process tests remain portable.
-
-For the same reason, Windows does not expose partial pipe output in `communicate()` timeout exceptions. The late-completion regression still requires a failed deadline, exit zero after sampling, and complete final progress on every platform; it expects deadline-only partial progress on POSIX, where the packaged runner executes.
-
-## Hosted GUI service readiness
-
-The failed job used macOS 26.6.1 (25G76), Intel image `20260824.0517.1`. This exactly matches [actions/runner-images#14751](https://github.com/actions/runner-images/issues/14751), which reports an IconServices crash loop that blocks GUI startup/focus, including on GitHub-hosted runners. This is a supported lead, not yet proof that every observed application timeout has that cause.
-
-Before launching GUI tests, CI now compiles a separate AppKit probe that renders text and application icons. A healthy probe changes no service state. If it times out, the runner disables and unloads only its own GUI-domain `com.apple.iconservices.iconservicesagent`, the documented workaround for the image bug, then requires the probe to pass. A different probe failure, unsuccessful disable, unconfirmed service absence or failed second probe fails CI. The script refuses operator machines and self-hosted runners. The disposable VM retains the workaround until teardown; the application and its entitlements are unchanged.
-
-`macos-gui-preflight.json` records bounded runner metadata, closed stages, command exit statuses, and before/after probe results. The full packaged TLS and recovery suite remains required after this check. The probe compiles and passes on the authorized physical Mac; the service workaround is exercised only by disposable hosted CI. Portable regression tests cover healthy/no-mutation behavior, exact service targeting, failure handling and diagnostic redaction.
-
-[Run 39940472953](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39940472953) reproduced the icon probe timeout on that exact image. Disable and bootout both returned zero, and the service was confirmed absent. The preflight stopped because its disabled-state parser expected `true`, while current macOS prints `disabled` (confirmed by read-only inspection on the physical Mac). The corrected parser accepts exact `disabled`/`true` states and rejects enabled states, other services and trailing text. The [sanitized preflight evidence](packaged-macos-startup-evidence/preflight-failure.json) records the failure without arbitrary launchctl output; a subsequent run must still prove the repaired icon probe and full application suite pass.
-
-[Run 39942673512](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39942673512) passed the icon preflight with the workaround and 15 packaged scenarios, including pending recovery and controller unlock. The next controller recovery launch remained at `configuration:enter` at its deadline, then completed successfully during sampling. This is a real configuration delay, not an inherited-pipe false timeout. Its [sanitized evidence](packaged-macos-startup-evidence/configuration-delay.json) retains the distinction; cleanup and request counts passed. The runner now also samples a still-running app after 15 seconds, retaining this closed-label sample even if the app later passes. The 45-second acceptance deadline is unchanged. This earlier sample is diagnostic, not a claimed correction of the remaining delay.
-
-[Run 39948188195](https://github.com/sixtoad/vaultwarden-cli/actions/runs/39948188195) captured the main thread waiting in AppKit and Mach messaging before any Dart startup progress, at both 15 seconds and the 45-second deadline. The process was still alive before cleanup, and no provider command was sent. This [sanitized sample](packaged-macos-startup-evidence/appkit-wait.json) places that failure in native application startup, independently of secret lookup. A separate temporary diagnostic job now exercises a minimal signed AppKit app with abrupt and normal termination, to characterize startup quickly without rebuilding Flutter; the full acceptance job remains required.
+The security audit separately flagged `ctutils 0.4.3` under
+`RUSTSEC-2026-0385`. The root lockfile now selects `0.4.4`, containing the upstream
+[constant-time fixes](https://github.com/RustCrypto/utils/pull/1569). The audit
+and 1,063 all-feature/all-target Rust tests passed (22 ignored), using the
+repository's secure temporary-directory harness.

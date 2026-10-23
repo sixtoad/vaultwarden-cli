@@ -10,15 +10,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import selectors
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
-import threading
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
@@ -27,153 +24,6 @@ PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity pe
 CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus".split())
 COMMANDS = frozenset("session list unlock review decision status".split())
 NATIVE_COMMANDS = frozenset("session list unlock review approve deny status".split())
-# Only these literal labels may leave a native sample. Never retain symbols,
-# addresses, thread names, binary paths, command lines or arbitrary diagnostics.
-STACK_LABELS = (
-    "SecItemCopyMatching", "SecIdentityCopyCertificate", "KeychainIdentity",
-    "ProviderSettings", "ProviderAdapter", "FlutterEngine", "FlutterViewController",
-    "FlutterView", "FlutterMethodChannel", "FlutterBinaryMessenger",
-    "NSApplication", "NSWindow", "CFRunLoop", "CA::Transaction", "CATransaction",
-    "CALayer", "Metal", "IOGPU", "swift_task", "dispatch_main",
-    "semaphore_wait", "mach_msg", "pthread_cond", "__semwait_signal",
-    "fml::", "flutter::", "dart::", "Dart_", "SecKeychain", "Security::",
-    "FlutterThreadSynchronizer", "FlutterSurfaceManager", "FlutterCompositor",
-    "Rasterizer::Draw", "WaitForFirstFrame", "waitUntilScheduled",
-    "blockUntilFrameAvailable", "performCommit", "waitUntilFrameAvailable",
-    "__psynch_cvwait", "__ulock_wait", "__workq_kernreturn",
-    "NSWorkspace", "ISConcreteIcon", "_ISRetryRequest",
-    "xpc_connection_send_message_with_reply_sync", "ResizeSynchronizer",
-    "NSApplicationMain", "sharedApplication", "finishLaunching", "_commonApplicationInit",
-    "_setup", "_register", "registerWithDock", "setActivationPolicy", "CGS", "SLS", "CPS",
-    "_LSApplicationCheckIn", "GetCurrentProcess", "HIApplication",
-)
-STACK_IMAGES = ("Security", "FlutterMacOS", "AppKit", "QuartzCore", "Metal",
-                "IconServices", "CoreServices", "CoreGraphics", "SkyLight", "HIServices",
-                "LaunchServices", "ApplicationServices", "libswift_Concurrency.dylib",
-                "libdispatch.dylib", "libxpc.dylib")
-DRAIN_TIMEOUT = 2
-
-
-def stack_diagnostics(raw):
-    if len(raw) > 1_048_576:
-        return {"status": "oversized"}
-    threads = []
-    current = None
-    graph = False
-    for line in raw.decode("utf-8", errors="replace").splitlines():
-        if line == "Call graph:":
-            graph = True
-            continue
-        if not graph:
-            continue
-        if line and not line[0].isspace():
-            break
-        if re.match(r"\s+\d+ Thread_", line):
-            if len(threads) == 32:
-                break
-            current = {"main": "com.apple.main-thread" in line, "frames": []}
-            threads.append(current)
-        elif current is not None and len(current["frames"]) < 128:
-            frame = re.match(r"([\s+|!:]*)(\d+) (.*?)\s+\(in ([^)]+)\)", line)
-            if frame is None:
-                continue
-            indent, count, symbol, library = frame.groups()
-            labels = [label for label in STACK_LABELS if label in symbol]
-            if library in STACK_IMAGES:
-                labels.append("image:" + library)
-            if labels:
-                current["frames"].append({"depth": min(len(indent), 256),
-                    "samples": min(int(count[:7]), 1_000_000), "labels": labels})
-    return {"status": "captured" if threads else "unrecognized", "threads": threads}
-
-
-def sample_process(pid):
-    if sys.platform != "darwin":
-        return {"status": "unsupported"}
-    try:
-        result = subprocess.run(
-            ["/usr/bin/sample", str(pid), "1", "10", "-file", "/dev/stdout"],
-            check=True, timeout=5, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        return stack_diagnostics(result.stdout)
-    except (OSError, subprocess.SubprocessError):
-        return {"status": "unavailable"}
-
-
-def run_app(argv, environment, timeout=45, sample_after=15, include_progress=False):
-    # subprocess.run kills on timeout before callers can inspect the live child.
-    # Own the process, collect bounded samples, then kill/reap on failure. No relaunch.
-    with subprocess.Popen(list(map(str, argv)), env=environment,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-        deadline = time.monotonic() + timeout
-        observed = []
-        slow_samples = []
-        sampling_done = threading.Event()
-        result = None
-        def sample_slow_process():
-            if not sampling_done.wait(sample_after) and process.poll() is None:
-                slow_samples.append(sample_process(process.pid))
-        sampler = None
-        observer = None
-        try:
-            sampler = threading.Thread(target=sample_slow_process, daemon=True)
-            sampler.start()
-            initial_exit = process.poll()
-            if initial_exit is not None:
-                observed.append((initial_exit, time.monotonic()))
-            else:
-                def observe_exit():
-                    observed.append((process.wait(), time.monotonic()))
-                observer = threading.Thread(target=observe_exit, daemon=True)
-                observer.start()
-            try:
-                stdout, stderr = process.communicate(timeout=max(0, deadline - time.monotonic()))
-            except subprocess.TimeoutExpired as error:
-                # Pipe EOF can outlive the app. Require an independent exit
-                # observation BEFORE the deadline; polling only now could accept
-                # a late exit if the timeout handler was delayed by scheduling.
-                if observed and observed[0][1] <= deadline and os.name == "posix":
-                    process.stdout.close()
-                    process.stderr.close()
-                    result = app_diagnostics(observed[0][0], error.output or b"", error.stderr or b"",
-                                             include_progress=include_progress)
-                    result["inherited_pipe_open"] = True
-                    return result
-                deadline_progress = progress_diagnostics(
-                    error.output or b"", error.stderr or b"", b"COMPANION_PROVIDER_TLS_PROGRESS", PHASES)
-                try:
-                    sample = sample_process(process.pid) if process.poll() is None else {"status": "exited"}
-                finally:
-                    exit_before_cleanup = process.poll()
-                    process.kill()
-                    try:
-                        stdout, stderr = process.communicate(timeout=DRAIN_TIMEOUT)
-                    except subprocess.TimeoutExpired as drain_error:
-                        # A descendant may retain an inherited pipe. Preserve
-                        # captured bytes and close our ends instead of hanging.
-                        stdout, stderr = drain_error.output or b"", drain_error.stderr or b""
-                        process.stdout.close()
-                        process.stderr.close()
-                        process.wait(timeout=DRAIN_TIMEOUT)
-                result = app_diagnostics(None, stdout, stderr, timed_out=True)
-                result["deadline_progress"] = deadline_progress
-                result["exit_code_before_cleanup"] = exit_before_cleanup
-                result["native_sample"] = sample
-                return result
-            result = app_diagnostics(process.returncode, stdout, stderr, include_progress=include_progress)
-            return result
-        finally:
-            # Include diagnostic thread startup in cleanup protection. An
-            # instrumentation failure must never leave a live app to __exit__.
-            if process.poll() is None:
-                process.kill()
-                process.wait(timeout=DRAIN_TIMEOUT)
-            sampling_done.set()
-            if sampler is not None and sampler.ident is not None:
-                sampler.join(timeout=6)
-            if result is not None and slow_samples:
-                result["slow_sample"] = slow_samples[0]
-            if observer is not None and observer.ident is not None:
-                observer.join(timeout=DRAIN_TIMEOUT)
 
 
 def progress_diagnostics(stdout, stderr, prefix, phases):
@@ -190,7 +40,7 @@ def progress_diagnostics(stdout, stderr, prefix, phases):
     return progress
 
 
-def app_diagnostics(code, stdout, stderr, timed_out=False, include_progress=False):
+def app_diagnostics(code, stdout, stderr, timed_out=False):
     """Keep only exact, bounded test markers; discard all arbitrary app output."""
     result = {"exit_code": code, "timed_out": timed_out, "failures": [], "native_rejections": []}
     for line in (stdout[-65536:] + b"\n" + stderr[-65536:]).splitlines():
@@ -206,7 +56,7 @@ def app_diagnostics(code, stdout, stderr, timed_out=False, include_progress=Fals
     result["passed"] = (code == 0 and not timed_out
                         and stdout.splitlines().count(b"COMPANION_PROVIDER_TLS_OK") == 1
                         and not result["failures"])
-    if not result["passed"] or include_progress:
+    if not result["passed"]:
         result["progress"] = progress_diagnostics(stdout, stderr, b"COMPANION_PROVIDER_TLS_PROGRESS", PHASES)
     return result
 
@@ -238,7 +88,7 @@ def run_diagnosed(argv, diagnostics, **options):
 
 
 def launch_app(executable, environment):
-    return run_app([executable], environment)
+    return run_diagnosed([executable], app_diagnostics, env=environment)
 
 
 def command_counts(path):

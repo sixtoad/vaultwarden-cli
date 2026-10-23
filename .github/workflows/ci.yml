@@ -22,35 +22,14 @@ permissions:
   pull-requests: write
 
 jobs:
-  appkit-startup-diagnostic:
-    name: Characterize hosted AppKit startup (${{ matrix.termination }})
-    runs-on: macos-26-intel
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        termination: [abrupt, graceful]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - run: python3 scripts/prepare-macos-gui.py "$RUNNER_TEMP/appkit-evidence"
-      - run: python3 scripts/diagnose-macos-appkit.py "$RUNNER_TEMP/appkit-evidence" "${{ matrix.termination }}"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: appkit-startup-diagnostic-${{ matrix.termination }}
-          path: ${{ runner.temp }}/appkit-evidence
-
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-26-intel' && 90 || 45 }}
+    timeout-minutes: ${{ matrix.os == 'macos-26' && 90 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26-intel, windows-latest]
+        os: [ubuntu-24.04, macos-26, windows-latest]
     defaults:
       run:
         shell: bash
@@ -73,10 +52,6 @@ jobs:
           flutter-version: '3.47.7'
           channel: stable
           cache: true
-      - name: Verify Intel macOS GUI service readiness
-        if: matrix.os == 'macos-26-intel'
-        timeout-minutes: 3
-        run: python3 scripts/prepare-macos-gui.py "$RUNNER_TEMP/desktop-evidence"
       - name: Verify independent core and actual packaged desktop bridge
         run: bash scripts/test-desktop-companion.sh "$RUNNER_TEMP/desktop-evidence"
       - name: Preserve development artifacts and test evidence
