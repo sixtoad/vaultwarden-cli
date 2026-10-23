@@ -16,7 +16,7 @@ evidence = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else repo / "target/
 evidence.mkdir(parents=True, exist_ok=True)
 command = [str(repo / "scripts/with-secure-test-tmpdir.sh"), "cargo", "test", "--locked", "--test", "protected_rehearsal", "support::pilot::tests::", "--", "--test-threads=1"]
 mutations = {
-    "poll_busy": ('Err(error) if error.is::<BusyPoll>() => {}', 'Err(error) if error.is::<BusyPoll>() => return Err(error)'),
+    "poll_busy": ('Err(error) if error.is::<BusyPoll>() => {}', 'Err(error) if error.is::<BusyPoll>() => { return Err(error); }'),
     "readiness": ('if observed.is_none() {\n            return Ok(false);\n        } // mutation: readiness', 'if observed.is_none() {\n            return Ok(true);\n        } // mutation: readiness'),
     "duplicate": ('ensure!(!self.consumed, "pilot submission already consumed"); // mutation: duplicate', '// mutation: duplicate disabled'),
     "counts": ('ensure!(\n            starts == usize::from(*approve) && successes == usize::from(*approve),\n            "pilot execution count mismatch"\n        ); // mutation: counts', 'let _ = (starts, successes); // mutation: counts disabled'),
