@@ -381,7 +381,7 @@ class GuiPreparationTests(unittest.TestCase):
         missing = subprocess.CompletedProcess([], 113, stdout=SECRET,
             stderr=b'Could not find service "com.apple.iconservices.iconservicesagent" in domain')
         disabled = subprocess.CompletedProcess([], 0, stdout=SECRET +
-            b'\n"com.apple.iconservices.iconservicesagent" => true\n')
+            b'\n\t"com.apple.iconservices.iconservicesagent" => disabled\n')
         with patch.object(GUI, "probe", side_effect=["timed_out", "passed"]) as probe, \
                 patch.object(GUI.os, "getuid", return_value=501, create=True), \
                 patch.object(GUI, "command", side_effect=[ok, missing, missing, disabled]) as command:
@@ -394,6 +394,31 @@ class GuiPreparationTests(unittest.TestCase):
         self.assertTrue(report["passed"])
         self.assertTrue(report["service_unloaded"] and report["service_disabled"])
         self.assertNotIn(SECRET.decode(), json.dumps(report))
+
+    def test_disabled_state_requires_exact_service_and_state(self):
+        ok = subprocess.CompletedProcess([], 0, stdout=b"")
+        missing = subprocess.CompletedProcess([], 113, stdout=b"",
+            stderr=b'Could not find service "com.apple.iconservices.iconservicesagent" in domain')
+        for line, expected in [
+                (b'"com.apple.iconservices.iconservicesagent" => disabled', True),
+                (b'"com.apple.iconservices.iconservicesagent" => true', True),
+                (b'"com.apple.iconservices.iconservicesagent" => enabled', False),
+                (b'"com.apple.iconservices.iconservicesagent" => false', False),
+                (b'"com.apple.iconservices.iconservicesagent" => trueish', False),
+                (b'"com.apple.iconservices.iconservicesagent" => disabled extra', False),
+                (b'"other.service" => disabled', False)]:
+            state = subprocess.CompletedProcess([], 0, stdout=b'disabled services = {\n\t' + line + b'\n}\n')
+            report = {}
+            with self.subTest(line=line), patch.object(GUI.os, "getuid", return_value=501, create=True), \
+                    patch.object(GUI, "probe", side_effect=["timed_out", "passed"]), \
+                    patch.object(GUI, "command", side_effect=[ok, ok, missing, state]):
+                if expected:
+                    GUI.prepare("probe", report)
+                    self.assertTrue(report["passed"])
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "postconditions"):
+                        GUI.prepare("probe", report)
+                self.assertEqual(report["service_disabled"], expected)
 
     def test_failed_probe_does_not_trigger_a_workaround(self):
         with patch.object(GUI, "probe", return_value="failed"), patch.object(GUI, "command") as command:

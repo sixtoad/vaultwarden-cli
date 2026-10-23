@@ -80,7 +80,8 @@ def prepare(executable, report):
     report["service_unloaded"] = (loaded is not None and loaded.returncode == 113 and
         f'Could not find service "{SERVICE}"'.encode() in loaded.stderr)
     report["service_disabled"] = (state is not None and state.returncode == 0 and
-        re.search(rb'"com\.apple\.iconservices\.iconservicesagent"\s*=>\s*true', state.stdout) is not None)
+        re.search(rb'^\s*"com\.apple\.iconservices\.iconservicesagent"[^\S\r\n]*=>[^\S\r\n]*(?:disabled|true)[^\S\r\n]*$',
+                  state.stdout, re.MULTILINE) is not None)
     if not report["service_unloaded"] or not report["service_disabled"]:
         raise RuntimeError("CI icon service postconditions failed")
     report["stage"] = "final_probe"
