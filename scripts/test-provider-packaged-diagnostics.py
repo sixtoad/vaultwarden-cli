@@ -19,6 +19,9 @@ sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location("packaged", Path(__file__).with_name("test-provider-packaged.py"))
 PROBE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PROBE)
+GUI_SPEC = importlib.util.spec_from_file_location("gui", Path(__file__).with_name("prepare-macos-gui.py"))
+GUI = importlib.util.module_from_spec(GUI_SPEC)
+GUI_SPEC.loader.exec_module(GUI)
 SECRET = b"password identity-reference PRIVATE KEY raw-request raw-response"
 
 
@@ -299,6 +302,96 @@ class DiagnosticsTests(unittest.TestCase):
         adapter = (PROBE.ROOT / "companion/macos/Runner/ProviderAdapter.swift").read_text()
         handler = adapter.split("catch let error as ProviderSettingsError {", 1)[1].split("} catch {", 1)[0]
         self.assertIn('code: error.code, message: "Provider setup, trust or transport unavailable.", details: nil', handler)
+
+
+class GuiPreparationTests(unittest.TestCase):
+    def test_healthy_icon_service_is_not_modified(self):
+        report = {"workaround_applied": False}
+        with patch.object(GUI, "probe", return_value="passed"), patch.object(GUI, "command") as command:
+            GUI.prepare("probe", report)
+        self.assertTrue(report["passed"])
+        self.assertFalse(report["workaround_applied"])
+        command.assert_not_called()
+
+    def test_only_known_timeout_triggers_exact_service_workaround(self):
+        report = {}
+        ok = subprocess.CompletedProcess([], 0, stdout=SECRET)
+        missing = subprocess.CompletedProcess([], 113, stdout=SECRET,
+            stderr=b'Could not find service "com.apple.iconservices.iconservicesagent" in domain')
+        disabled = subprocess.CompletedProcess([], 0, stdout=SECRET +
+            b'\n"com.apple.iconservices.iconservicesagent" => true\n')
+        with patch.object(GUI, "probe", side_effect=["timed_out", "passed"]) as probe, \
+                patch.object(GUI.os, "getuid", return_value=501, create=True), \
+                patch.object(GUI, "command", side_effect=[ok, missing, missing, disabled]) as command:
+            GUI.prepare("probe", report)
+        target = "gui/501/com.apple.iconservices.iconservicesagent"
+        self.assertEqual([call.args[0] for call in command.call_args_list], [
+            ["/bin/launchctl", "disable", target], ["/bin/launchctl", "bootout", target],
+            ["/bin/launchctl", "print", target], ["/bin/launchctl", "print-disabled", "gui/501"]])
+        self.assertEqual(probe.call_count, 2)
+        self.assertTrue(report["passed"])
+        self.assertTrue(report["service_unloaded"] and report["service_disabled"])
+        self.assertNotIn(SECRET.decode(), json.dumps(report))
+
+    def test_failed_probe_does_not_trigger_a_workaround(self):
+        with patch.object(GUI, "probe", return_value="failed"), patch.object(GUI, "command") as command:
+            with self.assertRaisesRegex(RuntimeError, "without the known timeout"):
+                GUI.prepare("probe", {})
+        command.assert_not_called()
+
+    def test_unconfirmed_service_state_and_failed_reprobe_fail_closed(self):
+        ok = subprocess.CompletedProcess([], 0, stdout=b'"com.apple.iconservices.iconservicesagent" => true')
+        missing = subprocess.CompletedProcess([], 113, stdout=b"",
+            stderr=b'Could not find service "com.apple.iconservices.iconservicesagent" in domain')
+        permission = subprocess.CompletedProcess([], 1, stdout=b"", stderr=SECRET)
+        for replies, expected in [([ok, ok, ok, ok], "postconditions"),
+                                  ([ok, ok, permission, ok], "postconditions"),
+                                  ([ok, ok, missing, None], "postconditions"),
+                                  ([ok, ok, missing, ok], "remains unavailable")]:
+            with self.subTest(expected=expected), patch.object(GUI.os, "getuid", return_value=501, create=True), \
+                    patch.object(GUI, "probe", side_effect=["timed_out", "failed"]), \
+                    patch.object(GUI, "command", side_effect=replies):
+                report = {"passed": False}
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    GUI.prepare("probe", report)
+                self.assertFalse(report["passed"])
+
+    def test_operator_machines_are_refused_before_any_command(self):
+        with patch.object(GUI.sys, "platform", "darwin"), \
+                patch.object(GUI.platform, "machine", return_value="x86_64"), \
+                patch.dict(GUI.os.environ, {"GITHUB_ACTIONS": "true", "ImageOS": "macos26",
+                                           "RUNNER_ENVIRONMENT": "self-hosted"}, clear=True), \
+                patch.object(GUI, "command") as command:
+            with self.assertRaisesRegex(SystemExit, "disposable GitHub-hosted"):
+                GUI.main()
+        command.assert_not_called()
+
+    def test_probe_requires_exact_success_marker(self):
+        for result, expected in [
+                (None, "timed_out"),
+                (subprocess.CompletedProcess([], 1, stdout=b"COMPANION_ICON_PROBE_OK\n"), "failed"),
+                (subprocess.CompletedProcess([], 0, stdout=SECRET), "failed"),
+                (subprocess.CompletedProcess([], 0, stdout=b"COMPANION_ICON_PROBE_OK\n"), "passed")]:
+            with patch.object(GUI, "command", return_value=result):
+                self.assertEqual(GUI.probe("probe"), expected)
+
+    def test_failed_preflight_writes_closed_stage_evidence(self):
+        for compile_result in [None, subprocess.CompletedProcess([], 2, stdout=SECRET, stderr=SECRET)]:
+            with tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(GUI.sys, "platform", "darwin"), \
+                    patch.object(GUI.platform, "machine", return_value="x86_64"), \
+                    patch.object(GUI, "machine_metadata", return_value={"image_os": "macos26"}), \
+                    patch.dict(GUI.os.environ, {"GITHUB_ACTIONS": "true", "ImageOS": "macos26",
+                                               "RUNNER_ENVIRONMENT": "github-hosted"}, clear=True), \
+                    patch.object(GUI.sys, "argv", ["prepare", temporary]), \
+                    patch.object(GUI, "command", return_value=compile_result):
+                with self.assertRaisesRegex(RuntimeError, "Could not build"):
+                    GUI.main()
+                report = json.loads((Path(temporary) / "macos-gui-preflight.json").read_text())
+                self.assertFalse(report["passed"])
+                self.assertEqual(report["stage"], "compile")
+                self.assertEqual(report["compile"], GUI.outcome(compile_result))
+                self.assertNotIn(SECRET.decode(), json.dumps(report))
 
 
 if __name__ == "__main__":

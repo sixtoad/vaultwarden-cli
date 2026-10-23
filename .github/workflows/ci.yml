@@ -52,6 +52,10 @@ jobs:
           flutter-version: '3.47.7'
           channel: stable
           cache: true
+      - name: Verify Intel macOS GUI service readiness
+        if: matrix.os == 'macos-26-intel'
+        timeout-minutes: 3
+        run: python3 scripts/prepare-macos-gui.py "$RUNNER_TEMP/desktop-evidence"
       - name: Verify independent core and actual packaged desktop bridge
         run: bash scripts/test-desktop-companion.sh "$RUNNER_TEMP/desktop-evidence"
       - name: Preserve development artifacts and test evidence

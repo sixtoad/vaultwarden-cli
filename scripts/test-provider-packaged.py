@@ -39,9 +39,12 @@ STACK_LABELS = (
     "Rasterizer::Draw", "WaitForFirstFrame", "waitUntilScheduled",
     "blockUntilFrameAvailable", "performCommit", "waitUntilFrameAvailable",
     "__psynch_cvwait", "__ulock_wait", "__workq_kernreturn",
+    "NSWorkspace", "ISConcreteIcon", "_ISRetryRequest",
+    "xpc_connection_send_message_with_reply_sync", "ResizeSynchronizer",
 )
 STACK_IMAGES = ("Security", "FlutterMacOS", "AppKit", "QuartzCore", "Metal",
-                "libswift_Concurrency.dylib", "libdispatch.dylib", "libxpc.dylib")
+                "IconServices", "CoreServices", "libswift_Concurrency.dylib",
+                "libdispatch.dylib", "libxpc.dylib")
 DRAIN_TIMEOUT = 2
 
 
