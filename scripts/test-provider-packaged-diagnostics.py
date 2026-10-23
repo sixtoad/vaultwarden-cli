@@ -186,6 +186,86 @@ class DiagnosticsTests(unittest.TestCase):
                 self.assertEqual(run.call_args.args[0],
                     ["/usr/bin/sample", "123", "1", "10", "-file", "/dev/stdout"])
 
+    def test_early_sample_captures_live_child_without_extending_deadline(self):
+        children = []
+        calls = []
+        original = subprocess.Popen
+        def start(*args, **kwargs):
+            process = original(*args, **kwargs)
+            children.append(process)
+            return process
+        def sample(pid):
+            self.assertEqual(pid, children[0].pid)
+            self.assertIsNone(children[0].poll())
+            calls.append(pid)
+            if len(calls) == 1:
+                # Keep the early sampler blocked across the application
+                # deadline. Cleanup must proceed before this sample returns.
+                self.assertNotEqual(children[0].wait(timeout=5), 0)
+            else:
+                return {"status": "unavailable"}
+            return {"status": "captured", "threads": []}
+        with patch.object(PROBE.subprocess, "Popen", side_effect=start), \
+                patch.object(PROBE, "sample_process", side_effect=sample) as sampled:
+            result = PROBE.run_app([sys.executable, "-c", "import time; time.sleep(20)"],
+                                   dict(os.environ), timeout=1, sample_after=0.05)
+        self.assertEqual(sampled.call_count, 2)
+        self.assertTrue(result["timed_out"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["slow_sample"], {"status": "captured", "threads": []})
+        self.assertIsNotNone(children[0].returncode)
+
+    def test_early_sample_is_retained_when_child_finishes_before_deadline(self):
+        children = []
+        original = subprocess.Popen
+        captured = {"status": "captured", "threads": [{"main": True, "frames": [
+            {"depth": 4, "samples": 50, "labels": ["SecItemCopyMatching", "image:Security"]}]}]}
+        with tempfile.TemporaryDirectory() as directory:
+            release = Path(directory) / "release"
+            program = ("from pathlib import Path\nimport sys,time\n"
+                       "while not Path(sys.argv[1]).exists(): time.sleep(0.01)\n"
+                       "print('COMPANION_PROVIDER_TLS_OK', flush=True)\n")
+            def start(*args, **kwargs):
+                process = original(*args, **kwargs)
+                children.append(process)
+                return process
+            def sample(pid):
+                self.assertEqual(pid, children[0].pid)
+                self.assertIsNone(children[0].poll())
+                release.touch()
+                self.assertEqual(children[0].wait(timeout=3), 0)
+                return captured
+            with patch.object(PROBE.subprocess, "Popen", side_effect=start), \
+                    patch.object(PROBE, "sample_process", side_effect=sample) as sampled:
+                result = PROBE.run_app([sys.executable, "-c", program, str(release)],
+                                       dict(os.environ), timeout=5, sample_after=0.05)
+            sampled.assert_called_once()
+            self.assertTrue(result["passed"])
+            self.assertEqual(result["slow_sample"], captured)
+
+    def test_diagnostic_thread_start_failure_still_kills_and_reaps_child(self):
+        original = subprocess.Popen
+        original_start = PROBE.threading.Thread.start
+        for failing_start in (1, 2):
+            children, starts = [], []
+            def start_child(*args, **kwargs):
+                process = original(*args, **kwargs)
+                children.append(process)
+                return process
+            def start_thread(thread):
+                starts.append(thread)
+                if len(starts) == failing_start:
+                    raise RuntimeError("synthetic thread creation failure")
+                return original_start(thread)
+            with self.subTest(failing_start=failing_start), \
+                    patch.object(PROBE.subprocess, "Popen", side_effect=start_child), \
+                    patch.object(PROBE.threading.Thread, "start", new=start_thread):
+                with self.assertRaisesRegex(RuntimeError, "synthetic thread"):
+                    PROBE.run_app([sys.executable, "-c", "import time; time.sleep(20)"],
+                                   dict(os.environ), timeout=0.05)
+            self.assertIsNotNone(children[0].returncode)
+            self.assertNotEqual(children[0].returncode, 0)
+
     @unittest.skipUnless(sys.platform == "darwin", "requires native macOS sampler")
     def test_native_sampler_recognizes_a_live_owned_process(self):
         with subprocess.Popen(["/bin/sleep", "10"]) as child:

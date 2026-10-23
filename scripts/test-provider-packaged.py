@@ -95,23 +95,32 @@ def sample_process(pid):
         return {"status": "unavailable"}
 
 
-def run_app(argv, environment, timeout=45):
+def run_app(argv, environment, timeout=45, sample_after=15):
     # subprocess.run kills on timeout before callers can inspect the live child.
-    # Own the process here, sample it once, then always kill/reap it. No relaunch.
+    # Own the process, collect bounded samples, then kill/reap on failure. No relaunch.
     with subprocess.Popen(list(map(str, argv)), env=environment,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
         deadline = time.monotonic() + timeout
         observed = []
+        slow_samples = []
+        sampling_done = threading.Event()
+        result = None
+        def sample_slow_process():
+            if not sampling_done.wait(sample_after) and process.poll() is None:
+                slow_samples.append(sample_process(process.pid))
+        sampler = None
         observer = None
-        initial_exit = process.poll()
-        if initial_exit is not None:
-            observed.append((initial_exit, time.monotonic()))
-        else:
-            def observe_exit():
-                observed.append((process.wait(), time.monotonic()))
-            observer = threading.Thread(target=observe_exit, daemon=True)
-            observer.start()
         try:
+            sampler = threading.Thread(target=sample_slow_process, daemon=True)
+            sampler.start()
+            initial_exit = process.poll()
+            if initial_exit is not None:
+                observed.append((initial_exit, time.monotonic()))
+            else:
+                def observe_exit():
+                    observed.append((process.wait(), time.monotonic()))
+                observer = threading.Thread(target=observe_exit, daemon=True)
+                observer.start()
             try:
                 stdout, stderr = process.communicate(timeout=max(0, deadline - time.monotonic()))
             except subprocess.TimeoutExpired as error:
@@ -145,9 +154,20 @@ def run_app(argv, environment, timeout=45):
                 result["exit_code_before_cleanup"] = exit_before_cleanup
                 result["native_sample"] = sample
                 return result
-            return app_diagnostics(process.returncode, stdout, stderr)
+            result = app_diagnostics(process.returncode, stdout, stderr)
+            return result
         finally:
-            if observer is not None:
+            # Include diagnostic thread startup in cleanup protection. An
+            # instrumentation failure must never leave a live app to __exit__.
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=DRAIN_TIMEOUT)
+            sampling_done.set()
+            if sampler is not None and sampler.ident is not None:
+                sampler.join(timeout=6)
+            if result is not None and slow_samples:
+                result["slow_sample"] = slow_samples[0]
+            if observer is not None and observer.ident is not None:
                 observer.join(timeout=DRAIN_TIMEOUT)
 
 
