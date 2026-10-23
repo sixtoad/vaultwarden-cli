@@ -295,6 +295,17 @@ impl AgentAction {
     }
 }
 
+// A typed, read-only polling condition. Submission Busy remains an ordinary
+// rejection: callers must never retry a potentially accepted submission.
+#[derive(Debug)]
+struct BusyPoll;
+impl std::fmt::Display for BusyPoll {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("restricted agent poll rejected: busy")
+    }
+}
+impl std::error::Error for BusyPoll {}
+
 // Parse the closed production protocol before constructing a diagnostic. Never
 // format response bytes, identifiers, or serde errors, even for malformed JSON.
 // The caller must run its secret-redaction gate before invoking this parser.
@@ -302,6 +313,9 @@ pub fn agent_response(action: AgentAction, bytes: &[u8]) -> Result<Value> {
     let invalid = || anyhow::anyhow!("restricted agent {} response invalid", action.label());
     let response = AgentResponse::parse(bytes).map_err(|_error| invalid())?;
     if let AgentResponse::Rejected { category, .. } = response {
+        if matches!(action, AgentAction::Poll) && category == AgentRejection::Busy {
+            return Err(BusyPoll.into());
+        }
         let category = match category {
             AgentRejection::Unauthorized => "unauthorized",
             AgentRejection::Malformed => "malformed",

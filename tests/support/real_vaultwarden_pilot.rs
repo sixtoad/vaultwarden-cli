@@ -1056,40 +1056,36 @@ fn execute(
         scan(run, &serde_json::to_vec(&receipt)?)?;
         observation.status(&json!({"status":"pending"}), agent)?;
         println!("PENDING: {phase}; request_id={id}; human must decide in foreground Flutter");
-        let deadline = Instant::now() + Duration::from_secs(310);
-        loop {
-            interrupted_or_stopped(&run.root)?;
-            ensure!(
-                Instant::now() < deadline,
-                "pilot decision deadline exceeded; never resubmit"
-            );
-            let response = if agent {
-                run.agent(
-                    AgentAction::Poll,
-                    &[
-                        &id,
-                        "--socket",
-                        &socket,
-                        "--key-file",
-                        &key,
-                        "--binding-id",
-                        binding,
-                    ],
-                )
-                .context("pilot status poll failed")?
-            } else {
-                run.cli(&["status", &id])
-                    .context("pilot status poll failed")?
-            };
-            scan(run, &serde_json::to_vec(&response)?)?;
-            observation.status(&response["state"], agent)?;
-            if terminal(&response["state"], agent, approve)
-                .context("pilot terminal verification failed")?
-            {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(250));
-        }
+        wait_for_pilot_decision(
+            Instant::now() + Duration::from_secs(310),
+            Duration::from_millis(250),
+            || interrupted_or_stopped(&run.root),
+            || {
+                if agent {
+                    run.agent(
+                        AgentAction::Poll,
+                        &[
+                            &id,
+                            "--socket",
+                            &socket,
+                            "--key-file",
+                            &key,
+                            "--binding-id",
+                            binding,
+                        ],
+                    )
+                } else {
+                    run.cli(&["status", &id])
+                }
+                .context("pilot status poll failed")
+            },
+            |response| {
+                scan(run, &serde_json::to_vec(response)?)?;
+                observation.status(&response["state"], agent)?;
+                terminal(&response["state"], agent, approve)
+                    .context("pilot terminal verification failed")
+            },
+        )?;
         completed.push((id.clone(), approve));
         let history = run
             .cli(&["history", "--limit", "200"])
@@ -1111,6 +1107,36 @@ fn execute(
         "PASS: four human Flutter decisions; two successful credential checks; two denials without execution"
     );
     Ok(())
+}
+
+// Retry only a strictly parsed Busy response to a read-only agent poll. Keep
+// one absolute deadline for starting polls, cancellation checks and the original
+// request closure (an in-flight CLI call retains its existing 30-second bound);
+// Busy is never recorded as a lifecycle observation or treated as success.
+fn wait_for_pilot_decision(
+    deadline: Instant,
+    interval: Duration,
+    mut check: impl FnMut() -> Result<()>,
+    mut poll: impl FnMut() -> Result<Value>,
+    mut observe: impl FnMut(&Value) -> Result<bool>,
+) -> Result<()> {
+    loop {
+        check()?;
+        ensure!(
+            Instant::now() < deadline,
+            "pilot decision deadline exceeded; never resubmit"
+        );
+        match poll() {
+            Ok(response) => {
+                if observe(&response)? {
+                    return Ok(());
+                }
+            }
+            Err(error) if error.is::<BusyPoll>() => {}
+            Err(error) => return Err(error),
+        }
+        std::thread::sleep(interval.min(deadline.saturating_duration_since(Instant::now())));
+    }
 }
 
 fn initialized_layout(state: &Path) -> Result<()> {
@@ -1799,6 +1825,183 @@ mod tests {
             }
             assert!(terminal(&json!({"status":"completed","exit_code":0}), agent, false).is_err());
         }
+    }
+
+    #[test]
+    fn pilot_poll_retries_typed_busy_without_losing_terminal_observation() {
+        let mut responses = [
+            br#"{"protocol_version":1,"status":"rejected","category":"busy"}"#.as_slice(),
+            br#"{"protocol_version":1,"status":"rejected","category":"busy"}"#.as_slice(),
+        ]
+        .into_iter();
+        let mut polls = 0;
+        let mut observed = Vec::new();
+        wait_for_pilot_decision(
+            Instant::now() + Duration::from_secs(1),
+            Duration::ZERO,
+            || Ok(()),
+            || {
+                polls += 1;
+                if let Some(bytes) = responses.next() {
+                    agent_response(AgentAction::Poll, bytes).context("pilot status poll failed")
+                } else {
+                    agent_response(
+                        AgentAction::Poll,
+                        &serde_json::to_vec(&json!({
+                            "protocol_version":1,"status":"status","request_id":"A".repeat(43),
+                            "state":{"status":"completed","exit_code":0}
+                        }))
+                        .unwrap(),
+                    )
+                }
+            },
+            |response| {
+                observed.push(response["state"].clone());
+                terminal(&response["state"], true, true)
+            },
+        )
+        .unwrap();
+        assert_eq!(polls, 3);
+        assert_eq!(observed, vec![json!({"status":"completed","exit_code":0})]);
+    }
+
+    #[test]
+    fn pilot_busy_preserves_last_observed_request_on_later_failure() {
+        let id = "A".repeat(43);
+        let mut observation = FailureObservation::new("agent-approve");
+        observation.request(&id).unwrap();
+        let responses = [
+            json!({"protocol_version":1,"status":"status","request_id":id,"state":{"status":"pending"}}),
+            json!({"protocol_version":1,"status":"rejected","category":"busy"}),
+            json!({"protocol_version":1,"status":"rejected","category":"unavailable"}),
+        ];
+        let mut responses = responses.into_iter();
+        let error = wait_for_pilot_decision(
+            Instant::now() + Duration::from_secs(1),
+            Duration::ZERO,
+            || Ok(()),
+            || {
+                agent_response(
+                    AgentAction::Poll,
+                    &serde_json::to_vec(&responses.next().unwrap()).unwrap(),
+                )
+            },
+            |response| {
+                observation.status(&response["state"], true)?;
+                terminal(&response["state"], true, true)
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "restricted agent poll rejected: unavailable"
+        );
+        let evidence = serde_json::to_value(&observation).unwrap();
+        assert_eq!(evidence["request_id"], id);
+        assert_eq!(
+            evidence["last_observed_status"]["value"]["state"]["status"],
+            "pending"
+        );
+        assert_eq!(
+            evidence["last_observed_status"]["freshness"],
+            "historical_may_be_stale"
+        );
+        assert_eq!(
+            evidence["exact_request_counts"]["availability"],
+            "unavailable"
+        );
+    }
+
+    #[test]
+    fn pilot_poll_busy_expires_and_other_failures_never_retry() {
+        let busy = br#"{"protocol_version":1,"status":"rejected","category":"busy"}"#;
+        let mut polls = 0;
+        let error = wait_for_pilot_decision(
+            Instant::now() + Duration::from_millis(10),
+            Duration::from_millis(1),
+            || Ok(()),
+            || {
+                polls += 1;
+                agent_response(AgentAction::Poll, busy)
+            },
+            |_| panic!("Busy must not become an observation"),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "pilot decision deadline exceeded; never resubmit"
+        );
+        for (action, bytes) in [
+            (AgentAction::Submit, busy.as_slice()),
+            (
+                AgentAction::Poll,
+                br#"{"protocol_version":1,"status":"rejected","category":"locked"}"#.as_slice(),
+            ),
+            (
+                AgentAction::Poll,
+                br#"{"protocol_version":2,"status":"rejected","category":"busy"}"#.as_slice(),
+            ),
+            (AgentAction::Poll, b"".as_slice()),
+            (AgentAction::Poll, b"not-json".as_slice()),
+        ] {
+            let mut polls = 0;
+            assert!(
+                wait_for_pilot_decision(
+                    Instant::now() + Duration::from_secs(1),
+                    Duration::ZERO,
+                    || Ok(()),
+                    || {
+                        polls += 1;
+                        agent_response(action, bytes)
+                    },
+                    |_| panic!("invalid observation"),
+                )
+                .is_err()
+            );
+            assert_eq!(polls, 1);
+        }
+        for message in [
+            "restricted agent poll rejected: busy",
+            "transport failed",
+            "redaction gate failed",
+        ] {
+            let mut polls = 0;
+            assert!(
+                wait_for_pilot_decision(
+                    Instant::now() + Duration::from_secs(1),
+                    Duration::ZERO,
+                    || Ok(()),
+                    || {
+                        polls += 1;
+                        anyhow::bail!(message)
+                    },
+                    |_| panic!("invalid observation"),
+                )
+                .is_err()
+            );
+            assert_eq!(polls, 1);
+        }
+        let mut polls = 0;
+        let mut checks = 0;
+        assert!(
+            wait_for_pilot_decision(
+                Instant::now() + Duration::from_secs(1),
+                Duration::ZERO,
+                || {
+                    checks += 1;
+                    ensure!(checks == 1, "stopped");
+                    Ok(())
+                },
+                || {
+                    polls += 1;
+                    agent_response(AgentAction::Poll, busy)
+                },
+                |_| Ok(false),
+            )
+            .is_err()
+        );
+        assert_eq!(polls, 1);
+        assert_eq!(checks, 2);
     }
 
     #[test]

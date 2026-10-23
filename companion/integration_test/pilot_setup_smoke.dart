@@ -12,6 +12,21 @@ import 'package:companion_slice/provider/pilot_bundle.dart';
 
 import 'provider_tls_smoke.dart' as probe;
 
+// Match ProviderPage's lifecycle forwarding: losing focus during an async
+// setup must invalidate the controller operation before it can unlock.
+class PilotLifecycle with WidgetsBindingObserver {
+  PilotLifecycle(this.controller);
+  final ProviderController controller;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      controller.resume();
+    } else {
+      controller.suspend();
+    }
+  }
+}
+
 Future<void> waitForFocus(bool foreground) async {
   final deadline = DateTime.now().add(const Duration(seconds: 5));
   while (DateTime.now().isBefore(deadline)) {
@@ -93,6 +108,8 @@ Future<void> main() async {
     } else {
       probe.check(!before.configured, probe.ProbeCheck.negativeClosed);
       final controller = ProviderController(native);
+      final lifecycle = PilotLifecycle(controller);
+      WidgetsBinding.instance.addObserver(lifecycle);
       try {
         await controller.initialize();
         await probe.progress(probe.ProbePhase.controller);
@@ -102,6 +119,7 @@ Future<void> main() async {
           probe.ProbeCheck.sessionUnlocked,
         );
       } finally {
+        WidgetsBinding.instance.removeObserver(lifecycle);
         controller.dispose();
       }
       // Read persisted metadata through a fresh platform object after setup.

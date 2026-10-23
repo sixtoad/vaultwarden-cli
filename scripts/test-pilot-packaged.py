@@ -79,7 +79,8 @@ def main():
     parser.add_argument("app", type=Path)
     parser.add_argument("evidence", type=Path)
     args = parser.parse_args()
-    if sys.platform != "darwin" or os.environ.get("CI") != "true":
+    if (sys.platform != "darwin" or os.environ.get("CI") != "true"
+            or os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"):
         raise SystemExit("Pilot channel provisioning requires a disposable macOS CI runner.")
     executable = args.app.resolve() / "Contents/MacOS/companion_slice"
     if not executable.is_file():
@@ -96,12 +97,17 @@ def main():
     app = focus = server = None
     keychain_created = False
     configuration_owned = False
+    configuration = None
     report = {"kind": "packaged-pilot-production-channel", "cases": {}, "passed": False, "cleanup_passed": False}
     try:
         PROBE.run([sys.executable, PROBE.FIXTURE, "provision", temporary])
         helper = temporary / "focus-helper"
         PROBE.run(["swiftc", "-parse-as-library", PROBE.ROOT / "companion/provider_native_tests/PilotFixtureFocus.swift", "-o", helper])
-        server = subprocess.Popen([sys.executable, str(PROBE.FIXTURE), "serve", str(temporary), "--mode", "controller"],
+        audit = temporary / "identity-audit"
+        PROBE.run(["swiftc", "-parse-as-library", PROBE.ROOT / "companion/provider_native_tests/PilotFixtureIdentityAudit.swift", "-o", audit])
+        for name in ["client", "revoked"]:
+            PROBE.run([audit, "absent", "unused", "unused", temporary / f"{name}.der"])
+        server = subprocess.Popen([sys.executable, str(PROBE.FIXTURE), "serve", str(temporary), "--mode", "pilot"],
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         with selectors.DefaultSelector() as selector:
             selector.register(server.stdout, selectors.EVENT_READ)
@@ -116,7 +122,7 @@ def main():
                   "client_sha256": hashlib.sha256((temporary / "client.der").read_bytes()).hexdigest(),
                   "ca_der": base64.b64encode((temporary / "ca.der").read_bytes()).decode(),
                   "pkcs12": base64.b64encode((temporary / "client.p12").read_bytes()).decode(),
-                  "import_passphrase": "synthetic-only", "unlock_password": "synthetic-only"}
+                  "import_passphrase": "synthetic-only", "unlock_password": "synthetic-pilot-unlock-only"}
         saved_bytes = None
         configuration = None
         for scenario in ["foreground", "inactive"]:
@@ -139,7 +145,11 @@ def main():
             wait_marker(focus, b"COMPANION_PILOT_FOCUS_READY")
             # A changed valid pin would replace persisted metadata if the native
             # inactive gate were bypassed. It must not import or save anything.
-            payload = dict(bundle, **({"leaf_sha256": "0" * 64} if scenario == "inactive" else {}))
+            payload = dict(bundle)
+            if scenario == "inactive":
+                payload.update(leaf_sha256="0" * 64,
+                    client_sha256=hashlib.sha256((temporary / "revoked.der").read_bytes()).hexdigest(),
+                    pkcs12=base64.b64encode((temporary / "revoked.p12").read_bytes()).decode())
             configuration_owned = True
             try:
                 stdout, stderr = app.communicate(json.dumps(payload).encode(), timeout=45)
@@ -164,6 +174,8 @@ def main():
                 saved_bytes = observed
             elif observed != saved_bytes or list(configuration.parent.glob("configuration-before-pilot-*")):
                 raise RuntimeError("inactive setup changed persisted configuration")
+            PROBE.run([audit, "present", configuration, keychain, temporary / "client.der"])
+            PROBE.run([audit, "absent", "unused", "unused", temporary / "revoked.der"])
             verify_commands(temporary / "requests.jsonl")
         report.update(passed=True, observed_command_counts=PROBE.command_counts(temporary / "requests.jsonl"))
     finally:
@@ -193,6 +205,10 @@ def main():
             try:
                 if keychain_created:
                     PROBE.run(["security", "delete-keychain", keychain])
+                    if configuration is not None:
+                        PROBE.run([audit, "removed", configuration, "unused", temporary / "client.der"])
+                    for name in ["client", "revoked"]:
+                        PROBE.run([audit, "absent", "unused", "unused", temporary / f"{name}.der"])
                 if keychain_directory is not None:
                     shutil.rmtree(keychain_directory)
                 if configuration_owned:
