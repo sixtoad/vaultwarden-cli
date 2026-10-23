@@ -22,6 +22,27 @@ permissions:
   pull-requests: write
 
 jobs:
+  appkit-startup-diagnostic:
+    name: Characterize hosted AppKit startup (${{ matrix.termination }})
+    runs-on: macos-26-intel
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        termination: [abrupt, graceful]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/prepare-macos-gui.py "$RUNNER_TEMP/appkit-evidence"
+      - run: python3 scripts/diagnose-macos-appkit.py "$RUNNER_TEMP/appkit-evidence" "${{ matrix.termination }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: appkit-startup-diagnostic-${{ matrix.termination }}
+          path: ${{ runner.temp }}/appkit-evidence
+
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

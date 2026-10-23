@@ -22,10 +22,57 @@ SPEC.loader.exec_module(PROBE)
 GUI_SPEC = importlib.util.spec_from_file_location("gui", Path(__file__).with_name("prepare-macos-gui.py"))
 GUI = importlib.util.module_from_spec(GUI_SPEC)
 GUI_SPEC.loader.exec_module(GUI)
+APPKIT_SPEC = importlib.util.spec_from_file_location("appkit", Path(__file__).with_name("diagnose-macos-appkit.py"))
+APPKIT = importlib.util.module_from_spec(APPKIT_SPEC)
+APPKIT_SPEC.loader.exec_module(APPKIT)
 SECRET = b"password identity-reference PRIVATE KEY raw-request raw-response"
 
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_success_progress_is_opt_in_and_closed(self):
+        child = "print('COMPANION_PROVIDER_TLS_PROGRESS:startup:enter'); print('password'); print('COMPANION_PROVIDER_TLS_OK')"
+        for include in [False, True]:
+            result = PROBE.run_app([sys.executable, "-c", child], dict(os.environ), include_progress=include)
+            self.assertTrue(result["passed"])
+            self.assertEqual(result.get("progress"), [{"phase": "startup", "event": "enter"}] if include else None)
+            self.assertNotIn("password", json.dumps(result))
+
+    def test_appkit_harness_failures_record_attempt_without_retry_or_error_content(self):
+        for error, category in [(OSError("password"), "os_error"),
+                                (subprocess.SubprocessError("password"), "process_error"),
+                                (RuntimeError("password"), "instrumentation_error")]:
+            report = {"variants": {}}
+            with patch.object(PROBE, "run_app", side_effect=error) as run_app:
+                with self.assertRaisesRegex(RuntimeError, "^Native startup diagnostic harness failed$"):
+                    APPKIT.collect("probe", "graceful", run_app, report)
+            run_app.assert_called_once()
+            self.assertEqual(report["variants"]["graceful"], [
+                {"index": 1, "observation": "incomplete", "harness_failure": category}])
+            self.assertNotIn("password", json.dumps(report))
+
+    def test_appkit_requires_expected_termination_and_stops_on_first_failure(self):
+        abrupt = [{"phase": "startup", "event": "enter"},
+                  {"phase": "startup", "event": "complete"},
+                  {"phase": "shutdown", "event": "enter"}]
+        graceful = abrupt + [{"phase": "shutdown", "event": "complete"}]
+        for variant, progress in [("abrupt", abrupt), ("graceful", graceful)]:
+            report = {"variants": {}}
+            with patch.object(PROBE, "run_app", side_effect=[
+                {"passed": True, "progress": progress},
+                {"passed": True, "progress": []},
+            ]) as run_app:
+                APPKIT.collect("probe", variant, run_app, report)
+            self.assertEqual(run_app.call_count, 2)
+            attempts = report["variants"][variant]
+            self.assertTrue(attempts[0]["passed"])
+            self.assertFalse(attempts[1]["passed"])
+            self.assertFalse(attempts[1]["termination_markers_match"])
+        report = {"variants": {}}
+        with patch.object(PROBE, "run_app", return_value={"passed": True, "progress": abrupt}) as run_app:
+            APPKIT.collect("probe", "graceful", run_app, report)
+        run_app.assert_called_once()
+        self.assertFalse(report["variants"]["graceful"][0]["passed"])
+
     def test_controller_cases_extend_existing_matrix_and_use_production_controller(self):
         source = (PROBE.ROOT / "scripts/test-provider-packaged.py").read_text()
         tree = ast.parse(source)

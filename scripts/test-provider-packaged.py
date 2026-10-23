@@ -43,9 +43,13 @@ STACK_LABELS = (
     "__psynch_cvwait", "__ulock_wait", "__workq_kernreturn",
     "NSWorkspace", "ISConcreteIcon", "_ISRetryRequest",
     "xpc_connection_send_message_with_reply_sync", "ResizeSynchronizer",
+    "NSApplicationMain", "sharedApplication", "finishLaunching", "_commonApplicationInit",
+    "_setup", "_register", "registerWithDock", "setActivationPolicy", "CGS", "SLS", "CPS",
+    "_LSApplicationCheckIn", "GetCurrentProcess", "HIApplication",
 )
 STACK_IMAGES = ("Security", "FlutterMacOS", "AppKit", "QuartzCore", "Metal",
-                "IconServices", "CoreServices", "libswift_Concurrency.dylib",
+                "IconServices", "CoreServices", "CoreGraphics", "SkyLight", "HIServices",
+                "LaunchServices", "ApplicationServices", "libswift_Concurrency.dylib",
                 "libdispatch.dylib", "libxpc.dylib")
 DRAIN_TIMEOUT = 2
 
@@ -95,7 +99,7 @@ def sample_process(pid):
         return {"status": "unavailable"}
 
 
-def run_app(argv, environment, timeout=45, sample_after=15):
+def run_app(argv, environment, timeout=45, sample_after=15, include_progress=False):
     # subprocess.run kills on timeout before callers can inspect the live child.
     # Own the process, collect bounded samples, then kill/reap on failure. No relaunch.
     with subprocess.Popen(list(map(str, argv)), env=environment,
@@ -130,7 +134,8 @@ def run_app(argv, environment, timeout=45, sample_after=15):
                 if observed and observed[0][1] <= deadline and os.name == "posix":
                     process.stdout.close()
                     process.stderr.close()
-                    result = app_diagnostics(observed[0][0], error.output or b"", error.stderr or b"")
+                    result = app_diagnostics(observed[0][0], error.output or b"", error.stderr or b"",
+                                             include_progress=include_progress)
                     result["inherited_pipe_open"] = True
                     return result
                 deadline_progress = progress_diagnostics(
@@ -154,7 +159,7 @@ def run_app(argv, environment, timeout=45, sample_after=15):
                 result["exit_code_before_cleanup"] = exit_before_cleanup
                 result["native_sample"] = sample
                 return result
-            result = app_diagnostics(process.returncode, stdout, stderr)
+            result = app_diagnostics(process.returncode, stdout, stderr, include_progress=include_progress)
             return result
         finally:
             # Include diagnostic thread startup in cleanup protection. An
@@ -185,7 +190,7 @@ def progress_diagnostics(stdout, stderr, prefix, phases):
     return progress
 
 
-def app_diagnostics(code, stdout, stderr, timed_out=False):
+def app_diagnostics(code, stdout, stderr, timed_out=False, include_progress=False):
     """Keep only exact, bounded test markers; discard all arbitrary app output."""
     result = {"exit_code": code, "timed_out": timed_out, "failures": [], "native_rejections": []}
     for line in (stdout[-65536:] + b"\n" + stderr[-65536:]).splitlines():
@@ -201,7 +206,7 @@ def app_diagnostics(code, stdout, stderr, timed_out=False):
     result["passed"] = (code == 0 and not timed_out
                         and stdout.splitlines().count(b"COMPANION_PROVIDER_TLS_OK") == 1
                         and not result["failures"])
-    if not result["passed"]:
+    if not result["passed"] or include_progress:
         result["progress"] = progress_diagnostics(stdout, stderr, b"COMPANION_PROVIDER_TLS_PROGRESS", PHASES)
     return result
 

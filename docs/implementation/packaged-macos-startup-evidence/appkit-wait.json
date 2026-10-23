@@ -1,0 +1,303 @@
+{
+  "source_run": 39948188195,
+  "source_head": "417bb7e008f96d4fdbb4ffc4f00eee2b245c34d6",
+  "cases_passed": [
+    "approve",
+    "deny",
+    "wrong-password",
+    "pin",
+    "ca"
+  ],
+  "failed_case_name": "foreign-client",
+  "failed_case": {
+    "passed": false,
+    "launches": [
+      {
+        "exit_code": null,
+        "timed_out": true,
+        "failures": [],
+        "native_rejections": [],
+        "passed": false,
+        "progress": [],
+        "deadline_progress": [],
+        "exit_code_before_cleanup": null,
+        "native_sample": {
+          "status": "captured",
+          "threads": [
+            {
+              "main": true,
+              "frames": [
+                {
+                  "depth": 10,
+                  "samples": 88,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 12,
+                  "samples": 88,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 14,
+                  "samples": 88,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 16,
+                  "samples": 88,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 18,
+                  "samples": 88,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 20,
+                  "samples": 88,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 22,
+                  "samples": 88,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 36,
+                  "samples": 88,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                },
+                {
+                  "depth": 38,
+                  "samples": 88,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                },
+                {
+                  "depth": 40,
+                  "samples": 88,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                },
+                {
+                  "depth": 42,
+                  "samples": 88,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "slow_sample": {
+          "status": "captured",
+          "threads": [
+            {
+              "main": true,
+              "frames": [
+                {
+                  "depth": 10,
+                  "samples": 90,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 12,
+                  "samples": 90,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 14,
+                  "samples": 90,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 16,
+                  "samples": 90,
+                  "labels": [
+                    "NSApplication",
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 18,
+                  "samples": 90,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 20,
+                  "samples": 90,
+                  "labels": [
+                    "image:libdispatch.dylib"
+                  ]
+                },
+                {
+                  "depth": 22,
+                  "samples": 90,
+                  "labels": [
+                    "image:libdispatch.dylib"
+                  ]
+                },
+                {
+                  "depth": 24,
+                  "samples": 90,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 26,
+                  "samples": 90,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 28,
+                  "samples": 90,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 30,
+                  "samples": 90,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 32,
+                  "samples": 90,
+                  "labels": [
+                    "image:AppKit"
+                  ]
+                },
+                {
+                  "depth": 36,
+                  "samples": 90,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                },
+                {
+                  "depth": 38,
+                  "samples": 90,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                },
+                {
+                  "depth": 40,
+                  "samples": 90,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                },
+                {
+                  "depth": 42,
+                  "samples": 90,
+                  "labels": [
+                    "mach_msg"
+                  ]
+                }
+              ]
+            },
+            {
+              "main": false,
+              "frames": [
+                {
+                  "depth": 10,
+                  "samples": 90,
+                  "labels": [
+                    "__workq_kernreturn"
+                  ]
+                }
+              ]
+            },
+            {
+              "main": false,
+              "frames": [
+                {
+                  "depth": 10,
+                  "samples": 90,
+                  "labels": [
+                    "__workq_kernreturn"
+                  ]
+                }
+              ]
+            },
+            {
+              "main": false,
+              "frames": [
+                {
+                  "depth": 10,
+                  "samples": 90,
+                  "labels": [
+                    "__workq_kernreturn"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "expected_command_counts": {
+      "decision": 0,
+      "list": 0,
+      "review": 0,
+      "session": 0,
+      "status": 0,
+      "unlock": 0
+    },
+    "provision": {
+      "exit_code": 0,
+      "timed_out": false,
+      "failures": [],
+      "passed": true
+    },
+    "observed_command_counts": {
+      "decision": 0,
+      "list": 0,
+      "review": 0,
+      "session": 0,
+      "status": 0,
+      "unlock": 0
+    }
+  },
+  "cleanup_passed": true
+}
