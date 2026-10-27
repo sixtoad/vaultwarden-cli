@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../platform/provider.dart';
 import '../src/rust/api/provider.dart' as core;
+import 'pilot_bundle.dart';
 
 /// Rust owns admission, review and reply validation. Dart schedules only reads;
 /// decision/unlock are exclusively explicit calls from the foreground UI.
@@ -29,6 +30,11 @@ class ProviderController extends ChangeNotifier {
       _settlementId.isNotEmpty ? _settlementId : state.uncertainId;
   bool get canSetup =>
       platform.available && eligible && _ready && !busy && recoveryId.isEmpty;
+  bool get canSetupPilot =>
+      disposablePilotEnabled &&
+      platform is PilotProviderPlatform &&
+      canSetup &&
+      state.statusProgress != core.ProviderStatusProgress.committed;
   int get refreshDelaySeconds => _backoff;
 
   void _publish() {
@@ -147,6 +153,57 @@ class ProviderController extends ChangeNotifier {
     // Always reload persisted metadata; never keep the old label with new TLS.
     await _reconcile();
     if (eligible) await refresh();
+  }
+
+  Future<void> setupPilot(String input) async {
+    clearPasswords?.call();
+    if (!canSetupPilot) return; // mutation: pilot recovery admission
+    PilotBundle bundle;
+    try {
+      bundle = PilotBundle.parse(input);
+    } catch (_) {
+      diagnostic = 'Invalid disposable pilot bundle.';
+      _publish();
+      return;
+    }
+    invalidate();
+    final context = _context;
+    _ready = false;
+    settingUp = true;
+    _poll?.cancel();
+    diagnostic = '';
+    _publish();
+    var imported = false;
+    try {
+      final installed = await (platform as PilotProviderPlatform).setupPilot(
+        bundle,
+      );
+      if (!eligible || context != _context) return;
+      if (!installed.configured ||
+          installed.uncertainId.isNotEmpty ||
+          installed.endpoint != bundle.endpoint ||
+          installed.pin != bundle.pin ||
+          installed.fingerprint != bundle.fingerprint) {
+        throw StateError('Disposable identity mismatch');
+      }
+      configuration = installed;
+      state = core.providerConfigure(uncertainId: '');
+      _loaded = true;
+      _ready = true;
+      imported = true;
+    } catch (_) {
+      diagnostic = 'Disposable setup failed. No unlock was sent. Check the bundle and dedicated identity.';
+    } finally {
+      settingUp = false;
+      clearPasswords?.call();
+      _publish();
+    }
+    // No refresh/retry after a failed or invalidated import. A later explicit
+    // reload may reconcile persisted metadata, but never retains the password.
+    if (!imported || !eligible || context != _context) {
+      return; // mutation: pilot import success
+    }
+    await unlock(bundle.unlockPassword);
   }
 
   Future<bool> perform(

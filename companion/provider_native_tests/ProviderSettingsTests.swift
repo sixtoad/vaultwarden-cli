@@ -18,7 +18,7 @@ final class ProviderSettingsTests: XCTestCase {
             throw CompanionError.configuration
         }
         var disposable: SecKeychain?
-        let password = "synthetic-keychain-only"
+        let password = "synthetic-keychain-only" // fake password for the disposable CI Keychain
         let path = directory.appendingPathComponent("install.keychain-db").path
         let created = path.withCString { path in
             password.withCString { bytes in SecKeychainCreate(path, UInt32(password.utf8.count), bytes, false, nil, &disposable) }
@@ -79,6 +79,36 @@ final class ProviderSettingsTests: XCTestCase {
         XCTAssertEqual(configuration.leafSHA256, pin)
         XCTAssertEqual(try reloaded.metadata()["fingerprint"] as? String, fingerprint)
         XCTAssertEqual(try KeychainIdentity.fingerprint(configuration.identityReference), fingerprint)
+        #if COMPANION_DISPOSABLE_PILOT
+        let savedFile = settingsDirectory.appendingPathComponent("configuration-v1.json")
+        let original = try Data(contentsOf: savedFile)
+        var bundle: [String: Any] = ["version": 1, "kind": "disposable-companion-pilot",
+                                   "endpoint": endpoint.absoluteString, "leaf_sha256": String(repeating: "c", count: 64),
+                                   "client_sha256": fingerprint, "ca_der": ca.base64EncodedString(),
+                                   "pkcs12": package.base64EncodedString(), "import_passphrase": "wrong"]
+        XCTAssertThrowsError(try settings.installPilot(bundle))
+        XCTAssertEqual(try Data(contentsOf: savedFile), original)
+        bundle["import_passphrase"] = "synthetic-only"
+        bundle["client_sha256"] = String(repeating: "d", count: 64)
+        XCTAssertThrowsError(try settings.installPilot(bundle))
+        XCTAssertEqual(try Data(contentsOf: savedFile), original)
+        bundle["client_sha256"] = fingerprint
+        try settings.installPilot(bundle)
+        XCTAssertEqual(try settings.configuration().leafSHA256, String(repeating: "c", count: 64))
+        XCTAssertEqual(try settings.metadata()["fingerprint"] as? String, fingerprint)
+        let backups = try FileManager.default.contentsOfDirectory(at: settingsDirectory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("configuration-before-pilot-") }
+        XCTAssertEqual(backups.count, 3)
+        for backup in backups {
+            XCTAssertEqual(try Data(contentsOf: backup), original)
+            XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: backup.path)[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        }
+        let id = String(repeating: "A", count: 43)
+        try settings.beforeSend(Data("{\"command\":\"decision\",\"request_id\":\"\(id)\"}".utf8))
+        XCTAssertThrowsError(try settings.installPilot(bundle))
+        XCTAssertEqual(try settings.pendingID(), id)
+        try settings.settle(id)
+        #endif
         let blocker = directory.appendingPathComponent("not-a-directory")
         try Data([1]).write(to: blocker)
         let cannotSave = ProviderSettings(directory: blocker)
@@ -159,4 +189,32 @@ final class ProviderSettingsTests: XCTestCase {
         XCTAssertEqual(ProviderSettingsError.invalid.code, "provider_configuration_invalid")
         XCTAssertEqual(ProviderSettingsError.identityUnavailable.code, "provider_identity_unavailable")
     }
+    #if COMPANION_DISPOSABLE_PILOT
+    func testPilotParserRejectsMalformedInputsBeforeKeychain() throws {
+        let valid: [String: Any] = ["version": 1, "kind": "disposable-companion-pilot",
+                                  "endpoint": "https://fixture.example/v1/companion", "leaf_sha256": String(repeating: "a", count: 64),
+                                  "client_sha256": String(repeating: "b", count: 64), "ca_der": "AQID", "pkcs12": "BAUG",
+                                  "import_passphrase": "synthetic-only"]
+        XCTAssertNoThrow(try DisposablePilotBundle(valid))
+        XCTAssertThrowsError(try DisposablePilotBundle(nil))
+        let invalid: [[String: Any]] = [
+            ["version": 2], ["version": true], ["version": 1.0], ["kind": "production"],
+            ["endpoint": "http://fixture.example"], ["endpoint": "https://user@fixture.example"],
+            ["endpoint": "https://fixture.example?x"], ["endpoint": "https://fixture.example/other"],
+            ["endpoint": "https://fixture.example:0"], ["endpoint": "https://fixture.example:65536"],
+            ["leaf_sha256": "bad"], ["client_sha256": String(repeating: "A", count: 64)],
+            ["ca_der": ""], ["pkcs12": "!"], ["pkcs12": "BAUG\n"],
+            ["ca_der": Data(repeating: 1, count: 65_537).base64EncodedString()],
+            ["pkcs12": Data(repeating: 1, count: 1_048_577).base64EncodedString()],
+            ["import_passphrase": ""], ["import_passphrase": String(repeating: "é", count: 2049)],
+            ["unlock_password": "must-not-reach-native"],
+        ]
+        for replacement in invalid {
+            XCTAssertThrowsError(try DisposablePilotBundle(valid.merging(replacement) { _, new in new }))
+        }
+        var missing = valid
+        missing.removeValue(forKey: "pkcs12")
+        XCTAssertThrowsError(try DisposablePilotBundle(missing))
+    }
+    #endif
 }

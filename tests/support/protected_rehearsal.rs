@@ -1,5 +1,7 @@
 //! Disposable, black-box production acceptance. No provider application is
 //! constructed here and no lifecycle, policy or pairing files are injected.
+#[path = "real_vaultwarden_pilot.rs"]
+pub mod pilot;
 use aes::cipher::{BlockModeEncrypt, KeyIvInit, block_padding::Pkcs7};
 use anyhow::{Context, Result, ensure};
 use base64::{
@@ -293,6 +295,17 @@ impl AgentAction {
     }
 }
 
+// A typed, read-only polling condition. Submission Busy remains an ordinary
+// rejection: callers must never retry a potentially accepted submission.
+#[derive(Debug)]
+struct BusyPoll;
+impl std::fmt::Display for BusyPoll {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("restricted agent poll rejected: busy")
+    }
+}
+impl std::error::Error for BusyPoll {}
+
 // Parse the closed production protocol before constructing a diagnostic. Never
 // format response bytes, identifiers, or serde errors, even for malformed JSON.
 // The caller must run its secret-redaction gate before invoking this parser.
@@ -300,6 +313,9 @@ pub fn agent_response(action: AgentAction, bytes: &[u8]) -> Result<Value> {
     let invalid = || anyhow::anyhow!("restricted agent {} response invalid", action.label());
     let response = AgentResponse::parse(bytes).map_err(|_error| invalid())?;
     if let AgentResponse::Rejected { category, .. } = response {
+        if matches!(action, AgentAction::Poll) && category == AgentRejection::Busy {
+            return Err(BusyPoll.into());
+        }
         let category = match category {
             AgentRejection::Unauthorized => "unauthorized",
             AgentRejection::Malformed => "malformed",
@@ -876,6 +892,19 @@ impl Rehearsal {
         let mut units = Vec::new();
         for line in data.lines() {
             let record: Value = serde_json::from_str(line)?;
+            if record["event"] == "retired-unit" {
+                let retired: OwnedUnit = serde_json::from_value(record["unit"].clone())?;
+                // A pilot may bootstrap and later restart the fixed provider.
+                // Retirement removes only an exact previously recorded lifetime;
+                // unmatched or repeated retirement is never accepted.
+                let position = units
+                    .iter()
+                    .position(|unit| unit == &retired)
+                    .context("unowned or already retired ledger unit")?;
+                ensure!(retired.name == UNIT, "only provider bootstrap may retire");
+                units.remove(position);
+                continue;
+            }
             if record["event"] != "owned-unit" {
                 continue;
             }
@@ -934,8 +963,10 @@ impl Rehearsal {
         );
         self.ledger("intent-unit", name)?;
         self.ownership_uncertain = true;
-        let stdout = self.capture(&format!("{name}-stdout"))?;
-        let stderr = self.capture(&format!("{name}-stderr"))?;
+        // Keep distinct bounded captures when the pilot restarts an owned unit.
+        let capture_generation = self.captures.len();
+        let stdout = self.capture(&format!("{name}-{capture_generation}-stdout"))?;
+        let stderr = self.capture(&format!("{name}-{capture_generation}-stderr"))?;
         let mut cmd = command("/usr/bin/systemd-run");
         cmd.arg(format!(
             "--property=StandardOutput=file:{}",
@@ -1839,6 +1870,20 @@ fn string<'a>(value: &'a Value, lower: &str, upper: &str) -> Result<&'a str> {
         .context("required synthetic response field")
 }
 fn setup_vault(run: &mut Rehearsal, url: &str, ca: &Path) -> Result<(String, String)> {
+    let mut ids = setup_vault_items(
+        run,
+        url,
+        ca,
+        &[("rehearsal-check", FIELD), ("rehearsal-wrong", WRONG_FIELD)],
+    )?;
+    Ok((ids.remove(0), ids.remove(0)))
+}
+fn setup_vault_items(
+    run: &mut Rehearsal,
+    url: &str,
+    ca: &Path,
+    items: &[(&str, &str)],
+) -> Result<Vec<String>> {
     vaultwarden_cli::install_rustls_crypto_provider();
     let http = Client::builder()
         .no_proxy()
@@ -1943,7 +1988,7 @@ fn setup_vault(run: &mut Rehearsal, url: &str, ca: &Path) -> Result<(String, Str
     )?;
     let encrypt = |value: &str| encrypted(value.as_bytes(), &symmetric[..32], &symmetric[32..]);
     let mut ids = Vec::new();
-    for (operation, value) in [("rehearsal-check", FIELD), ("rehearsal-wrong", WRONG_FIELD)] {
+    for &(operation, value) in items {
         let cipher=response(http.post(format!("{url}/api/ciphers")).bearer_auth(bearer).json(&json!({
             "type":1,"name":encrypt("Disposable rehearsal Login"),"notes":null,"favorite":false,
             "login":{"username":encrypt("synthetic"),"password":encrypt("unused-synthetic-login-password"),"uris":[]},
@@ -1952,7 +1997,7 @@ fn setup_vault(run: &mut Rehearsal, url: &str, ca: &Path) -> Result<(String, Str
         })))?;
         ids.push(string(&cipher, "id", "Id")?.to_owned());
     }
-    Ok((ids.remove(0), ids.remove(0)))
+    Ok(ids)
 }
 
 pub fn run() -> Result<()> {
@@ -2161,8 +2206,7 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-fn execute(run: &mut Rehearsal, mode: &str) -> Result<()> {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+fn setup_private_services(run: &mut Rehearsal) -> Result<(PathBuf, String, PathBuf)> {
     for (name, permission) in [
         ("private", 0o700),
         ("bin", 0o750),
@@ -2340,6 +2384,19 @@ fn execute(run: &mut Rehearsal, mode: &str) -> Result<()> {
         ]))?)?
         .contains("true"))
     })?;
+    Ok((checker, public, tls))
+}
+
+fn execute(run: &mut Rehearsal, mode: &str) -> Result<()> {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let (checker, public, tls) = setup_private_services(run)?;
+    let tag = run
+        .root
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .trim_start_matches('.')
+        .to_owned();
     // UI controller launches Xvfb and Firefox inside its manager-owned cgroup.
     let mut driver = command("/usr/bin/systemd-run");
     let driver_stderr = run.capture("browser-driver-stderr")?;

@@ -19,6 +19,32 @@ SPEC.loader.exec_module(ARTIFACT)
 
 
 class ArtifactTests(unittest.TestCase):
+    def test_pilot_archive_and_metadata_never_overwrite_normal_artifact(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "app"
+            root.mkdir()
+            (root / "synthetic").write_bytes(b"synthetic executable")
+            evidence = Path(temporary) / "evidence"
+            evidence.mkdir()
+            normal = ARTIFACT.package(root, evidence, "macos", "revision", False)
+            original = normal.read_bytes()
+            metadata = (evidence / "artifact.json").read_bytes()
+            pilot = ARTIFACT.package(root, evidence, "macos", "revision", False, True)
+            self.assertNotEqual(normal, pilot)
+            self.assertEqual(normal.read_bytes(), original)
+            self.assertEqual((evidence / "artifact.json").read_bytes(), metadata)
+            pilot_metadata = json.loads((evidence / "pilot-artifact.json").read_text())
+            self.assertTrue(pilot_metadata["disposable_test_only"])
+            self.assertEqual(pilot_metadata["requested_build_flags"], {
+                "dart_define": "COMPANION_DISPOSABLE_PILOT=true",
+                "swift_condition": "COMPANION_DISPOSABLE_PILOT"})
+            self.assertNotIn("dart_define", pilot_metadata)
+            self.assertNotIn("swift_condition", pilot_metadata)
+            with tarfile.open(pilot) as source:
+                self.assertIn("companion_disposable_pilot.app/synthetic", source.getnames())
+            with self.assertRaises(ValueError):
+                ARTIFACT.package(root, evidence, "linux", "revision", False, True)
+
     def test_archive_preserves_executable_and_framework_link(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "app"
