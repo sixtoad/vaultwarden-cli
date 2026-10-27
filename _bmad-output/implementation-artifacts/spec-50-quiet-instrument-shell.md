@@ -2,7 +2,7 @@
 title: 'Issue 50: Quiet Instrument shell and real request review'
 type: feature
 created: '2026-10-27'
-status: done
+status: in-review
 baseline_commit: 476bf3f506aad6f52628ad32a6ef34e31172d1ba
 context:
   - '{project-root}/docs/implementation/issue-50-capabilities.md'
@@ -155,3 +155,22 @@ Use selected A tokens from `docs/design/issue-50/DESIGN.md`: system typography, 
 
 - Review evidence and CI prerequisites before expanding or closing the parent issue.
   [issue-50-capabilities.md:114](../../docs/implementation/issue-50-capabilities.md#L114)
+
+## PR #51 CI follow-up (2026-10-27)
+
+- Retain exact golden comparisons and all six layout/theme scenarios. Pin the
+  Android widget platform and English locale; load bundled licensed regular,
+  medium and bold font outlines plus icon outlines to remove host font synthesis
+  and SDK icon-resource variability. Regenerate and inspect all 12 captures.
+  Archive failure PNGs from desktop and pilot CI for any remaining host differences.
+- Update root crypto-bigint 0.7.5 to 0.7.9, the earliest patched non-yanked release
+  (0.7.6–0.7.8 are yanked), plus its required ctutils 0.4.6 dependency. No other
+  lock entries changed. Rust 1.88 all-targets tests: 542 passed.
+- Pin the native Swift build system in both parent and mutation child, preserving
+  the object layout already verified with the local Xcode 27 compatibility run.
+- Move the main macOS desktop gate to Intel after ARM runner acquisition failed;
+  keep the ARM pilot and universal libraries. Packaging/smoke scripts have no
+  host-CPU assumptions. Native install-save and packaged TLS acceptance still
+  require the actual CI result, not a locally forged CI environment.
+- Local full Flutter suite: 59 passed; analyzer clean; readable regenerated
+  captures inspected. Cross-host golden and full native CI outcomes remain pending.

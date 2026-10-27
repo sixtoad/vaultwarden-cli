@@ -43,16 +43,20 @@ jobs:
         if: always()
         with:
           name: companion-macOS-disposable-pilot
-          path: ${{ runner.temp }}/disposable-pilot-evidence
+          path: |
+            ${{ runner.temp }}/disposable-pilot-evidence
+            companion/test/failures
 
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-26' && 90 || 45 }}
+    timeout-minutes: ${{ matrix.os == 'macos-26-intel' && 90 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26, windows-latest]
+        # ARM capacity left the native/TLS gate unacquired; Intel runs the same
+        # universal-library checks. The disposable pilot retains ARM coverage.
+        os: [ubuntu-24.04, macos-26-intel, windows-latest]
     defaults:
       run:
         shell: bash
@@ -84,6 +88,7 @@ jobs:
           name: companion-slice-${{ runner.os }}-development
           path: |
             ${{ runner.temp }}/desktop-evidence
+            companion/test/failures
 
   desktop-companion-msrv:
     name: Companion Rust 1.88 and security mutations

@@ -13,10 +13,15 @@ void main() {
   setUpAll(() async {
     await RustLib.init();
     // Deterministic licensed test font, never packaged with the application.
+    // Include real weights so each engine uses the same glyph outlines instead
+    // of host-specific synthesis/fallback. Pin icons for the same reason.
     // Register the same font for the review's test-only monospace fallback.
-    final bytes = ByteData.sublistView(
-      File('test/fonts/Roboto-Regular.ttf').readAsBytesSync(),
-    );
+    final fonts = [
+      for (final weight in ['Regular', 'Medium', 'Bold'])
+        ByteData.sublistView(
+          File('test/fonts/Roboto-$weight.ttf').readAsBytesSync(),
+        ),
+    ];
     for (final family in [
       'Roboto',
       'monospace',
@@ -27,11 +32,20 @@ void main() {
       'CupertinoSystemDisplay',
       'Segoe UI',
     ]) {
-      await (FontLoader(family)..addFont(Future.value(bytes))).load();
+      final loader = FontLoader(family);
+      for (final bytes in fonts) {
+        loader.addFont(Future.value(bytes));
+      }
+      await loader.load();
     }
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    await (FontLoader('MaterialIcons')..addFont(
+          Future.value(
+            ByteData.sublistView(
+              File('test/fonts/MaterialIcons-Regular.otf').readAsBytesSync(),
+            ),
+          ),
+        ))
+        .load();
   });
   setUp(resetProvider);
   // Only the synthetic provider fixture is rendered. Goldens never read native
@@ -52,6 +66,7 @@ void main() {
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         await tester.pumpWidget(
           MaterialApp(
+            locale: const Locale('en', 'US'),
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(
                 textScaler: TextScaler.linear(layout == 'large' ? 2 : 1),
@@ -88,7 +103,7 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
-      });
+      }, variant: TargetPlatformVariant.only(TargetPlatform.android));
     }
   }
 }

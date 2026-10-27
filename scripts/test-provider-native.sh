@@ -16,14 +16,16 @@ cp "$repo/macos/Tests/Fixtures/tls_fixture.py" "$stage/Tests/Fixtures/"
 # TLSTests resolves the canonical review relative to the package root.
 mkdir -p "$fixture_root/tests/fixtures/companion"
 cp "$repo/tests/fixtures/companion/review.json" "$fixture_root/tests/fixtures/companion/review.json"
-swift test --package-path "$stage" 2>&1 | tee "$evidence/native.log"
+swift test --build-system native --package-path "$stage" 2>&1 | tee "$evidence/native.log"
+# Pin SwiftPM's native build system: Xcode 27 defaults to swiftbuild, whose
+# object layout does not match the symbol checks below or the mutation harness.
 # Inspect the actual normal object: the optional parser/import must not exist.
 nm "$stage/.build/debug/CompanionCore.build/ProviderSettings.swift.o" > "$evidence/normal-settings-symbols.txt"
 if grep -E 'installPilot|DisposablePilotBundle' "$evidence/normal-settings-symbols.txt"; then
   echo 'Disposable pilot entry leaked into normal native build' >&2
   exit 1
 fi
-swift test --package-path "$stage" -Xswiftc -DCOMPANION_DISPOSABLE_PILOT 2>&1 | tee "$evidence/pilot-native.log"
+swift test --build-system native --package-path "$stage" -Xswiftc -DCOMPANION_DISPOSABLE_PILOT 2>&1 | tee "$evidence/pilot-native.log"
 nm "$stage/.build/debug/CompanionCore.build/ProviderSettings.swift.o" > "$evidence/pilot-settings-symbols.txt"
 grep -q 'installPilot' "$evidence/pilot-settings-symbols.txt"
 python3 "$repo/scripts/mutate-provider-trust.py" "$stage" "$evidence/trust-mutations"
