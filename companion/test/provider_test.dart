@@ -358,10 +358,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Review $providerId'));
       await tester.pumpAndSettle();
-      final password = find.widgetWithText(
-        TextField,
-        'Fresh approval password',
-      );
+      final password = find.byKey(const Key('Fresh approval password'));
       await tester.enterText(password, 'synthetic');
       final field = tester.widget<TextField>(password).controller!;
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -372,6 +369,8 @@ void main() {
       await tester.pump(const Duration(seconds: 31));
       expect(native.commands.length, count);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('destination-settings')));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.text('Open separate synthetic signing demonstration'),
@@ -541,10 +540,7 @@ void main() {
           .data!;
       expect(review, contains('Arguments (1 separate values)'));
       expect(review, contains('Credentials (1)'));
-      final password = find.widgetWithText(
-        TextField,
-        'Fresh approval password',
-      );
+      final password = find.byKey(const Key('Fresh approval password'));
       await tester.ensureVisible(password);
       await tester.enterText(password, 'synthetic-password');
       await tester.pump(const Duration(seconds: 5));
@@ -591,6 +587,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('provider-unavailable')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('destination-settings')));
+    await tester.pumpAndSettle();
     expect(
       tester
           .widget<FilledButton>(

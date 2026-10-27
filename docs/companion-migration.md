@@ -10,7 +10,8 @@ identity and production provider sources are unchanged.
 
 ## Foreground provider flow
 
-The normal entrypoint opens development provider setup/inbox. Supply an HTTPS
+The normal entrypoint opens Requests in the Quiet Instrument shell. Open Settings
+for advanced development provider setup and the separate synthetic signer. Supply an HTTPS
 endpoint and independently verified lowercase server leaf SHA-256, confirm the
 client identity is dedicated to this development application, then select the
 private CA DER and dedicated PKCS#12 through native file dialogs. The PKCS#12

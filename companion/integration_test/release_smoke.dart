@@ -26,16 +26,20 @@ void require(bool condition, String check) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  var stage = 'packaged core initialization';
   try {
     require(kReleaseMode, 'release mode required');
     await initializePackagedCore();
+    stage = 'provider bridge fixture';
     checkProviderBridge(require);
+    stage = 'native provider metadata';
     final providerPlatform = NativeProviderPlatform();
     if (!Platform.isMacOS) {
       require(!providerPlatform.available, 'unsupported provider transport');
     } else {
       await providerPlatform.configuration();
     }
+    stage = 'native signer availability';
     final platform = NativeApprovalPlatform();
     final availability = await platform.availability();
     if (!Platform.isMacOS) {
@@ -44,6 +48,7 @@ Future<void> main() async {
         'unsupported authentication',
       );
     } else {
+      stage = 'native closed signer contract';
       const channel = MethodChannel('dev.vaultwarden.companionSlice/signer');
       final raw = await channel.invokeMethod<Object?>('availability');
       require(
@@ -58,6 +63,7 @@ Future<void> main() async {
       }
       require(rejected, 'native closed request contract');
     }
+    stage = 'synthetic Rust lifecycle';
     require(!core.snapshot().hasKey, 'no startup key access');
     var rejected = false;
     try {
@@ -71,6 +77,7 @@ Future<void> main() async {
       'Rust fixture selection',
     );
     core.selectFixture(id: 1);
+    stage = 'synthetic widget rendering';
     runApp(CompanionApp(platform: platform));
     // Observe actual rendered release widgets without flutter_test/assert.
     await WidgetsBinding.instance.endOfFrame;
@@ -104,6 +111,7 @@ Future<void> main() async {
       core.snapshot().verified == 0 && !core.snapshot().busy,
       'no startup approval or worker',
     );
+    stage = 'provider shell rendering';
     runApp(
       MaterialApp(
         home: ProviderPage(
@@ -118,10 +126,7 @@ Future<void> main() async {
     await WidgetsBinding.instance.endOfFrame;
     text.clear();
     inspect(WidgetsBinding.instance.rootElement!);
-    require(
-      text.contains('Companion · provider approvals'),
-      'release provider screen',
-    );
+    require(text.contains('Vaultwarden Access'), 'release provider screen');
     if (!Platform.isMacOS) {
       require(
         text.contains(
@@ -147,7 +152,7 @@ Future<void> main() async {
   } catch (error) {
     final check = error is SmokeFailure
         ? error.check
-        : 'initialization or runtime failure';
+        : stage; // Bounded stage labels only; never log native errors or data.
     final message = 'COMPANION_RELEASE_SMOKE_FAILED: $check\n';
     if (Platform.isWindows) {
       final path = Platform.environment['COMPANION_RELEASE_RESULT'];
