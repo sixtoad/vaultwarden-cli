@@ -1,3 +1,4 @@
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -8,8 +9,27 @@ import 'package:companion_slice/src/rust/frb_generated.dart';
 
 import 'provider_support.dart';
 
+String goldenHost() {
+  if (!Platform.isMacOS) return Platform.operatingSystem;
+  // CoreText rasterization changes with the OS, independently of pinned fonts.
+  // Darwin kernel versions are not macOS product versions; query the latter.
+  final result = Process.runSync('/usr/bin/sw_vers', ['-productVersion']);
+  final version = (result.stdout as String).trim();
+  if (result.exitCode != 0 ||
+      !RegExp(r'^[0-9]+(?:\.[0-9]+){1,2}$').hasMatch(version)) {
+    throw StateError('Cannot identify the macOS golden renderer version');
+  }
+  final architecture = switch (Abi.current()) {
+    Abi.macosArm64 => 'arm64',
+    Abi.macosX64 => 'x64',
+    _ => throw StateError('Unrecognized macOS golden renderer ABI'),
+  };
+  return 'macos-${version.split('.').first}-$architecture';
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final host = goldenHost();
   setUpAll(() async {
     await RustLib.init();
     // Deterministic licensed test font, never packaged with the application.
@@ -86,7 +106,10 @@ void main() {
         await tester.ensureVisible(find.text('Review $providerId'));
         await tester.tap(find.text('Review $providerId'));
         await tester.pumpAndSettle();
-        final name = '${brightness.name}_$layout';
+        // Keep exact comparisons within each engine host. The same pinned font
+        // outlines rasterize differently on Linux, Windows and macOS. Missing
+        // host baselines fail normally; there is no tolerance or fallback.
+        final name = '$host/${brightness.name}_$layout';
         await expectLater(
           find.byKey(const Key('golden')),
           matchesGoldenFile('goldens/${name}_review.png'),

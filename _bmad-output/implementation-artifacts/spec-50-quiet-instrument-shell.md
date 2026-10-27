@@ -174,3 +174,12 @@ Use selected A tokens from `docs/design/issue-50/DESIGN.md`: system typography, 
   require the actual CI result, not a locally forged CI environment.
 - Local full Flutter suite: 59 passed; analyzer clean; readable regenerated
   captures inspected. Cross-host golden and full native CI outcomes remain pending.
+
+- Cross-host follow-up: CI 40538955066 proved pinned outlines still rasterize
+  differently by host. Keep every exact comparison, route to reviewed OS-specific
+  baselines and preserve the original Mac captures. Linux actuals were inspected
+  individually; all scope, geometry and actions are unchanged. No tolerance added.
+  Windows and macOS 26 ARM captures were likewise reviewed. macOS routing uses
+  the product major (26/27) and process ABI, preserving the original local 27 ARM
+  baseline; pinned fonts cannot pin CoreText across OS versions or CPUs. All 12
+  Intel 26 actuals were inspected separately and retained in their own exact set.
