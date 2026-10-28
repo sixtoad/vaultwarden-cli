@@ -42,8 +42,25 @@ The edge reviewer confirmed the final count-bound correction resolves the
 allocation problem while preserving complete accepted scope. Local exact golden
 comparisons still pass after removing the unnecessary pagination.
 
-Matching Windows/Linux/macOS 26 renderer captures and hosted native/TLS checks
-remain pending. The spec remains in review until that evidence is recorded.
+All four other renderer sets were captured in
+[CI run 40693829222](https://github.com/sixtoad/vaultwarden-cli/actions/runs/40693829222)
+on `f3d03b4`. Each host passed 64 non-golden Flutter tests; the six failed tests
+were the intended presentation changes. Independent visual review inspected all
+ten changed actuals, all ten isolated diffs and both unchanged large-text action
+references per host. The forty approved PNGs were adopted byte-for-byte; no
+comparison tolerance or skipped assertion was introduced.
+
+The spec remains in review. The authoritative final verification is the latest
+[PR #52 checks](https://github.com/sixtoad/vaultwarden-cli/pull/52/checks) for its
+current head, including exact renderer comparisons, native installation and
+packaged TLS/recovery/cleanup. The PR verification summary records the resulting
+run and evidence; initial expected screenshot failures are not a passing gate.
+
+The final local AOT smoke, debug packaged-bridge integration and normal-entry
+release archive verification passed on clean commit `f3d03b4`. The archive
+SHA-256 is `493911acd71b28a2b885285e661ae75c82e8b87efe870c77b83d1bce80ba1c73`;
+it records `lib/main.dart`, release mode and successful extraction verification.
+The separate synthetic Swift probe's 11 tests and final Clippy checks passed.
 
 The full local desktop gate reached native checks. Normal and pilot suites
 executed 36 and 37 tests respectively, each with one CI-only installation test

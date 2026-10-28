@@ -56,7 +56,7 @@ not an editing target.
 - [x] `companion/lib/provider/request_review.dart`, `page.dart` — render complete selectable facts from the typed snapshot; preserve controls/navigation.
 - [x] `companion/rust/tests/provider.rs`, `companion/rust/src/provider/session.rs` tests — cover projection completeness, escaping, malformed/extended schemas and clearing on invalidation/expiry.
 - [x] `companion/test/provider_test.dart`, `access_shell_test.dart`, `provider_support.dart` — test real bridge values, malicious/empty/long text, completeness, navigation and recovery.
-- [ ] `companion/test/access_golden_test.dart`, `test/goldens/` — review and update exact desktop/compact light/dark and large-text captures on each supported renderer.
+- [x] `companion/test/access_golden_test.dart`, `test/goldens/` — review and update exact desktop/compact light/dark and large-text captures on each supported renderer.
 - [x] `scripts/mutate-provider-companion.py`, `mutate-provider-controller.py` — retain mutations; ensure escaping/retirement mutants exercise the typed path.
 - [x] `docs/implementation/issue-50-capabilities.md`, `companion/README.md` — record schema limits, supported facts and verification evidence.
 
