@@ -10,7 +10,7 @@ Evidence directory: `/Volumes/sixto_dev/.devcache/tmp/vaultwarden-history-eviden
 Tools: Flutter 3.47.7 / Dart 3.13.5, flutter_rust_bridge_codegen 2.13.0,
 cargo-expand 1.0.112, Rust 1.99.1 and 1.88.0. Generated bindings were regenerated.
 
-- Companion Rust: 37 tests passed, Rustfmt and Clippy clean.
+- Companion Rust: 37 tests passed on Rust 1.88 and 1.99.1, Rustfmt and Clippy clean.
 - Full Flutter suite: 79 tests passed; analyzer clean. This includes generated
   FFI/controller regressions for late responses, replacement, exact-ID reopening,
   legacy timestamps, unsupported providers and status-only uncertainty recovery.
@@ -29,8 +29,18 @@ cargo-expand 1.0.112, Rust 1.99.1 and 1.88.0. Generated bindings were regenerate
   companion Clippy gate passed; final Linux lint remains mandatory.
 - Six new macOS 27 arm64 Activity captures were individually reviewed: light/dark,
   desktop/compact and scrolled 200% event controls. Existing review/action goldens
-  are unchanged. Other-host images must be reviewed from matching CI captures
-  before addition; exact comparisons are retained.
+  are unchanged. Linux, Windows and macOS 26 x64 images were individually reviewed from
+  capture run `40721598625` on `55f1007` and copied exactly; exact comparisons
+  are retained. The ARM pilot capture is still pending.
+
+The full local desktop script passed Flutter/pilot, packaging diagnostics, Swift
+contract and normal/pilot native fixture suites, then correctly failed the
+`install-save` mutation because the CI-only production-namespace test was skipped.
+Native sources were restored exactly and the restored baseline passed. No CI flag
+was forged. Separate remaining checks passed the Swift probe (11), release AOT
+smoke and packaged debug bridge integration (1); the normal app archive passed extraction/provenance verification. It records
+`55f1007` with `source_dirty: true` because captures/docs were pending; this is
+local packaging evidence, not a clean final-revision release artifact. Hosted final-revision CI must close the native acceptance gap.
 
 ## Independent review
 
@@ -59,3 +69,11 @@ by synthetic fixtures. No CI flag is forged to satisfy native prerequisites.
 Final PR revision and CI run evidence will be linked in the PR after matching-host
 capture review and successful checks. This document does not substitute historical
 PR #52 evidence for the current revision.
+
+The first CI run confirmed the Linux endpoint tests and all four new endpoint
+mutations, plus companion MSRV/security mutations. Missing Activity references
+failed exact comparisons as expected. Because Flutter emits no actual image for
+an absent reference, a reviewed test-only comparator now records actual Activity
+bytes under ignored `test/failures/`, then delegates the exact comparison unchanged.
+It never creates expected images or accepts differences. CI uploads those captures
+for manual review and adoption.

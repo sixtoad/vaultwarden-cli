@@ -46,6 +46,7 @@ origin, and resulting scroll positions. Desktop review/action pairs cover the
 complete scope; compact and 200% text layouts retain accessible actions. Full
 matching-host comparisons and packaged checks remain enforced by PR #52 CI.
 
+## Activity history update, 2026-10-28
 
 Activity history adds six synthetic captures per matching host (light/dark,
 desktop/compact/200%). On macOS 27 arm64 the six new captures were rendered with
@@ -54,3 +55,10 @@ navigation and reachable event controls. Existing review/action references remai
 byte-identical. The 200% capture scrolls the event action into view; widget tests
 also check the complete list and exact-ID reopening. Other-host references must
 come from that host's reviewed CI captures; comparisons remain exact.
+
+Linux, Windows and macOS 26 x64 Activity references were individually visually
+reviewed and copied byte-for-byte from [CI run 40721598625](https://github.com/sixtoad/vaultwarden-cli/actions/runs/40721598625),
+source `55f10079469bc999dcf2a78c183e724a4a0df59d`. Labels, UTC timestamps, long
+request IDs, selected navigation and the fresh-review action remain readable in
+both themes and all three layouts. The 200% captures intentionally center the
+action using scrolling; content at the viewport edges is clipped by that scroll.
