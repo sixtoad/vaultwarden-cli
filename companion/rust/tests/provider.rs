@@ -629,3 +629,248 @@ fn commitment_is_distinct_from_terminal_status_and_configuration_clears_tracking
     );
     assert!(session.snapshot().status_id.is_empty());
 }
+
+fn history_event(id: &str, at: Option<u64>, ordinal: u32, outcome: &str) -> Value {
+    json!({"request_id":id,"operation":"deploy","at_unix_seconds":at,"ordinal":ordinal,"outcome":outcome})
+}
+fn history_response(events: Vec<Value>) -> Value {
+    json!({"version":1,"history_version":1,"events":events})
+}
+#[test]
+fn history_uses_closed_bounded_display_and_preserves_canonical_order() {
+    use companion_core::api::provider::{ProviderHistoryOutcome, ProviderHistoryState};
+    let id_b = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    let value = history_response(vec![
+        history_event(id_b, Some(9), 1, "succeeded"),
+        history_event(ID, Some(9), 3, "denied"),
+        history_event(ID, Some(9), 2, "approved"),
+        history_event(ID, None, 0, "legacy_unknown"),
+    ]);
+    let mut session = connected();
+    let work = session
+        .begin(Command::History, String::new(), String::new())
+        .unwrap();
+    assert_eq!(
+        serde_json::from_slice::<Value>(&work.body).unwrap(),
+        json!({"version":1,"command":"history","limit":50})
+    );
+    assert_eq!(
+        session.snapshot().history_state,
+        ProviderHistoryState::Loading
+    );
+    session.finish(work.token, &serde_json::to_vec(&value).unwrap());
+    let snapshot = session.snapshot();
+    assert_eq!(snapshot.history_state, ProviderHistoryState::Available);
+    assert_eq!(
+        snapshot
+            .history
+            .iter()
+            .map(|e| (e.request_id.as_str(), e.ordinal))
+            .collect::<Vec<_>>(),
+        vec![(id_b, 1), (ID, 3), (ID, 2), (ID, 0)]
+    );
+    assert_eq!(snapshot.history[3].at_unix_seconds, None);
+    assert_eq!(
+        snapshot.history[0].outcome,
+        ProviderHistoryOutcome::Succeeded
+    );
+    assert!(!snapshot.can_decide);
+    assert!(snapshot.review.is_none());
+    assert!(snapshot.status_id.is_empty());
+    assert_eq!(snapshot.status_progress, ProviderStatusProgress::None);
+    assert!(session
+        .begin(Command::Approve, String::new(), "fresh".into())
+        .is_err());
+}
+#[test]
+fn history_rejects_unknown_sensitive_missing_and_malformed_fields() {
+    let base = history_response(vec![history_event(ID, Some(3), 0, "submitted")]);
+    let mut invalid = Vec::new();
+    for field in [
+        "ticket",
+        "password",
+        "token",
+        "stdout",
+        "diagnostic",
+        "requester",
+        "credentials",
+        "policy_revision",
+        "status",
+    ] {
+        let mut value = base.clone();
+        value["events"][0][field] = json!("NEVER DISPLAY");
+        invalid.push(value);
+    }
+    for field in ["version", "history_version"] {
+        let mut value = base.clone();
+        value[field] = json!(2);
+        invalid.push(value);
+    }
+    let mut value = base.clone();
+    value["extra"] = json!(true);
+    invalid.push(value);
+    for field in [
+        "request_id",
+        "operation",
+        "at_unix_seconds",
+        "ordinal",
+        "outcome",
+    ] {
+        let mut value = base.clone();
+        value["events"][0].as_object_mut().unwrap().remove(field);
+        invalid.push(value);
+    }
+    for outcome in ["completed", "unknown", "execution_secret", ""] {
+        let mut value = base.clone();
+        value["events"][0]["outcome"] = json!(outcome);
+        invalid.push(value);
+    }
+    for operation in [
+        "",
+        "A",
+        "-a",
+        "a-",
+        "a--b",
+        "a b",
+        "a_b",
+        "a\u{202e}b",
+        &"a".repeat(65),
+    ] {
+        let mut value = base.clone();
+        value["events"][0]["operation"] = json!(operation);
+        invalid.push(value);
+    }
+    for (field, bad) in [
+        ("request_id", json!("bad")),
+        ("at_unix_seconds", json!(-1)),
+        ("at_unix_seconds", Value::Null),
+        ("ordinal", json!(-1)),
+        ("ordinal", json!(4294967296_u64)),
+    ] {
+        let mut value = base.clone();
+        value["events"][0][field] = bad;
+        invalid.push(value);
+    }
+    for value in invalid {
+        let mut session = connected();
+        reply(&mut session, Command::History, "", value.clone());
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.outcome, ProviderOutcome::Invalid, "{value}");
+        assert!(snapshot.history.is_empty());
+        assert!(!snapshot.can_decide);
+    }
+}
+#[test]
+fn history_enforces_default_maximum_unique_identity_and_descending_order() {
+    let valid = (0..200)
+        .rev()
+        .map(|i| history_event(ID, Some(9), i, "submitted"))
+        .collect::<Vec<_>>();
+    let encoded = serde_json::to_vec(&history_response(valid.clone())).unwrap();
+    let parsed: HistoryResponse = decode(&encoded).unwrap();
+    assert!(parsed.valid(200));
+    assert!(!parsed.valid(201));
+    assert!(!parsed.valid(0));
+    assert!(!parsed.valid(50));
+    let mut session = connected();
+    reply(
+        &mut session,
+        Command::History,
+        "",
+        history_response(valid[..50].to_vec()),
+    );
+    assert_eq!(session.snapshot().history.len(), 50);
+    for events in [
+        valid[..51].to_vec(),
+        vec![valid[0].clone(), valid[0].clone()],
+        vec![
+            history_event(ID, Some(9), 0, "submitted"),
+            history_event(ID, Some(8), 0, "submitted"),
+        ],
+        vec![
+            history_event(ID, Some(8), 1, "submitted"),
+            history_event(ID, Some(9), 0, "submitted"),
+        ],
+        vec![
+            history_event(ID, None, 0, "legacy_unknown"),
+            history_event(ID, Some(9), 1, "submitted"),
+        ],
+    ] {
+        let mut session = connected();
+        reply(&mut session, Command::History, "", history_response(events));
+        assert_eq!(session.snapshot().outcome, ProviderOutcome::Invalid);
+        assert!(session.snapshot().history.is_empty());
+    }
+    let excessive = history_response(
+        (0..201)
+            .rev()
+            .map(|i| history_event(ID, Some(9), i, "submitted"))
+            .collect(),
+    );
+    assert!(decode::<HistoryResponse>(&serde_json::to_vec(&excessive).unwrap()).is_err());
+    let mut oversized = serde_json::to_vec(&history_response(Vec::new())).unwrap();
+    oversized.resize(RESPONSE_LIMIT + 1, b' ');
+    let mut session = connected();
+    let work = session
+        .begin(Command::History, String::new(), String::new())
+        .unwrap();
+    session.finish(work.token, &oversized);
+    assert_eq!(session.snapshot().outcome, ProviderOutcome::Invalid);
+}
+#[test]
+fn history_retirement_compatibility_lock_and_uncertainty_never_restore_authority() {
+    use companion_core::api::provider::ProviderHistoryState;
+    let value = history_response(vec![history_event(ID, Some(9), 1, "succeeded")]);
+    let mut session = connected();
+    reply(&mut session, Command::History, "", value.clone());
+    session.invalidate();
+    assert!(session.snapshot().history.is_empty());
+    let work = session
+        .begin(Command::History, String::new(), String::new())
+        .unwrap();
+    session.invalidate();
+    session.finish(work.token, &serde_json::to_vec(&value).unwrap());
+    assert_eq!(session.snapshot().outcome, ProviderOutcome::Stale);
+    assert!(session.snapshot().history.is_empty());
+    session.configure("").unwrap();
+    assert_eq!(session.snapshot().history_state, ProviderHistoryState::Idle);
+    assert!(session
+        .begin(Command::History, String::new(), String::new())
+        .is_err());
+    reply(
+        &mut session,
+        Command::Session,
+        "",
+        json!({"version":1,"state":"locked","generation":2}),
+    );
+    assert!(session
+        .begin(Command::History, String::new(), String::new())
+        .is_err());
+    let mut session = connected();
+    reply(
+        &mut session,
+        Command::History,
+        "",
+        json!({"version":1,"error":"invalid_request"}),
+    );
+    assert_eq!(
+        session.snapshot().history_state,
+        ProviderHistoryState::Unavailable
+    );
+    assert_eq!(session.snapshot().outcome, ProviderOutcome::Rejected);
+    let mut session = reviewed();
+    let work = session
+        .begin(Command::Approve, String::new(), "fresh".into())
+        .unwrap();
+    session.finish(work.token, b"");
+    assert!(session
+        .begin(Command::History, String::new(), String::new())
+        .is_err());
+    let work = session
+        .begin(Command::Status, ID.into(), String::new())
+        .unwrap();
+    session.finish(work.token, &serde_json::to_vec(&value).unwrap());
+    assert_eq!(session.snapshot().uncertain_id, ID);
+    assert!(!session.snapshot().can_decide);
+    assert!(session.snapshot().history.is_empty());
+}

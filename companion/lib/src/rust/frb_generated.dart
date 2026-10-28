@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -584985841;
+  int get rustContentHash => -1223364608;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -104,6 +104,8 @@ abstract class RustLibApi extends BaseApi {
     required int token,
     required List<int> response,
   });
+
+  Future<ProviderHistoryState> crateApiProviderProviderHistoryStateDefault();
 
   ProviderSnapshot crateApiProviderProviderInvalidate();
 
@@ -295,12 +297,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ProviderHistoryState> crateApiProviderProviderHistoryStateDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_history_state,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProviderProviderHistoryStateDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProviderProviderHistoryStateDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_history_state_default",
+        argNames: [],
+      );
+
+  @override
   ProviderSnapshot crateApiProviderProviderInvalidate() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -325,7 +357,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -349,7 +381,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -375,7 +407,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -403,7 +435,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -425,7 +457,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -463,6 +495,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ProviderReview dco_decode_box_autoadd_provider_review(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_provider_review(raw);
+  }
+
+  @protected
+  BigInt dco_decode_box_autoadd_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_u_64(raw);
   }
 
   @protected
@@ -522,6 +560,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ProviderHistoryEvent> dco_decode_list_provider_history_event(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_provider_history_event)
+        .toList();
+  }
+
+  @protected
   List<ProviderReviewCredential> dco_decode_list_provider_review_credential(
     dynamic raw,
   ) {
@@ -544,6 +592,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_64(raw);
+  }
+
+  @protected
   Outcome dco_decode_outcome(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Outcome.values[raw as int];
@@ -553,6 +607,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ProviderCommand dco_decode_provider_command(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ProviderCommand.values[raw as int];
+  }
+
+  @protected
+  ProviderHistoryEvent dco_decode_provider_history_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ProviderHistoryEvent(
+      requestId: dco_decode_String(arr[0]),
+      operation: dco_decode_String(arr[1]),
+      atUnixSeconds: dco_decode_opt_box_autoadd_u_64(arr[2]),
+      ordinal: dco_decode_u_32(arr[3]),
+      outcome: dco_decode_provider_history_outcome(arr[4]),
+    );
+  }
+
+  @protected
+  ProviderHistoryOutcome dco_decode_provider_history_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderHistoryOutcome.values[raw as int];
+  }
+
+  @protected
+  ProviderHistoryState dco_decode_provider_history_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProviderHistoryState.values[raw as int];
   }
 
   @protected
@@ -600,23 +681,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ProviderSnapshot dco_decode_provider_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 14)
-      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    if (arr.length != 17)
+      throw Exception('unexpected arr length: expect 17 but see ${arr.length}');
     return ProviderSnapshot(
       outcome: dco_decode_provider_outcome(arr[0]),
       statusProgress: dco_decode_provider_status_progress(arr[1]),
       configured: dco_decode_bool(arr[2]),
       busy: dco_decode_bool(arr[3]),
       locked: dco_decode_bool(arr[4]),
-      requests: dco_decode_list_String(arr[5]),
-      reviewText: dco_decode_String(arr[6]),
-      review: dco_decode_opt_box_autoadd_provider_review(arr[7]),
-      reviewId: dco_decode_String(arr[8]),
-      canDecide: dco_decode_bool(arr[9]),
-      uncertainId: dco_decode_String(arr[10]),
-      statusId: dco_decode_String(arr[11]),
-      statusText: dco_decode_String(arr[12]),
-      message: dco_decode_String(arr[13]),
+      authorityKnown: dco_decode_bool(arr[5]),
+      historyState: dco_decode_provider_history_state(arr[6]),
+      history: dco_decode_list_provider_history_event(arr[7]),
+      requests: dco_decode_list_String(arr[8]),
+      reviewText: dco_decode_String(arr[9]),
+      review: dco_decode_opt_box_autoadd_provider_review(arr[10]),
+      reviewId: dco_decode_String(arr[11]),
+      canDecide: dco_decode_bool(arr[12]),
+      uncertainId: dco_decode_String(arr[13]),
+      statusId: dco_decode_String(arr[14]),
+      statusText: dco_decode_String(arr[15]),
+      message: dco_decode_String(arr[16]),
     );
   }
 
@@ -726,6 +810,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_64(deserializer));
+  }
+
+  @protected
   Completion sse_decode_completion(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_outcome = sse_decode_outcome(deserializer);
@@ -787,6 +877,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ProviderHistoryEvent> sse_decode_list_provider_history_event(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ProviderHistoryEvent>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_provider_history_event(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<ProviderReviewCredential> sse_decode_list_provider_review_credential(
     SseDeserializer deserializer,
   ) {
@@ -821,6 +925,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_64(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   Outcome sse_decode_outcome(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
@@ -832,6 +947,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return ProviderCommand.values[inner];
+  }
+
+  @protected
+  ProviderHistoryEvent sse_decode_provider_history_event(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_requestId = sse_decode_String(deserializer);
+    var var_operation = sse_decode_String(deserializer);
+    var var_atUnixSeconds = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_ordinal = sse_decode_u_32(deserializer);
+    var var_outcome = sse_decode_provider_history_outcome(deserializer);
+    return ProviderHistoryEvent(
+      requestId: var_requestId,
+      operation: var_operation,
+      atUnixSeconds: var_atUnixSeconds,
+      ordinal: var_ordinal,
+      outcome: var_outcome,
+    );
+  }
+
+  @protected
+  ProviderHistoryOutcome sse_decode_provider_history_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderHistoryOutcome.values[inner];
+  }
+
+  @protected
+  ProviderHistoryState sse_decode_provider_history_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProviderHistoryState.values[inner];
   }
 
   @protected
@@ -894,6 +1046,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_configured = sse_decode_bool(deserializer);
     var var_busy = sse_decode_bool(deserializer);
     var var_locked = sse_decode_bool(deserializer);
+    var var_authorityKnown = sse_decode_bool(deserializer);
+    var var_historyState = sse_decode_provider_history_state(deserializer);
+    var var_history = sse_decode_list_provider_history_event(deserializer);
     var var_requests = sse_decode_list_String(deserializer);
     var var_reviewText = sse_decode_String(deserializer);
     var var_review = sse_decode_opt_box_autoadd_provider_review(deserializer);
@@ -909,6 +1064,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       configured: var_configured,
       busy: var_busy,
       locked: var_locked,
+      authorityKnown: var_authorityKnown,
+      historyState: var_historyState,
+      history: var_history,
       requests: var_requests,
       reviewText: var_reviewText,
       review: var_review,
@@ -1038,6 +1196,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self, serializer);
+  }
+
+  @protected
   void sse_encode_completion(Completion self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_outcome(self.outcome, serializer);
@@ -1097,6 +1261,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_provider_history_event(
+    List<ProviderHistoryEvent> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_provider_history_event(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_provider_review_credential(
     List<ProviderReviewCredential> self,
     SseSerializer serializer,
@@ -1128,6 +1304,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_64(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_outcome(Outcome self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
@@ -1136,6 +1322,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_encode_provider_command(
     ProviderCommand self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_history_event(
+    ProviderHistoryEvent self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.requestId, serializer);
+    sse_encode_String(self.operation, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.atUnixSeconds, serializer);
+    sse_encode_u_32(self.ordinal, serializer);
+    sse_encode_provider_history_outcome(self.outcome, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_history_outcome(
+    ProviderHistoryOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_history_state(
+    ProviderHistoryState self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1193,6 +1410,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.configured, serializer);
     sse_encode_bool(self.busy, serializer);
     sse_encode_bool(self.locked, serializer);
+    sse_encode_bool(self.authorityKnown, serializer);
+    sse_encode_provider_history_state(self.historyState, serializer);
+    sse_encode_list_provider_history_event(self.history, serializer);
     sse_encode_list_String(self.requests, serializer);
     sse_encode_String(self.reviewText, serializer);
     sse_encode_opt_box_autoadd_provider_review(self.review, serializer);

@@ -17,6 +17,7 @@ class ProviderController extends ChangeNotifier {
   );
   bool settingUp = false, suspended = false, _disposed = false;
   bool _routeCurrent = true, _ready = false, _loaded = false;
+  bool _activityCurrent = false;
   bool _reconciling = false, _operation = false;
   String _settlementId = '';
   String diagnostic = '';
@@ -36,6 +37,11 @@ class ProviderController extends ChangeNotifier {
       canSetup &&
       state.statusProgress != core.ProviderStatusProgress.committed;
   int get refreshDelaySeconds => _backoff;
+  bool get connected =>
+      eligible && _ready && configuration.configured && state.authorityKnown;
+  void setActivityCurrent(bool current) {
+    _activityCurrent = current;
+  }
 
   void _publish() {
     if (!_disposed) notifyListeners();
@@ -95,6 +101,7 @@ class ProviderController extends ChangeNotifier {
       diagnostic = '';
     } catch (_) {
       _ready = false;
+      invalidate();
       diagnostic = 'Saved provider setup is unavailable. Check the dedicated client identity.';
     } finally {
       _reconciling = false;
@@ -267,7 +274,12 @@ class ProviderController extends ChangeNotifier {
           core.ProviderCommand.deny,
         ].contains(command) &&
         state.outcome == core.ProviderOutcome.rejected;
-    if (pendingId.isNotEmpty &&
+    if ([
+          core.ProviderCommand.status,
+          core.ProviderCommand.approve,
+          core.ProviderCommand.deny,
+        ].contains(command) &&
+        pendingId.isNotEmpty &&
         state.uncertainId.isEmpty &&
         (accepted || rejectedDecision) &&
         state.statusProgress != core.ProviderStatusProgress.pending) {
@@ -303,10 +315,22 @@ class ProviderController extends ChangeNotifier {
         core.ProviderCommand.status,
         id: recoveryId.isNotEmpty ? recoveryId : state.statusId,
       );
+      // A committed status ends delivery uncertainty only after durable marker
+      // settlement. Activity may then read history under fresh authority, while
+      // statusProgress still schedules the original execution on the next poll.
+      if (success && eligible && _activityCurrent && recoveryId.isEmpty) {
+        success = await perform(core.ProviderCommand.session);
+        if (success && eligible && !state.locked) {
+          success = await perform(core.ProviderCommand.history);
+        }
+      }
     } else {
       success = await perform(core.ProviderCommand.session);
       if (success && eligible && !state.locked) {
         success = await perform(core.ProviderCommand.list);
+        if (success && eligible && _activityCurrent && !state.locked) {
+          success = await perform(core.ProviderCommand.history);
+        }
       }
     }
     _backoff = success ? 5 : (_backoff * 2).clamp(5, 30);

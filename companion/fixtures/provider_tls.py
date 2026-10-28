@@ -71,6 +71,16 @@ def serve(directory, mode):
                 return self.reply(200, {"version": 1, "state": "unlocked", "generation": 1})
             if command == "list":
                 return self.reply(200, {"version": 1, "requests": [] if locked else [review["review"]["id"]]})
+            if command == "history":
+                if mode == "history-unsupported":
+                    return self.reply(400, {"version": 1, "error": "invalid_request"})
+                events = [{"request_id": review["review"]["id"], "operation": "deploy",
+                           "at_unix_seconds": 1700000000, "ordinal": 1, "outcome": "succeeded"},
+                          {"request_id": "B" * 43, "operation": "inspect",
+                           "at_unix_seconds": None, "ordinal": 0, "outcome": "legacy_unknown"}]
+                if mode == "history-invalid":
+                    events[0]["ticket"] = "must-not-be-admitted"
+                return self.reply(200, {"version": 1, "history_version": 1, "events": events})
             if command == "review":
                 return self.reply(200, review)
             if command == "decision":

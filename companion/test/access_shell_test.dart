@@ -56,6 +56,98 @@ void main() {
   setUpAll(() async => RustLib.init());
   setUp(resetProvider);
 
+  testWidgets(
+    'history preserves order, legacy unknown time and exact second-event reopening',
+    (tester) async {
+      const secondId = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+      final native = FixtureProviderPlatform();
+      final history = providerHistory();
+      (history['events'] as List).add({
+        'request_id': secondId,
+        'operation': 'legacy-task',
+        'at_unix_seconds': null,
+        'ordinal': 0,
+        'outcome': 'legacy_unknown',
+      });
+      native.historyReply = encoded(history);
+      native.reviewReply = providerReview();
+      native.reviewReply!['review']['id'] = secondId;
+      await showShell(tester, native, size: const Size(390, 844), textScale: 2);
+      await destination(tester, 'activity');
+      expect(find.text('Unknown · legacy event'), findsOneWidget);
+      expect(find.text('2023-11-14 22:13:20 UTC'), findsOneWidget);
+      final events = core.providerSnapshot().history;
+      expect(events.map((e) => e.requestId), [providerId, secondId]);
+      expect(native.commands.where((c) => c['command'] == 'review'), isEmpty);
+      final second = find.byKey(
+        const ValueKey(
+          'activity-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB-0',
+        ),
+      );
+      final button = find.descendant(
+        of: second,
+        matching: find.text('Open request with fresh review'),
+      );
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(native.commands.last['command'], 'review');
+      expect(native.commands.last['request_id'], secondId);
+      expect(core.providerSnapshot().reviewId, secondId);
+      expect(core.providerSnapshot().history, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'activity exposes loading empty unavailable and disconnected states',
+    (tester) async {
+      final native = FixtureProviderPlatform()
+        ..heldHistory = Completer<Uint8List>();
+      await showShell(tester, native);
+      await tester.tap(find.byKey(const Key('destination-activity')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Loading recent activity…'), findsOneWidget);
+      native.heldHistory!.complete(
+        encoded({'version': 1, 'history_version': 1, 'events': []}),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('No history events are available.'), findsOneWidget);
+      native.heldHistory = null;
+      native.historyReply = encoded({'version': 1, 'error': 'invalid_request'});
+      await tester.tap(find.text('Refresh activity'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Activity unavailable.'), findsOneWidget);
+      native.invalidate!();
+      await tester.pump();
+      expect(
+        find.text('Disconnected. Refresh to load current provider activity.'),
+        findsOneWidget,
+      );
+      expect(find.text('Open request with fresh review'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('activity renders full u64 timestamps without truncation', (
+    tester,
+  ) async {
+    final native = FixtureProviderPlatform();
+    native.historyReply = Uint8List.fromList(
+      utf8.encode(
+        jsonEncode(providerHistory())
+            .replaceFirst('1700000000', '18446744073709551615'),
+      ),
+    );
+    await showShell(tester, native);
+    await destination(tester, 'activity');
+    expect(find.text('Unix seconds: 18446744073709551615'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('enabled text and action colors meet 4.5 to 1 in both themes', () {
     double contrast(Color a, Color b) {
       final x = a.computeLuminance(), y = b.computeLuminance();
@@ -179,11 +271,16 @@ void main() {
         OutlinedButton,
         'Open request with fresh review',
       );
-      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
+      expect(button, findsNothing);
+      expect(
+        find.text(
+          'Provider locked. Unlock separately in Requests before loading Activity.',
+        ),
+        findsOneWidget,
+      );
       final reviews = native.commands
           .where((c) => c['command'] == 'review')
           .length;
-      await tester.tap(button);
       await tester.pumpAndSettle();
       expect(
         native.commands.where((c) => c['command'] == 'review'),
@@ -305,7 +402,7 @@ void main() {
   );
 
   testWidgets(
-    'activity shows validated latest status and reopening explicitly requests fresh review',
+    'activity shows durable history and reopening explicitly requests fresh review',
     (tester) async {
       final native = FixtureProviderPlatform();
       await showShell(tester, native);
@@ -318,10 +415,10 @@ void main() {
           .length;
       await destination(tester, 'activity');
       expect(
-        find.text('Latest known request status · not a durable history'),
+        find.text('Recent redacted provider history · up to 50 events'),
         findsOneWidget,
       );
-      expect(find.textContaining('denied'), findsWidgets);
+      expect(find.textContaining('Denied'), findsWidgets);
       expect(core.providerSnapshot().canDecide, false);
       expect(
         native.commands.where((c) => c['command'] == 'review'),
@@ -370,7 +467,8 @@ void main() {
       expect(core.providerSnapshot().statusId, providerId);
       await destination(tester, 'activity');
       expect(find.text(providerId), findsOneWidget);
-      expect(find.textContaining('denied'), findsWidgets);
+      expect(core.providerSnapshot().statusText, contains('denied'));
+      expect(find.textContaining('Submitted'), findsOneWidget);
       expect(core.providerSnapshot().canDecide, false);
       await tester.pumpWidget(const SizedBox.shrink());
     },

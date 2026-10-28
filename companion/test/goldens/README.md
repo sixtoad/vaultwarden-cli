@@ -45,3 +45,12 @@ Changes match the labeled typed fields, quoted identifiers, explicit unavailable
 origin, and resulting scroll positions. Desktop review/action pairs cover the
 complete scope; compact and 200% text layouts retain accessible actions. Full
 matching-host comparisons and packaged checks remain enforced by PR #52 CI.
+
+
+Activity history adds six synthetic captures per matching host (light/dark,
+desktop/compact/200%). On macOS 27 arm64 the six new captures were rendered with
+pinned Flutter 3.47.7 and visually reviewed for wrapping, contrast, selected
+navigation and reachable event controls. Existing review/action references remain
+byte-identical. The 200% capture scrolls the event action into view; widget tests
+also check the complete list and exact-ID reopening. Other-host references must
+come from that host's reviewed CI captures; comparisons remain exact.

@@ -1011,6 +1011,15 @@ impl ProviderApplication {
         self.check_owner(owner)?;
         self.history_current(None, limit)
     }
+    /// Only the currently enrolled, authenticated companion transport may call
+    /// this path. Its certificate authorizes the provider owner's history; no
+    /// caller-supplied identifier is converted into an authenticated OS identity.
+    pub(crate) fn companion_history(
+        &self,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        self.history_current(None, limit)
+    }
     /// Only the browser adapter supplies a generation from a verified cookie/proof session.
     pub(crate) fn browser_history(
         &self,

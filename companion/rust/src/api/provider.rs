@@ -5,6 +5,7 @@ use std::sync::{Mutex, OnceLock};
 pub enum ProviderCommand {
     Session,
     List,
+    History,
     Review,
     Approve,
     Deny,
@@ -62,6 +63,45 @@ pub struct ProviderReviewCredential {
     pub use_type: String,
 }
 
+/// History is display-only; none of these values convey decision authority.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ProviderHistoryState {
+    #[default]
+    Idle,
+    Loading,
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderHistoryOutcome {
+    Submitted,
+    Approved,
+    Denied,
+    Expired,
+    ReviewUnavailable,
+    ExecutionStarted,
+    Succeeded,
+    ExecutionNonzero,
+    ExecutionSignaled,
+    ExecutionRejected,
+    ExecutionUnavailable,
+    Invalidated,
+    Recovered,
+    LegacyUnknown,
+    Reconciled,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProviderHistoryEvent {
+    pub request_id: String,
+    pub operation: String,
+    pub at_unix_seconds: Option<u64>,
+    pub ordinal: u32,
+    pub outcome: ProviderHistoryOutcome,
+}
+
 #[derive(Clone, Debug)]
 pub struct ProviderSnapshot {
     pub outcome: ProviderOutcome,
@@ -69,6 +109,9 @@ pub struct ProviderSnapshot {
     pub configured: bool,
     pub busy: bool,
     pub locked: bool,
+    pub authority_known: bool,
+    pub history_state: ProviderHistoryState,
+    pub history: Vec<ProviderHistoryEvent>,
     pub requests: Vec<String>,
     pub review_text: String,
     pub review: Option<ProviderReview>,

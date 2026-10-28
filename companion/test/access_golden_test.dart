@@ -130,6 +130,20 @@ void main() {
           find.byKey(const Key('golden')),
           matchesGoldenFile('goldens/${name}_actions.png'),
         );
+        await tester.tap(find.byKey(const Key('destination-activity')));
+        await tester.pumpAndSettle();
+        if (layout == 'large') {
+          await Scrollable.ensureVisible(
+            tester.element(find.text('Open request with fresh review')),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+        }
+        await expectLater(
+          find.byKey(const Key('golden')),
+          matchesGoldenFile('goldens/${name}_activity.png'),
+        );
+        await tester.ensureVisible(find.text('Open request with fresh review'));
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       }, variant: TargetPlatformVariant.only(TargetPlatform.android));
