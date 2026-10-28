@@ -244,7 +244,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   Widget requestDetail() {
     final state = controller.state;
-    if (state.reviewText.isEmpty) {
+    if (state.review == null) {
       return AccessPanel(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

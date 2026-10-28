@@ -78,6 +78,175 @@ fn canonical_review_renders_every_field_and_argument_boundary() {
 }
 
 #[test]
+fn typed_review_preserves_every_fact_and_escapes_every_untrusted_string() {
+    let mut session = connected();
+    let mut value = fixture();
+    value["review"]["requester"] = json!("agent\u{202e}");
+    value["review"]["operation"] = json!("dep\nloy");
+    value["review"]["effect"] = json!("\"quoted\"");
+    value["review"]["target"] = json!("\0target");
+    value["review"]["arguments"] =
+        json!(["", " a b ", "a\nb", "\u{202e}hidden", "literal\\u{202e}"]);
+    value["review"]["credentials"] = json!([
+        {"label":"Login\u{200b}","use_type":"log\nin"},
+        {"label":"\"Second\"","use_type":"key\\type"}
+    ]);
+    value["review"]["one_time"] = json!("once\u{00ad}");
+    reply(&mut session, Command::Review, ID, value);
+    let state = session.snapshot();
+    assert!(state.can_decide);
+    let review = state.review.unwrap();
+    assert_eq!(review.id, format!("\"{ID}\""));
+    assert_eq!(review.requester, "\"agent\\u{202e}\"");
+    assert_eq!(review.operation, "\"dep\\u{000a}loy\"");
+    assert_eq!(review.effect, "\"\\\"quoted\\\"\"");
+    assert_eq!(review.target, "\"\\u{0000}target\"");
+    assert_eq!(
+        review.arguments,
+        [
+            "\"\"",
+            "\" a b \"",
+            "\"a\\u{000a}b\"",
+            "\"\\u{202e}hidden\"",
+            "\"literal\\\\u{202e}\""
+        ]
+    );
+    assert_eq!(review.credentials.len(), 2);
+    assert_eq!(review.credentials[0].label, "\"Login\\u{200b}\"");
+    assert_eq!(review.credentials[0].use_type, "\"log\\u{000a}in\"");
+    assert_eq!(review.credentials[1].label, "\"\\\"Second\\\"\"");
+    assert_eq!(review.credentials[1].use_type, "\"key\\\\type\"");
+    assert_eq!(review.executable_digest, "a".repeat(64));
+    assert_eq!(review.policy_digest, "b".repeat(64));
+    assert_eq!(review.arguments_digest, "c".repeat(64));
+    assert_eq!(review.expires_at_unix_seconds, 2_000_000_000);
+    assert_eq!(review.one_time, "\"once\\u{00ad}\"");
+    assert_eq!(review.status, r#"{"status":"pending"}"#);
+}
+
+#[test]
+fn typed_review_retains_empty_lists_and_closed_status_details() {
+    for status in [
+        json!({"status":"pending"}),
+        json!({"status":"approved"}),
+        json!({"status":"denied"}),
+        json!({"status":"expired"}),
+        json!({"status":"running"}),
+        json!({"status":"completed","exit_code":255}),
+        json!({"status":"failed","reason":"execution_nonzero"}),
+    ] {
+        let mut session = connected();
+        let mut value = fixture();
+        value["ticket"] = Value::Null;
+        value["review"]["arguments"] = json!([]);
+        value["review"]["credentials"] = json!([]);
+        value["review"]["status"] = status.clone();
+        reply(&mut session, Command::Review, ID, value);
+        let state = session.snapshot();
+        assert!(!state.can_decide);
+        let review = state.review.unwrap();
+        assert!(review.arguments.is_empty());
+        assert!(review.credentials.is_empty());
+        assert_eq!(
+            serde_json::from_str::<Value>(&review.status).unwrap(),
+            status
+        );
+    }
+}
+
+#[test]
+fn review_accepts_existing_provider_count_boundaries_without_losing_entries() {
+    let mut session = connected();
+    let mut value = fixture();
+    value["review"]["arguments"] =
+        json!((0..32).map(|i| format!("argument {i}")).collect::<Vec<_>>());
+    value["review"]["credentials"] = json!((0..16)
+        .map(|i| json!({
+            "label": format!("credential {i}"), "use_type": "login"
+        }))
+        .collect::<Vec<_>>());
+    reply(&mut session, Command::Review, ID, value);
+    let state = session.snapshot();
+    assert!(state.can_decide);
+    let review = state.review.unwrap();
+    assert_eq!(review.arguments.len(), 32);
+    assert_eq!(review.credentials.len(), 16);
+    for i in 0..32 {
+        assert_eq!(review.arguments[i], format!("\"argument {i}\""));
+        assert!(state
+            .review_text
+            .contains(&format!("[{i}] \"argument {i}\"")));
+    }
+    for i in 0..16 {
+        assert_eq!(review.credentials[i].label, format!("\"credential {i}\""));
+        assert_eq!(review.credentials[i].use_type, "\"login\"");
+        assert!(state
+            .review_text
+            .contains(&format!("label=\"credential {i}\"")));
+    }
+}
+
+#[test]
+fn excessive_counts_retire_previous_review_before_projection_and_decision() {
+    for (argument_count, credential_count) in [(33, 1), (1, 17), (300_000, 1)] {
+        let mut session = reviewed();
+        let mut value = fixture();
+        value["review"]["arguments"] = json!(vec![""; argument_count]);
+        value["review"]["credentials"] = json!(vec![
+            json!({"label":"", "use_type":"login"});
+            credential_count
+        ]);
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(
+            bytes.len() < RESPONSE_LIMIT,
+            "exercise cardinality, not byte rejection"
+        );
+        let work = session
+            .begin(Command::Review, ID.into(), String::new())
+            .unwrap();
+        session.finish(work.token, &bytes);
+        let state = session.snapshot();
+        assert_eq!(state.outcome, ProviderOutcome::Invalid);
+        assert!(state.review.is_none());
+        assert!(state.review_text.is_empty());
+        assert!(state.review_id.is_empty());
+        assert!(!state.can_decide);
+        for command in [Command::Approve, Command::Deny] {
+            assert!(session
+                .begin(command, ID.into(), "never-sent".into())
+                .is_err());
+        }
+        assert!(session.snapshot().uncertain_id.is_empty());
+    }
+}
+
+#[test]
+fn unknown_review_extensions_and_oversize_never_create_typed_or_text_review() {
+    for extension in ["create", "ssh", "future_scope"] {
+        for scope in [Value::Null, json!({"effect":"must not disappear"})] {
+            let mut session = reviewed();
+            let mut value = fixture();
+            value["review"][extension] = scope;
+            reply(&mut session, Command::Review, ID, value);
+            let state = session.snapshot();
+            assert_eq!(state.outcome, ProviderOutcome::Invalid);
+            assert!(state.review.is_none());
+            assert!(state.review_text.is_empty());
+            assert!(!state.can_decide);
+        }
+    }
+    let mut session = reviewed();
+    let work = session
+        .begin(Command::Review, ID.into(), String::new())
+        .unwrap();
+    session.finish(work.token, &vec![b' '; RESPONSE_LIMIT + 1]);
+    let state = session.snapshot();
+    assert!(state.review.is_none());
+    assert!(state.review_text.is_empty());
+    assert!(!state.can_decide);
+}
+
+#[test]
 fn closed_schema_rejects_unknown_missing_duplicate_and_invalid_variants() {
     for path in [
         vec!["extra"],
@@ -161,7 +330,10 @@ fn review_rejects_wrong_id_generation_digest_ticket_status_version_and_deadline(
             value2[field] = value;
         }
         reply(&mut session, Command::Review, ID, value2);
-        assert!(!session.snapshot().can_decide, "accepted {field}");
+        let state = session.snapshot();
+        assert!(!state.can_decide, "accepted {field}");
+        assert!(state.review.is_none(), "projected invalid {field}");
+        assert!(state.review_text.is_empty());
     }
 }
 
@@ -176,6 +348,7 @@ fn consumes_ticket_before_send_wrong_password_requires_explicit_new_review() {
     assert_eq!(request["password"], "fresh-password");
     assert_eq!(request["ticket"], "d".repeat(64));
     assert!(session.snapshot().review_text.is_empty());
+    assert!(session.snapshot().review.is_none());
     assert_eq!(session.snapshot().uncertain_id, ID);
     assert!(session
         .begin(Command::Approve, ID.into(), "fresh".into())
@@ -296,8 +469,10 @@ fn generation_invalidation_and_late_reads_never_restore_review() {
     session.finish(work.token, &serde_json::to_vec(&fixture()).unwrap());
     assert!(!session.snapshot().busy);
     assert!(session.snapshot().review_text.is_empty());
+    assert!(session.snapshot().review.is_none());
     session.finish(work.token, &serde_json::to_vec(&fixture()).unwrap());
     assert!(session.snapshot().review_text.is_empty());
+    assert!(session.snapshot().review.is_none());
 }
 
 #[test]
@@ -309,6 +484,7 @@ fn same_generation_late_review_cannot_restore_after_sleep_selection_or_close() {
     session.invalidate();
     session.finish(work.token, &serde_json::to_vec(&fixture()).unwrap());
     assert!(session.snapshot().review_text.is_empty());
+    assert!(session.snapshot().review.is_none());
     assert!(!session.snapshot().can_decide);
 }
 
@@ -337,6 +513,7 @@ fn unlock_is_separate_consumes_review_and_is_not_retried() {
         .begin(Command::Unlock, String::new(), "fresh".into())
         .unwrap();
     assert!(session.snapshot().review_text.is_empty());
+    assert!(session.snapshot().review.is_none());
     session.finish(work.token, b"");
     assert!(session.snapshot().locked);
     assert!(session.snapshot().uncertain_id.is_empty());

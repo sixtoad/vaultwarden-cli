@@ -278,8 +278,10 @@ Future<void> main() async {
         check(core.providerSnapshot().canDecide, ProbeCheck.reviewDecidable);
         check(
           core.providerSnapshot().reviewText.contains(
-            'Arguments (1 separate values)',
-          ),
+                'Arguments (1 separate values)',
+              ) &&
+              core.providerSnapshot().review?.arguments.length == 1 &&
+              core.providerSnapshot().review?.id == '"$id"',
           ProbeCheck.completeArguments,
         );
         await send(

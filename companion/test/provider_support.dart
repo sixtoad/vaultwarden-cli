@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/src/rust/api/provider.dart' as core;
 
@@ -12,6 +14,15 @@ Uint8List encoded(Object value) =>
 Map<String, dynamic> providerReview() => jsonDecode(
   File('../tests/fixtures/companion/review.json').readAsStringSync(),
 ) as Map<String, dynamic>;
+
+String reviewFact(WidgetTester tester, String key) => tester
+    .widget<SelectableText>(
+      find.descendant(
+        of: find.byKey(Key(key)),
+        matching: find.byType(SelectableText),
+      ),
+    )
+    .data!;
 
 void resetProvider() {
   final state = core.providerSnapshot();
@@ -44,6 +55,7 @@ class FixtureProviderPlatform implements ProviderPlatform {
   bool failSettlement = false, failConfiguration = false;
   bool clearThenFailSettlement = false;
   Uint8List? sessionReply;
+  Map<String, dynamic>? reviewReply;
   ProviderConfiguration saved = ProviderConfiguration(
     configured: true,
     endpoint: 'https://fixture.example/v1/companion',
@@ -86,7 +98,7 @@ class FixtureProviderPlatform implements ProviderPlatform {
         return encoded({'version': 1, 'requests': requestIds});
       case 'review':
         return heldReview == null
-            ? encoded(providerReview())
+            ? encoded(reviewReply ?? providerReview())
             : heldReview!.future;
       case 'decision':
         savePending(command['request_id'] as String);

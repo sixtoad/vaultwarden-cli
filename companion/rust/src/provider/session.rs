@@ -92,6 +92,10 @@ impl ProviderSession {
                 .as_ref()
                 .map(|r| r.response.review.visible())
                 .unwrap_or_default(),
+            review: self
+                .reviewed
+                .as_ref()
+                .map(|r| r.response.review.projection()),
             review_id: self
                 .reviewed
                 .as_ref()
@@ -371,6 +375,7 @@ mod tests {
             });
             assert!(!session.can_decide());
             assert!(session.snapshot().review_text.is_empty());
+            assert!(session.snapshot().review.is_none());
             assert!(session
                 .begin(Command::Approve, String::new(), "fresh".into())
                 .is_err());

@@ -426,6 +426,7 @@ void main() {
     native.heldReview!.complete(encoded(providerReview()));
     await pending;
     expect(controller.state.reviewText, isEmpty);
+    expect(controller.state.review, isNull);
     expect(controller.state.canDecide, false);
     controller.dispose();
   });
@@ -535,11 +536,15 @@ void main() {
       await tester.tap(find.text('Review $providerId'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('provider-review')), findsOneWidget);
-      final review = tester
-          .widget<SelectableText>(find.byKey(const Key('provider-review')))
-          .data!;
-      expect(review, contains('Arguments (1 separate values)'));
-      expect(review, contains('Credentials (1)'));
+      expect(find.text('Arguments (1 separate values)'), findsOneWidget);
+      expect(find.text('Credentials (1)'), findsOneWidget);
+      expect(reviewFact(tester, 'review-id'), '"$providerId"');
+      expect(reviewFact(tester, 'review-argument-0'), '"staging"');
+      expect(
+        reviewFact(tester, 'review-credential-0-label'),
+        '"Synthetic login"',
+      );
+      expect(core.providerSnapshot().review, isNotNull);
       final password = find.byKey(const Key('Fresh approval password'));
       await tester.ensureVisible(password);
       await tester.enterText(password, 'synthetic-password');

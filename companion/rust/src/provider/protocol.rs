@@ -1,9 +1,14 @@
 //! Frozen v1 wire contract. No provider authority or synthetic proofs live here.
+use crate::api::provider::{ProviderReview, ProviderReviewCredential};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub const RESPONSE_LIMIT: usize = 1_048_576;
 pub const REQUEST_LIMIT: usize = 16_384;
+// Match the existing provider policy cardinalities. Literal boundary tests in
+// both crates prevent a local constant change from silently widening this view.
+const MAX_ARGUMENTS: usize = 32;
+const MAX_CREDENTIALS: usize = 16;
 
 pub fn valid_id(value: &str) -> bool {
     value.len() == 43
@@ -70,6 +75,8 @@ pub struct Review {
 impl Review {
     pub fn valid(&self) -> bool {
         valid_id(&self.id)
+            && self.arguments.len() <= MAX_ARGUMENTS
+            && self.credentials.len() <= MAX_CREDENTIALS
             && [
                 &self.executable_digest,
                 &self.policy_digest,
@@ -77,6 +84,30 @@ impl Review {
             ]
             .into_iter()
             .all(|s| valid_hex(s))
+    }
+    pub fn projection(&self) -> ProviderReview {
+        ProviderReview {
+            id: visible(&self.id),
+            requester: visible(&self.requester),
+            operation: visible(&self.operation),
+            effect: visible(&self.effect),
+            target: visible(&self.target),
+            arguments: self.arguments.iter().map(|value| visible(value)).collect(),
+            credentials: self
+                .credentials
+                .iter()
+                .map(|credential| ProviderReviewCredential {
+                    label: visible(&credential.label),
+                    use_type: visible(&credential.use_type),
+                })
+                .collect(),
+            executable_digest: self.executable_digest.clone(),
+            policy_digest: self.policy_digest.clone(),
+            arguments_digest: self.arguments_digest.clone(),
+            expires_at_unix_seconds: self.expires_at_unix_seconds,
+            one_time: visible(&self.one_time),
+            status: self.status.summary(),
+        }
     }
     pub fn visible(&self) -> String {
         let mut rows = vec![

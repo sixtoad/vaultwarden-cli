@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `session`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 ProviderSnapshot providerSnapshot() =>
     RustLib.instance.api.crateApiProviderProviderSnapshot();
@@ -52,6 +52,94 @@ enum ProviderOutcome {
       RustLib.instance.api.crateApiProviderProviderOutcomeDefault();
 }
 
+/// Display-only projection of a validated review. Strings originating in the
+/// response are already quoted and escaped; no ticket or decision authority is
+/// exposed here. The snapshot's can_decide remains the authority indicator.
+class ProviderReview {
+  final String id;
+  final String requester;
+  final String operation;
+  final String effect;
+  final String target;
+  final List<String> arguments;
+  final List<ProviderReviewCredential> credentials;
+  final String executableDigest;
+  final String policyDigest;
+  final String argumentsDigest;
+  final BigInt expiresAtUnixSeconds;
+  final String oneTime;
+  final String status;
+
+  const ProviderReview({
+    required this.id,
+    required this.requester,
+    required this.operation,
+    required this.effect,
+    required this.target,
+    required this.arguments,
+    required this.credentials,
+    required this.executableDigest,
+    required this.policyDigest,
+    required this.argumentsDigest,
+    required this.expiresAtUnixSeconds,
+    required this.oneTime,
+    required this.status,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      requester.hashCode ^
+      operation.hashCode ^
+      effect.hashCode ^
+      target.hashCode ^
+      arguments.hashCode ^
+      credentials.hashCode ^
+      executableDigest.hashCode ^
+      policyDigest.hashCode ^
+      argumentsDigest.hashCode ^
+      expiresAtUnixSeconds.hashCode ^
+      oneTime.hashCode ^
+      status.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProviderReview &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          requester == other.requester &&
+          operation == other.operation &&
+          effect == other.effect &&
+          target == other.target &&
+          arguments == other.arguments &&
+          credentials == other.credentials &&
+          executableDigest == other.executableDigest &&
+          policyDigest == other.policyDigest &&
+          argumentsDigest == other.argumentsDigest &&
+          expiresAtUnixSeconds == other.expiresAtUnixSeconds &&
+          oneTime == other.oneTime &&
+          status == other.status;
+}
+
+class ProviderReviewCredential {
+  final String label;
+  final String useType;
+
+  const ProviderReviewCredential({required this.label, required this.useType});
+
+  @override
+  int get hashCode => label.hashCode ^ useType.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProviderReviewCredential &&
+          runtimeType == other.runtimeType &&
+          label == other.label &&
+          useType == other.useType;
+}
+
 class ProviderSnapshot {
   final ProviderOutcome outcome;
   final ProviderStatusProgress statusProgress;
@@ -60,6 +148,7 @@ class ProviderSnapshot {
   final bool locked;
   final List<String> requests;
   final String reviewText;
+  final ProviderReview? review;
   final String reviewId;
   final bool canDecide;
   final String uncertainId;
@@ -75,6 +164,7 @@ class ProviderSnapshot {
     required this.locked,
     required this.requests,
     required this.reviewText,
+    this.review,
     required this.reviewId,
     required this.canDecide,
     required this.uncertainId,
@@ -92,6 +182,7 @@ class ProviderSnapshot {
       locked.hashCode ^
       requests.hashCode ^
       reviewText.hashCode ^
+      review.hashCode ^
       reviewId.hashCode ^
       canDecide.hashCode ^
       uncertainId.hashCode ^
@@ -111,6 +202,7 @@ class ProviderSnapshot {
           locked == other.locked &&
           requests == other.requests &&
           reviewText == other.reviewText &&
+          review == other.review &&
           reviewId == other.reviewId &&
           canDecide == other.canDecide &&
           uncertainId == other.uncertainId &&

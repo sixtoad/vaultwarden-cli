@@ -27,6 +27,8 @@ mutations = {
 }
 
 page_mutations = {
+    # The shell regressions assert nullable typed review as well as legacy text,
+    # so these mutations exercise the generated structured-display path too.
     "navigation-retirement": ("controller.invalidate(); // mutation: navigation retirement", "// mutation: navigation retirement removed"),
     "back-retirement": ("controller.invalidate(); // mutation: back retirement", "// mutation: back retirement removed"),
 }

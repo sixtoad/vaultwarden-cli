@@ -53,6 +53,17 @@ void checkProviderBridge(void Function(bool, String) require) {
     provider.providerSnapshot().reviewText.contains(r'\u{202e}'),
     'escaped provider review',
   );
+  final review = provider.providerSnapshot().review;
+  require(
+    review != null &&
+        review.id == '"$id"' &&
+        review.arguments.length == 3 &&
+        review.arguments[0] == '""' &&
+        review.arguments[1] == '" a b "' &&
+        review.arguments[2] == r'"\u{202e}"' &&
+        review.expiresAtUnixSeconds.toString() == '2000000000',
+    'typed escaped provider review',
+  );
   final decision = provider.providerBegin(
     command: provider.ProviderCommand.deny,
     requestId: id,
@@ -63,6 +74,10 @@ void checkProviderBridge(void Function(bool, String) require) {
     'passwordless denial',
   );
   provider.providerInvalidate();
+  require(
+    provider.providerSnapshot().review == null,
+    'typed review retirement',
+  );
   provider.providerFinish(token: decision.token, response: []);
   require(
     provider.providerSnapshot().uncertainId == id,

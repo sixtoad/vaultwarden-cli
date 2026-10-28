@@ -32,6 +32,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Completion dco_decode_box_autoadd_completion(dynamic raw);
 
   @protected
+  ProviderReview dco_decode_box_autoadd_provider_review(dynamic raw);
+
+  @protected
   Completion dco_decode_completion(dynamic raw);
 
   @protected
@@ -53,7 +56,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<ProviderReviewCredential> dco_decode_list_provider_review_credential(
+    dynamic raw,
+  );
+
+  @protected
   Operation dco_decode_operation(dynamic raw);
+
+  @protected
+  ProviderReview? dco_decode_opt_box_autoadd_provider_review(dynamic raw);
 
   @protected
   Outcome dco_decode_outcome(dynamic raw);
@@ -63,6 +74,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProviderOutcome dco_decode_provider_outcome(dynamic raw);
+
+  @protected
+  ProviderReview dco_decode_provider_review(dynamic raw);
+
+  @protected
+  ProviderReviewCredential dco_decode_provider_review_credential(dynamic raw);
 
   @protected
   ProviderSnapshot dco_decode_provider_snapshot(dynamic raw);
@@ -101,6 +118,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Completion sse_decode_box_autoadd_completion(SseDeserializer deserializer);
 
   @protected
+  ProviderReview sse_decode_box_autoadd_provider_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Completion sse_decode_completion(SseDeserializer deserializer);
 
   @protected
@@ -122,7 +144,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<ProviderReviewCredential> sse_decode_list_provider_review_credential(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Operation sse_decode_operation(SseDeserializer deserializer);
+
+  @protected
+  ProviderReview? sse_decode_opt_box_autoadd_provider_review(
+    SseDeserializer deserializer,
+  );
 
   @protected
   Outcome sse_decode_outcome(SseDeserializer deserializer);
@@ -132,6 +164,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProviderOutcome sse_decode_provider_outcome(SseDeserializer deserializer);
+
+  @protected
+  ProviderReview sse_decode_provider_review(SseDeserializer deserializer);
+
+  @protected
+  ProviderReviewCredential sse_decode_provider_review_credential(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProviderSnapshot sse_decode_provider_snapshot(SseDeserializer deserializer);
@@ -175,6 +215,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_provider_review(
+    ProviderReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_completion(Completion self, SseSerializer serializer);
 
   @protected
@@ -199,7 +245,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_provider_review_credential(
+    List<ProviderReviewCredential> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_operation(Operation self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_provider_review(
+    ProviderReview? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_outcome(Outcome self, SseSerializer serializer);
@@ -213,6 +271,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_provider_outcome(
     ProviderOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_provider_review(
+    ProviderReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_provider_review_credential(
+    ProviderReviewCredential self,
     SseSerializer serializer,
   );
 
