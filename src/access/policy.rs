@@ -1846,8 +1846,10 @@ mod tests {
         assert!(validate_draft(&targets_at_limit).is_ok());
 
         let mut arguments_at_limit = draft();
+        // Literal limits also pin the independent companion review validator's
+        // compatibility contract; using the constants here would hide drift.
         arguments_at_limit.arguments = std::iter::once(ArgumentSpec::Target)
-            .chain((0..MAX_ARGUMENTS - 1).map(|_| ArgumentSpec::Integer {
+            .chain((0..31).map(|_| ArgumentSpec::Integer {
                 minimum: 0,
                 maximum: 1,
             }))
@@ -1855,7 +1857,7 @@ mod tests {
         assert!(validate_draft(&arguments_at_limit).is_ok());
 
         let mut credentials_at_limit = draft();
-        credentials_at_limit.credentials = (0..MAX_CREDENTIALS)
+        credentials_at_limit.credentials = (0..16)
             .map(|index| {
                 credential(
                     format!("11111111-1111-1111-1111-{index:012x}"),
@@ -1899,7 +1901,7 @@ mod tests {
         assert_invalid_draft(invalid);
         let mut invalid = draft();
         invalid.arguments = std::iter::once(ArgumentSpec::Target)
-            .chain((0..MAX_ARGUMENTS).map(|index| ArgumentSpec::Choice {
+            .chain((0..32).map(|index| ArgumentSpec::Choice {
                 choices: vec![format!("choice-{index}")],
             }))
             .collect();
@@ -1909,7 +1911,7 @@ mod tests {
         invalid.credentials.clear();
         assert_invalid_draft(invalid);
         let mut invalid = draft();
-        invalid.credentials = (0..MAX_CREDENTIALS + 1)
+        invalid.credentials = (0..17)
             .map(|index| {
                 credential(
                     format!("11111111-1111-1111-1111-{index:012x}"),

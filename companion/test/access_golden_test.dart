@@ -106,6 +106,12 @@ void main() {
         await tester.ensureVisible(find.text('Review $providerId'));
         await tester.tap(find.text('Review $providerId'));
         await tester.pumpAndSettle();
+        expect(find.byKey(const Key('review-requester')), findsOneWidget);
+        expect(find.byKey(const Key('review-one-time')), findsOneWidget);
+        expect(
+          find.text('Not supplied by provider protocol v1.'),
+          findsOneWidget,
+        );
         // Keep exact comparisons within each engine host. The same pinned font
         // outlines rasterize differently on Linux, Windows and macOS. Missing
         // host baselines fail normally; there is no tolerance or fallback.

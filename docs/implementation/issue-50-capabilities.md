@@ -34,12 +34,19 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   and `NativeTestKey.swift` implement the separate signing demonstration.
   `companion/lib/main.dart` hosts it separately. Do not remove it or represent its
   signatures as real provider approval.
-- [ ] **Structured review presentation:** Rust validates and escapes all facts in
-  `companion/rust/src/provider/protocol.rs:55`; the bridge exports `review_text`,
-  not structured facts (`companion/rust/src/api/provider.rs:42`). Slice one keeps
-  complete text. A later typed projection must retain escaping, argument
-  boundaries, digests and scope. The review has no separate originating-device
-  field: do not infer one from requester labels. Regenerate bindings normally.
+- [x] **Structured review presentation, current companion schema:** Rust validates
+  and escapes facts in `companion/rust/src/provider/protocol.rs`; the bridge now
+  exports an optional typed review alongside retained `review_text`. Both derive
+  from the same admitted review and clear together on retirement/expiry. Flutter
+  displays all fields, separate indexed arguments/credentials, digests and exact
+  deadline. Originating device identity remains unavailable and is labeled so.
+  Reviews exceeding the existing provider limits of 32 arguments or 16 credentials
+  are rejected before display or decision admission; prior review authority clears.
+  Existing `create`/`ssh` extensions and unknown fields remain rejected in full;
+  adding complete support requires another slice. See the
+  [structured-review spec](../../_bmad-output/implementation-artifacts/spec-50-typed-request-review.md).
+  This records implementation; its new verification evidence must be recorded
+  separately from the first-slice results below.
 - [ ] **Mutual enrollment:** `src/bin/vaultwarden-accessd.rs:64` provides offline
   console enrollment and exact-fingerprint revocation. Flutter imports an already
   provisioned CA/PKCS#12 (`companion/macos/Runner/ProviderAdapter.swift:47`). No
@@ -96,10 +103,11 @@ These are local proposals linked to #50; no external issues have been created.
 1. **Shell and existing flow:** the approved specification implements shared theme,
    responsive navigation and the existing real request path. Verification below;
    retain #50 as open.
-2. **Typed read models:** expose validated structured review, bounded redacted
-   history and actual trust/role/capability metadata. Include negative schema,
-   escaping, exact-ID and privacy tests. Add missing origin identity at the
-   authoritative producer, not in widgets.
+2. **Typed read models:** structured review is the second slice. Bounded redacted
+   remote history and actual trust/role/capability metadata remain separate API
+   work, with negative-schema, exact-ID and privacy tests. Add missing origin
+   identity at the authoritative producer, not in widgets. Current companion
+   review does not yet admit the provider's optional `create`/`ssh` extensions.
 3. **Mutual enrollment protocol:** define expiring single-use invitations, session
    identity verification, independent human authorization at both endpoints,
    cancellation, duplicates and revoked identities. Validate mismatch, replay,

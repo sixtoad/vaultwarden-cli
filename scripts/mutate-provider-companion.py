@@ -22,6 +22,11 @@ evidence = args.evidence.resolve()
 evidence.mkdir(parents=True, exist_ok=True)
 command = ["cargo", "test", "--locked", "--offline", "--manifest-path", str(root / "companion/rust/Cargo.toml")]
 mutations = {
+    "review-argument-count": ("protocol.rs", [("self.arguments.len() <= MAX_ARGUMENTS", "true")]),
+    "review-credential-count": ("protocol.rs", [("self.credentials.len() <= MAX_CREDENTIALS", "true")]),
+    "typed-requester-escape": ("protocol.rs", [("requester: visible(&self.requester),", "requester: self.requester.clone(),")]),
+    "typed-argument-boundary": ("protocol.rs", [("map(|value| visible(value))", "map(|value| visible(value.trim()))")]),
+    "typed-review-retirement": ("session.rs", [("self.reviewed = None;", "// review retirement removed")]),
     "closed-schema": ("protocol.rs", [("#[serde(deny_unknown_fields)]\npub struct Credential", "pub struct Credential")]),
     "escaped-review": ("protocol.rs", [('_ => out.push_str(&format!("\\\\u{{{:04x}}}", c as u32)),', '_ => out.push(c),')]),
     "ticket-admission": ("session.rs", [("if !self.can_decide() {", "if false {")]),

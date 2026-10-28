@@ -23,9 +23,25 @@ text/icon edges while panel geometry, wrapping, review facts and actions matched
   visually inspected for complete review, layout and actions before adoption.
 - `linux`: the twelve actual PNGs from that run's Ubuntu 24.04 failure artifact,
   individually inspected before adoption. Full review and explicit actions are
-  retained; desktop review/actions are intentionally identical because both fit.
+  retained.
 
 For updates, run `flutter test --update-goldens test/access_golden_test.dart` on
 the matching host with the pinned SDK, inspect all captures, then run the full
 suite without updates. Never adopt a failing image without reviewing its content
 and the isolated diff. CI archives `test/failures` for diagnosis.
+
+## Structured review update, 2026-10-28
+
+The macOS 27 arm64 references were regenerated and individually reviewed locally
+for the structured review. The other four hosts use actual captures from
+[CI run 40693829222](https://github.com/sixtoad/vaultwarden-cli/actions/runs/40693829222)
+on source `f3d03b446b069122fad2ac572b071f6a15cd6470`. For each host, an independent
+review inspected ten changed captures, all ten isolated diffs, and the two
+unchanged large-text action references before adoption. The changed PNGs are
+copied byte-for-byte from the matching host artifact. Both unchanged captures
+passed exact comparison in that run.
+
+Changes match the labeled typed fields, quoted identifiers, explicit unavailable
+origin, and resulting scroll positions. Desktop review/action pairs cover the
+complete scope; compact and 200% text layouts retain accessible actions. Full
+matching-host comparisons and packaged checks remain enforced by PR #52 CI.

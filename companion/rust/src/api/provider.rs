@@ -36,6 +36,32 @@ pub struct ProviderWork {
     pub token: u32,
     pub body: Vec<u8>,
 }
+/// Display-only projection of a validated review. Strings originating in the
+/// response are already quoted and escaped; no ticket or decision authority is
+/// exposed here. The snapshot's can_decide remains the authority indicator.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProviderReview {
+    pub id: String,
+    pub requester: String,
+    pub operation: String,
+    pub effect: String,
+    pub target: String,
+    pub arguments: Vec<String>,
+    pub credentials: Vec<ProviderReviewCredential>,
+    pub executable_digest: String,
+    pub policy_digest: String,
+    pub arguments_digest: String,
+    pub expires_at_unix_seconds: u64,
+    pub one_time: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProviderReviewCredential {
+    pub label: String,
+    pub use_type: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct ProviderSnapshot {
     pub outcome: ProviderOutcome,
@@ -45,6 +71,7 @@ pub struct ProviderSnapshot {
     pub locked: bool,
     pub requests: Vec<String>,
     pub review_text: String,
+    pub review: Option<ProviderReview>,
     pub review_id: String,
     pub can_decide: bool,
     pub uncertain_id: String,
