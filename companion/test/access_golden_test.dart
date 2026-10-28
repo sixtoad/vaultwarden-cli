@@ -9,6 +9,32 @@ import 'package:companion_slice/src/rust/frb_generated.dart';
 
 import 'provider_support.dart';
 
+// Preserve actual Activity pixels even when a matching-host reference does not
+// exist yet. The delegated exact comparison still fails; captures are review
+// evidence only and never become expected images automatically.
+class ActivityCaptureComparator extends GoldenFileComparator {
+  ActivityCaptureComparator(this.delegate);
+  final GoldenFileComparator delegate;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    if (golden.path.endsWith('_activity.png')) {
+      final parts = golden.pathSegments;
+      final directory = Directory('test/failures')..createSync(recursive: true);
+      File('${directory.path}/${parts[parts.length - 2]}_${parts.last}')
+          .writeAsBytesSync(imageBytes);
+    }
+    return delegate.compare(imageBytes, golden);
+  }
+
+  @override
+  Future<void> update(Uri golden, Uint8List imageBytes) =>
+      delegate.update(golden, imageBytes);
+
+  @override
+  Uri getTestUri(Uri key, int? version) => delegate.getTestUri(key, version);
+}
+
 String goldenHost() {
   if (!Platform.isMacOS) return Platform.operatingSystem;
   // CoreText rasterization changes with the OS, independently of pinned fonts.
@@ -30,6 +56,9 @@ String goldenHost() {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final host = goldenHost();
+  final comparator = goldenFileComparator;
+  goldenFileComparator = ActivityCaptureComparator(comparator);
+  tearDownAll(() => goldenFileComparator = comparator);
   setUpAll(() async {
     await RustLib.init();
     // Deterministic licensed test font, never packaged with the application.
