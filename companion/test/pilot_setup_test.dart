@@ -68,6 +68,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('destination-settings')));
+      await tester.pumpAndSettle();
       final field = find.byKey(const Key('pilot-bundle'));
       final configure = find.widgetWithText(
         FilledButton,
@@ -325,6 +327,8 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('destination-settings')));
       await tester.pumpAndSettle();
       final field = find.byKey(const Key('pilot-bundle'));
       if (!disposablePilotEnabled) {

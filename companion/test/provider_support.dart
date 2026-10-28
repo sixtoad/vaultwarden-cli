@@ -52,6 +52,7 @@ class FixtureProviderPlatform implements ProviderPlatform {
   );
   bool loseDecision = false, wrongPassword = false;
   String status = 'pending';
+  List<String> requestIds = [providerId];
   void Function()? invalidate;
   @override
   Future<ProviderConfiguration> configuration() async {
@@ -82,10 +83,7 @@ class FixtureProviderPlatform implements ProviderPlatform {
       case 'unlock':
         return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
       case 'list':
-        return encoded({
-          'version': 1,
-          'requests': [providerId],
-        });
+        return encoded({'version': 1, 'requests': requestIds});
       case 'review':
         return heldReview == null
             ? encoded(providerReview())

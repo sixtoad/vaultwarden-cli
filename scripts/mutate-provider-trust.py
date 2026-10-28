@@ -20,7 +20,7 @@ mutations = {
 
 def run(name):
     with (evidence / f"{name}.log").open("wb") as log:
-        return subprocess.run(["swift", "test", "--package-path", str(stage)], stdout=log, stderr=subprocess.STDOUT, timeout=180).returncode
+        return subprocess.run(["swift", "test", "--build-system", "native", "--package-path", str(stage)], stdout=log, stderr=subprocess.STDOUT, timeout=180).returncode
 
 report = {"source_sha256": hashlib.sha256(original).hexdigest(), "mutations": {}}
 try:

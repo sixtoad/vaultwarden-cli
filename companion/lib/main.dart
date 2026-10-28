@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'platform/signer.dart';
+import 'design/access_theme.dart';
 import 'platform/core_loader.dart';
 import 'platform/provider.dart';
 import 'provider/page.dart';
@@ -14,11 +15,9 @@ Future<void> main() async {
     await initializePackagedCore();
     runApp(
       MaterialApp(
-        title: 'Companion development',
-        theme: ThemeData(
-          colorSchemeSeed: const Color(0xff315b65),
-          useMaterial3: true,
-        ),
+        title: 'Vaultwarden Access',
+        theme: accessTheme(Brightness.light),
+        darkTheme: accessTheme(Brightness.dark),
         home: ProviderPage(
           platform: NativeProviderPlatform(),
           syntheticBuilder: (_) =>
@@ -47,10 +46,8 @@ class CompanionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Companion Slice',
-    theme: ThemeData(
-      colorSchemeSeed: const Color(0xff315b65),
-      useMaterial3: true,
-    ),
+    theme: accessTheme(Brightness.light),
+    darkTheme: accessTheme(Brightness.dark),
     home: CompanionReview(platform: platform),
   );
 }
