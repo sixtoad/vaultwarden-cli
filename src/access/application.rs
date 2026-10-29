@@ -1262,7 +1262,7 @@ impl ProviderApplication {
     ) -> Result<DirectStatus, DirectRequestError> {
         self.commit_decision(prepared, false)
     }
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn management_hold_gate_for_test(&self, action: impl FnOnce()) {
         let _guard = self.gate.lock().unwrap();
         action();

@@ -175,6 +175,15 @@ impl NativeProcessSupervisor {
         let _retained = super::ssh_material::recover(&self.material);
         Ok(())
     }
+    /// Trusted-console recovery requires proving the fixed provider is stopped
+    /// before global runtime/session cleanup; no native proof exists yet, so
+    /// refuse and leave the management fence in place.
+    pub(crate) fn recover_stopped(
+        _state_root: &Path,
+        _clear_session: impl FnOnce() -> Result<(), ExecutionError>,
+    ) -> Result<(), ExecutionError> {
+        Err(ExecutionError::Unavailable)
+    }
 }
 impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor {
     fn ssh_material_root(&self) -> Option<&Path> {
@@ -360,13 +369,12 @@ impl Spawn {
                 return Err(ExecutionError::Unavailable);
             }
         }
-        if let Some(cwd) = &prepared.cwd {
-            if unsafe {
+        if let Some(cwd) = &prepared.cwd
+            && unsafe {
                 libc::posix_spawn_file_actions_addfchdir_np(&mut launch.actions, cwd.as_raw_fd())
             } != 0
-            {
-                return Err(ExecutionError::Unavailable);
-            }
+        {
+            return Err(ExecutionError::Unavailable);
         }
         Ok(launch)
     }

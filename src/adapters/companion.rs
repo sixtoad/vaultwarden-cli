@@ -313,10 +313,13 @@ impl Companion {
         actor: Option<&str>,
     ) -> Result<serde_json::Value, SessionError> {
         management::reconcile_stopped(root, action_id, kind, id, actor, || {
-            crate::adapters::supervisor::SystemdProcessSupervisor::recover_stopped(root, || {
-                crate::adapters::session::clear_persisted_session()
-                    .map_err(|_error| crate::access::ports::ExecutionError::CleanupUncertain)
-            })
+            crate::adapters::platform_execution::PlatformProcessSupervisor::recover_stopped(
+                root,
+                || {
+                    crate::adapters::session::clear_persisted_session()
+                        .map_err(|_error| crate::access::ports::ExecutionError::CleanupUncertain)
+                },
+            )
             .map_err(|_error| ())
         })
     }

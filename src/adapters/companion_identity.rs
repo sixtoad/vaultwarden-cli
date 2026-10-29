@@ -291,7 +291,7 @@ fn read_or_initial(root: &Path) -> Result<Registry, SessionError> {
         _ => registry(&path),
     }
 }
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 fn persist(root: &Path, identities: Vec<EnrolledCompanion>) -> Result<(), SessionError> {
     persist_registry(
         root,

@@ -117,7 +117,7 @@ fn slice(bytes: &[u8]) -> Result<(), ExecutionError> {
     for _ in 0..count {
         let cmd = word(bytes, p)?;
         let size = word(bytes, p + 4)? as usize;
-        if size < 8 || size % 8 != 0 || p.checked_add(size).is_none_or(|n| n > end) {
+        if size < 8 || !size.is_multiple_of(8) || p.checked_add(size).is_none_or(|n| n > end) {
             return Err(ExecutionError::UnsupportedImage);
         }
         match cmd {
