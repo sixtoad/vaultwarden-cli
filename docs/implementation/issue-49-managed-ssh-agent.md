@@ -102,3 +102,15 @@ lifecycle script passed after that test-only correction. The broad regression ru
 preceded this final harness correction; production code did not change afterward.
 See [verification evidence](issue-49-managed-ssh-agent-evidence.json) for source
 hashes, command results and limits.
+
+
+## CI follow-up, 2026-10-29
+
+PR #55's Linux test matrix exposed signed/unsigned comparisons in the synthetic
+SSH fixture under Clang's warnings-as-errors check, before Cargo tests started.
+The receive counters now match the unsigned bounded frame lengths; the final
+write-result comparison converts the bounded count to the syscall result type.
+`./scripts/check-native-fixtures.sh` passes for x86-64 and AArch64, and
+`VW18_SCENARIO=app-ssh-nonzero scripts/with-secure-test-tmpdir.sh scripts/test-systemd-supervisor.sh`
+passes the real provider/signature exchange. Production code is unchanged.
+The earlier evidence hashes remain the record of the earlier test run.

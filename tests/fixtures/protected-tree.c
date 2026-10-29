@@ -104,7 +104,7 @@ static int agent_identity(const char *path) {
     if(call(NR_connect,fd,(long)&address,n+3,0)!=0)return 0;
     const unsigned char query[]={0,0,0,1,11};
     if(call(NR_write,fd,(long)query,5,0)!=5)return 0;
-    unsigned char response[512];int got=0;
+    unsigned char response[512];U got=0;
     while(got<4){long size=call(NR_read,fd,(long)(response+got),4-got,0);if(size<=0)return 0;got+=size;}
     U size=((U)response[0]<<24)|((U)response[1]<<16)|((U)response[2]<<8)|response[3];
     if(size<9 || size>508)return 0;
@@ -121,12 +121,12 @@ static void agent_exchange(const char *path,int expected,const char *output) {
     unsigned char bytes[2048];long file=call(NR_openat,-100,(long)path,0,0);if(file<0)finish(72);
     long n=call(NR_read,file,(long)bytes,sizeof(bytes),0);call(NR_close,file,0,0,0);
     if(n<5 || call(NR_write,agent_fd,(long)bytes,n,0)!=n)finish(73);
-    int got=0;while(got<4){long count=call(NR_read,agent_fd,(long)(bytes+got),4-got,0);if(count<=0)finish(74);got+=count;}
+    U got=0;while(got<4){long count=call(NR_read,agent_fd,(long)(bytes+got),4-got,0);if(count<=0)finish(74);got+=count;}
     U size=((U)bytes[0]<<24)|((U)bytes[1]<<16)|((U)bytes[2]<<8)|bytes[3];
     if(size<1 || size>2044)finish(75);
     while(got<size+4){long count=call(NR_read,agent_fd,(long)(bytes+got),size+4-got,0);if(count<=0)finish(76);got+=count;}
     if(bytes[4]!=expected)finish(77);
-    if(output){file=call(NR_openat,-100,(long)output,0101|01000,0600);if(file<0)finish(78);if(call(NR_write,file,(long)bytes,got,0)!=got)finish(79);call(NR_close,file,0,0,0);}
+    if(output){file=call(NR_openat,-100,(long)output,0101|01000,0600);if(file<0)finish(78);if(call(NR_write,file,(long)bytes,got,0)!=(long)got)finish(79);call(NR_close,file,0,0,0);}
 }
 static void ssh_run(U argc,char **argv,char **env) {
     if(argc != 60 || !same(argv[1],"-F") || !same(argv[2],"/dev/null"))finish(60);
