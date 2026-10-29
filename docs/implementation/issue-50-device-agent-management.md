@@ -140,11 +140,11 @@ review stays closed; unknown v2 security fields cannot be silently discarded.
 
 ## Verification and integration
 
-Implementation is being verified in the separate
+Implementation uses the separate
 `codex/issue-50-device-agent-management` worktree based on `60fadd6`, which includes
 PR #52 (`93431e6460f5a73c1d0f2e8d8fd087bade4e2f54`). Current main `07b10e7`
-(merged Activity #54) was integrated and bindings regenerated. Final tested revision and CI
-results will be recorded in the draft PR. No installed application, production
+(merged Activity #54) was integrated and bindings regenerated. The tested revision and CI
+results are tracked in [draft PR #57](https://github.com/sixtoad/vaultwarden-cli/pull/57). No installed application, production
 identity, vault or service is modified by source tests.
 
 Shared changes are narrow: a separate management Rust API/session and Flutter
