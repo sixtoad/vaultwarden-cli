@@ -16,6 +16,34 @@ bundle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bundle)
 
 class BundleTests(unittest.TestCase):
+    def test_app_build_resolves_platform_launcher_and_preserves_checked_arguments(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            for platform, launcher in [('windows', 'flutter.bat'), ('linux', 'flutter'), ('macos', 'flutter')]:
+                resolved = str(repo / 'Flutter SDK' / 'bin' / launcher)
+                with patch.object(bundle.shutil, 'which', return_value=resolved) as which, patch.object(bundle.subprocess, 'run') as run, patch.object(bundle.host_platform, 'machine', return_value='x86_64'):
+                    bundle.build_app(repo, platform, repo)
+                which.assert_called_once_with(launcher, path=os.environ.get('PATH'))
+                self.assertEqual(run.call_args.args[0], [resolved, 'build', platform, '--release', '--target', 'lib/main.dart'])
+                self.assertEqual(run.call_args.kwargs['cwd'], repo / 'companion')
+                self.assertTrue(run.call_args.kwargs['check'])
+                self.assertNotIn('shell', run.call_args.kwargs)
+            with patch.object(bundle.shutil, 'which', return_value=None), patch.object(bundle.subprocess, 'run') as run:
+                with self.assertRaisesRegex(FileNotFoundError, 'flutter.bat'):
+                    bundle.build_app(repo, 'windows', repo)
+                run.assert_not_called()
+
+    @unittest.skipUnless(os.name == 'nt', 'exercises native Windows batch launcher resolution')
+    def test_windows_app_build_invokes_batch_launcher_from_path_with_spaces(self):
+        with tempfile.TemporaryDirectory(prefix='Flutter launcher ') as temporary:
+            repo = Path(temporary)
+            (repo / 'companion').mkdir()
+            sdk = repo / 'SDK with spaces'; sdk.mkdir()
+            (sdk / 'flutter.bat').write_bytes(b'@echo off\r\necho %*>invocation.txt\r\nexit /b 0\r\n')
+            with patch.dict(os.environ, {'PATH': str(sdk)}):
+                bundle.build_app(repo, 'windows', repo)
+            self.assertEqual((repo / 'companion/invocation.txt').read_text().strip(), 'build windows --release --target lib/main.dart')
+
     def test_provenance_reports_exact_changed_untracked_and_deleted_inputs(self):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)

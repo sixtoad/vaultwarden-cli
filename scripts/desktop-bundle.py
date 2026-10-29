@@ -72,6 +72,12 @@ def build_commands(repo, platform):
 
 def build_app(repo, platform, evidence):
     environment = dict(os.environ)
+    # Windows CreateProcess does not expand the bare name to Flutter's batch
+    # launcher as the calling shell does. Pass its resolved path explicitly.
+    launcher = 'flutter.bat' if platform == 'windows' else 'flutter'
+    flutter = shutil.which(launcher, path=environment.get('PATH'))
+    if flutter is None:
+        raise FileNotFoundError(f'Flutter launcher not found on PATH: {launcher}')
     if platform == 'macos':
         # Flutter defaults to a universal app. Its commands are host-native, so
         # make the app's launch architecture coherent with the whole package.
@@ -89,7 +95,7 @@ def build_app(repo, platform, evidence):
         config = evidence / 'desktop-architecture.xcconfig'
         config.write_text('\n'.join(lines) + '\n')
         environment['XCODE_XCCONFIG_FILE'] = str(config)
-    subprocess.run(['flutter', 'build', platform, '--release', '--target', 'lib/main.dart'], cwd=repo / 'companion', env=environment, check=True)
+    subprocess.run([flutter, 'build', platform, '--release', '--target', 'lib/main.dart'], cwd=repo / 'companion', env=environment, check=True)
 
 
 def populate(repo, root, platform, source):
