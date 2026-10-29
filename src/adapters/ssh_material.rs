@@ -1,11 +1,11 @@
-//! Provider-private SSH files. No destructor deletes material; reap evidence is mandatory.
+//! Request-local agent resources and conservative recovery of historical private files.
 use crate::access::{
     policy::SshOperation,
     ports::{CleanupEvidence, ExecutionError, SensitiveString, SshMaterial},
 };
 use base64::{
     Engine,
-    engine::general_purpose::{STANDARD, STANDARD_NO_PAD},
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE_NO_PAD},
 };
 use sha2::{Digest, Sha256};
 use std::{
@@ -243,19 +243,30 @@ fn remove(parent: &File, leaf: &str, directory: bool) -> Result<(), ExecutionErr
     })?;
     parent.sync_all().map_err(failure)
 }
-fn cleanup(parent: &File, leaf: &str, dir: &File) -> Result<(), ExecutionError> {
+fn cleanup(parent: &File, leaf: &str, dir: &File, public: bool) -> Result<(), ExecutionError> {
     same(parent, leaf, dir, true)?;
     // Validate the entire set before deleting anything. Unknown objects are never removed.
     let names = entries(dir)?;
     let mut checked = Vec::new();
     for leaf in names {
-        if !["identity", "known_hosts"].contains(&leaf.as_str()) {
+        if !(["identity", "known_hosts", "in_use", "pending"].contains(&leaf.as_str())
+            || (public && leaf == "agent.json"))
+        {
             return Err(ExecutionError::CleanupUncertain);
         }
         let file = open_at(dir, &leaf, false)?;
         private(&file, false)?;
         checked.push((leaf, file));
     }
+    // Keep the unused marker until all material has been removed, so a partial
+    // cleanup can safely resume after restart.
+    checked.sort_by_key(|(leaf, _)| {
+        if leaf == "agent.json" {
+            2
+        } else {
+            usize::from(leaf == "pending")
+        }
+    });
     for (leaf, file) in checked {
         same(dir, &leaf, &file, false)?;
         remove(dir, &leaf, false)?;
@@ -270,9 +281,162 @@ fn request_name(value: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentRecord {
+    directory: (u64, u64),
+    socket: (u64, u64),
+    files: Vec<(String, (u64, u64))>,
+}
+fn identity(file: &File) -> Result<(u64, u64), ExecutionError> {
+    let m = file.metadata().map_err(failure)?;
+    Ok((m.dev(), m.ino()))
+}
+fn path_identity(path: &Path) -> Result<(u64, u64), ExecutionError> {
+    let m = std::fs::symlink_metadata(path).map_err(failure)?;
+    Ok((m.dev(), m.ino()))
+}
+fn socket_leaf(request: &str) -> Result<String, ExecutionError> {
+    if !request_name(request) {
+        return Err(ExecutionError::CleanupUncertain);
+    }
+    let nonce = (4..36)
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&request[i..i + 2], 16).map_err(failure))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(format!("{}.sock", URL_SAFE_NO_PAD.encode(nonce)))
+}
+/// Reclaim only a fully recorded request whose exact socket is no longer listening.
+/// Unknown/replaced objects or ambiguous connection errors preserve the entire request.
+fn recover_agent(parent: &File, leaf: &str, runtime: &Path) -> Result<(), ExecutionError> {
+    use std::os::unix::fs::FileTypeExt;
+    if !request_name(leaf) {
+        return Err(ExecutionError::CleanupUncertain);
+    }
+    let dir = open_at(parent, leaf, true)?;
+    private(&dir, true)?;
+    let record_file = open_at(&dir, "agent.json", false)?;
+    private(&record_file, false)?;
+    let mut bytes = Vec::new();
+    (&record_file)
+        .take(4097)
+        .read_to_end(&mut bytes)
+        .map_err(failure)?;
+    if bytes.len() > 4096 {
+        return Err(ExecutionError::CleanupUncertain);
+    }
+    let record: AgentRecord = serde_json::from_slice(&bytes).map_err(failure)?;
+    if identity(&dir)? != record.directory
+        || record.files.len() != 2
+        || record.files[0].0 != "pending"
+        || record.files[1].0 != "known_hosts"
+    {
+        return Err(ExecutionError::CleanupUncertain);
+    }
+    let mut checked = Vec::new();
+    for name in entries(&dir)? {
+        if name == "agent.json" {
+            continue;
+        }
+        let expected = record
+            .files
+            .iter()
+            .find(|(file, _)| *file == name)
+            .ok_or(ExecutionError::CleanupUncertain)?
+            .1;
+        let file = open_at(&dir, &name, false)?;
+        private(&file, false)?;
+        if identity(&file)? != expected {
+            return Err(ExecutionError::CleanupUncertain);
+        }
+        checked.push((name, file));
+    }
+    same(parent, leaf, &dir, true)?;
+    same(&dir, "agent.json", &record_file, false)?;
+    let runtime = directory(runtime, true)?;
+    let sockets = ensure_directory(&runtime, "vw-ssh-agents")?;
+    let socket_name = socket_leaf(leaf)?;
+    let path = PathBuf::from(format!(
+        "/proc/self/fd/{}/{}",
+        sockets.as_raw_fd(),
+        socket_name
+    ));
+    match std::fs::symlink_metadata(&path) {
+        Ok(m) => {
+            if !m.file_type().is_socket()
+                || m.uid() != unsafe { libc::geteuid() }
+                || m.mode() & 0o7777 != 0o600
+                || m.nlink() != 1
+                || (m.dev(), m.ino()) != record.socket
+            {
+                return Err(ExecutionError::CleanupUncertain);
+            }
+            let raw = unsafe {
+                libc::socket(
+                    libc::AF_UNIX,
+                    libc::SOCK_STREAM | libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
+                    0,
+                )
+            };
+            if raw < 0 {
+                return Err(ExecutionError::CleanupUncertain);
+            }
+            let socket = unsafe { File::from_raw_fd(raw) };
+            let mut address: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+            address.sun_family = libc::AF_UNIX as _;
+            let path_bytes = path.as_os_str().as_bytes();
+            if path_bytes.len() >= address.sun_path.len() {
+                return Err(ExecutionError::CleanupUncertain);
+            }
+            for (to, from) in address.sun_path.iter_mut().zip(path_bytes) {
+                *to = *from as _;
+            }
+            let result = unsafe {
+                libc::connect(
+                    socket.as_raw_fd(),
+                    (&address as *const libc::sockaddr_un).cast(),
+                    std::mem::size_of_val(&address) as _,
+                )
+            };
+            let error = std::io::Error::last_os_error().raw_os_error();
+            if result == 0 || matches!(error, Some(libc::EINPROGRESS | libc::EAGAIN)) {
+                return Ok(());
+            }
+            if error != Some(libc::ECONNREFUSED) {
+                return Err(ExecutionError::CleanupUncertain);
+            }
+            if path_identity(&path)? != record.socket {
+                return Err(ExecutionError::CleanupUncertain);
+            }
+            remove(&sockets, &socket_name, false)?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(ExecutionError::CleanupUncertain),
+    }
+    same(parent, leaf, &dir, true)?;
+    same(&dir, "agent.json", &record_file, false)?;
+    for (name, file) in checked {
+        same(&dir, &name, &file, false)?;
+        remove(&dir, &name, false)?;
+    }
+    same(&dir, "agent.json", &record_file, false)?;
+    remove(&dir, "agent.json", false)?;
+    same(parent, leaf, &dir, true)?;
+    remove(parent, leaf, true)
+}
 /// Called only after manager recovery under the provider's writer lock.
 pub fn recover(root: &Path) -> Result<(), ExecutionError> {
+    recover_with_runtime(root, &runtime_path())
+}
+fn recover_with_runtime(root: &Path, runtime: &Path) -> Result<(), ExecutionError> {
     let root = directory(root, true)?;
+    let agents = ensure_directory(&root, "agents")?;
+    let mut uncertain = false;
+    for leaf in entries(&agents)? {
+        if recover_agent(&agents, &leaf, runtime).is_err() {
+            uncertain = true;
+        }
+    }
     let requests = ensure_directory(&root, "requests")?;
     for leaf in entries(&requests)? {
         if !request_name(&leaf) {
@@ -280,15 +444,28 @@ pub fn recover(root: &Path) -> Result<(), ExecutionError> {
         }
         let dir = open_at(&requests, &leaf, true)?;
         private(&dir, true)?;
-        cleanup(&requests, &leaf, &dir)?;
+        // A durable marker precedes helper handoff. Restart cannot prove that
+        // consumers stopped; preserve these historical files without blocking new agents.
+        let names = entries(&dir)?;
+        if names.is_empty()
+            || (names.iter().any(|name| name == "pending")
+                && !names.iter().any(|name| name == "in_use"))
+        {
+            cleanup(&requests, &leaf, &dir, false)?;
+        }
     }
-    Ok(())
+    if uncertain {
+        Err(ExecutionError::CleanupUncertain)
+    } else {
+        Ok(())
+    }
 }
 /// Create the dedicated private namespace. Its path comes only from daemon composition.
 pub fn initialize(state_root: &Path) -> Result<PathBuf, ExecutionError> {
     let root = directory(state_root, true)?;
     let ssh = ensure_directory(&root, "ssh")?;
     let _requests = ensure_directory(&ssh, "requests")?;
+    let _agents = ensure_directory(&ssh, "agents")?;
     Ok(state_root.join("ssh"))
 }
 #[derive(serde::Deserialize)]
@@ -360,39 +537,65 @@ pub(crate) struct Material {
     dir: File,
     leaf: String,
     finished: bool,
+    pub(crate) agent: std::rc::Rc<std::cell::RefCell<super::ssh_agent::Agent>>,
 }
 impl SshMaterial for Material {
     fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError> {
-        if key.expose().is_empty() || key.expose().len() > 64 * 1024 || key.expose().contains('\0')
-        {
-            return Err(ExecutionError::InvalidArguments);
-        }
-        create(&self.dir, "identity", key.expose().as_bytes())
+        self.agent.borrow_mut().install(key)
     }
-    fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError> {
-        if evidence == CleanupEvidence::Uncertain {
+    fn finalize(&mut self, _evidence: CleanupEvidence) -> Result<(), ExecutionError> {
+        self.agent.borrow_mut().close();
+        if self.finished {
+            return Ok(());
+        }
+        // Only public files exist here, and authentication has ended. No live
+        // consumer needs a private key file or this authentication's host pin.
+        if entries(&self.dir)?.iter().any(|name| name == "identity") {
             return Err(ExecutionError::CleanupUncertain);
         }
         if !self.finished {
-            cleanup(&self.parent, &self.leaf, &self.dir)?;
+            cleanup(&self.parent, &self.leaf, &self.dir, true)?;
             self.finished = true;
         }
         Ok(())
     }
 }
+#[cfg(test)]
+thread_local! { static TEST_RUNTIME: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) }; }
+fn runtime_path() -> PathBuf {
+    #[cfg(test)]
+    if let Some(path) = TEST_RUNTIME.with(|runtime| runtime.borrow().clone()) {
+        return path;
+    }
+    PathBuf::from(format!("/run/user/{}", unsafe { libc::geteuid() }))
+}
+#[cfg(test)]
+pub(crate) fn with_test_runtime<T>(path: &Path, action: impl FnOnce() -> T) -> T {
+    struct Restore(Option<PathBuf>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            TEST_RUNTIME.with(|runtime| *runtime.borrow_mut() = self.0.take());
+        }
+    }
+    let _restore = Restore(TEST_RUNTIME.with(|runtime| runtime.replace(Some(path.to_owned()))));
+    action()
+}
 pub(crate) fn prepare(
     root: &Path,
     ssh: &SshOperation,
 ) -> Result<(Material, Vec<String>, File), ExecutionError> {
+    prepare_with_runtime(root, ssh, &runtime_path())
+}
+fn prepare_with_runtime(
+    root: &Path,
+    ssh: &SshOperation,
+    runtime_path: &Path,
+) -> Result<(Material, Vec<String>, File), ExecutionError> {
     let cwd = directory(Path::new(&ssh.working_directory), false)?;
     let private_root = directory(root, true)?;
     let known_hosts = host_key(&private_root, ssh)?;
-    let parent = open_at(&private_root, "requests", true)?;
+    let parent = open_at(&private_root, "agents", true)?;
     private(&parent, true)?;
-    // A residual is a durable interlock, including after an unsuccessful earlier cleanup.
-    if !entries(&parent)?.is_empty() {
-        return Err(ExecutionError::CleanupUncertain);
-    }
     let mut nonce = [0u8; 16];
     getrandom::fill(&mut nonce).map_err(failure)?;
     let leaf = format!(
@@ -403,8 +606,8 @@ pub(crate) fn prepare(
     if unsafe { libc::mkdirat(parent.as_raw_fd(), encoded.as_ptr(), 0o700) } != 0 {
         return Err(ExecutionError::UnsafePath);
     }
-    // Until Material owns the directory, any failure leaves a residual that must
-    // close admission immediately as well as after restart.
+    // Setup failures can leave only isolated public resources; they never
+    // block a later request or authorize deletion of historical private files.
     let dir = (|| {
         #[cfg(test)]
         test_fault(Fault::RequestSync)?;
@@ -418,13 +621,28 @@ pub(crate) fn prepare(
         Ok::<_, ExecutionError>(dir)
     })()
     .map_err(|_error| ExecutionError::CleanupUncertain)?;
+    let host_text = known_hosts
+        .split_once(' ')
+        .ok_or(ExecutionError::InvalidArguments)?
+        .1
+        .trim();
+    let host = ssh_key::PublicKey::from_openssh(host_text)
+        .map_err(|_error| ExecutionError::InvalidArguments)?;
+    // Unix socket names have a small fixed kernel limit. Keep the endpoint in
+    // the private runtime directory, independent of state-root pathname length.
+    let runtime = directory(runtime_path, true)?;
+    let sockets = ensure_directory(&runtime, "vw-ssh-agents")?;
+    let socket_path = runtime_path.join("vw-ssh-agents").join(socket_leaf(&leaf)?);
+    let agent =
+        super::ssh_agent::Agent::bind(sockets, &socket_path, host, ssh.destination.user.clone())?;
     let mut material = Material {
+        agent: std::rc::Rc::new(std::cell::RefCell::new(agent)),
         parent,
         dir,
         leaf,
         finished: false,
     };
-    let request = root.join("requests").join(&material.leaf);
+    let request = root.join("agents").join(&material.leaf);
     let result = (|| {
         let path = request.to_str().ok_or(ExecutionError::UnsafePath)?;
         if path
@@ -433,14 +651,36 @@ pub(crate) fn prepare(
         {
             return Err(ExecutionError::UnsafePath);
         }
+        create(&material.dir, "pending", b"not handed to a helper\n")?;
         create(&material.dir, "known_hosts", known_hosts.as_bytes())?;
+        let record = AgentRecord {
+            directory: identity(&material.dir)?,
+            socket: path_identity(&socket_path)?,
+            files: ["pending", "known_hosts"]
+                .into_iter()
+                .map(|name| {
+                    Ok((
+                        name.to_owned(),
+                        identity(&open_at(&material.dir, name, false)?)?,
+                    ))
+                })
+                .collect::<Result<_, ExecutionError>>()?,
+        };
+        create(
+            &material.dir,
+            "agent.json",
+            &serde_json::to_vec(&record).map_err(failure)?,
+        )?;
         let mut argv = vec!["-F".into(), "/dev/null".into()];
         for option in [
-            format!("IdentityFile=\"{path}/identity\""),
+            "IdentityFile=none".into(),
             format!("UserKnownHostsFile=\"{path}/known_hosts\""),
             "CertificateFile=none".into(),
-            "IdentityAgent=none".into(),
-            "IdentitiesOnly=yes".into(),
+            format!(
+                "IdentityAgent=\"{}\"",
+                socket_path.to_str().ok_or(ExecutionError::UnsafePath)?
+            ),
+            "IdentitiesOnly=no".into(),
             "GlobalKnownHostsFile=/dev/null".into(),
             "StrictHostKeyChecking=yes".into(),
             "UpdateHostKeys=no".into(),
@@ -547,6 +787,15 @@ pub(crate) fn fixture(root: &Path) -> (SshOperation, String) {
 mod tests {
     use super::*;
     use std::os::unix::fs::{PermissionsExt, symlink};
+    fn prepare(
+        root: &Path,
+        ssh: &SshOperation,
+    ) -> Result<(Material, Vec<String>, File), ExecutionError> {
+        super::prepare_with_runtime(root, ssh, root.parent().unwrap())
+    }
+    fn recover(root: &Path) -> Result<(), ExecutionError> {
+        super::recover_with_runtime(root, root.parent().unwrap())
+    }
     fn setup() -> (tempfile::TempDir, SshOperation, String) {
         let root = tempfile::tempdir().unwrap();
         let (ssh, key) = fixture(root.path());
@@ -574,10 +823,10 @@ mod tests {
         let (ssh, key) = fixture(root.path());
         let (mut material, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
         material.install_key(SensitiveString::new(key)).unwrap();
-        let request = root.path().join("ssh/requests").join(&material.leaf);
+        let request = root.path().join("ssh/agents").join(&material.leaf);
         for dir in [
             root.path().join("ssh"),
-            root.path().join("ssh/requests"),
+            root.path().join("ssh/agents"),
             request.clone(),
         ] {
             let meta = std::fs::symlink_metadata(dir).unwrap();
@@ -585,7 +834,7 @@ mod tests {
             assert_eq!(meta.mode() & 0o7777, 0o700);
             assert_eq!(meta.uid(), unsafe { libc::geteuid() });
         }
-        for name in ["identity", "known_hosts"] {
+        for name in ["known_hosts", "pending"] {
             let meta = std::fs::symlink_metadata(request.join(name)).unwrap();
             assert!(meta.is_file());
             assert_eq!(meta.mode() & 0o7777, 0o600);
@@ -595,60 +844,15 @@ mod tests {
         material.finalize(CleanupEvidence::NotStarted).unwrap();
     }
     #[test]
-    fn ssh_exclusive_install_preserves_existing_key_and_replacement_inodes() {
+    fn key_is_memory_only_and_replacement_is_rejected() {
         let (root, ssh, key) = setup();
         let (mut material, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
         material
             .install_key(SensitiveString::new(key.clone()))
             .unwrap();
-        let request = root.path().join("ssh/requests").join(&material.leaf);
-        assert!(
-            material
-                .install_key(SensitiveString::new("replacement-key-sentinel".into()))
-                .is_err()
-        );
-        assert_eq!(
-            std::fs::read_to_string(request.join("identity")).unwrap(),
-            key
-        );
-        let retained = open_at(&material.dir, "identity", false).unwrap();
-        std::fs::rename(request.join("identity"), request.join("saved-identity")).unwrap();
-        create(&material.dir, "identity", b"replacement-file-sentinel").unwrap();
-        assert!(
-            same(&material.dir, "identity", &retained, false).is_err(),
-            "valid replacement metadata cannot substitute another inode"
-        );
-        assert_eq!(
-            std::fs::read(request.join("identity")).unwrap(),
-            b"replacement-file-sentinel"
-        );
-        assert_eq!(
-            std::fs::read_to_string(request.join("saved-identity")).unwrap(),
-            key
-        );
-        std::fs::remove_file(request.join("identity")).unwrap();
-        std::fs::rename(request.join("saved-identity"), request.join("identity")).unwrap();
-        let moved = root.path().join("ssh/requests/moved-original");
-        std::fs::rename(&request, &moved).unwrap();
-        std::fs::create_dir(&request).unwrap();
-        std::fs::set_permissions(&request, std::fs::Permissions::from_mode(0o700)).unwrap();
-        std::fs::write(request.join("unrelated"), b"replacement-directory-sentinel").unwrap();
-        assert!(
-            material.finalize(CleanupEvidence::Reaped).is_err(),
-            "cleanup must reject a replacement directory before removing original files"
-        );
-        assert_eq!(
-            std::fs::read_to_string(moved.join("identity")).unwrap(),
-            key
-        );
-        assert_eq!(
-            std::fs::read(request.join("unrelated")).unwrap(),
-            b"replacement-directory-sentinel"
-        );
-        std::fs::remove_file(request.join("unrelated")).unwrap();
-        std::fs::remove_dir(&request).unwrap();
-        std::fs::rename(&moved, &request).unwrap();
-        material.finalize(CleanupEvidence::Reaped).unwrap();
+        assert!(material.install_key(SensitiveString::new(key)).is_err());
+        assert!(!entries(&material.dir).unwrap().contains(&"identity".into()));
+        material.finalize(CleanupEvidence::NotStarted).unwrap();
     }
     #[test]
     #[ignore = "requires subordinate UID/GID mappings and unshare; invoked explicitly by systemd verification script"]
@@ -693,10 +897,17 @@ mod tests {
             "never run the provider fixture as host root"
         );
         let (root, ssh, key) = setup();
-        let (mut material, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
+        let (mut material, argv, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
         material.install_key(SensitiveString::new(key)).unwrap();
-        let request = root.path().join("ssh/requests").join(&material.leaf);
-        let script = r#"import os,sys
+        let request = root.path().join("ssh/agents").join(&material.leaf);
+        let socket_path = argv
+            .iter()
+            .find_map(|arg| {
+                arg.strip_prefix("IdentityAgent=\"")
+                    .and_then(|path| path.strip_suffix('"'))
+            })
+            .unwrap();
+        let script = r#"import os,sys,socket
 uid=int(sys.argv[1])
 maps=[list(map(int,line.split())) for line in open('/proc/self/uid_map')]
 assert all(outer != 0 for inner,outer,count in maps)
@@ -704,7 +915,7 @@ assert any(inner <= uid < inner+count for inner,outer,count in maps)
 os.setgroups([])
 os.setgid(uid)
 os.setuid(uid)
-for leaf in ['identity','known_hosts']:
+for leaf in ['known_hosts']:
     try:
         fd=os.open(os.path.join(sys.argv[2],leaf),os.O_RDONLY)
     except PermissionError:
@@ -712,6 +923,13 @@ for leaf in ['identity','known_hosts']:
     else:
         os.close(fd)
         sys.exit(2)
+s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+try:
+    s.connect(sys.argv[3])
+except PermissionError:
+    pass
+else:
+    sys.exit(3)
 "#;
         for uid in [8, 10] {
             let status = std::process::Command::new("unshare")
@@ -726,11 +944,12 @@ for leaf in ['identity','known_hosts']:
                     &uid.to_string(),
                 ])
                 .arg(&request)
+                .arg(socket_path)
                 .status()
                 .unwrap();
             assert!(
                 status.success(),
-                "distinct mapped UID {uid} must receive EACCES for both material files"
+                "distinct mapped UID {uid} must receive EACCES for public files and the signing socket"
             );
         }
         let output=std::process::Command::new("unshare")
@@ -738,7 +957,7 @@ for leaf in ['identity','known_hosts']:
             .arg(std::env::current_exe().unwrap())
             .args(["--exact","adapters::ssh_material::tests::distinct_agent_principals_cannot_read_live_provider_material","--ignored","--test-threads=1","--nocapture"])
             .env("VW_SSH_FOREIGN_OWNER_CHILD","1")
-            .stdin(std::process::Stdio::from(open_at(&material.dir,"identity",false).unwrap()))
+            .stdin(std::process::Stdio::from(open_at(&material.dir,"known_hosts",false).unwrap()))
             .output().unwrap();
         assert!(
             output.status.success(),
@@ -750,221 +969,54 @@ for leaf in ['identity','known_hosts']:
         assert!(!request.exists());
     }
     #[test]
-    fn partial_setup_is_cleaned_and_unlink_failure_survives_restart_until_recovery() {
-        for failure_at in [0, 1] {
-            let (root, ssh, key) = setup();
-            let material_root = root.path().join("ssh");
-            TEST_FAIL_CREATE_AFTER.with(|fail| fail.set(Some(failure_at)));
-            let result = prepare(&material_root, &ssh);
-            if failure_at == 0 {
-                assert!(result.is_err());
-            } else {
-                let (mut material, _, _) = result.unwrap();
-                assert!(material.install_key(SensitiveString::new(key)).is_err());
-                material.finalize(CleanupEvidence::NotStarted).unwrap();
-            }
-            TEST_FAIL_CREATE_AFTER.with(|fail| fail.set(None));
-            assert_eq!(
-                std::fs::read_dir(material_root.join("requests"))
-                    .unwrap()
-                    .count(),
-                0
-            );
-        }
-        let (root, ssh, key) = setup();
-        let material_root = root.path().join("ssh");
-        let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
-        material.install_key(SensitiveString::new(key)).unwrap();
-        let request = material_root.join("requests").join(&material.leaf);
-        TEST_FAIL_REMOVE.with(|fail| fail.set(true));
-        assert!(material.finalize(CleanupEvidence::Reaped).is_err());
-        drop(material);
-        assert!(request.join("identity").exists());
-        assert!(prepare(&material_root, &ssh).is_err());
-        assert!(recover(&material_root).is_err());
-        TEST_FAIL_REMOVE.with(|fail| fail.set(false));
-        recover(&material_root).unwrap();
-        assert!(!request.exists());
-    }
-    fn arm_fault(fault: Option<Fault>) {
-        TEST_FAULT.with(|value| value.set(fault));
-        TEST_FAULT_HIT.with(|hit| hit.set(false));
-    }
-    fn assert_recovered_and_reusable(root: &Path, ssh: &SshOperation) {
-        recover(root).unwrap();
-        assert_eq!(std::fs::read_dir(root.join("requests")).unwrap().count(), 0);
-        let (mut material, _, _) = prepare(root, ssh).unwrap();
-        material.finalize(CleanupEvidence::NotStarted).unwrap();
-    }
-    #[test]
-    fn ssh_post_mkdir_failures_report_uncertain_and_interlock_until_recovery() {
+    fn partial_setup_and_cleanup_failure_do_not_interlock_new_agents() {
         for fault in [
             Fault::RequestSync,
             Fault::RequestOpen,
             Fault::RequestMetadata,
-        ] {
-            let (root, ssh, _) = setup();
-            let material_root = root.path().join("ssh");
-            arm_fault(Some(fault));
-            assert!(
-                matches!(
-                    prepare(&material_root, &ssh),
-                    Err(ExecutionError::CleanupUncertain)
-                ),
-                "{fault:?}"
-            );
-            assert!(TEST_FAULT_HIT.with(|hit| hit.get()), "{fault:?}");
-            let residuals: Vec<_> = std::fs::read_dir(material_root.join("requests"))
-                .unwrap()
-                .collect();
-            assert_eq!(residuals.len(), 1);
-            let request = residuals[0].as_ref().unwrap().path();
-            assert_eq!(std::fs::read_dir(&request).unwrap().count(), 0);
-            assert!(matches!(
-                prepare(&material_root, &ssh),
-                Err(ExecutionError::CleanupUncertain)
-            ));
-            arm_fault(None);
-            assert_recovered_and_reusable(&material_root, &ssh);
-            assert!(!request.exists());
-        }
-    }
-    #[test]
-    fn ssh_partial_writes_and_create_sync_failures_are_cleaned_or_interlocked() {
-        for fault in [
             Fault::PartialWrite,
             Fault::FileSync,
             Fault::CreateParentSync,
         ] {
-            for identity in [false, true] {
-                for cleanup_fails in [false, true] {
-                    let (root, ssh, key) = setup();
-                    let material_root = root.path().join("ssh");
-                    if identity {
-                        let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
-                        arm_fault(Some(fault));
-                        assert!(
-                            material
-                                .install_key(SensitiveString::new(key.clone()))
-                                .is_err()
-                        );
-                        assert!(TEST_FAULT_HIT.with(|hit| hit.get()));
-                        let request = material_root.join("requests").join(&material.leaf);
-                        let written = std::fs::read(request.join("identity")).unwrap();
-                        let expected = if fault == Fault::PartialWrite {
-                            &key.as_bytes()[..key.len() / 2]
-                        } else {
-                            key.as_bytes()
-                        };
-                        assert_eq!(written, expected, "{fault:?}");
-                        TEST_FAIL_REMOVE.with(|fail| fail.set(cleanup_fails));
-                        assert_eq!(
-                            material.finalize(CleanupEvidence::NotStarted).is_err(),
-                            cleanup_fails
-                        );
-                        drop(material);
-                    } else {
-                        arm_fault(Some(fault));
-                        TEST_FAIL_REMOVE.with(|fail| fail.set(cleanup_fails));
-                        let result = prepare(&material_root, &ssh);
-                        assert!(TEST_FAULT_HIT.with(|hit| hit.get()));
-                        assert!(
-                            matches!(result, Err(error) if error == if cleanup_fails { ExecutionError::CleanupUncertain } else { ExecutionError::UnsafePath })
-                        );
-                    }
-                    arm_fault(None);
-                    let count = std::fs::read_dir(material_root.join("requests"))
-                        .unwrap()
-                        .count();
-                    assert_eq!(count, usize::from(cleanup_fails));
-                    if cleanup_fails {
-                        assert!(matches!(
-                            prepare(&material_root, &ssh),
-                            Err(ExecutionError::CleanupUncertain)
-                        ));
-                        assert!(recover(&material_root).is_err());
-                    }
-                    TEST_FAIL_REMOVE.with(|fail| fail.set(false));
-                    assert_recovered_and_reusable(&material_root, &ssh);
-                }
-            }
+            let (root, ssh, _) = setup();
+            TEST_FAULT.with(|value| value.set(Some(fault)));
+            assert!(
+                prepare(&root.path().join("ssh"), &ssh).is_err(),
+                "{fault:?}"
+            );
+            assert!(TEST_FAULT_HIT.with(|hit| hit.get()));
+            TEST_FAULT.with(|value| value.set(None));
+            let (mut next, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
+            next.finalize(CleanupEvidence::NotStarted).unwrap();
         }
-    }
-    #[test]
-    fn ssh_cleanup_failure_after_unlink_or_directory_removal_recovers_safely() {
         for fault in [
-            None,
-            Some(Fault::RemoveFileSync),
-            Some(Fault::RemoveDirectory),
-            Some(Fault::RemoveDirectorySync),
+            Fault::RemoveFileSync,
+            Fault::RemoveDirectory,
+            Fault::RemoveDirectorySync,
         ] {
             let (root, ssh, key) = setup();
-            let material_root = root.path().join("ssh");
-            let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
+            let (mut material, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
             material.install_key(SensitiveString::new(key)).unwrap();
-            let request = material_root.join("requests").join(&material.leaf);
-            arm_fault(fault);
-            if fault.is_none() {
-                TEST_FAIL_REMOVE_AFTER.with(|remaining| remaining.set(Some(1)));
-            }
+            TEST_FAULT.with(|value| value.set(Some(fault)));
             assert!(material.finalize(CleanupEvidence::Reaped).is_err());
-            if fault.is_some() {
-                assert!(TEST_FAULT_HIT.with(|hit| hit.get()));
-            }
-            drop(material);
-            if fault == Some(Fault::RemoveDirectorySync) {
-                // Both files and the request directory were removed before sync failed.
-                assert!(!request.exists());
-            } else {
-                let remaining = std::fs::read_dir(&request).unwrap().count();
-                assert_eq!(
-                    remaining,
-                    if fault == Some(Fault::RemoveDirectory) {
-                        0
-                    } else {
-                        1
-                    }
-                );
-                assert!(matches!(
-                    prepare(&material_root, &ssh),
-                    Err(ExecutionError::CleanupUncertain)
-                ));
-                assert!(recover(&material_root).is_err());
-                assert!(request.exists());
-            }
-            arm_fault(None);
-            TEST_FAIL_REMOVE_AFTER.with(|remaining| remaining.set(None));
-            assert_recovered_and_reusable(&material_root, &ssh);
+            TEST_FAULT.with(|value| value.set(None));
+            let (mut next, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
+            next.finalize(CleanupEvidence::NotStarted).unwrap();
         }
     }
     #[test]
-    fn material_is_private_pinned_and_only_explicitly_removed_after_reap() {
+    fn public_resources_are_pinned_and_detachment_does_not_block_new_requests() {
         let (root, ssh, key) = setup();
         let (mut material, argv, cwd) = prepare(&root.path().join("ssh"), &ssh).unwrap();
-        material
-            .install_key(SensitiveString::new(key.clone()))
-            .unwrap();
+        material.install_key(SensitiveString::new(key)).unwrap();
         assert_eq!(
             cwd.metadata().unwrap().ino(),
             std::fs::metadata(root.path()).unwrap().ino()
         );
-        assert_eq!(entries(&material.dir).unwrap().len(), 2);
-        for name in ["identity", "known_hosts"] {
-            private(&open_at(&material.dir, name, false).unwrap(), false).unwrap();
-        }
-        assert_eq!(
-            std::fs::read_to_string(
-                root.path()
-                    .join("ssh/requests")
-                    .join(&material.leaf)
-                    .join("identity")
-            )
-            .unwrap(),
-            key
-        );
         for required in [
             "StrictHostKeyChecking=yes",
-            "IdentityAgent=none",
+            "IdentityFile=none",
+            "IdentitiesOnly=no",
             "GlobalKnownHostsFile=/dev/null",
             "ProxyCommand=none",
             "ForwardAgent=no",
@@ -972,66 +1024,52 @@ for leaf in ['identity','known_hosts']:
         ] {
             assert!(argv.iter().any(|arg| arg == required), "{required}");
         }
-        assert_eq!(&argv[..2], ["-F", "/dev/null"]);
-        assert_eq!(
-            &argv[argv.len() - 7..],
-            [
-                "-p",
-                "2222",
-                "-l",
-                "backup",
-                "--",
-                "backup.example.test",
-                "/srv/archive"
-            ]
-        );
-        let path = root.path().join("ssh/requests").join(&material.leaf);
-        assert!(material.finalize(CleanupEvidence::Uncertain).is_err());
-        assert!(path.join("identity").exists());
-        assert!(matches!(
-            prepare(&root.path().join("ssh"), &ssh),
-            Err(ExecutionError::CleanupUncertain)
-        ));
-        material.finalize(CleanupEvidence::Reaped).unwrap();
+        assert!(argv.iter().any(|arg| arg.starts_with("IdentityAgent=")));
+        let path = root.path().join("ssh/agents").join(&material.leaf);
+        let socket = argv
+            .iter()
+            .find_map(|arg| {
+                arg.strip_prefix("IdentityAgent=\"")
+                    .map(|path| path.trim_end_matches('"'))
+            })
+            .unwrap();
+        assert!(Path::new(socket).exists());
+        assert!(!path.join("identity").exists());
+        material.mark_in_use().unwrap();
+        material.finalize(CleanupEvidence::Detached).unwrap();
+        assert!(!Path::new(socket).exists());
         assert!(!path.exists());
-    }
-    #[test]
-    fn drop_preserves_residual_until_ordered_recovery() {
-        let (root, ssh, key) = setup();
-        let material_root = root.path().join("ssh");
-        let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
-        material.install_key(SensitiveString::new(key)).unwrap();
-        let path = material_root.join("requests").join(&material.leaf);
-        drop(material);
-        assert!(path.join("identity").exists());
-        assert!(prepare(&material_root, &ssh).is_err());
-        recover(&material_root).unwrap();
-        assert!(!path.exists());
-        let (mut next, _, _) = prepare(&material_root, &ssh).unwrap();
+        let (mut next, _, _) = prepare(&root.path().join("ssh"), &ssh).unwrap();
         next.finalize(CleanupEvidence::NotStarted).unwrap();
     }
     #[test]
-    fn unknown_objects_and_links_poison_cleanup_and_are_never_removed() {
-        for attack in ["unknown", "symlink", "hardlink", "mode"] {
+    fn unknown_objects_and_links_are_preserved_without_blocking_independent_agents() {
+        for attack in ["unknown", "symlink", "hardlink", "mode", "directory"] {
             let (root, ssh, key) = setup();
             let material_root = root.path().join("ssh");
             let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
             material.install_key(SensitiveString::new(key)).unwrap();
-            let path = material_root.join("requests").join(&material.leaf);
+            let path = material_root.join("agents").join(&material.leaf);
             let unrelated = root.path().join("unrelated");
             std::fs::write(&unrelated, b"preserve unrelated").unwrap();
             match attack {
                 "unknown" => std::fs::write(path.join("unrelated"), b"preserve unknown").unwrap(),
                 "symlink" => {
-                    std::fs::remove_file(path.join("identity")).unwrap();
-                    symlink(&unrelated, path.join("identity")).unwrap();
+                    std::fs::remove_file(path.join("known_hosts")).unwrap();
+                    symlink(&unrelated, path.join("known_hosts")).unwrap();
                 }
                 "hardlink" => {
-                    std::fs::remove_file(path.join("identity")).unwrap();
-                    std::fs::hard_link(&unrelated, path.join("identity")).unwrap();
+                    std::fs::remove_file(path.join("known_hosts")).unwrap();
+                    std::fs::hard_link(&unrelated, path.join("known_hosts")).unwrap();
+                }
+                "directory" => {
+                    std::fs::rename(&path, root.path().join("moved")).unwrap();
+                    std::fs::create_dir(&path).unwrap();
+                    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))
+                        .unwrap();
                 }
                 _ => std::fs::set_permissions(
-                    path.join("identity"),
+                    path.join("known_hosts"),
                     std::fs::Permissions::from_mode(0o644),
                 )
                 .unwrap(),
@@ -1040,9 +1078,8 @@ for leaf in ['identity','known_hosts']:
                 material.finalize(CleanupEvidence::Reaped).is_err(),
                 "{attack}"
             );
-            assert!(path.exists());
-            assert!(recover(&material_root).is_err());
-            assert!(prepare(&material_root, &ssh).is_err());
+            let (mut next, _, _) = prepare(&material_root, &ssh).unwrap();
+            next.finalize(CleanupEvidence::NotStarted).unwrap();
             assert_eq!(std::fs::read(&unrelated).unwrap(), b"preserve unrelated");
         }
     }
@@ -1133,5 +1170,106 @@ for leaf in ['identity','known_hosts']:
             .unwrap();
         assert!(text.starts_with("backup.example.test ssh-ed25519 "));
         material.finalize(CleanupEvidence::NotStarted).unwrap();
+    }
+    #[test]
+    fn detached_and_legacy_unknown_material_survive_recovery() {
+        for marked in [false, true] {
+            let (root, ssh, key) = setup();
+            let material_root = root.path().join("ssh");
+            let parent =
+                open_at(&directory(&material_root, true).unwrap(), "requests", true).unwrap();
+            let leaf = "req-00000000000000000000000000000000";
+            let dir = ensure_directory(&parent, leaf).unwrap();
+            create(&dir, "identity", key.as_bytes()).unwrap();
+            if marked {
+                create(&dir, "in_use", b"historical").unwrap();
+            }
+            recover(&material_root).unwrap();
+            assert_eq!(
+                std::fs::read_to_string(material_root.join("requests").join(leaf).join("identity"))
+                    .unwrap(),
+                key
+            );
+            let (mut next, _, _) = prepare(&material_root, &ssh).unwrap();
+            next.finalize(CleanupEvidence::NotStarted).unwrap();
+        }
+    }
+    #[test]
+    fn recovery_reclaims_stale_resources_preserves_live_and_replaced_objects() {
+        use super::super::ssh_agent::FAIL_UNLINK;
+        for mutation in ["none", "file", "unknown", "socket", "directory"] {
+            let (root, ssh, key) = setup();
+            let material_root = root.path().join("ssh");
+            let (mut material, argv, _) = prepare(&material_root, &ssh).unwrap();
+            material.install_key(SensitiveString::new(key)).unwrap();
+            let request = material_root.join("agents").join(&material.leaf);
+            let socket = PathBuf::from(
+                argv.iter()
+                    .find_map(|arg| {
+                        arg.strip_prefix("IdentityAgent=\"")
+                            .map(|path| path.trim_end_matches('"'))
+                    })
+                    .unwrap(),
+            );
+            recover(&material_root).unwrap();
+            assert!(request.exists());
+            assert!(socket.exists());
+            FAIL_UNLINK.with(|fail| fail.set(true));
+            material.agent.borrow_mut().close();
+            FAIL_UNLINK.with(|fail| fail.set(false));
+            assert!(socket.exists());
+            let replacement = match mutation {
+                "file" => {
+                    std::fs::rename(
+                        request.join("known_hosts"),
+                        root.path().join("original-hosts"),
+                    )
+                    .unwrap();
+                    create(&material.dir, "known_hosts", b"replacement").unwrap();
+                    None
+                }
+                "unknown" => {
+                    create(&material.dir, "unknown", b"preserve").unwrap();
+                    None
+                }
+                "socket" => {
+                    std::fs::rename(&socket, root.path().join("original.sock")).unwrap();
+                    Some(std::os::unix::net::UnixListener::bind(&socket).unwrap())
+                }
+                "directory" => {
+                    std::fs::rename(&request, root.path().join("original-request")).unwrap();
+                    std::fs::create_dir(&request).unwrap();
+                    std::fs::set_permissions(&request, std::fs::Permissions::from_mode(0o700))
+                        .unwrap();
+                    None
+                }
+                _ => None,
+            };
+            if mutation == "none" {
+                recover(&material_root).unwrap();
+                assert!(!request.exists());
+                assert!(!socket.exists());
+            } else {
+                assert!(recover(&material_root).is_err(), "{mutation}");
+                assert!(request.exists());
+                assert!(socket.exists());
+            }
+            let (mut next, _, _) = prepare(&material_root, &ssh).unwrap();
+            next.finalize(CleanupEvidence::NotStarted).unwrap();
+            drop(replacement);
+        }
+    }
+    #[test]
+    fn recovery_retries_partial_public_finalization_without_a_user_manager() {
+        let (root, ssh, key) = setup();
+        let material_root = root.path().join("ssh");
+        let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
+        material.install_key(SensitiveString::new(key)).unwrap();
+        let request = material_root.join("agents").join(&material.leaf);
+        TEST_FAIL_REMOVE_AFTER.with(|remaining| remaining.set(Some(1)));
+        assert!(material.finalize(CleanupEvidence::Detached).is_err());
+        TEST_FAIL_REMOVE_AFTER.with(|remaining| remaining.set(None));
+        recover(&material_root).unwrap();
+        assert!(!request.exists());
     }
 }

@@ -30,8 +30,16 @@ if [[ -n "${VW18_SCENARIO:-}" ]]; then
 fi
 timeout --signal=TERM --kill-after=15s 900s cargo test --offline --locked --test systemd_supervisor -- "${VW18_FILTER[@]}" --ignored --nocapture
 
-# Story 3.2: provider material is created outside the child user namespace.
-# Distinct mapped agent UIDs must be unable to read either live file.
+# Provider-owned SSH resources stay outside the restricted-agent user namespace.
+# Distinct mapped agent UIDs cannot reach the public resources or signing socket.
 if [[ -z "${VW18_SCENARIO:-}" ]]; then
     timeout --signal=TERM --kill-after=15s 900s cargo test --offline --locked --lib -- --ignored --exact adapters::ssh_material::tests::distinct_agent_principals_cannot_read_live_provider_material --nocapture
+fi
+
+# Real protocol interoperability uses a disposable loopback sshd configuration and
+# memory-only synthetic client keys; it never changes an installed SSH service.
+if [[ -z "${VW18_SCENARIO:-}" ]]; then
+    test -x /usr/bin/ssh
+    test -x /usr/sbin/sshd
+    timeout --signal=TERM --kill-after=15s 900s cargo test --offline --locked --lib -- --ignored --exact adapters::ssh_agent::openssh_tests::real_openssh_authenticates_with_memory_only_client_key_and_survives_agent_close --nocapture
 fi

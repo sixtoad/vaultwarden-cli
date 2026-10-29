@@ -502,7 +502,8 @@ fn response_frame(response: &HumanResponse) -> Vec<u8> {
 
 /// Validate filesystem ownership and server kernel credentials before sending input.
 pub fn exchange(root: &Path, command: HumanCommand) -> Result<HumanResponse, HumanTransportError> {
-    // Revocation must await the application's bounded (20s) execution cleanup.
+    // Retain the administrative transport budget for persistence; revocation
+    // does not wait for consumer programs to exit.
     let response_timeout = if matches!(&command, HumanCommand::AgentRevoke { .. }) {
         Duration::from_secs(30)
     } else {

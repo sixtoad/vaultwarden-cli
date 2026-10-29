@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "hardware": "Apple M1",
+  "passed": 15,
+  "python": "Python 3.9.6",
+  "skipped": 1,
+  "tests_run": 16
+}

@@ -1,0 +1,424 @@
+{
+  "files": {
+    "coalition": {
+      "exists": false,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sys/coalition.h"
+    },
+    "coalition-private": {
+      "exists": false,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sys/coalition_private.h"
+    },
+    "endpoint-message": {
+      "excerpts": [
+        {
+          "line": 2710,
+          "text": " * @field process Describes the process that took the action."
+        },
+        {
+          "line": 2711,
+          "text": " * @field seq_num Per-client, per-event-type sequence number that can be"
+        },
+        {
+          "line": 2712,
+          "text": " *        inspected to detect whether the kernel had to drop events for this"
+        },
+        {
+          "line": 2713,
+          "text": " *        client.  When no events are dropped for this client, seq_num"
+        },
+        {
+          "line": 2714,
+          "text": " *        increments by 1 for every message of that event type.  When events"
+        },
+        {
+          "line": 2715,
+          "text": " *        have been dropped, the difference between the last seen sequence"
+        },
+        {
+          "line": 2716,
+          "text": " *        number of that event type plus 1 and seq_num of the received message"
+        },
+        {
+          "line": 2717,
+          "text": " *        indicates the number of events that had to be dropped."
+        },
+        {
+          "line": 2718,
+          "text": " *        Dropped events generally indicate that more events were generated in"
+        },
+        {
+          "line": 2719,
+          "text": " *        the kernel than the client was able to handle."
+        },
+        {
+          "line": 2720,
+          "text": " *        @see global_seq_num"
+        },
+        {
+          "line": 2721,
+          "text": " * @field action_type Indicates if the action field is an auth or notify action."
+        },
+        {
+          "line": 2722,
+          "text": " * @field action For auth events, contains the opaque auth ID that must be"
+        },
+        {
+          "line": 2723,
+          "text": " *        supplied when responding to the event.  For notify events, describes"
+        },
+        {
+          "line": 2724,
+          "text": " *        the result of the action."
+        },
+        {
+          "line": 2731,
+          "text": " *        csops(CS_OPS_MARKINVALID)."
+        },
+        {
+          "line": 2732,
+          "text": " * @field global_seq_num Per-client sequence number that can be inspected to"
+        },
+        {
+          "line": 2733,
+          "text": " *        detect whether the kernel had to drop events for this client. When no"
+        },
+        {
+          "line": 2734,
+          "text": " *        events are dropped for this client, global_seq_num increments by 1 for"
+        },
+        {
+          "line": 2735,
+          "text": " *        every message. When events have been dropped, the difference between"
+        },
+        {
+          "line": 2736,
+          "text": " *        the last seen global sequence number and the global_seq_num of the"
+        },
+        {
+          "line": 2737,
+          "text": " *        received message indicates the number of events that had to be dropped."
+        },
+        {
+          "line": 2738,
+          "text": " *        Dropped events generally indicate that more events were generated in"
+        },
+        {
+          "line": 2739,
+          "text": " *        the kernel than the client was able to handle."
+        },
+        {
+          "line": 2740,
+          "text": " *        @see seq_num"
+        },
+        {
+          "line": 2741,
+          "text": " * @field opaque Opaque data that must not be accessed directly."
+        },
+        {
+          "line": 2742,
+          "text": " *"
+        },
+        {
+          "line": 2743,
+          "text": " * @note For events that can be authorized there are unique NOTIFY and AUTH"
+        },
+        {
+          "line": 2744,
+          "text": " * event types for the same event data, eg: event.exec is the correct union"
+        },
+        {
+          "line": 2771,
+          "text": "\tes_process_t *_Nonnull process;"
+        },
+        {
+          "line": 2772,
+          "text": "\tuint64_t seq_num; /* field available only if message version >= 2 */"
+        },
+        {
+          "line": 2773,
+          "text": "\tes_action_type_t action_type;"
+        },
+        {
+          "line": 2774,
+          "text": "\tunion {"
+        },
+        {
+          "line": 2775,
+          "text": "\t\tes_event_id_t auth;"
+        },
+        {
+          "line": 2776,
+          "text": "\t\tes_result_t notify;"
+        },
+        {
+          "line": 2780,
+          "text": "\tes_thread_t *_Nullable thread; /* field available only if message version >= 4 */"
+        },
+        {
+          "line": 2781,
+          "text": "\tuint64_t global_seq_num;       /* field available only if message version >= 4 */"
+        },
+        {
+          "line": 2782,
+          "text": "\tuint64_t opaque[];             /* Opaque data that must not be accessed directly */"
+        },
+        {
+          "line": 2783,
+          "text": "} es_message_t;"
+        },
+        {
+          "line": 2784,
+          "text": ""
+        },
+        {
+          "line": 2785,
+          "text": "__BEGIN_DECLS"
+        }
+      ],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/EndpointSecurity/ESMessage.h",
+      "sha256": "2a05238ee9eb74adb9ad21ac6d68e7ff3389d9c35b23a1bf04355282bdec65cf"
+    },
+    "endpoint-types": {
+      "excerpts": [
+        {
+          "line": 111,
+          "text": "\t// The following events are available beginning in macOS 10.15"
+        },
+        {
+          "line": 112,
+          "text": "\tES_EVENT_TYPE_AUTH_EXEC,"
+        },
+        {
+          "line": 113,
+          "text": "\tES_EVENT_TYPE_AUTH_OPEN,"
+        },
+        {
+          "line": 114,
+          "text": "\tES_EVENT_TYPE_AUTH_KEXTLOAD,"
+        },
+        {
+          "line": 115,
+          "text": "\tES_EVENT_TYPE_AUTH_MMAP,"
+        },
+        {
+          "line": 116,
+          "text": "\tES_EVENT_TYPE_AUTH_MPROTECT,"
+        },
+        {
+          "line": 120,
+          "text": "\tES_EVENT_TYPE_AUTH_UNLINK,"
+        },
+        {
+          "line": 121,
+          "text": "\tES_EVENT_TYPE_NOTIFY_EXEC,"
+        },
+        {
+          "line": 122,
+          "text": "\tES_EVENT_TYPE_NOTIFY_OPEN,"
+        },
+        {
+          "line": 123,
+          "text": "\tES_EVENT_TYPE_NOTIFY_FORK,"
+        },
+        {
+          "line": 124,
+          "text": "\tES_EVENT_TYPE_NOTIFY_CLOSE,"
+        },
+        {
+          "line": 125,
+          "text": "\tES_EVENT_TYPE_NOTIFY_CREATE,"
+        },
+        {
+          "line": 126,
+          "text": "\tES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,"
+        },
+        {
+          "line": 127,
+          "text": "\tES_EVENT_TYPE_NOTIFY_EXIT,"
+        },
+        {
+          "line": 128,
+          "text": "\tES_EVENT_TYPE_NOTIFY_GET_TASK,"
+        },
+        {
+          "line": 129,
+          "text": "\tES_EVENT_TYPE_NOTIFY_KEXTLOAD,"
+        },
+        {
+          "line": 130,
+          "text": "\tES_EVENT_TYPE_NOTIFY_KEXTUNLOAD,"
+        },
+        {
+          "line": 131,
+          "text": "\tES_EVENT_TYPE_NOTIFY_LINK,"
+        }
+      ],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/EndpointSecurity/ESTypes.h",
+      "sha256": "9749e821138f2204b2b373cedaeec829e5e9042643dedc6e632c5495c18200e9"
+    },
+    "event": {
+      "excerpts": [
+        {
+          "line": 252,
+          "text": " * passed to KNOTE(). If NOTE_SIGNAL is passed as a hint, then the lower bits"
+        },
+        {
+          "line": 253,
+          "text": " * of the hint contain the signal. IF NOTE_FORK is passed, then the lower bits"
+        },
+        {
+          "line": 254,
+          "text": " * contain the PID of the child (but the pid does not get passed through in"
+        },
+        {
+          "line": 255,
+          "text": " * the actual kevent)."
+        },
+        {
+          "line": 256,
+          "text": " */"
+        },
+        {
+          "line": 257,
+          "text": "enum {"
+        },
+        {
+          "line": 261,
+          "text": "#define NOTE_EXIT               0x80000000      /* process exited */"
+        },
+        {
+          "line": 262,
+          "text": "#define NOTE_FORK               0x40000000      /* process forked */"
+        },
+        {
+          "line": 263,
+          "text": "#define NOTE_EXEC               0x20000000      /* process exec'd */"
+        },
+        {
+          "line": 264,
+          "text": "#define NOTE_REAP               ((unsigned int)eNoteReapDeprecated /* 0x10000000 */ )   /* process reaped */"
+        },
+        {
+          "line": 265,
+          "text": "#define NOTE_SIGNAL             0x08000000      /* shared with EVFILT_SIGNAL */"
+        },
+        {
+          "line": 266,
+          "text": "#define NOTE_EXITSTATUS         0x04000000      /* exit status to be returned, valid for child process or when allowed to signal target pid */"
+        },
+        {
+          "line": 356,
+          "text": " * DEPRECATED!!!!!!!!!"
+        },
+        {
+          "line": 357,
+          "text": " * NOTE_TRACK, NOTE_TRACKERR, and NOTE_CHILD are no longer supported as of 10.5"
+        },
+        {
+          "line": 358,
+          "text": " */"
+        },
+        {
+          "line": 359,
+          "text": "/* additional flags for EVFILT_PROC */"
+        },
+        {
+          "line": 360,
+          "text": "#define NOTE_TRACK      0x00000001              /* follow across forks */"
+        },
+        {
+          "line": 361,
+          "text": "#define NOTE_TRACKERR   0x00000002              /* could not track child */"
+        },
+        {
+          "line": 362,
+          "text": "#define NOTE_CHILD      0x00000004              /* am a child process */"
+        },
+        {
+          "line": 363,
+          "text": ""
+        },
+        {
+          "line": 364,
+          "text": ""
+        },
+        {
+          "line": 365,
+          "text": "/* Temporary solution for BootX to use inode.h till kqueue moves to vfs layer */"
+        },
+        {
+          "line": 366,
+          "text": "struct knote;"
+        }
+      ],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sys/event.h",
+      "sha256": "435ed8fe99ae70c19404c3da14be6e2d217686ac256aed3b5df721b353dbb350"
+    },
+    "launchd-man": {
+      "excerpts": [
+        {
+          "line": 608,
+          "text": ".El"
+        },
+        {
+          "line": 609,
+          "text": ".It Sy AbandonProcessGroup <boolean>"
+        },
+        {
+          "line": 610,
+          "text": "When a job dies,"
+        },
+        {
+          "line": 611,
+          "text": ".Nm launchd"
+        },
+        {
+          "line": 612,
+          "text": "kills any remaining processes with the same process group ID as the job. Setting"
+        },
+        {
+          "line": 613,
+          "text": "this key to true disables that behavior."
+        },
+        {
+          "line": 614,
+          "text": ".It Sy LowPriorityIO <boolean>"
+        },
+        {
+          "line": 615,
+          "text": "This optional key specifies whether the kernel should consider this daemon to be"
+        },
+        {
+          "line": 616,
+          "text": "low priority when doing filesystem I/O."
+        }
+      ],
+      "exists": true,
+      "path": "/usr/share/man/man5/launchd.plist.5",
+      "sha256": "1c5f5041c1d3492988bfa6f9dc6d969dfd072d20af2703c28d9a8f6ed6aaadcb"
+    },
+    "spawn": {
+      "excerpts": [],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/spawn.h",
+      "sha256": "2d90f16beec60b2080553613234f004b58f384003feaa5eb809fe5e91b42b884"
+    },
+    "spawn-private": {
+      "exists": false,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/spawn_private.h"
+    },
+    "sys-spawn": {
+      "excerpts": [],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sys/spawn.h",
+      "sha256": "988afa3a6d7a1ce18df118d234240c02eff0715b5712784ac28b44e7f66254dc"
+    }
+  },
+  "interpretation": "Read-only header/manual inventory; declaration presence is not qualification and absence does not prove impossibility.",
+  "observed_utc": "2026-10-27T16:14:57.855343+00:00",
+  "sdk_path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk",
+  "sdk_version": "27.0"
+}

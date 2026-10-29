@@ -1,0 +1,38 @@
+{
+  "source_sha256": {
+    "src/access/application.rs": "96d29d699d0060d2b9369bcb30a3ad07f51f8c71ac5c5f9c41d795704df75f47",
+    "src/adapters/supervisor/manager.rs": "1e76b4acb11e61785afc453ba29c6d54574b1dca2d66a32064ac08960ab1f2e9"
+  },
+  "cases": {
+    "release-bypasses-cancellation": {
+      "exit_code": 101,
+      "caught_by_test": true,
+      "test": "access::direct_request_tests::final_release_revalidates_authority_after_supervisor_setup",
+      "patch_sha256": "92ba2668d14820fb848f3d6c577ede3f8f95f048b5bca8551499d955957fae49",
+      "receipt_sha256": "e6382d31f4248dc36d67883bd321b2652e42119c3e50b57ace6d5d2365fe4d24"
+    },
+    "consumer-control-group-stop": {
+      "exit_code": 101,
+      "caught_by_test": true,
+      "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties",
+      "patch_sha256": "b9ce46fa647cc9f840a3382ca19fcde9158f66cd52d88ab9bd5224f1b2ede773",
+      "receipt_sha256": "60c6e41de8d9c148df8fe27d87659073976306fe260e67ea3251ada48dd49ce4"
+    },
+    "provider-dependency-stop": {
+      "exit_code": 101,
+      "caught_by_test": true,
+      "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties",
+      "patch_sha256": "4d1c8face6efb6791ff8a0efe1d4960eb13de89096bab2ba2f787d52d60b6e7e",
+      "receipt_sha256": "28440b6354e16d7e9eaada4592b1ab8cf34629274c05e0103a00d98ba49c3155"
+    },
+    "consumer-runtime-expiry": {
+      "exit_code": 101,
+      "caught_by_test": true,
+      "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties",
+      "patch_sha256": "eac208c90dbf4f2c773403165a2a1fd169c5d464e54dfd1acef3495f5d65f99f",
+      "receipt_sha256": "4aad7e606a59f8ea766c79ec1b0dac13c20555b308f27331976027236708fe06"
+    }
+  },
+  "worktree_untouched": true,
+  "patch_provenance": "Reconstructed from the exact recorded source hashes and retained mutation script; both source hashes verified before generating patches."
+}

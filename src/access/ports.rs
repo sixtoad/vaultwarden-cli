@@ -62,8 +62,13 @@ pub(crate) trait ProducerOutput {
     ) -> Result<crate::secret_storage::SecretImport, ExecutionError>;
 }
 
-/// Material never cleans itself in Drop: only independent containment evidence authorizes removal.
+/// Provider-owned SSH signing authority and public resources. Finalization always
+/// ends authority; public authentication resources have no consumer-lifetime dependency.
 pub(crate) trait SshMaterial {
+    /// Persist potential public-resource use before handing paths to a helper.
+    fn mark_in_use(&mut self) -> Result<(), ExecutionError> {
+        Ok(())
+    }
     fn install_key(&mut self, key: SensitiveString) -> Result<(), ExecutionError>;
     fn finalize(&mut self, evidence: CleanupEvidence) -> Result<(), ExecutionError>;
 }
@@ -151,6 +156,8 @@ fn valid_environment_name(name: &str) -> bool {
 pub(crate) enum CleanupEvidence {
     NotStarted,
     Reaped,
+    /// Observation ended; consumers or descendants may still own resources.
+    Detached,
     Uncertain,
 }
 pub(crate) struct Supervision {
@@ -239,6 +246,7 @@ pub enum ExecutionError {
     Cancelled,
     ManagerUnavailable,
     CleanupUncertain,
+    ObservationLost,
     UnitCollision,
 }
 impl fmt::Display for ExecutionError {
@@ -255,6 +263,7 @@ impl fmt::Display for ExecutionError {
             Self::Cancelled => "execution cancelled",
             Self::ManagerUnavailable => "containment manager unavailable",
             Self::CleanupUncertain => "execution cleanup unconfirmed",
+            Self::ObservationLost => "consumer observation ended",
             Self::UnitCollision => "execution unit collision",
         })
     }

@@ -75,6 +75,7 @@ pub enum DirectFailure {
     ExecutionRejected,
     ExecutionNonzero,
     ExecutionSignaled,
+    ObservationLost,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case", from = "StrictDirectStatus")]

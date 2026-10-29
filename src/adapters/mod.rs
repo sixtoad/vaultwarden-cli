@@ -10,6 +10,8 @@ pub mod human_socket;
 pub mod loopback_ui;
 pub mod session;
 #[cfg(target_os = "linux")]
+pub(crate) mod ssh_agent;
+#[cfg(target_os = "linux")]
 pub mod ssh_material;
 pub mod supervisor;
 #[cfg(target_os = "linux")]

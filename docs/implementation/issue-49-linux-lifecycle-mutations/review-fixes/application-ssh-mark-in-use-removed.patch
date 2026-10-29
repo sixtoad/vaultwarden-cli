@@ -1,0 +1,11 @@
+--- a/src/access/application.rs
++++ b/src/access/application.rs
+@@ -1395,7 +1395,7 @@
+             Ok((prepared, environment)) => {
+                 if material
+                     .as_mut()
+-                    .is_some_and(|material| material.mark_in_use().is_err())
++                    .is_some_and(|_material| false)
+                 {
+                     Supervision {
+                         outcome: Err(ExecutionError::ExecutionFailed),

@@ -83,6 +83,11 @@ impl SecretBackend for Backend {
         assert!(live());
         assert_eq!(input.password.as_deref(), Some("private-producer-sentinel"));
         CREATE_CALLS.with(|c| c.set(c.get() + 1));
+        CREATE_ACTION.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe(live);
+            }
+        });
         match CREATE_MODE.with(std::cell::Cell::get) {
             1 => Err(crate::secret_storage::WriteStatus::Uncertain),
             2 => panic!("simulated interrupted write"),
@@ -2310,7 +2315,7 @@ fn claimed_execution_failure_before_launch_is_redacted_terminal_and_never_superv
 }
 
 #[test]
-fn claimed_execution_rechecks_live_authority_before_terminal_persistence() {
+fn observed_main_exit_remains_accurate_after_future_access_ends() {
     for cause in ["closing", "request_expiry", "session_expiry"] {
         let f = if cause == "session_expiry" {
             fixture_with_lifetime(Duration::from_secs(3600))
@@ -2335,11 +2340,11 @@ fn claimed_execution_rechecks_live_authority_before_terminal_persistence() {
                 &ExecutionPreparation::default(),
                 &supervisor,
             ),
-            Err(DirectRequestError::Unavailable),
+            Ok(DirectStatus::Completed { exit_code: 0 }),
             "{cause}"
         );
         let persisted = serde_json::to_string(&records(&f)).unwrap();
-        assert!(!persisted.contains("completed"), "{cause}");
+        assert!(persisted.contains("completed"), "{cause}");
     }
 }
 
@@ -6915,6 +6920,7 @@ fn ssh_application_supervises_before_finalization_and_persists_redacted_failures
     struct Supervisor {
         events: Events,
         evidence: CleanupEvidence,
+        outcome: ExecutionOutcome,
     }
     impl ProcessSupervisor<Preparation> for Supervisor {
         fn ssh_material_root(&self) -> Option<&std::path::Path> {
@@ -6945,7 +6951,7 @@ fn ssh_application_supervises_before_finalization_and_persists_redacted_failures
             control.started().unwrap();
             self.events.borrow_mut().push("reap");
             Supervision {
-                outcome: Ok(ExecutionOutcome::ExitedZero),
+                outcome: Ok(self.outcome),
                 cleanup: self.evidence,
                 helper_reaped: true,
             }
@@ -6954,7 +6960,10 @@ fn ssh_application_supervises_before_finalization_and_persists_redacted_failures
     for (phase, failure, evidence) in [
         ("launch", false, CleanupEvidence::Reaped),
         ("launch", true, CleanupEvidence::Reaped),
+        ("nonzero", true, CleanupEvidence::Reaped),
+        ("signal", true, CleanupEvidence::Reaped),
         ("launch", false, CleanupEvidence::Uncertain),
+        ("launch", false, CleanupEvidence::Detached),
         ("key", false, CleanupEvidence::Reaped),
         ("key", true, CleanupEvidence::Reaped),
         ("backend", false, CleanupEvidence::Reaped),
@@ -6995,15 +7004,23 @@ fn ssh_application_supervises_before_finalization_and_persists_redacted_failures
             fail: failure,
             key_failure: phase == "key",
         };
+        let outcome = match phase {
+            "nonzero" => ExecutionOutcome::ExitedNonZero,
+            "signal" => ExecutionOutcome::Signaled,
+            _ => ExecutionOutcome::ExitedZero,
+        };
         let supervisor = Supervisor {
             events: events.clone(),
             evidence,
+            outcome,
         };
         let result = f.app.run_execution(owner, &id, &preparer, &supervisor);
         RESOLUTION_ACTION.with(|hook| *hook.borrow_mut() = None);
         PROBE_ACTION.with(|hook| *hook.borrow_mut() = None);
         let expected = match phase {
-            "launch" => vec!["image", "host-and-cwd", "key", "reap", "finalize"],
+            "launch" | "nonzero" | "signal" => {
+                vec!["image", "host-and-cwd", "key", "reap", "finalize"]
+            }
             "key" => vec!["image", "host-and-cwd", "key", "finalize-not-started"],
             _ => vec!["image", "host-and-cwd", "finalize-not-started"],
         };
@@ -7012,28 +7029,60 @@ fn ssh_application_supervises_before_finalization_and_persists_redacted_failures
             expected,
             "{phase}, cleanup failure={failure}"
         );
-        if phase == "launch" && !failure && evidence == CleanupEvidence::Reaped {
-            assert_eq!(result, Ok(DirectStatus::Completed { exit_code: 0 }));
+        if matches!(phase, "launch" | "nonzero" | "signal")
+            && evidence != CleanupEvidence::Uncertain
+        {
+            let status = match outcome {
+                ExecutionOutcome::ExitedZero => DirectStatus::Completed { exit_code: 0 },
+                ExecutionOutcome::ExitedNonZero => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionNonzero,
+                },
+                ExecutionOutcome::Signaled => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionSignaled,
+                },
+            };
+            assert_eq!(
+                result,
+                if outcome == ExecutionOutcome::ExitedZero {
+                    Ok(status.clone())
+                } else {
+                    Err(DirectRequestError::Unavailable)
+                }
+            );
+            assert_eq!(f.app.direct_status(owner, &id), Ok(status));
+            assert!(!f.app.admission_closed());
         } else {
             assert_eq!(result, Err(DirectRequestError::Unavailable));
             assert_eq!(
                 f.app.admission_closed(),
-                failure || evidence == CleanupEvidence::Uncertain
+                evidence == CleanupEvidence::Uncertain
             );
             if evidence != CleanupEvidence::Uncertain {
-                let record: DirectRecord =
-                    serde_json::from_value(records(&f)["requests"][0]["direct"].clone()).unwrap();
                 assert_eq!(
-                    record.review.status,
-                    DirectStatus::Failed {
+                    f.app.direct_status(owner, &id),
+                    Ok(DirectStatus::Failed {
                         reason: DirectFailure::ExecutionUnavailable
-                    }
+                    })
                 );
             }
         }
         let surfaces = format!("{} {:?}", records(&f), result);
         assert!(!surfaces.contains("ssh-private-key-sentinel"));
         assert!(!surfaces.contains("SSH_AUTH_SOCK"));
+        if evidence == CleanupEvidence::Detached || failure {
+            // Retained/failed SSH cleanup must not disable an independent normal
+            // operation: exercise the complete next approval and dispatch.
+            let next = approved(&f);
+            assert_eq!(
+                f.app.run_execution(
+                    owner,
+                    &next,
+                    &ExecutionPreparation::default(),
+                    &RecordingSupervisor::default()
+                ),
+                Ok(DirectStatus::Completed { exit_code: 0 })
+            );
+        }
     }
 }
 
@@ -7071,7 +7120,10 @@ fn ssh_lock_intent_during_key_resolution_cleans_material_without_launch() {
             ssh: &SshOperation,
         ) -> Result<Box<dyn SshMaterial>, ExecutionError> {
             Ok(Box::new(WatchedMaterial {
-                inner: LinuxExecutablePreparer.prepare_ssh(prepared, root, ssh)?,
+                inner: crate::adapters::ssh_material::with_test_runtime(
+                    root.parent().unwrap(),
+                    || LinuxExecutablePreparer.prepare_ssh(prepared, root, ssh),
+                )?,
                 installed: self.0.clone(),
             }))
         }
@@ -7122,7 +7174,7 @@ fn ssh_lock_intent_during_key_resolution_cleans_material_without_launch() {
     EXECUTION_RESOLUTION_CALLS.with(|calls| calls.set(0));
     RESOLUTION_ACTION.with(|hook| {
         *hook.borrow_mut() = Some(Box::new(move || {
-            let requests: Vec<_> = std::fs::read_dir(observed.join("requests"))
+            let requests: Vec<_> = std::fs::read_dir(observed.join("agents"))
                 .unwrap()
                 .map(|entry| entry.unwrap().path())
                 .collect();
@@ -7162,7 +7214,7 @@ fn ssh_lock_intent_during_key_resolution_cleans_material_without_launch() {
         .unwrap();
     EXECUTION_RESOLUTION_CALLS.with(|calls| assert_eq!(calls.get(), 1));
     assert_eq!(
-        std::fs::read_dir(root.join("requests")).unwrap().count(),
+        std::fs::read_dir(root.join("agents")).unwrap().count(),
         0,
         "NotStarted cleanup must remove the material prepared before blocked key resolution"
     );
@@ -7237,7 +7289,9 @@ fn companion_inbox_expires_and_locked_submission_never_creates_work() {
     assert!(f.app.companion_pending().unwrap().is_empty());
 }
 
+type CreateAction = std::cell::RefCell<Option<Box<dyn FnOnce(&dyn Fn() -> bool)>>>;
 thread_local! {
+    static CREATE_ACTION: CreateAction = std::cell::RefCell::new(None);
     static CREATE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static CREATE_MODE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
 }
@@ -7693,5 +7747,347 @@ fn protected_create_fresh_approval_after_restart_cannot_replay_equivalent_destin
             .unwrap()["direct"]["write_receipt"]
             .clone();
         assert_eq!(retained, original);
+    }
+}
+
+#[test]
+fn detached_observation_is_terminal_without_recall_cleanup_or_approval_replay() {
+    struct Detached;
+    impl ProcessSupervisor<ExecutionPreparation> for Detached {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("controlled supervision required")
+        }
+        fn supervise_controlled(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            control.release(&mut || Ok(())).unwrap();
+            control.started().unwrap();
+            Supervision {
+                outcome: Err(ExecutionError::ObservationLost),
+                cleanup: CleanupEvidence::Detached,
+                helper_reaped: false,
+            }
+        }
+    }
+    let f = fixture();
+    let id = approved(&f);
+    assert_eq!(
+        f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &Detached
+        ),
+        Err(DirectRequestError::Unavailable)
+    );
+    assert!(!f.app.admission_closed());
+    assert_eq!(
+        f.app.direct_status(f.app.human_owner(), &id),
+        Ok(DirectStatus::Failed {
+            reason: DirectFailure::ObservationLost
+        })
+    );
+    assert_eq!(
+        f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &Detached
+        ),
+        Err(DirectRequestError::AlreadyDecided)
+    );
+    assert_eq!(f.app.lock(), Ok(()));
+    assert!(
+        !serde_json::to_string(&records(&f))
+            .unwrap()
+            .contains("synthetic-password-sentinel")
+    );
+}
+
+#[test]
+fn protected_create_detached_producer_never_posts_and_preserves_observation_loss() {
+    struct DetachedProducer(Result<ExecutionOutcome, ExecutionError>);
+    impl ProcessSupervisor<ProducerPreparation> for DetachedProducer {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: (),
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("controlled supervision required")
+        }
+        fn supervise_controlled(
+            &self,
+            _: (),
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            control.release(&mut || Ok(())).unwrap();
+            control.started().unwrap();
+            Supervision {
+                outcome: self.0,
+                cleanup: CleanupEvidence::Detached,
+                helper_reaped: false,
+            }
+        }
+    }
+    for (outcome, failure, history) in [
+        (
+            Err(ExecutionError::ObservationLost),
+            DirectFailure::ObservationLost,
+            HistoryOutcome::ObservationLost,
+        ),
+        (
+            Ok(ExecutionOutcome::ExitedNonZero),
+            DirectFailure::ExecutionNonzero,
+            HistoryOutcome::ExecutionNonzero,
+        ),
+        (
+            Ok(ExecutionOutcome::Signaled),
+            DirectFailure::ExecutionSignaled,
+            HistoryOutcome::ExecutionSignaled,
+        ),
+    ] {
+        CREATE_CALLS.with(|calls| calls.set(0));
+        let f = fixture();
+        let id = create_pending(&f);
+        let owner = f.app.human_owner();
+        f.app.commit_approval(approval(&f, &id)).unwrap();
+        assert_eq!(
+            f.app.run_execution(
+                owner,
+                &id,
+                &ProducerPreparation { malformed: false },
+                &DetachedProducer(outcome)
+            ),
+            Err(DirectRequestError::Unavailable)
+        );
+        assert_eq!(CREATE_CALLS.with(std::cell::Cell::get), 0);
+        let expected = DirectStatus::Failed { reason: failure };
+        assert_eq!(f.app.direct_status(owner, &id), Ok(expected.clone()));
+        let record: DirectRecord =
+            serde_json::from_value(records(&f)["requests"][0]["direct"].clone()).unwrap();
+        assert!(record.write_receipt.is_none());
+        assert_eq!(record.review.status, expected);
+        assert_eq!(f.app.history(owner, None).unwrap()[0].outcome, history);
+        assert!(!f.app.admission_closed());
+    }
+}
+
+#[test]
+fn protected_create_final_post_serializes_both_cancellation_orderings() {
+    use std::sync::mpsc;
+    for cancel_first in [true, false] {
+        let f = fixture();
+        let id = create_pending(&f);
+        let owner = f.app.human_owner();
+        f.app.commit_approval(approval(&f, &id)).unwrap();
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let (attempt_tx, attempt_rx) = mpsc::channel();
+        let (published_tx, published_rx) = mpsc::channel();
+        let (worker_cancel_tx, worker_cancel_rx) = mpsc::channel();
+        let app = f.app.clone();
+        let request = id.clone();
+        let worker = std::thread::spawn(move || {
+            CREATE_MODE.with(|mode| mode.set(0));
+            CREATE_CALLS.with(|calls| calls.set(0));
+            if cancel_first {
+                super::application::PRODUCER_WRITE_GATE_HOOK.with(|hook| {
+                    *hook.borrow_mut() = Some(Box::new(move || {
+                        entered_tx.send(()).unwrap();
+                        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }))
+                });
+            } else {
+                CREATE_ACTION.with(|hook| {
+                    *hook.borrow_mut() = Some(Box::new(move |_live| {
+                        entered_tx.send(()).unwrap();
+                        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }))
+                });
+            }
+            if !cancel_first {
+                super::application::PRODUCER_WRITE_FINISHED_HOOK.with(|hook| {
+                    *hook.borrow_mut() = Some(Box::new(move || {
+                        // Keep this execution registered until cancellation has
+                        // acquired the released gate and published its token.
+                        worker_cancel_rx
+                            .recv_timeout(Duration::from_secs(5))
+                            .unwrap();
+                    }))
+                });
+            }
+            let result = app.run_execution(
+                owner,
+                &request,
+                &ProducerPreparation { malformed: false },
+                &ProducerSupervisor,
+            );
+            (result, CREATE_CALLS.with(std::cell::Cell::get))
+        });
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let app = f.app.clone();
+        let request = id.clone();
+        let canceller = std::thread::spawn(move || {
+            super::application::EXECUTION_CANCEL_PUBLISHED_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    published_tx.send(()).unwrap();
+                    let _receiver_closed = worker_cancel_tx.send(());
+                }))
+            });
+            attempt_tx.send(()).unwrap();
+            app.cancel_execution(owner, &request)
+        });
+        attempt_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let published =
+            published_rx.recv_timeout(Duration::from_millis(if cancel_first { 2000 } else { 250 }));
+        // Always unblock the backend before asserting, even for an escaped
+        // mutation, so no failed witness strands the worker or its canceller.
+        resume_tx.send(()).unwrap();
+        let work = worker.join();
+        let cancelled = canceller.join().unwrap();
+        assert_eq!(
+            published.is_ok(),
+            cancel_first,
+            "cancel_first={cancel_first}"
+        );
+        assert_eq!(cancelled, Ok(()));
+        let (result, writes) = work.unwrap();
+        assert_eq!(writes, usize::from(!cancel_first));
+        assert_eq!(result, Err(DirectRequestError::Unavailable));
+        let record: DirectRecord =
+            serde_json::from_value(records(&f)["requests"][0]["direct"].clone()).unwrap();
+        assert_eq!(
+            record.review.status,
+            DirectStatus::Failed {
+                reason: DirectFailure::ExecutionUnavailable
+            }
+        );
+        let receipt = record.write_receipt.unwrap();
+        assert_eq!(
+            receipt.status,
+            if cancel_first {
+                crate::secret_storage::WriteStatus::Uncertain
+            } else {
+                crate::secret_storage::WriteStatus::CreatedUnverified
+            }
+        );
+        assert_eq!(
+            receipt.item_id,
+            (!cancel_first).then(|| "33333333-3333-3333-3333-333333333333".to_owned())
+        );
+        if !cancel_first {
+            published_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        }
+    }
+}
+
+#[test]
+fn running_execution_signature_release_rechecks_full_binding_and_withdrawal() {
+    struct SecondRelease<'a> {
+        fixture: &'a Fixture,
+        case: &'a str,
+        deliveries: std::cell::Cell<usize>,
+        lock: std::cell::RefCell<Option<std::thread::JoinHandle<Result<(), SessionError>>>>,
+    }
+    impl ProcessSupervisor<ExecutionPreparation> for SecondRelease<'_> {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            panic!("controlled delivery required")
+        }
+        fn supervise_controlled(
+            &self,
+            _: ObservedPrepared,
+            _: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            control
+                .release(&mut || {
+                    self.deliveries.set(self.deliveries.get() + 1);
+                    Ok(())
+                })
+                .unwrap();
+            control.started().unwrap();
+            // SSH signing happens after executable start, when durable status is Running.
+            match self.case {
+                "binding" => write_execution_record(self.fixture, |record| {
+                    record.review.effect = "changed after executable start".into()
+                }),
+                "deadline" => self.fixture.monotonic.store(310, Ordering::SeqCst),
+                "lock" => {
+                    let app = self.fixture.app.clone();
+                    let epoch = app.revocation_epoch_for_test();
+                    *self.lock.borrow_mut() = Some(std::thread::spawn(move || app.lock()));
+                    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                    while self.fixture.app.revocation_epoch_for_test() == epoch {
+                        assert!(std::time::Instant::now() < deadline);
+                        std::thread::yield_now();
+                    }
+                }
+                _ => {}
+            }
+            let signature = control.release(&mut || {
+                self.deliveries.set(self.deliveries.get() + 1);
+                Ok(())
+            });
+            assert_eq!(signature.is_ok(), self.case == "allowed", "{}", self.case);
+            Supervision {
+                outcome: signature.map(|_| ExecutionOutcome::ExitedZero),
+                cleanup: CleanupEvidence::Reaped,
+                helper_reaped: true,
+            }
+        }
+    }
+    for case in ["allowed", "binding", "deadline", "lock"] {
+        let f = fixture();
+        let id = approved(&f);
+        let supervisor = SecondRelease {
+            fixture: &f,
+            case,
+            deliveries: std::cell::Cell::new(0),
+            lock: std::cell::RefCell::new(None),
+        };
+        let _outcome = f.app.run_execution(
+            f.app.human_owner(),
+            &id,
+            &ExecutionPreparation::default(),
+            &supervisor,
+        );
+        assert_eq!(
+            supervisor.deliveries.get(),
+            if case == "allowed" { 2 } else { 1 }
+        );
+        if let Some(lock) = supervisor.lock.borrow_mut().take() {
+            lock.join().unwrap().unwrap();
+        }
+        assert!(
+            f.app
+                .run_execution(
+                    f.app.human_owner(),
+                    &id,
+                    &ExecutionPreparation::default(),
+                    &RecordingSupervisor::default()
+                )
+                .is_err()
+        );
     }
 }

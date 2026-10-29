@@ -1,0 +1,11 @@
+{
+  "api_baseline": "13.0",
+  "architecture": "x86_64",
+  "certified_versions": [],
+  "kernel_release": "6.18.7-76061807-generic",
+  "native_host_authorized": false,
+  "os_build": null,
+  "os_version": null,
+  "system": "Linux",
+  "uid": 1000
+}

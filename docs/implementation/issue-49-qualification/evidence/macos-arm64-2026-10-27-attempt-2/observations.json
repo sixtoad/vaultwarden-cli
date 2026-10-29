@@ -1,0 +1,56 @@
+[
+  {
+    "case": "signed-fixtures",
+    "detail": "ad-hoc-signatures-only",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "peer-kernel-uid",
+    "detail": "socketpair-same-account-no-secret-release",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "peer-expected-uid-mismatch",
+    "detail": "socketpair-same-account-no-secret-release",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "pathname-replacement-negative-control",
+    "detail": "checked-path-executed-different-bytes-candidate-rejected",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "signature-mutation-negative-control",
+    "detail": "invalid-image-denied-before-launch",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "inspection",
+    "detail": "bounded-fixture-observation-not-production-cleanup-proof",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "crash",
+    "detail": "bounded-fixture-observation-not-production-cleanup-proof",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "descendants",
+    "detail": "bounded-fixture-observation-not-production-cleanup-proof",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  },
+  {
+    "case": "descendants-parent-crash",
+    "detail": "bounded-fixture-observation-not-production-cleanup-proof",
+    "outcome": "pass",
+    "production_gate_satisfied": false
+  }
+]

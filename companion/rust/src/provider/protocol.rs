@@ -42,6 +42,7 @@ pub enum Failure {
     ExecutionRejected,
     ExecutionNonzero,
     ExecutionSignaled,
+    ObservationLost,
 }
 impl Status {
     pub fn summary(&self) -> String {
@@ -233,4 +234,28 @@ pub fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, &'stati
         return Err("Provider response exceeded the size limit.");
     }
     serde_json::from_slice(bytes).map_err(|_| "Provider returned an invalid response.")
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn observation_loss_is_closed_redacted_status_not_process_completion() {
+        let status: Status = decode(br#"{"status":"failed","reason":"observation_lost"}"#).unwrap();
+        assert_eq!(
+            status,
+            Status::Failed {
+                reason: Failure::ObservationLost
+            }
+        );
+        assert_eq!(
+            status.summary(),
+            r#"{"status":"failed","reason":"observation_lost"}"#
+        );
+        assert!(decode::<Status>(
+            br#"{"status":"failed","reason":"observation_lost","secret":"sentinel"}"#
+        )
+        .is_err());
+        assert!(decode::<Status>(br#"{"status":"failed","reason":"consumer_killed"}"#).is_err());
+    }
 }

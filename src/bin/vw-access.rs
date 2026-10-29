@@ -143,7 +143,7 @@ enum AgentCommand {
     },
     /// List immutable IDs, fingerprints, OS identities and enabled/revoked status.
     List,
-    /// Revoke an immutable binding ID and wait for affected execution cleanup.
+    /// Revoke future access for an immutable binding ID; running consumers continue.
     Revoke {
         #[arg(allow_hyphen_values = true)]
         id: String,

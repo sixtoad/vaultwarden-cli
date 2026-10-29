@@ -423,10 +423,12 @@ impl ProviderStore {
                 }
                 use super::direct_request::{DecisionOutcome, DirectFailure, DirectStatus};
                 if request.direct.is_some() {
-                    let (next, _outcome) = if request.status == RequestLifecycleStatus::Running {
+                    let (next, _outcome) = if request.status == RequestLifecycleStatus::Running
+                        || request.direct.as_ref().is_some_and(|d| d.execution_claimed)
+                    {
                         (
                             DirectStatus::Failed {
-                                reason: DirectFailure::ExecutionUnavailable,
+                                reason: DirectFailure::ObservationLost,
                             },
                             DecisionOutcome::ExecutionUnavailable,
                         )

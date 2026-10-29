@@ -1,0 +1,10 @@
+{
+  "identity_reuse_permitted": false,
+  "material_deleted": false,
+  "note": "kernel-exit-is-not-independent-reap-or-an-atomic-fork-barrier",
+  "outcome": "direct-children-accounted",
+  "production_cleanup_evidence": "Unavailable",
+  "resources_retained": true,
+  "unobserved_registered_pids": [],
+  "unregistered_descendants_possible_after_failure": false
+}
