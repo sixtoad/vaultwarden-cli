@@ -450,7 +450,7 @@ impl ProviderApplication {
         // Busy remote actions fail closed; the local emergency path remains
         // token-before-gate so it can cancel a blocked resolver.
         let mut checked_authority = if authority_binding.is_some() {
-            Some(self.gate.try_lock().map_err(|_| {
+            Some(self.gate.try_lock().map_err(|_error| {
                 ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
             })?)
         } else {
@@ -458,7 +458,7 @@ impl ProviderApplication {
         };
         // Preserve token-before-gate cancellation even while a resolver owns gate.
         {
-            let _release = self.release_gate.lock().map_err(|_| {
+            let _release = self.release_gate.lock().map_err(|_error| {
                 ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
             })?;
             if authority_binding.is_some_and(|(generation, epoch, deadline)| {
@@ -472,7 +472,7 @@ impl ProviderApplication {
                     DirectRequestError::Unauthorized,
                 ));
             }
-            let tokens = self.agent_tokens.lock().map_err(|_| {
+            let tokens = self.agent_tokens.lock().map_err(|_error| {
                 ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
             })?;
             let token = tokens.get(id).ok_or(ManagementMutationError::NotStarted(
@@ -497,7 +497,7 @@ impl ProviderApplication {
                 None => self
                     .gate
                     .lock()
-                    .map_err(|_| DirectRequestError::Unavailable)?,
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
             };
             let result = self
                 .clock
@@ -1151,7 +1151,7 @@ impl ProviderApplication {
         let authority = self
             .gate
             .lock()
-            .map_err(|_| DirectRequestError::Unavailable)?;
+            .map_err(|_error| DirectRequestError::Unavailable)?;
         authority.provider.request_origin(self.owner, id)
     }
     /// Retire all approval authority, checking the administrative ticket atomically.
@@ -1161,17 +1161,16 @@ impl ProviderApplication {
         epoch: u64,
         deadline: Duration,
     ) -> Result<bool, ManagementMutationError> {
-        let mut authority = self
-            .gate
-            .try_lock()
-            .map_err(|_| ManagementMutationError::NotStarted(DirectRequestError::Unavailable))?;
+        let mut authority = self.gate.try_lock().map_err(|_error| {
+            ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
+        })?;
         if authority.generation != generation || self.clock.now() >= deadline {
             return Err(ManagementMutationError::NotStarted(
                 DirectRequestError::Unauthorized,
             ));
         }
         {
-            let _release = self.release_gate.lock().map_err(|_| {
+            let _release = self.release_gate.lock().map_err(|_error| {
                 ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
             })?;
             if self.revocation_epoch.load(Ordering::Acquire) != epoch
@@ -1263,7 +1262,7 @@ impl ProviderApplication {
         let mut authority = self
             .gate
             .lock()
-            .map_err(|_| DirectRequestError::Unavailable)?;
+            .map_err(|_error| DirectRequestError::Unavailable)?;
         match self.admit(&mut authority) {
             Ok(()) | Err(SessionError::Locked) => {}
             Err(e) => return Err(e.into()),
@@ -1271,7 +1270,7 @@ impl ProviderApplication {
         let _release = self
             .release_gate
             .lock()
-            .map_err(|_| DirectRequestError::Unavailable)?;
+            .map_err(|_error| DirectRequestError::Unavailable)?;
         Ok((
             authority.generation,
             self.revocation_epoch.load(Ordering::Acquire),

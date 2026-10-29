@@ -77,7 +77,7 @@ impl SystemdProcessSupervisor {
         let manager = Manager::connect()?;
         manager.require_provider_stopped(PROVIDER)?;
         let helper = std::env::current_exe()
-            .map_err(|_| ExecutionError::Unavailable)?
+            .map_err(|_error| ExecutionError::Unavailable)?
             .parent()
             .ok_or(ExecutionError::UnsafePath)?
             .join("vaultwarden-access-exec");
@@ -416,7 +416,7 @@ impl ExecutionWorker {
                     );
                 }
             })
-            .map_err(|_| SessionError::BackendUnavailable)?;
+            .map_err(|_error| SessionError::BackendUnavailable)?;
         Ok(Self {
             sender: Some(sender),
             worker: Some(worker),
@@ -443,7 +443,7 @@ impl ExecutionWorker {
             .take()
             .ok_or(SessionError::CleanupFailed)?
             .join()
-            .map_err(|_| SessionError::CleanupFailed)
+            .map_err(|_error| SessionError::CleanupFailed)
     }
 }
 

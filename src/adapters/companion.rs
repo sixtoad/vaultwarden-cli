@@ -298,9 +298,9 @@ impl Companion {
         management::reconcile_stopped(root, action_id, kind, id, actor, || {
             crate::adapters::supervisor::SystemdProcessSupervisor::recover_stopped(root, || {
                 crate::adapters::session::clear_persisted_session()
-                    .map_err(|_| crate::access::ports::ExecutionError::CleanupUncertain)
+                    .map_err(|_error| crate::access::ports::ExecutionError::CleanupUncertain)
             })
-            .map_err(|_| ())
+            .map_err(|_error| ())
         })
     }
     pub fn bind(

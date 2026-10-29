@@ -158,7 +158,7 @@ fn inventory(
     app: &ProviderApplication,
 ) -> Result<Vec<Identity>, Error> {
     let mut rows = identity::management_records(&service.identity_store)
-        .map_err(|_| Error::Unavailable)?
+        .map_err(|_error| Error::Unavailable)?
         .into_iter()
         .map(|(entry, revoked, admin)| Identity {
             kind: Kind::ApprovalClient,
@@ -178,7 +178,7 @@ fn inventory(
         .collect::<Vec<_>>();
     for agent in app
         .list_agents(app.human_owner())
-        .map_err(|_| Error::Unavailable)?
+        .map_err(|_error| Error::Unavailable)?
     {
         let revoked = agent.status == crate::access::agent_binding::AgentBindingStatus::Revoked;
         rows.push(Identity {
@@ -195,7 +195,7 @@ fn inventory(
     Ok(rows)
 }
 fn read_journal(root: &Path) -> Result<Journal, Error> {
-    identity::private_directory(root).map_err(|_| Error::Unavailable)?;
+    identity::private_directory(root).map_err(|_error| Error::Unavailable)?;
     let path = root.join(JOURNAL);
     match std::fs::symlink_metadata(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Journal {
@@ -203,8 +203,9 @@ fn read_journal(root: &Path) -> Result<Journal, Error> {
             actions: Vec::new(),
         }),
         _ => {
-            let raw = identity::private_file(&path).map_err(|_| Error::Unavailable)?;
-            let journal: Journal = serde_json::from_slice(&raw).map_err(|_| Error::Unavailable)?;
+            let raw = identity::private_file(&path).map_err(|_error| Error::Unavailable)?;
+            let journal: Journal =
+                serde_json::from_slice(&raw).map_err(|_error| Error::Unavailable)?;
             let mut ids = std::collections::HashSet::new();
             if journal.version != 2
                 || journal.actions.len() > MAX_ACTIONS
@@ -232,12 +233,12 @@ fn read_journal(root: &Path) -> Result<Journal, Error> {
     }
 }
 fn save_journal(root: &Path, journal: &Journal) -> Result<(), Error> {
-    let bytes = serde_json::to_vec(journal).map_err(|_| Error::Unavailable)?;
+    let bytes = serde_json::to_vec(journal).map_err(|_error| Error::Unavailable)?;
     if bytes.len() > 65536 {
         return Err(Error::Unavailable);
     }
     let mut nonce = [0; 32];
-    getrandom::fill(&mut nonce).map_err(|_| Error::Unavailable)?;
+    getrandom::fill(&mut nonce).map_err(|_error| Error::Unavailable)?;
     let path = root.join(format!(".management-{}.new", identity::fingerprint(&nonce)));
     let result = (|| {
         let mut file = std::fs::OpenOptions::new()
@@ -246,17 +247,17 @@ fn save_journal(root: &Path, journal: &Journal) -> Result<(), Error> {
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW)
             .open(&path)
-            .map_err(|_| Error::Unavailable)?;
+            .map_err(|_error| Error::Unavailable)?;
         file.write_all(&bytes)
             .and_then(|_| file.sync_all())
-            .map_err(|_| Error::Unavailable)?;
-        std::fs::rename(&path, root.join(JOURNAL)).map_err(|_| Error::Unavailable)?;
+            .map_err(|_error| Error::Unavailable)?;
+        std::fs::rename(&path, root.join(JOURNAL)).map_err(|_error| Error::Unavailable)?;
         std::fs::File::open(root)
             .and_then(|f| f.sync_all())
-            .map_err(|_| Error::Unavailable)
+            .map_err(|_error| Error::Unavailable)
     })();
     if result.is_err() {
-        let _ = std::fs::remove_file(&path);
+        let _cleanup = std::fs::remove_file(&path);
     }
     result
 }
@@ -275,7 +276,7 @@ pub(super) fn dispatch(
         if let Command::RequestOrigin { request_id, .. } = command {
             let origin = app
                 .companion_origin(&request_id)
-                .map_err(|_| Error::Unavailable)?;
+                .map_err(|_error| Error::Unavailable)?;
             return Ok(Response::ok(
                 serde_json::json!({"version":2,"request_id":request_id,"origin":origin}),
             ));
@@ -311,7 +312,9 @@ pub(super) fn dispatch(
         if !identity::administrator(&service.identity_store, actor) {
             return Err(Error::Unauthorized);
         }
-        let (generation, epoch) = app.management_authority().map_err(|_| Error::Unavailable)?;
+        let (generation, epoch) = app
+            .management_authority()
+            .map_err(|_error| Error::Unavailable)?;
         match command {
             Command::IdentityList { limit, after, .. } => {
                 let mut rows = inventory(service, actor, app)?;
@@ -347,7 +350,10 @@ pub(super) fn dispatch(
                 ))
             }
             Command::IdentityPrepare { target, .. } => {
-                let mut state = service.management.lock().map_err(|_| Error::Unavailable)?;
+                let mut state = service
+                    .management
+                    .lock()
+                    .map_err(|_error| Error::Unavailable)?;
                 let row = inventory(service, actor, app)?
                     .into_iter()
                     .find(|row| row.target() == target)
@@ -361,11 +367,11 @@ pub(super) fn dispatch(
                     return Err(Error::RateLimited);
                 }
                 let action_id = crate::access::RequestId::new_random()
-                    .map_err(|_| Error::Unavailable)?
+                    .map_err(|_error| Error::Unavailable)?
                     .as_str()
                     .to_owned();
                 let mut nonce = [0; 32];
-                getrandom::fill(&mut nonce).map_err(|_| Error::Unavailable)?;
+                getrandom::fill(&mut nonce).map_err(|_error| Error::Unavailable)?;
                 let ticket = identity::fingerprint(&nonce);
                 let deadline = now
                     .checked_add(Duration::from_secs(55))
@@ -390,7 +396,10 @@ pub(super) fn dispatch(
                 password,
                 ..
             } => {
-                let mut state = service.management.lock().map_err(|_| Error::Unavailable)?;
+                let mut state = service
+                    .management
+                    .lock()
+                    .map_err(|_error| Error::Unavailable)?;
                 let position = state
                     .tickets
                     .iter()
@@ -409,7 +418,7 @@ pub(super) fn dispatch(
                 let _authentication = service
                     .authentication
                     .try_lock()
-                    .map_err(|_| Error::RateLimited)?;
+                    .map_err(|_error| Error::RateLimited)?;
                 if !service.attempt(actor, app.companion_now()) {
                     return Err(Error::RateLimited);
                 }
@@ -419,15 +428,17 @@ pub(super) fn dispatch(
                     .ok_or(Error::Unavailable)?;
                 authenticator
                     .authenticate(password)
-                    .map_err(|_| Error::Authentication)?;
+                    .map_err(|_error| Error::Authentication)?;
                 let _commit = service
                     .identity_commit
                     .lock()
-                    .map_err(|_| Error::Unavailable)?;
+                    .map_err(|_error| Error::Unavailable)?;
                 if !service.authorized(actor)
                     || !identity::administrator(&service.identity_store, actor)
                     || app.companion_now() >= ticket.deadline
-                    || app.management_authority().map_err(|_| Error::Unavailable)?
+                    || app
+                        .management_authority()
+                        .map_err(|_error| Error::Unavailable)?
                         != (ticket.generation, ticket.epoch)
                 {
                     return Err(Error::Stale);
@@ -461,7 +472,7 @@ pub(super) fn dispatch(
                     let hook = service
                         .management
                         .lock()
-                        .map_err(|_| Error::Unavailable)?
+                        .map_err(|_error| Error::Unavailable)?
                         .before_mutation
                         .take();
                     if let Some(hook) = hook {
@@ -490,7 +501,7 @@ pub(super) fn dispatch(
                                         service
                                             .management
                                             .lock()
-                                            .map_err(|_| Error::Unavailable)?
+                                            .map_err(|_error| Error::Unavailable)?
                                             .failed = true;
                                         app.close_admission();
                                         Err(ManagementMutationError::Uncertain(
@@ -526,7 +537,7 @@ pub(super) fn dispatch(
                     service
                         .management
                         .lock()
-                        .map_err(|_| Error::Unavailable)?
+                        .map_err(|_error| Error::Unavailable)?
                         .failed = true;
                     app.close_admission();
                     return Err(Error::Unavailable);
@@ -608,12 +619,12 @@ pub(super) fn reconcile_stopped(
             }
         }
     };
-    let before = read_journal(root).map_err(|_| SessionError::BackendUnavailable)?;
+    let before = read_journal(root).map_err(|_error| SessionError::BackendUnavailable)?;
     resolve_actor(&before)?;
     // start_with_cleanup refuses a competing daemon before invoking cleanup.
     let mut provider = Provider::start_with_cleanup(root, cleanup)
-        .map_err(|_| SessionError::BackendUnavailable)?;
-    let mut journal = read_journal(root).map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
+    let mut journal = read_journal(root).map_err(|_error| SessionError::BackendUnavailable)?;
     let actor = resolve_actor(&journal)?;
     if !journal.actions.iter().any(|a| a.action_id == action_id) {
         // Persist the owner's separate recovery intent before target mutation.
@@ -627,7 +638,7 @@ pub(super) fn reconcile_stopped(
             owner_reconciled: false,
             reconciled_by_uid: None,
         });
-        save_journal(root, &journal).map_err(|_| SessionError::BackendUnavailable)?;
+        save_journal(root, &journal).map_err(|_error| SessionError::BackendUnavailable)?;
     }
     let action = journal
         .actions
@@ -640,21 +651,21 @@ pub(super) fn reconcile_stopped(
         Kind::RequesterAgent => {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|_| SessionError::BackendUnavailable)?
+                .map_err(|_error| SessionError::BackendUnavailable)?
                 .as_secs();
             provider
                 .revoke_agent(owner, &target.id, now)
-                .map_err(|_| SessionError::BackendUnavailable)?;
+                .map_err(|_error| SessionError::BackendUnavailable)?;
         }
     }
     provider
         .shutdown()
-        .map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     action.owner_reconciled = true;
     action.reconciled_by_uid = Some(unsafe { libc::geteuid() });
     let receipt = serde_json::from_str(&action_response(action).body)
-        .map_err(|_| SessionError::BackendUnavailable)?;
-    save_journal(root, &journal).map_err(|_| SessionError::BackendUnavailable)?;
+        .map_err(|_error| SessionError::BackendUnavailable)?;
+    save_journal(root, &journal).map_err(|_error| SessionError::BackendUnavailable)?;
     Ok(receipt)
 }
 

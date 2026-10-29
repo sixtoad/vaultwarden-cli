@@ -163,8 +163,13 @@ fn provider_harness() {
             manager.require_provider_stopped(&supervisor.config.provider),
             Err(ExecutionError::ManagerUnavailable)
         );
-        let lease = manager.lease(supervisor.config.name().unwrap());
-        supervisor.config.record(&lease).unwrap();
+        let lease = supervisor
+            .config
+            .leases()
+            .unwrap()
+            .into_iter()
+            .next()
+            .expect("crash recovery must retain the original consumer lease");
         manager::FAULT.with(|fault| fault.set(manager::Fault::Observe));
         let refused = manager.recover_strict(&supervisor.config);
         manager::FAULT.with(|fault| fault.set(manager::Fault::None));

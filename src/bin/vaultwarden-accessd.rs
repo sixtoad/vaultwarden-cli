@@ -106,13 +106,13 @@ fn run(args: Args) -> Result<(), ()> {
             args.companion_reconcile_id.as_deref().ok_or(())?,
             args.companion_reconcile_actor.as_deref(),
         )
-        .map_err(|_| ())?;
+        .map_err(|_error| ())?;
         println!("{receipt}");
         return Ok(());
     }
     if let Some(fingerprint) = &args.companion_grant_admin {
         return companion_identity::grant_administrator(&args.state_root, fingerprint)
-            .map_err(|_| ());
+            .map_err(|_error| ());
     }
     if let Some(certificate) = &args.companion_enroll_cert {
         let fingerprint = companion_identity::enroll(
