@@ -66,11 +66,31 @@ fn boot_time() -> Option<Duration> {
         }
         boot_duration(time.tv_sec, time.tv_nsec)
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     {
-        None
+        #[repr(C)]
+        struct Timebase {
+            numer: u32,
+            denom: u32,
+        }
+        unsafe extern "C" {
+            fn mach_timebase_info(info: *mut Timebase) -> libc::c_int;
+            fn mach_continuous_time() -> u64;
+        }
+        let mut scale = Timebase { numer: 0, denom: 0 };
+        if unsafe { mach_timebase_info(&mut scale) } != 0 || scale.denom == 0 {
+            return None;
+        }
+        let nanos = (unsafe { mach_continuous_time() } as u128)
+            .checked_mul(scale.numer as u128)?
+            .checked_div(scale.denom as u128)?;
+        Some(Duration::new(
+            u64::try_from(nanos / 1_000_000_000).ok()?,
+            (nanos % 1_000_000_000) as u32,
+        ))
     }
 }
+#[cfg(any(target_os = "linux", test))]
 fn boot_duration(seconds: i64, nanos: i64) -> Option<Duration> {
     if seconds < 0 || !(0..1_000_000_000).contains(&nanos) {
         return None;
@@ -133,11 +153,16 @@ pub fn clear_persisted_session() -> Result<(), SessionError> {
 
 /// Read setup only, not Config::load(), which also restores CLI authority.
 pub(crate) fn load_setup(path: &Path) -> Result<Config, SessionError> {
+    #[cfg(target_os = "macos")]
+    let _checked = super::native::platform::open_no_writers(path, false)
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     let mut file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)
         .map_err(|_error| SessionError::BackendUnavailable)?;
+    #[cfg(target_os = "macos")]
+    super::native::platform::no_acl(&file).map_err(|_error| SessionError::BackendUnavailable)?;
     let metadata = file
         .metadata()
         .map_err(|_error| SessionError::BackendUnavailable)?;
@@ -265,6 +290,7 @@ mod tests {
         assert_eq!(poisoned.now(), Duration::MAX);
     }
     #[test]
+    #[cfg(target_os = "linux")]
     fn provider_guards_ignore_the_direct_cli_insecure_mac_override() {
         for test in [
             "adapters::session::tests::silent_derivation_and_setup_require_supported_authenticated_keys",

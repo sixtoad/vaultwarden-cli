@@ -74,6 +74,8 @@ fn open_at(parent: &File, leaf: &str, directory: bool) -> Result<File, Execution
     Ok(unsafe { File::from_raw_fd(fd) })
 }
 fn private(file: &File, directory: bool) -> Result<(), ExecutionError> {
+    #[cfg(target_os = "macos")]
+    super::native::platform::no_acl(file)?;
     let m = file.metadata().map_err(failure)?;
     if m.uid() != unsafe { libc::geteuid() }
         || m.mode() & 0o7777 != if directory { 0o700 } else { 0o600 }
@@ -117,6 +119,8 @@ pub(crate) fn directory(path: &Path, require_private: bool) -> Result<File, Exec
             }
             _ => return Err(ExecutionError::UnsafePath),
         }
+        #[cfg(target_os = "macos")]
+        super::native::platform::no_acl(&file)?;
         let m = file.metadata().map_err(failure)?;
         if !m.is_dir()
             || (m.uid() != 0 && m.uid() != unsafe { libc::geteuid() })
@@ -181,6 +185,7 @@ fn create(parent: &File, leaf: &str, bytes: &[u8]) -> Result<(), ExecutionError>
     test_fault(Fault::CreateParentSync)?;
     parent.sync_all().map_err(failure)
 }
+#[cfg(target_os = "linux")]
 fn entries(file: &File) -> Result<Vec<String>, ExecutionError> {
     std::fs::read_dir(format!("/proc/self/fd/{}", file.as_raw_fd()))
         .map_err(failure)?
@@ -192,6 +197,52 @@ fn entries(file: &File) -> Result<Vec<String>, ExecutionError> {
                 .map_err(failure)
         })
         .collect()
+}
+#[cfg(target_os = "macos")]
+fn entries(file: &File) -> Result<Vec<String>, ExecutionError> {
+    let fd = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 0) };
+    if fd < 0 {
+        return Err(ExecutionError::UnsafePath);
+    }
+    let directory = unsafe { libc::fdopendir(fd) };
+    if directory.is_null() {
+        unsafe {
+            libc::close(fd);
+        };
+        return Err(ExecutionError::UnsafePath);
+    }
+    let mut names = Vec::new();
+    unsafe {
+        libc::rewinddir(directory);
+    }
+    let result = (|| {
+        loop {
+            unsafe {
+                *libc::__error() = 0;
+            }
+            let entry = unsafe { libc::readdir(directory) };
+            if entry.is_null() {
+                if std::io::Error::last_os_error().raw_os_error() != Some(0) {
+                    return Err(ExecutionError::UnsafePath);
+                }
+                break;
+            }
+            let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) }
+                .to_str()
+                .map_err(failure)?;
+            if name != "." && name != ".." {
+                names.push(name.to_owned());
+            }
+            if names.len() > 4096 {
+                return Err(ExecutionError::UnsafePath);
+            }
+        }
+        Ok(names)
+    })();
+    unsafe {
+        libc::closedir(directory);
+    }
+    result
 }
 fn same(parent: &File, leaf: &str, file: &File, directory: bool) -> Result<(), ExecutionError> {
     let current = open_at(parent, leaf, directory)?;
@@ -361,11 +412,14 @@ fn recover_agent(
     let runtime = directory(runtime, true)?;
     let sockets = ensure_directory(&runtime, "vw-ssh-agents")?;
     let socket_name = socket_leaf(leaf)?;
+    #[cfg(target_os = "linux")]
     let path = PathBuf::from(format!(
         "/proc/self/fd/{}/{}",
         sockets.as_raw_fd(),
         socket_name
     ));
+    #[cfg(target_os = "macos")]
+    let path = super::native::platform::descriptor_path(&sockets)?.join(&socket_name);
     match std::fs::symlink_metadata(&path) {
         Ok(m) => {
             if !m.file_type().is_socket()
@@ -376,17 +430,22 @@ fn recover_agent(
             {
                 return Err(ExecutionError::CleanupUncertain);
             }
-            let raw = unsafe {
-                libc::socket(
-                    libc::AF_UNIX,
-                    libc::SOCK_STREAM | libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
-                    0,
-                )
+            #[cfg(target_os = "linux")]
+            let socket = {
+                let raw = unsafe {
+                    libc::socket(
+                        libc::AF_UNIX,
+                        libc::SOCK_STREAM | libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
+                        0,
+                    )
+                };
+                if raw < 0 {
+                    return Err(ExecutionError::CleanupUncertain);
+                }
+                unsafe { File::from_raw_fd(raw) }
             };
-            if raw < 0 {
-                return Err(ExecutionError::CleanupUncertain);
-            }
-            let socket = unsafe { File::from_raw_fd(raw) };
+            #[cfg(target_os = "macos")]
+            let socket = super::native::platform::socket().map_err(failure)?;
             let mut address: libc::sockaddr_un = unsafe { std::mem::zeroed() };
             address.sun_family = libc::AF_UNIX as _;
             let path_bytes = path.as_os_str().as_bytes();
@@ -584,7 +643,16 @@ fn runtime_path() -> PathBuf {
     if let Some(path) = TEST_RUNTIME.with(|runtime| runtime.borrow().clone()) {
         return path;
     }
-    PathBuf::from(format!("/run/user/{}", unsafe { libc::geteuid() }))
+    #[cfg(target_os = "linux")]
+    {
+        PathBuf::from(format!("/run/user/{}", unsafe { libc::geteuid() }))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        super::native::identity::load()
+            .map(|identity| identity.ssh_runtime_dir)
+            .unwrap_or_default()
+    }
 }
 #[cfg(test)]
 pub(crate) fn with_test_runtime<T>(path: &Path, action: impl FnOnce() -> T) -> T {
@@ -800,7 +868,7 @@ pub(crate) fn fixture(root: &Path) -> (SshOperation, String) {
     .unwrap();
     (ssh, private)
 }
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use std::os::unix::fs::{PermissionsExt, symlink};
@@ -1307,5 +1375,51 @@ else:
         TEST_FAIL_REMOVE_AFTER.with(|remaining| remaining.set(None));
         recover(&material_root).unwrap();
         assert!(!request.exists());
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod native_acl_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    #[test]
+    fn descriptor_relative_files_and_resource_directories_reject_acl_grants() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let parent = File::open(root.path()).unwrap();
+        for directory in [false, true] {
+            let leaf = if directory { "request" } else { "known_hosts" };
+            let path = root.path().join(leaf);
+            if directory {
+                std::fs::create_dir(&path).unwrap();
+            } else {
+                std::fs::write(&path, b"synthetic public pin").unwrap();
+            }
+            std::fs::set_permissions(
+                &path,
+                std::fs::Permissions::from_mode(if directory { 0o700 } else { 0o600 }),
+            )
+            .unwrap();
+            let file = open_at(&parent, leaf, directory).unwrap();
+            assert!(private(&file, directory).is_ok());
+            assert!(
+                std::process::Command::new("/bin/chmod")
+                    .args(["+a", "everyone allow write"])
+                    .arg(&path)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(private(&file, directory).is_err());
+            assert!(
+                std::process::Command::new("/bin/chmod")
+                    .arg("-N")
+                    .arg(&path)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(private(&file, directory).is_ok());
+        }
     }
 }

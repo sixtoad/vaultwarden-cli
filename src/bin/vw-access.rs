@@ -1,14 +1,14 @@
 //! Human terminal client. Outputs contain only provider-owned receipts and states.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 use clap::{Parser, Subcommand, error::ErrorKind};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 use std::{
     io::{self, Write},
     path::PathBuf,
     process::ExitCode,
     time::Duration,
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 use vaultwarden_cli::{
     access::{
         agent_binding::AgentPairing,
@@ -19,7 +19,7 @@ use vaultwarden_cli::{
     adapters::human_socket::{HumanCommand, HumanResponse, exchange},
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Parser)]
 #[command(
     name = "vw-access",
@@ -33,7 +33,7 @@ struct Args {
     #[command(subcommand)]
     command: Command,
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Subcommand)]
 enum Command {
     /// Register or inspect provider-owned executable images.
@@ -124,7 +124,7 @@ enum Command {
         command: AgentCommand,
     },
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Subcommand)]
 enum AgentCommand {
     /// Pair a fresh Ed25519 public key with a restricted numeric OS identity.
@@ -149,7 +149,7 @@ enum AgentCommand {
         id: String,
     },
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Subcommand)]
 enum ImageCommand {
     /// Declare behavioral review and verify an immutable executable without running it.
@@ -162,7 +162,7 @@ enum ImageCommand {
         path: String,
         #[arg(long)]
         sha256: String,
-        #[arg(long, value_parser = ["reviewed_self_contained_elf64_v1"])]
+        #[arg(long, value_parser = ["reviewed_self_contained_elf64_v1", "reviewed_native_macho_arm64_v1"])]
         profile: String,
     },
     List,
@@ -170,7 +170,7 @@ enum ImageCommand {
         id: String,
     },
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Subcommand)]
 enum OperationCommand {
     /// Read a strict, bounded OperationPolicyDraft JSON file containing metadata only.
@@ -184,7 +184,7 @@ enum OperationCommand {
     },
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn read_policy(path: &std::path::Path) -> Result<OperationPolicyDraft, String> {
     use std::{io::Read, os::unix::fs::OpenOptionsExt};
     let file = std::fs::OpenOptions::new()
@@ -205,7 +205,7 @@ fn read_policy(path: &std::path::Path) -> Result<OperationPolicyDraft, String> {
     }
     serde_json::from_slice(&bytes).map_err(|_error| "invalid policy file".into())
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn main() -> ExitCode {
     let args = match Args::try_parse() {
         Ok(args) => args,
@@ -247,7 +247,7 @@ fn main() -> ExitCode {
         }
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn parse_timeout_seconds(value: &str) -> Result<u64, &'static str> {
     let seconds = value.parse::<u64>().map_err(|_error| "invalid timeout")?;
     if seconds == 0
@@ -259,14 +259,14 @@ fn parse_timeout_seconds(value: &str) -> Result<u64, &'static str> {
     }
     Ok(seconds)
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn valid_agent_id(id: &str) -> bool {
     use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
     URL_SAFE_NO_PAD
         .decode(id)
         .is_ok_and(|bytes| bytes.len() == 32 && URL_SAFE_NO_PAD.encode(bytes) == id)
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn run_agent(command: &Command) -> u8 {
     use vaultwarden_cli::{
         access::protocol::{SignedStatusQuery, SignedSubmission},
@@ -412,7 +412,7 @@ fn run_agent(command: &Command) -> u8 {
         }
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn run(args: Args) -> Result<(), String> {
     let state_root = args.state_root.ok_or("provider state root required")?;
     let (command, wait) = match args.command {
@@ -423,14 +423,18 @@ fn run(args: Args) -> Result<(), String> {
                     execution_root,
                     path,
                     sha256,
-                    profile: _,
+                    profile,
                 } => HumanCommand::ImageRegister {
                     image: ImageRegistration {
                         id,
                         execution_root,
                         path,
                         sha256,
-                        profile: ExecutionProfile::ReviewedSelfContainedElf64V1,
+                        profile: if profile == "reviewed_native_macho_arm64_v1" {
+                            ExecutionProfile::ReviewedNativeMachOArm64V1
+                        } else {
+                            ExecutionProfile::ReviewedSelfContainedElf64V1
+                        },
                     },
                 },
                 ImageCommand::List => HumanCommand::ImageList {},
@@ -531,7 +535,7 @@ fn run(args: Args) -> Result<(), String> {
     }
     Ok(())
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn reject_error(response: &HumanResponse) -> Result<(), String> {
     match response {
         HumanResponse::ProvisioningRejected { reason } => Err(reason.to_string()),
@@ -542,7 +546,7 @@ fn reject_error(response: &HumanResponse) -> Result<(), String> {
         _ => Ok(()),
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn output(response: &impl serde::Serialize) -> Result<(), String> {
     let encoded = terminal_json(response)?;
     let mut stdout = io::stdout().lock();
@@ -553,7 +557,7 @@ fn output(response: &impl serde::Serialize) -> Result<(), String> {
         .map_err(|_error| "output unavailable".into())
 }
 /// Preserve JSON semantics while making invisible terminal controls visible.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn terminal_json(value: &impl serde::Serialize) -> Result<String, String> {
     use std::fmt::Write as _;
     const MAX_OUTPUT: usize = 2 * 1024 * 1024;
@@ -574,7 +578,10 @@ fn terminal_json(value: &impl serde::Serialize) -> Result<String, String> {
     }
     Ok(safe)
 }
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(
+    test,
+    any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64"))
+))]
 mod tests {
     use super::*;
     #[test]
@@ -763,7 +770,7 @@ mod tests {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64"))))]
 fn main() -> std::process::ExitCode {
     eprintln!("vw-access: unsupported platform; requires Linux");
     std::process::ExitCode::FAILURE

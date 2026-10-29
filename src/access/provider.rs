@@ -302,9 +302,10 @@ impl Provider {
         owner: &Option<super::direct_request::AgentOwner>,
     ) -> bool {
         owner.as_ref().is_none_or(|owner| {
-            state.pairings.iter().any(|b| {
-                owner.matches(b) && b.status == super::agent_binding::AgentBindingStatus::Enabled
-            })
+            state
+                .pairings
+                .iter()
+                .any(|b| owner.matches(b) && b.enabled_current())
         })
     }
     pub(crate) fn authenticate_status_query(
@@ -1253,7 +1254,7 @@ impl Provider {
 
     /// Checks the registry-owned image before the backend eligibility port and
     /// only advances in-memory authority after durable replacement succeeds.
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn activate_operation<V: LoginEligibilityVerifier>(
         &mut self,
         draft: OperationPolicyDraft,
@@ -1262,7 +1263,7 @@ impl Provider {
         self.activate_operation_checked(draft, verifier, || true)
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn activate_operation_checked<V: LoginEligibilityVerifier>(
         &mut self,
         draft: OperationPolicyDraft,
@@ -1434,7 +1435,7 @@ impl Provider {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::access::policy::{

@@ -1,12 +1,27 @@
 # Native protected execution on macOS — issue 49
 
-Draft, updated 2026-10-28. Source: [issue 49](https://github.com/sixtoad/vaultwarden-cli/issues/49), with the operator's subsequent [secret-access responsibility boundary](secret-access-boundary.md). Repository baseline: `476bf3f506aad6f52628ad32a6ef34e31172d1ba`.
+Plan and source qualification status, updated 2026-10-29. Source: [issue 49](https://github.com/sixtoad/vaultwarden-cli/issues/49), with the operator's subsequent [secret-access responsibility boundary](secret-access-boundary.md). Historical plan baseline: `476bf3f506aad6f52628ad32a6ef34e31172d1ba`.
 
-This is a proposed delivery plan, not an approved security design or evidence of macOS protected execution. The first deliverable is native security qualification. Production enablement remains blocked until the mechanisms below meet their contracts. The shared Linux lifecycle now follows the accepted responsibility boundary; see the [migration record](implementation/issue-49-future-access-only-linux.md).
+The authorized native source candidate and its selected delivery contract are described below. Source qualification does not establish installed production support; separate service-account and installation qualification remains required. The shared Linux lifecycle now follows the accepted responsibility boundary; see the [migration record](implementation/issue-49-future-access-only-linux.md).
 
 The CLI/provider owns secret authorization and delivery. Consumer execution and sandbox management are outside this project’s scope. Neither automatic nor optional consumer termination belongs to this CLI. Missing process-tree containment does not block the Mac secret-access port. The remaining delivery boundaries still need qualification, and the Linux migration establishes the same future-access-only contract.
 
-## Current evidence
+## Native source candidate (2026-10-29)
+
+The subsequent authorized implementation now provides native Apple Silicon
+composition, reviewed Mach-O preparation, explicit operator/provider identities,
+Unix authentication, sleep-aware authority and memory-only SSH signing. See the
+[implementation and installation packet](implementation/issue-49-native-provider.md)
+for the selected contract, tests, service templates and remaining qualification.
+Source tests do not establish an installed deployment. Native producer output is
+still unavailable; distinct-account/service-Keychain/launchd lifecycle and release
+signing require the concrete separately approved setup described there.
+
+The earlier stages and observations below are preserved as design history; their
+statements about the source being Linux-only describe the baseline, not the new
+candidate. No production OS-version support is implied.
+
+## Historical baseline evidence (2026-10-28)
 
 `src/lib.rs` compiles the protected access/application and adapter modules only on Linux. The provider and protected client reject macOS before reading state. Linux execution verifies a sealed executable memfd, executes that object with `execveat`, and uses systemd/cgroup supervision, subreaping and independent process observations to establish cleanup. None of those guarantees follows from building an equivalent Mach-O binary.
 

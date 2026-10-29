@@ -147,6 +147,8 @@ fn valid_environment_name(name: &str) -> bool {
             name,
             "LANG" | "LC_ALL" | "PATH" | "IFS" | "SHELL" | "LD_PRELOAD" | "LD_LIBRARY_PATH"
         )
+        && !name.starts_with("DYLD_")
+        && !name.starts_with("LD_")
         && !name.starts_with("VAULTWARDEN_")
         && !name.starts_with("BITWARDEN_")
 }
@@ -167,6 +169,7 @@ pub(crate) struct Supervision {
 }
 pub(crate) trait ExecutionControl {
     fn live(&self) -> bool;
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     fn remaining(&self) -> std::time::Duration;
     /// Serializes only the final nonblocking release against revocation intent.
     fn release(

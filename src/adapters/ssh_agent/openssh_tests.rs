@@ -1,10 +1,10 @@
 //! Real OpenSSH interoperability, separate from the production executable profile.
 use super::*;
 use crate::{access::ports::SshMaterial, adapters::ssh_material};
-use std::{
-    os::fd::FromRawFd,
-    process::{Child, Command, Stdio},
-};
+use std::process::{Child, Command, Stdio};
+
+#[cfg(target_os = "linux")]
+use std::os::fd::FromRawFd;
 
 struct TestProcess(Child);
 impl Drop for TestProcess {
@@ -160,7 +160,14 @@ fn run_interoperability(
     operation.destination.host = "127.0.0.1".into();
     operation.destination.port = port;
     operation.destination.user = username;
-    operation.destination.resource_path = "/usr/bin/sleep 1".into();
+    #[cfg(target_os = "linux")]
+    {
+        operation.destination.resource_path = "/usr/bin/sleep 1".into();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        operation.destination.resource_path = "/bin/sleep 1".into();
+    }
     operation.destination.host_fingerprint =
         host.public_key().fingerprint(HashAlg::Sha256).to_string();
     std::fs::write(root.join("ssh/host_keys.json"), serde_json::to_vec(&serde_json::json!([{"host":"127.0.0.1","port":port,"key":host.public_key().to_openssh().unwrap().split_whitespace().take(2).collect::<Vec<_>>().join(" ")}])).unwrap()).unwrap();
@@ -195,14 +202,26 @@ fn run_interoperability(
             .spawn()
             .unwrap(),
     );
-    let descriptor = unsafe { libc::syscall(libc::SYS_pidfd_open, ssh.0.id(), 0) };
-    assert!(descriptor >= 0);
+    #[cfg(target_os = "linux")]
+    {
+        let descriptor = unsafe { libc::syscall(libc::SYS_pidfd_open, ssh.0.id(), 0) };
+        assert!(descriptor >= 0);
+        material
+            .agent
+            .borrow_mut()
+            .recipient((ssh.0.id(), unsafe {
+                OwnedFd::from_raw_fd(descriptor as i32)
+            }))
+            .unwrap();
+    }
+    #[cfg(target_os = "macos")]
     material
         .agent
         .borrow_mut()
-        .recipient((ssh.0.id(), unsafe {
-            OwnedFd::from_raw_fd(descriptor as i32)
-        }))
+        .recipient(Recipient {
+            pid: ssh.0.id(),
+            requirement: crate::adapters::native::native_ssh_requirement().unwrap(),
+        })
         .unwrap();
     let deadline = Instant::now() + Duration::from_secs(15);
     let mut survived_agent_close = false;

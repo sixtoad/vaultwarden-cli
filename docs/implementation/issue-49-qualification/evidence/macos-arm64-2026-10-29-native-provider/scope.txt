@@ -1,0 +1,1 @@
+Source qualification finished. Installed distinct-UID endpoints, service Keychain, launchd stop/upgrade/reboot and release signing remain UNQUALIFIED.

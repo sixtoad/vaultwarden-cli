@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.cantolla.vaultwarden-accessd</string>
+  <key>ProgramArguments</key><array>
+    <string>/Library/VaultwardenAccess/versions/@VERSION@/vaultwarden-accessd</string>
+    <string>--state-root</string><string>/Library/VaultwardenAccess/state</string>
+    <string>--backend-config</string><string>/Library/VaultwardenAccess/state/backend.json</string>
+    <string>--agent-socket-dir</string><string>/Library/VaultwardenAccess/run/agent</string>
+    <string>--agent-socket-gid</string><string>@AGENT_GID@</string>
+    <string>--companion-listen</string><string>127.0.0.1:8443</string>
+    <string>--companion-tls-cert</string><string>/Library/VaultwardenAccess/state/provider-cert.pem</string>
+    <string>--companion-tls-key</string><string>/Library/VaultwardenAccess/state/provider-key.pem</string>
+    <string>--companion-client-ca</string><string>/Library/VaultwardenAccess/state/companion-ca.pem</string>
+  </array>
+  <key>UserName</key><string>@PROVIDER_ACCOUNT@</string>
+  <key>GroupName</key><string>@PROVIDER_GROUP@</string>
+  <key>InitGroups</key><true/>
+  <key>WorkingDirectory</key><string>/</string>
+  <key>Umask</key><integer>63</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <!-- Critical: stopping/restarting the provider must not stop its consumers. -->
+  <key>AbandonProcessGroup</key><true/>
+  <key>SoftResourceLimits</key><dict><key>Core</key><integer>0</integer></dict>
+  <key>HardResourceLimits</key><dict><key>Core</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/dev/null</string>
+  <key>StandardErrorPath</key><string>/dev/null</string>
+</dict></plist>

@@ -234,6 +234,7 @@ struct FixtureTrafficState {
 struct FixtureTraffic(Mutex<FixtureTrafficState>);
 #[cfg(test)]
 impl FixtureTraffic {
+    #[cfg(target_os = "linux")]
     fn armed() -> Self {
         Self(Mutex::new(FixtureTrafficState {
             drop_next_successful_approval: true,
@@ -277,6 +278,7 @@ impl FixtureTraffic {
             false
         }
     }
+    #[cfg(target_os = "linux")]
     fn snapshot(&self) -> serde_json::Value {
         serde_json::to_value(&*self.0.lock().unwrap()).unwrap()
     }
@@ -861,7 +863,7 @@ impl Response {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::access::direct_request_tests::{Fixture, fixture, input};
@@ -1517,10 +1519,10 @@ mod tests {
     include!("companion/management_tests.rs");
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 #[path = "companion_acceptance_tests.rs"]
 mod acceptance_tests;
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 #[path = "storage_acceptance_tests.rs"]
 mod storage_acceptance_tests;

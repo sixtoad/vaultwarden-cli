@@ -223,7 +223,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::access::protocol::AgentFailure;

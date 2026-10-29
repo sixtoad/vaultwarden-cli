@@ -883,7 +883,7 @@ impl ProviderApplication {
         result
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn submit_agent_for_test(
         &self,
         binding_id: &str,
@@ -911,7 +911,7 @@ impl ProviderApplication {
     pub(crate) fn human_owner(&self) -> AuthenticatedHuman {
         self.owner
     }
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn revocation_epoch_for_test(&self) -> u64 {
         self.revocation_epoch.load(Ordering::Acquire)
     }
@@ -2333,7 +2333,7 @@ impl From<SessionError> for super::protocol::AgentRejection {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::super::policy::LoginField;
     use super::*;

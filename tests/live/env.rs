@@ -38,9 +38,13 @@ type Aes256CbcEnc = Encryptor<aes::Aes256>;
 pub const TEST_PASSWORD: &str = "LiveTest-P@ss!1"; // secrets-ignore: test fixture
 
 /// Explicit private bus addresses prevent desktop-bus auto-discovery.
-pub fn isolate_command(cmd: &mut Command, home: &Path, config_root: &Path) {
-    #[cfg(not(target_os = "linux"))]
+#[cfg(not(target_os = "linux"))]
+pub fn isolate_command(_cmd: &mut Command, _home: &Path, _config_root: &Path) {
     panic!("live CLI isolation is supported only on Linux");
+}
+
+#[cfg(target_os = "linux")]
+pub fn isolate_command(cmd: &mut Command, home: &Path, config_root: &Path) {
     cmd.env_clear()
         .env("PATH", "/usr/bin:/bin")
         .env("HOME", home)

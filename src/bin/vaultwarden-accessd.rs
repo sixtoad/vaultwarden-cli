@@ -1,6 +1,6 @@
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 use clap::Parser;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 use std::{
     path::PathBuf,
     process::ExitCode,
@@ -10,7 +10,7 @@ use std::{
     },
     time::Duration,
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 use vaultwarden_cli::{
     access::{application::ProviderApplication, provider::Provider},
     adapters::{
@@ -18,14 +18,14 @@ use vaultwarden_cli::{
         companion_identity,
         human_socket::HumanSocket,
         loopback_ui::LoopbackUi,
+        platform_execution::{ExecutionWorker, PlatformProcessSupervisor},
         session::{MonotonicClock, clear_persisted_session},
-        supervisor::{ExecutionWorker, SystemdProcessSupervisor},
         unix_socket::AgentSocket,
         vaultwarden::VaultwardenBackend,
     },
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Debug, Parser)]
 #[command(name = "vaultwarden-accessd")]
 #[command(group(clap::ArgGroup::new("human_transport").args(["ui_tls_cert", "companion_listen"])))]
@@ -85,7 +85,7 @@ struct Args {
     #[arg(long, requires = "companion_reconcile_action")]
     companion_reconcile_actor: Option<String>,
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn main() -> ExitCode {
     let args = Args::parse();
     match run(args) {
@@ -96,7 +96,7 @@ fn main() -> ExitCode {
         }
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn run(args: Args) -> Result<(), ()> {
     if let Some(action) = &args.companion_reconcile_action {
         let receipt = Companion::reconcile_management_action(
@@ -144,7 +144,7 @@ fn run(args: Args) -> Result<(), ()> {
     let mut supervisor = None;
     let mut provider = initialize_provider(&args.state_root, || {
         let contained = Arc::new(
-            SystemdProcessSupervisor::installed(&args.state_root)
+            PlatformProcessSupervisor::installed(&args.state_root)
                 .map_err(|_error| vaultwarden_cli::access::ports::SessionError::CleanupFailed)?,
         );
         contained
@@ -277,7 +277,7 @@ fn run(args: Args) -> Result<(), ()> {
         .and(agent_cleanup)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn configured_application(
     args: &Args,
     provider: Provider,
@@ -292,7 +292,7 @@ fn configured_application(
     )
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn transport_finished<U, H>(
     ui: &std::thread::JoinHandle<U>,
     human: &std::thread::JoinHandle<H>,
@@ -301,7 +301,7 @@ fn transport_finished<U, H>(
 }
 
 /// Signal reception stays on the async driver; gate-taking status runs elsewhere.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 async fn monitor_shutdown(
     app: Arc<ProviderApplication>,
     signal: impl std::future::Future<Output = ()>,
@@ -325,7 +325,7 @@ async fn monitor_shutdown(
     app.close_admission();
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn join_then_revoke(
     worker: std::thread::JoinHandle<Result<(), vaultwarden_cli::access::ports::SessionError>>,
     revoke: impl FnOnce() -> Result<(), ()>,
@@ -338,7 +338,7 @@ fn join_then_revoke(
     cleanup.and(serving)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn initialize_provider(
     root: &std::path::Path,
     clear: impl FnOnce() -> Result<(), vaultwarden_cli::access::ports::SessionError>,
@@ -351,7 +351,7 @@ fn initialize_provider(
     .map_err(|_error| ())
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn clear_previous_launch(path: &std::path::Path) -> Result<(), ()> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
@@ -360,7 +360,10 @@ fn clear_previous_launch(path: &std::path::Path) -> Result<(), ()> {
     }
 }
 
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(
+    test,
+    any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64"))
+))]
 mod tests {
     use super::*;
 
@@ -513,6 +516,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn startup_cleans_before_corrupt_missing_or_unsafe_state_and_preserves_competing_owner() {
         use std::os::unix::fs::PermissionsExt;
         for problem in ["corrupt", "missing", "unsafe"] {
@@ -553,6 +557,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn no_config_startup_removes_stale_launch_even_when_keyring_cleanup_fails() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
@@ -575,6 +580,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn signal_driver_closes_admission_while_status_waits_on_delayed_unlock() {
         use std::sync::mpsc;
         use vaultwarden_cli::access::ports::*;
@@ -690,6 +696,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn no_config_startup_clears_injected_keyring_and_cleanup_error_blocks_start() {
         use vaultwarden_cli::adapters::session::{
             BOOTSTRAP_ACCOUNT, KEYRING_SERVICE, SESSION_ACCOUNT,
@@ -783,6 +790,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(target_os = "linux")]
     fn configured_request_lifetime_controls_receipt_and_expiry() {
         use sha2::Digest;
         use std::{os::unix::fs::PermissionsExt, sync::atomic::AtomicU64};
@@ -944,7 +952,7 @@ mod tests {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64"))))]
 fn main() -> std::process::ExitCode {
     eprintln!("vaultwarden-accessd: unsupported platform; requires Linux");
     std::process::ExitCode::FAILURE

@@ -13,7 +13,7 @@ use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::Read;
 use std::net::IpAddr;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Component, Path, PathBuf};
@@ -29,6 +29,7 @@ const MAX_FIELD_MAPPINGS: usize = 8;
 const MAX_TARGET_LEN: usize = 256;
 const MAX_VALUE_LEN: usize = 256;
 const MAX_PRELIMINARY_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
+#[cfg(target_os = "linux")]
 const ELF_MAGIC: &[u8; 4] = b"\x7fELF";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -91,6 +92,8 @@ impl CreateEffect {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionProfile {
     ReviewedSelfContainedElf64V1,
+    #[serde(rename = "reviewed_native_macho_arm64_v1")]
+    ReviewedNativeMachOArm64V1,
 }
 
 /// Secret-free registration input and inspection metadata. The profile is an
@@ -749,6 +752,22 @@ fn valid_image_path(value: &str) -> bool {
 thread_local! {
     pub(crate) static TEST_IMAGE_HASH_BYTES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
+fn preliminary_header(header: &[u8; 16]) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        header[..4] == *ELF_MAGIC
+            && matches!(header[4], 1 | 2)
+            && matches!(header[5], 1 | 2)
+            && header[6] == 1
+    }
+    #[cfg(target_os = "macos")]
+    {
+        matches!(
+            &header[..4],
+            b"\xcf\xfa\xed\xfe" | b"\xca\xfe\xba\xbe" | b"\xca\xfe\xba\xbf"
+        )
+    }
+}
 fn executable_identity_matches(path: &Path, expected: &str) -> bool {
     let Some(metadata) = nonsymlink_regular(path) else {
         return false;
@@ -774,12 +793,7 @@ fn executable_identity_matches(path: &Path, expected: &str) -> bool {
     }
     let mut file = file.take(MAX_PRELIMINARY_IMAGE_BYTES + 1);
     let mut header = [0_u8; 16];
-    if file.read_exact(&mut header).is_err()
-        || header[..4] != *ELF_MAGIC
-        || !matches!(header[4], 1 | 2)
-        || !matches!(header[5], 1 | 2)
-        || header[6] != 1
-    {
+    if file.read_exact(&mut header).is_err() || !preliminary_header(&header) {
         return false;
     }
     let mut digest = Sha256::new();
@@ -1063,7 +1077,7 @@ fn hex_digest(data: &[u8]) -> String {
         .collect()
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
     const IMAGE: &[u8] = b"\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00\x01\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x01\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x78\x00\x00\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x78\x00\x40\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\xb8\x3c\x00\x00\x00\xbf\x00\x00\x00\x00\x0f\x05";
     let path = root.join("approved-image");
@@ -1095,7 +1109,7 @@ pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
     .unwrap()
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) fn test_ssh_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
         create: None,
@@ -1123,7 +1137,7 @@ pub(crate) fn test_ssh_draft() -> OperationPolicyDraft {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 
@@ -2165,7 +2179,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod create_boundary_tests {
     use super::*;
     #[test]

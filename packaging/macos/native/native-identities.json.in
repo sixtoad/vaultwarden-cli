@@ -1,0 +1,10 @@
+{
+  "provider_uid": "@PROVIDER_UID_AS_INTEGER@",
+  "provider_uuid": "@PROVIDER_GENERATED_UUID_LOWERCASE_HEX_WITHOUT_DASHES@",
+  "operator_uid": "@OPERATOR_UID_AS_INTEGER@",
+  "operator_uuid": "@OPERATOR_GENERATED_UUID_LOWERCASE_HEX_WITHOUT_DASHES@",
+  "human_gid": "@HUMAN_GID_AS_INTEGER@",
+  "agent_gid": "@AGENT_GID_AS_INTEGER@",
+  "human_socket_dir": "/Library/VaultwardenAccess/run/human",
+  "ssh_runtime_dir": "/Library/VaultwardenAccess/run/ssh"
+}

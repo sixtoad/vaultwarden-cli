@@ -8,6 +8,7 @@ use crate::access::{
     },
 };
 use ed25519_dalek::SigningKey;
+use std::path::Component;
 use std::{
     ffi::CString,
     fs::{self, File},
@@ -20,7 +21,7 @@ use std::{
             net::UnixListener as StdListener,
         },
     },
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -38,6 +39,7 @@ use zeroize::Zeroizing;
 
 pub const SOCKET_NAME: &str = "agent.sock";
 const MAX_CONNECTIONS: usize = 32;
+#[cfg(target_os = "linux")]
 const MAX_GROUPS: usize = 65536;
 const IO_TIMEOUT: Duration = Duration::from_secs(5);
 #[cfg(test)]
@@ -70,6 +72,7 @@ impl std::error::Error for AgentTransportError {}
 
 /// Open each directory component without following links and retain its inode.
 /// All later socket operations are relative to this descriptor, including cleanup.
+#[cfg(target_os = "linux")]
 fn open_directory(path: &Path) -> Result<File, AgentTransportError> {
     let mut directory = open_at(
         libc::AT_FDCWD,
@@ -91,6 +94,22 @@ fn open_directory(path: &Path) -> Result<File, AgentTransportError> {
     }
     Ok(directory)
 }
+#[cfg(target_os = "macos")]
+fn open_directory(path: &Path) -> Result<File, AgentTransportError> {
+    let mut absolute = if path.is_absolute() {
+        PathBuf::new()
+    } else {
+        std::env::current_dir().map_err(|_error| AgentTransportError)?
+    };
+    for component in path.components() {
+        match component {
+            Component::RootDir | Component::Normal(_) => absolute.push(component.as_os_str()),
+            Component::CurDir => {}
+            _ => return Err(AgentTransportError),
+        }
+    }
+    super::native::platform::open_no_writers(&absolute, false).map_err(|_error| AgentTransportError)
+}
 fn open_at(
     parent: libc::c_int,
     name: &[u8],
@@ -109,14 +128,34 @@ fn open_at(
     }
     Ok(unsafe { File::from_raw_fd(fd) })
 }
-fn descriptor_path(directory: &File, name: &std::ffi::OsStr) -> PathBuf {
-    PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd())).join(name)
+fn descriptor_path(
+    directory: &File,
+    name: &std::ffi::OsStr,
+) -> Result<PathBuf, AgentTransportError> {
+    #[cfg(target_os = "linux")]
+    {
+        Ok(PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd())).join(name))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Ok(super::native::platform::descriptor_path(directory)
+            .map_err(|_error| AgentTransportError)?
+            .join(name))
+    }
 }
 fn checked_directory(
     directory: &File,
     owner: Option<u32>,
     gid: Option<u32>,
 ) -> Result<fs::Metadata, AgentTransportError> {
+    #[cfg(target_os = "macos")]
+    let owner = Some(
+        owner.unwrap_or(
+            super::native::identity::load()
+                .map_err(|_error| AgentTransportError)?
+                .provider_uid,
+        ),
+    );
     let metadata = directory.metadata().map_err(|_error| AgentTransportError)?;
     if !metadata.is_dir()
         || metadata.mode() & 0o7777 != 0o750
@@ -151,9 +190,17 @@ impl AgentSocket {
     /// The deployment provisions the provider-owned 0750 directory and group.
     /// Refuse active listeners and unlink only a checked stale socket inode.
     pub fn bind(root: &Path, gid: u32) -> Result<Self, AgentTransportError> {
+        #[cfg(target_os = "macos")]
+        if gid
+            != super::native::identity::load()
+                .map_err(|_error| AgentTransportError)?
+                .agent_gid
+        {
+            return Err(AgentTransportError);
+        }
         let directory = open_directory(root)?;
         let metadata = checked_directory(&directory, Some(unsafe { libc::geteuid() }), Some(gid))?;
-        let path = descriptor_path(&directory, SOCKET_NAME.as_ref());
+        let path = descriptor_path(&directory, SOCKET_NAME.as_ref())?;
         match fs::symlink_metadata(&path) {
             Ok(_) => {
                 let before = checked_socket(&path, &metadata)?;
@@ -251,7 +298,9 @@ impl AgentSocket {
 }
 impl Drop for AgentSocket {
     fn drop(&mut self) {
-        let path = descriptor_path(&self.directory, SOCKET_NAME.as_ref());
+        let Ok(path) = descriptor_path(&self.directory, SOCKET_NAME.as_ref()) else {
+            return;
+        };
         if let Ok(metadata) = fs::symlink_metadata(&path)
             && metadata.file_type().is_socket()
             && (metadata.dev(), metadata.ino()) == self.identity
@@ -271,17 +320,23 @@ fn connect_nonblocking(path: &Path) -> std::io::Result<std::os::unix::net::UnixS
     for (destination, source) in address.sun_path.iter_mut().zip(bytes) {
         *destination = *source as libc::c_char;
     }
-    let fd = unsafe {
-        libc::socket(
-            libc::AF_UNIX,
-            libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC,
-            0,
-        )
+    #[cfg(target_os = "linux")]
+    let stream = {
+        let fd = unsafe {
+            libc::socket(
+                libc::AF_UNIX,
+                libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC,
+                0,
+            )
+        };
+        if fd < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) }
     };
-    if fd < 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let stream = unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) };
+    #[cfg(target_os = "macos")]
+    let stream = super::native::platform::socket()?;
+    let fd = stream.as_raw_fd();
     if unsafe {
         libc::connect(
             fd,
@@ -299,6 +354,7 @@ struct PeerCredentials {
     uid: u32,
     groups: Vec<u32>,
 }
+#[cfg(target_os = "linux")]
 fn peer_credentials(stream: &impl AsRawFd) -> Result<PeerCredentials, AgentTransportError> {
     let mut credentials: libc::ucred = unsafe { std::mem::zeroed() };
     let mut size = std::mem::size_of_val(&credentials) as libc::socklen_t;
@@ -333,12 +389,14 @@ fn peer_credentials(stream: &impl AsRawFd) -> Result<PeerCredentials, AgentTrans
         groups,
     })
 }
+#[cfg(target_os = "linux")]
 fn validate_peer_length(result: libc::c_int, bytes: usize) -> Result<(), AgentTransportError> {
     if result != 0 || bytes != std::mem::size_of::<libc::ucred>() {
         return Err(AgentTransportError);
     }
     Ok(())
 }
+#[cfg(target_os = "linux")]
 fn group_count(result: libc::c_int, bytes: usize) -> Result<usize, AgentTransportError> {
     if result != 0
         || bytes > MAX_GROUPS * std::mem::size_of::<u32>()
@@ -349,6 +407,18 @@ fn group_count(result: libc::c_int, bytes: usize) -> Result<usize, AgentTranspor
     Ok(bytes / std::mem::size_of::<u32>())
 }
 
+#[cfg(target_os = "macos")]
+fn peer_credentials(stream: &impl AsRawFd) -> Result<PeerCredentials, AgentTransportError> {
+    let (mut uid, mut gid) = (0, 0);
+    if unsafe { libc::getpeereid(stream.as_raw_fd(), &mut uid, &mut gid) } != 0 {
+        return Err(AgentTransportError);
+    }
+    // Native profile binds the effective GID, not Linux supplementary groups.
+    Ok(PeerCredentials {
+        uid,
+        groups: vec![gid],
+    })
+}
 async fn serve_one(
     mut stream: UnixStream,
     peer: PeerCredentials,
@@ -497,6 +567,8 @@ pub fn load_signing_key(path: &Path) -> Result<SigningKey, AgentTransportError> 
     )?;
     let name = path.file_name().ok_or(AgentTransportError)?;
     let file = open_at(parent.as_raw_fd(), name.as_bytes(), libc::O_RDONLY)?;
+    #[cfg(target_os = "macos")]
+    super::native::platform::no_acl(&file).map_err(|_error| AgentTransportError)?;
     let metadata = file.metadata().map_err(|_error| AgentTransportError)?;
     if !metadata.is_file()
         || metadata.uid() != unsafe { libc::geteuid() }
@@ -562,7 +634,7 @@ async fn exchange_envelope(
     }
     let directory = open_directory(path.parent().ok_or(AgentTransportError)?)?;
     let owner = checked_directory(&directory, None, None)?;
-    let pinned = descriptor_path(&directory, path.file_name().ok_or(AgentTransportError)?);
+    let pinned = descriptor_path(&directory, path.file_name().ok_or(AgentTransportError)?)?;
     let before = checked_socket(&pinned, &owner)?;
     let mut stream = timeout_at(deadline, UnixStream::connect(&pinned))
         .await
@@ -604,6 +676,78 @@ async fn exchange_envelope(
     AgentResponse::parse(&response).map_err(|_error| AgentTransportError)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 #[path = "unix_socket_tests.rs"]
 mod tests;
+
+#[cfg(all(test, target_os = "macos"))]
+mod native_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    #[test]
+    fn native_signing_seed_relative_path_rejects_acl_grants_and_symlink_parent() {
+        let seed = tempfile::NamedTempFile::new_in(std::env::current_dir().unwrap()).unwrap();
+        std::fs::write(seed.path(), [73u8; 32]).unwrap();
+        std::fs::set_permissions(seed.path(), std::fs::Permissions::from_mode(0o600)).unwrap();
+        let relative = Path::new(seed.path().file_name().unwrap());
+        assert!(load_signing_key(relative).is_ok());
+        assert!(load_signing_key(&Path::new(".").join(relative)).is_ok());
+        assert!(
+            std::process::Command::new("/bin/chmod")
+                .args(["+a", "everyone allow read,write"])
+                .arg(seed.path())
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(load_signing_key(relative).is_err());
+        assert!(
+            std::process::Command::new("/bin/chmod")
+                .arg("-N")
+                .arg(seed.path())
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(load_signing_key(relative).is_ok());
+        let root = tempfile::tempdir().unwrap();
+        let link = root.path().join("linked-parent");
+        std::os::unix::fs::symlink(seed.path().parent().unwrap(), &link).unwrap();
+        assert!(load_signing_key(&link.join(relative)).is_err());
+    }
+
+    #[test]
+    fn native_kernel_peer_and_enrolled_endpoint_reject_mismatched_identity_and_modes() {
+        let root = tempfile::tempdir().unwrap();
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o750)).unwrap();
+        super::super::native::identity::TEST_IDENTITIES.with(|v| {
+            *v.borrow_mut() = Some(super::super::native::identity::Identities {
+                provider_uid: uid,
+                provider_uuid: "synthetic".into(),
+                operator_uid: uid + 1,
+                operator_uuid: "synthetic".into(),
+                human_gid: gid + 1,
+                agent_gid: gid,
+                human_socket_dir: root.path().join("unused"),
+                ssh_runtime_dir: root.path().into(),
+            })
+        });
+        let socket = AgentSocket::bind(root.path(), gid).unwrap();
+        let client = connect_nonblocking(&root.path().join(SOCKET_NAME)).unwrap();
+        let (server, _) = socket.listener.as_ref().unwrap().accept().unwrap();
+        let peer = peer_credentials(&server).unwrap();
+        assert_eq!(peer.uid, uid);
+        assert_eq!(peer.groups, vec![gid]);
+        assert_eq!(peer_credentials(&client).unwrap().uid, uid);
+        assert!(checked_directory(&socket.directory, Some(uid + 1), Some(gid)).is_err());
+        assert!(checked_directory(&socket.directory, Some(uid), Some(gid + 1)).is_err());
+        super::super::native::identity::TEST_IDENTITIES
+            .with(|v| v.borrow_mut().as_mut().unwrap().provider_uid = uid + 1);
+        assert!(checked_directory(&socket.directory, None, None).is_err());
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o770)).unwrap();
+        assert!(open_directory(root.path()).is_err());
+        super::super::native::identity::TEST_IDENTITIES.with(|v| v.borrow_mut().take());
+    }
+}

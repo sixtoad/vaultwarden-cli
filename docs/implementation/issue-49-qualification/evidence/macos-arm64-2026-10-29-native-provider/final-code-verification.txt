@@ -1,0 +1,2 @@
+/Users/sixtocantolla/.bashrc: line 92: runpodctl: command not found
+Verified final source/build/test code hashes: 171

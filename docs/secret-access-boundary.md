@@ -4,7 +4,8 @@ Accepted product boundary, 2026-10-28. This document governs new design and
 changes to the protected CLI/provider, including issue 49. It supersedes earlier
 requirements that made program termination or descendant containment a condition
 of secret access. The Linux delivery implementation follows this boundary; macOS protected delivery
-remains disabled pending native implementation and qualification.
+has a native Apple Silicon source candidate; installed deployment qualification
+remains separate. See the [native implementation record](implementation/issue-49-native-provider.md).
 
 ## Who controls what
 

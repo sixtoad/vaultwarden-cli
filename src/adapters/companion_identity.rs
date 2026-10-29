@@ -89,12 +89,17 @@ pub(crate) fn private_directory(path: &Path) -> Result<(), SessionError> {
 }
 
 fn private_open(path: &Path, write: bool) -> Result<File, SessionError> {
+    #[cfg(target_os = "macos")]
+    let _checked = super::native::platform::open_no_writers(path, false)
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     let file = OpenOptions::new()
         .read(true)
         .write(write)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)
         .map_err(unavailable)?;
+    #[cfg(target_os = "macos")]
+    super::native::platform::no_acl(&file).map_err(|_error| SessionError::BackendUnavailable)?;
     let meta = file.metadata().map_err(unavailable)?;
     if !meta.is_file()
         || meta.uid() != unsafe { libc::geteuid() }
@@ -375,7 +380,7 @@ pub fn list(root: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
     enrolled(&root.join(STORE_FILE))
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;

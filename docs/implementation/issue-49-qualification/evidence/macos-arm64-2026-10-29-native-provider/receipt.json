@@ -1,0 +1,52 @@
+{
+  "baseline_commit": "60fadd6251cafb08e91ef2856f82ef44dfe164f5",
+  "date": "2026-10-29",
+  "scope": "Source qualification; installed service remains unqualified",
+  "complete_script_snapshot_archive_sha256": "8d752613cabf47d58ae312dbb99b59905c852cda2a3f34b498ff17f63575e102",
+  "complete_script_internal_archive_sha256": "b1be608ead32a409c9c8b4c6fe9c853c0882ce5b142759e3d8018bd6f3147a39",
+  "final_library_snapshot_archive_sha256": "740c877980ccae2fa7373d11ee1d9ee8e8cd085f4901e4a757ebbb0fb257c39e",
+  "delta_since_complete_script": [
+    "src/adapters/ssh_agent.rs"
+  ],
+  "results": {
+    "native_complete_script": "passed: formatting, strict all-target Clippy, 353 library tests, explicit real OpenSSH test (six algorithms)",
+    "native_final_delta": "superseded by post-review results below",
+    "linux_workspace_all_targets": "passed: 773 library tests, integration suites and benchmarks; intentionally ignored tests reported in log",
+    "linux_systemd": "passed: two lifecycle tests, distinct-principal isolation test, six-algorithm OpenSSH test",
+    "linux_clippy": "passed: all targets and all features, warnings denied",
+    "native_review_library_cli": "passed: 365 library tests, 6 provider binary tests, 4 client binary tests, 2 protected CLI subprocess tests",
+    "native_final_checks": "passed: formatting, strict all-target Clippy, affected environment delivery test, real OpenSSH six algorithms; final code hashes verified against Mac",
+    "dependency_policy": "cargo-audit and cargo-deny passed after advisory refresh; existing allowed inout0.2.3 yanked warning",
+    "linux_final_workspace": "post-review full workspace/all-target suite passed (773 library tests plus integration suites and benchmarks)",
+    "linux_final_clippy": "post-review all-target/all-feature Clippy with -D warnings passed",
+    "linux_final_systemd": "post-review real systemd lifecycle (2 tests), distinct-principal isolation (1 test), real OpenSSH (six algorithms, 1 test) passed"
+  },
+  "artifact_sha256": {
+    "audit.log.gz": "517e3b809ca16a65b43e92da8d57b265cd9b3566ecf2efe6226334beca29802a",
+    "complete-run-source-manifest.json.gz": "e9592f3ce876a5e2c69c0551f948854a2899d915c5a74d3e515c56f557948989",
+    "deny.log.gz": "c81cb030db3c8563fab31fb9a9d641ce5cebed4e286c1603981be40a9a76fbc0",
+    "environment.txt": "a7923f655f4583cbef60ba8d62c165fd90e0dad8c0a4c20ed36a3e5e5fb23745",
+    "final-code-manifest.json": "86fdf486fc45102834827587fb6457d878e27343a9f0f62780216010de55e406",
+    "final-code-verification.txt": "37a50275c097a4b8b68adfce01c3c46c97acd0a5d0b8261e9418e4665495743f",
+    "linux-clippy.log.gz": "b7d6f6562c745a627506843f86c794512428a521849155d3e60d68e9558f3c43",
+    "linux-final-clippy.log.gz": "eb37be720cad8ed2ea60043416ec6cac3f43d27a871dbf100ef0634407916813",
+    "linux-final-regression.log.gz": "38fe6390a2583e3b7bad4865cc3e4d73d9802c8e8170bfb47856e04eacfdc969",
+    "linux-final-systemd.log.gz": "0c711e41126f4740d290155bec50235ce315fcf12b6d03c33fefebb48bbba1de",
+    "linux-regression.log.gz": "e7d625c67b4b8bd162418b2b82d2dc2df0e6c508e4fda59a78e85093c850ba36",
+    "linux-systemd.log.gz": "53b20240b70e8002091afcb8afaaffdabc4637b7675477d08f354aaf245fccbb",
+    "native-complete.log.gz": "a43a07815692dfb540d7807a70c3d488b6d4df25d4157853412cffc225aa6a8c",
+    "native-final-checks.log.gz": "ceb5b066e3239f8b85631ba4f8515bc10779747cb54c47f1119fac194077ae28",
+    "native-final-library.log.gz": "01a7aa49ef040a3f247708daab8a0e43be35a4c94545db84ced870d7b64b1163",
+    "native-review-library-cli.log.gz": "60f3ea5ed708b8c388b797c7813fb053f4a1bcdae6ad3a723465828d509ccc9a",
+    "review-library-code-manifest.json": "b2aa41ae08283949993f2ef7cef49d0b32233c92c364bc3f54144ba0179d95f2",
+    "scope.txt": "5d37e718155b22c12cdf0e70c49737f5d583fc1fc376322649610001601827db",
+    "source-manifest.json.gz": "3c05851fc660a55e552d3ce0056d5b8437deee7e6c4d80d5518b134cf0df83de",
+    "system-ssh.txt": "5607e0f4d971e7f0681f42a591ca70279b0d16a364bb0c2ad91b9777ae8428fb"
+  },
+  "review_snapshot_archive_sha256": "36e66de013013813b3152ce6cfecab0f96369c30c547128cac43507414a55bd7",
+  "review_snapshot_corrections": [
+    "src/adapters/unix_socket.rs: portable Component import before full native library/CLI run",
+    "src/adapters/native/tests.rs: forbidden unreachable! replaced with unavailable in unused test port before final lint/delivery/OpenSSH run"
+  ],
+  "cleanup": "Exact temporary Mac source, toolchain and build workspace removed after final hash verification and evidence capture; command exit0"
+}

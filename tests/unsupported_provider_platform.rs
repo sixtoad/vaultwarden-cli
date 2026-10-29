@@ -1,5 +1,5 @@
 //! Unsupported hosts must reject provider use before parsing or touching state.
-#![cfg(not(target_os = "linux"))]
+#![cfg(not(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64"))))]
 
 use assert_cmd::Command;
 use std::{ffi::OsString, path::Path, time::Duration};

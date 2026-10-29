@@ -5,11 +5,13 @@ use ssh_key::{
     Algorithm, HashAlg, PrivateKey, PublicKey, Signature,
     encoding::{Decode, Encode},
 };
+#[cfg(target_os = "linux")]
+use std::os::fd::OwnedFd;
 use std::{
     fs::File,
     io::{Read, Write},
     os::{
-        fd::{AsRawFd, OwnedFd},
+        fd::AsRawFd,
         unix::{
             fs::{MetadataExt, PermissionsExt},
             net::{UnixListener, UnixStream},
@@ -19,6 +21,10 @@ use std::{
     time::{Duration, Instant},
 };
 use zeroize::Zeroizing;
+#[cfg(target_os = "linux")]
+type Recipient = (u32, OwnedFd);
+#[cfg(target_os = "macos")]
+use super::native::Recipient;
 
 const MAX_FRAME: usize = 32 * 1024;
 const IO_TIMEOUT: Duration = Duration::from_secs(5);
@@ -35,6 +41,8 @@ fn rsa_bits(bytes: &[u8]) -> usize {
         .map_or(0, |first| bytes.len() * 8 - first.leading_zeros() as usize)
 }
 
+#[cfg(all(test, target_os = "macos"))]
+thread_local! {static TEST_AFTER_PEER_VALIDATION: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const {std::cell::RefCell::new(None)};}
 pub(crate) struct Agent {
     listener: Option<UnixListener>,
     directory: File,
@@ -45,7 +53,7 @@ pub(crate) struct Agent {
     host: PublicKey,
     host_blob: Vec<u8>,
     user: String,
-    recipient: Option<(u32, OwnedFd)>,
+    recipient: Option<Recipient>,
     connection: Option<Connection>,
     consumed: bool,
     messages: usize,
@@ -98,6 +106,23 @@ impl<'a> Reader<'a> {
         }
     }
 }
+fn socket_path(
+    directory: &File,
+    name: &std::ffi::CStr,
+) -> Result<std::path::PathBuf, ExecutionError> {
+    #[cfg(target_os = "linux")]
+    {
+        Ok(
+            std::path::PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd()))
+                .join(name.to_str().map_err(invalid)?),
+        )
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Ok(super::native::platform::descriptor_path(directory)?
+            .join(name.to_str().map_err(invalid)?))
+    }
+}
 impl Agent {
     pub(crate) fn bind(
         directory: File,
@@ -115,7 +140,9 @@ impl Agent {
             return Err(ExecutionError::InvalidArguments);
         }
         // Validate the actual consumer-visible sockaddr length before descriptor-anchored bind.
-        if path.as_os_str().as_encoded_bytes().len() >= 108 {
+        if path.as_os_str().as_encoded_bytes().len()
+            >= if cfg!(target_os = "macos") { 104 } else { 108 }
+        {
             return Err(ExecutionError::UnsafePath);
         }
         let socket_name = std::ffi::CString::new(
@@ -124,11 +151,7 @@ impl Agent {
                 .as_encoded_bytes(),
         )
         .map_err(invalid)?;
-        let anchored = format!(
-            "/proc/self/fd/{}/{}",
-            directory.as_raw_fd(),
-            socket_name.to_str().map_err(invalid)?
-        );
+        let anchored = socket_path(&directory, &socket_name)?;
         let listener = UnixListener::bind(&anchored).map_err(invalid)?;
         let metadata = std::fs::symlink_metadata(&anchored).map_err(invalid)?;
         let socket_identity = (metadata.dev(), metadata.ino());
@@ -191,13 +214,14 @@ impl Agent {
         self.key = Some(key);
         Ok(())
     }
-    pub(crate) fn recipient(&mut self, recipient: (u32, OwnedFd)) -> Result<(), ExecutionError> {
+    pub(crate) fn recipient(&mut self, recipient: Recipient) -> Result<(), ExecutionError> {
         if self.recipient.is_some() || self.consumed {
             return Err(ExecutionError::ExecutionFailed);
         }
         self.recipient = Some(recipient);
         Ok(())
     }
+    #[cfg(target_os = "linux")]
     fn recipient_alive(&self) -> bool {
         self.recipient.as_ref().is_some_and(|(_, fd)| {
             let mut poll = libc::pollfd {
@@ -208,6 +232,49 @@ impl Agent {
             unsafe { libc::poll(&mut poll, 1, 0) == 0 }
         })
     }
+    #[cfg(target_os = "macos")]
+    fn recipient_alive(&self) -> bool {
+        // The native observer owns the unreaped direct-child lease until close().
+        self.recipient.is_some()
+    }
+    fn recipient_peer(&self, stream: &UnixStream) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            let valid = self
+                .recipient
+                .as_ref()
+                .is_some_and(|recipient| recipient.peer(stream));
+            #[cfg(test)]
+            if valid {
+                TEST_AFTER_PEER_VALIDATION.with(|hook| {
+                    if let Some(after) = hook.borrow_mut().take() {
+                        after();
+                    }
+                });
+            }
+            valid
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let mut peer: libc::ucred = unsafe { std::mem::zeroed() };
+            let mut length = std::mem::size_of_val(&peer) as libc::socklen_t;
+            (unsafe {
+                libc::getsockopt(
+                    stream.as_raw_fd(),
+                    libc::SOL_SOCKET,
+                    libc::SO_PEERCRED,
+                    (&mut peer as *mut libc::ucred).cast(),
+                    &mut length,
+                )
+            }) == 0
+                && length as usize == std::mem::size_of_val(&peer)
+                && peer.uid == unsafe { libc::geteuid() }
+                && self
+                    .recipient
+                    .as_ref()
+                    .is_some_and(|(pid, _)| peer.pid > 0 && peer.pid as u32 == *pid)
+        }
+    }
     pub(crate) fn close(&mut self) {
         self.key.take();
         self.connection.take();
@@ -215,11 +282,9 @@ impl Agent {
         self.recipient.take();
         self.consumed = true;
         {
-            let anchored = format!(
-                "/proc/self/fd/{}/{}",
-                self.directory.as_raw_fd(),
-                self.socket_name.to_string_lossy()
-            );
+            let Ok(anchored) = socket_path(&self.directory, &self.socket_name) else {
+                return;
+            };
             if std::fs::symlink_metadata(anchored)
                 .is_ok_and(|m| (m.dev(), m.ino()) == self.socket_identity)
             {
@@ -248,23 +313,7 @@ impl Agent {
             };
             match listener.accept() {
                 Ok((stream, _)) => {
-                    let mut peer: libc::ucred = unsafe { std::mem::zeroed() };
-                    let mut length = std::mem::size_of_val(&peer) as libc::socklen_t;
-                    let valid = unsafe {
-                        libc::getsockopt(
-                            stream.as_raw_fd(),
-                            libc::SOL_SOCKET,
-                            libc::SO_PEERCRED,
-                            (&mut peer as *mut libc::ucred).cast(),
-                            &mut length,
-                        )
-                    } == 0
-                        && length as usize == std::mem::size_of_val(&peer)
-                        && peer.uid == unsafe { libc::geteuid() }
-                        && self
-                            .recipient
-                            .as_ref()
-                            .is_some_and(|(pid, _)| peer.pid > 0 && peer.pid as u32 == *pid);
+                    let valid = self.recipient_peer(&stream);
                     if !valid {
                         return Ok(());
                     }
@@ -340,7 +389,10 @@ impl Agent {
             // share the same release lock. Partial delivery also consumes authority;
             // no signature bytes are queued for a later, ungated flush.
             let result = control.release(&mut || {
-                if !self.recipient_alive() {
+                if !self.recipient_alive()
+                    || !self.recipient_peer(&connection.stream)
+                    || control.remaining().is_zero()
+                {
                     return Err(ExecutionError::Cancelled);
                 }
                 self.consumed = true;
@@ -464,11 +516,14 @@ impl Drop for Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{cell::Cell, os::fd::FromRawFd};
+    use std::cell::Cell;
+    #[cfg(target_os = "linux")]
+    use std::os::fd::FromRawFd;
     struct Control {
         allowed: Cell<bool>,
         deny_release: bool,
         releases: Cell<usize>,
+        deadline: Cell<Option<Instant>>,
     }
     impl Control {
         fn new() -> Self {
@@ -476,6 +531,7 @@ mod tests {
                 allowed: Cell::new(true),
                 deny_release: false,
                 releases: Cell::new(0),
+                deadline: Cell::new(None),
             }
         }
     }
@@ -484,7 +540,11 @@ mod tests {
             self.allowed.get()
         }
         fn remaining(&self) -> Duration {
-            Duration::from_secs(60)
+            self.deadline
+                .get()
+                .map_or(Duration::from_secs(60), |deadline| {
+                    deadline.saturating_duration_since(Instant::now())
+                })
         }
         fn release(
             &self,
@@ -494,7 +554,7 @@ mod tests {
             if self.deny_release {
                 self.allowed.set(false);
             }
-            if !self.allowed.get() {
+            if !self.allowed.get() || self.remaining().is_zero() {
                 return Err(ExecutionError::Cancelled);
             }
             action()
@@ -516,10 +576,23 @@ mod tests {
         .unwrap();
         agent.install(SensitiveString::new(encoded)).unwrap();
         let pid = unsafe { libc::getpid() };
-        let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) } as i32;
-        assert!(raw >= 0);
+        #[cfg(target_os = "linux")]
+        {
+            let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) } as i32;
+            assert!(raw >= 0);
+            agent
+                .recipient((pid as u32, unsafe { OwnedFd::from_raw_fd(raw) }))
+                .unwrap();
+        }
+        #[cfg(target_os = "macos")]
         agent
-            .recipient((pid as u32, unsafe { OwnedFd::from_raw_fd(raw) }))
+            .recipient(Recipient {
+                pid: pid as u32,
+                requirement: super::super::native::test_requirement(
+                    &std::env::current_exe().unwrap(),
+                )
+                .unwrap(),
+            })
             .unwrap();
         let stream = UnixStream::connect(root.path().join("agent.sock")).unwrap();
         stream
@@ -762,13 +835,27 @@ mod tests {
     fn same_uid_wrong_process_is_rejected_without_poisoning_next_peer() {
         let (root, mut agent, key, mut stream) = setup();
         let control = Control::new();
-        agent.recipient.as_mut().unwrap().0 += 1;
+        #[cfg(target_os = "linux")]
+        {
+            agent.recipient.as_mut().unwrap().0 += 1;
+        }
+        #[cfg(target_os = "macos")]
+        {
+            agent.recipient.as_mut().unwrap().pid += 1;
+        }
         stream.write_all(&framed(&[11])).unwrap();
         agent.poll(&control).unwrap();
         assert!(agent.connection.is_none());
         assert!(agent.key.is_some());
         assert!(stream.read(&mut [0u8; 1]).is_err() || stream.read(&mut [0u8; 1]).unwrap() == 0);
-        agent.recipient.as_mut().unwrap().0 -= 1;
+        #[cfg(target_os = "linux")]
+        {
+            agent.recipient.as_mut().unwrap().0 -= 1;
+        }
+        #[cfg(target_os = "macos")]
+        {
+            agent.recipient.as_mut().unwrap().pid -= 1;
+        }
         let mut valid = UnixStream::connect(root.path().join("agent.sock")).unwrap();
         valid
             .set_read_timeout(Some(Duration::from_secs(2)))
@@ -790,6 +877,248 @@ mod tests {
         .unwrap();
     }
     #[test]
+    #[cfg(target_os = "macos")]
+    fn native_expiry_during_recipient_validation_cannot_release_signature() {
+        let (_root, mut agent, key, mut stream) = setup();
+        let control = Control::new();
+        assert_eq!(
+            exchange(&mut agent, &mut stream, &control, &binding(&key)),
+            [6]
+        );
+        control
+            .deadline
+            .set(Some(Instant::now() + Duration::from_millis(100)));
+        TEST_AFTER_PEER_VALIDATION.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(|| std::thread::sleep(Duration::from_millis(150))))
+        });
+        let data = authentication(&agent.public, b"backup", b"ssh-ed25519", None);
+        stream
+            .write_all(&framed(&signing(&agent.public, &data, 0)))
+            .unwrap();
+        assert_eq!(agent.poll(&control), Err(ExecutionError::Cancelled));
+        assert!(control.remaining().is_zero());
+        assert!(agent.consumed);
+        assert!(agent.key.is_none());
+        assert_eq!(stream.read(&mut [0; 1]).unwrap(), 0);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn native_same_pid_exec_keeps_socket_but_cannot_release_signature() {
+        use std::os::fd::OwnedFd;
+        use std::process::{Command, Stdio};
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("exec-recipient.c");
+        let first = root.path().join("recipient-first");
+        let second = root.path().join("recipient-second");
+        std::fs::write(&source, br#"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/time.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+static int transfer(int fd, void *bytes, size_t size, int writing) {
+    unsigned char *p=bytes;
+    while(size) { ssize_t n=writing?write(fd,p,size):read(fd,p,size); if(n<=0) return -1; p+=n; size-=n; }
+    return 0;
+}
+static int forward(int from, int to) {
+    unsigned int length;
+    unsigned char payload[32768];
+    if(transfer(from,&length,4,0)) return -1;
+    unsigned int size=ntohl(length);
+    if(size>sizeof(payload) || transfer(from,payload,size,0)) return -1;
+    return transfer(to,&length,4,1) || transfer(to,payload,size,1);
+}
+int main(int argc, char **argv) {
+    struct timeval timeout={3,0};
+    setsockopt(0,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));
+#ifdef SECOND_IMAGE
+    if(argc!=2) return 1;
+    int fd=atoi(argv[1]);
+    unsigned int pid=htonl(getpid());
+    unsigned char marker='B';
+    if(transfer(0,&marker,1,1) || transfer(0,&pid,4,1) || forward(0,fd)) return 1;
+    unsigned char response;
+    ssize_t n=read(fd,&response,1);
+    unsigned char denied=(n==0);
+    if(transfer(0,&denied,1,1)) return 1;
+    close(fd);
+    return denied?0:1;
+#else
+    if(argc!=3) return 1;
+    int fd=socket(AF_UNIX,SOCK_STREAM,0);
+    if(fd<0) return 1;
+    setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));
+    struct sockaddr_un address={0}; address.sun_family=AF_UNIX;
+    if(strlen(argv[1])>=sizeof(address.sun_path)) return 1;
+    strcpy(address.sun_path,argv[1]);
+    if(connect(fd,(struct sockaddr*)&address,sizeof(address)) || forward(0,fd) || forward(fd,0)) return 1;
+    unsigned char proceed;
+    if(transfer(0,&proceed,1,0) || proceed!='E') return 1;
+    char number[32]; snprintf(number,sizeof(number),"%d",fd);
+    execl(argv[2],argv[2],number,(char*)0);
+    return 1;
+#endif
+}
+"#).unwrap();
+        for (path, second_image) in [(&first, false), (&second, true)] {
+            let mut compile = Command::new("/usr/bin/clang");
+            compile.arg(&source).arg("-o").arg(path);
+            if second_image {
+                compile.arg("-DSECOND_IMAGE");
+            }
+            assert!(compile.status().unwrap().success());
+            assert!(
+                Command::new("/usr/bin/codesign")
+                    .args(["--force", "--sign", "-", "--options", "runtime"])
+                    .arg(path)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        let expected = super::super::native::test_requirement(&first).unwrap();
+        assert_ne!(
+            expected,
+            super::super::native::test_requirement(&second).unwrap()
+        );
+        let (_, encoded) = super::super::ssh_material::fixture(root.path());
+        let key = PrivateKey::from_openssh(&encoded).unwrap();
+        let path = root.path().join("agent.sock");
+        let mut agent = Agent::bind(
+            File::open(root.path()).unwrap(),
+            &path,
+            key.public_key().clone(),
+            "backup".into(),
+        )
+        .unwrap();
+        agent.install(SensitiveString::new(encoded)).unwrap();
+        let (mut channel, child_channel) = UnixStream::pair().unwrap();
+        channel
+            .set_read_timeout(Some(Duration::from_secs(4)))
+            .unwrap();
+        let owned: OwnedFd = child_channel.into();
+        let mut child = Command::new(&first)
+            .arg(&path)
+            .arg(&second)
+            .env_clear()
+            .stdin(Stdio::from(owned))
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        agent
+            .recipient(Recipient {
+                pid,
+                requirement: expected.clone(),
+            })
+            .unwrap();
+        let control = Control::new();
+        // Any assertion failure still closes the owned control channel before waiting;
+        // bounded child reads exit naturally. No test sends a consumer signal.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            channel.write_all(&framed(&binding(&key))).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while agent
+                .connection
+                .as_ref()
+                .is_none_or(|connection| connection.session.is_none())
+            {
+                agent.poll(&control).unwrap();
+                assert!(Instant::now() < deadline, "first executable did not bind");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            let mut accepted = [0u8; 5];
+            channel.read_exact(&mut accepted).unwrap();
+            assert_eq!(accepted, [0, 0, 0, 1, 6]);
+            channel.write_all(b"E").unwrap();
+            let mut ready = [0u8; 5];
+            channel.read_exact(&mut ready).unwrap();
+            assert_eq!(ready[0], b'B');
+            assert_eq!(u32::from_be_bytes(ready[1..].try_into().unwrap()), pid);
+            assert_eq!(agent.recipient.as_ref().unwrap().requirement, expected);
+            let data = authentication(&agent.public, b"backup", b"ssh-ed25519", None);
+            channel
+                .write_all(&framed(&signing(&agent.public, &data, 0)))
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(3);
+            let result = loop {
+                let result = agent.poll(&control);
+                if result.is_err() || agent.consumed {
+                    break result;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "second executable did not request signature"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            };
+            assert_eq!(result, Err(ExecutionError::Cancelled));
+            assert!(agent.consumed && agent.key.is_none());
+            let mut denied = [0];
+            channel.read_exact(&mut denied).unwrap();
+            assert_eq!(denied, [1], "exec recipient received signature bytes");
+        }));
+        drop(channel);
+        agent.close();
+        let status = child.wait().unwrap();
+        if let Err(error) = result {
+            std::panic::resume_unwind(error);
+        }
+        assert!(status.success());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn native_correct_peer_pid_with_wrong_cdhash_denies_acceptance_and_final_release() {
+        for after_acceptance in [false, true] {
+            let (_root, mut agent, key, mut stream) = setup();
+            let control = Control::new();
+            assert_eq!(
+                agent.recipient.as_ref().unwrap().pid,
+                unsafe { libc::getpid() } as u32
+            );
+            if after_acceptance {
+                assert_eq!(
+                    exchange(&mut agent, &mut stream, &control, &binding(&key)),
+                    [6]
+                );
+            }
+            // The UID and PID remain correct. Only the exact code identity differs:
+            // this peer is the test executable, not any reviewed native SSH slice.
+            agent.recipient.as_mut().unwrap().requirement =
+                super::super::native::native_ssh_requirement().unwrap();
+            let data = authentication(&agent.public, b"backup", b"ssh-ed25519", None);
+            stream
+                .write_all(&framed(&signing(&agent.public, &data, 0)))
+                .unwrap();
+            let result = agent.poll(&control);
+            if after_acceptance {
+                assert_eq!(result, Err(ExecutionError::Cancelled));
+                assert_eq!(control.releases.get(), 1);
+                assert!(agent.consumed);
+                assert!(agent.key.is_none());
+            } else {
+                result.unwrap();
+                assert_eq!(control.releases.get(), 0);
+                assert!(agent.key.is_some());
+            }
+            assert!(agent.connection.is_none());
+            match stream.read(&mut [0u8; 1]) {
+                Ok(0) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {}
+                other => panic!("wrong code identity received signature data: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
     fn dead_recipient_and_socket_replacement_do_not_retain_authority_or_delete_unrelated_files() {
         let (root, mut agent, _key, _stream) = setup();
         let mut child = std::process::Command::new("/bin/true").spawn().unwrap();
