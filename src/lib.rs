@@ -1,9 +1,9 @@
 //! vaultwarden-cli library
 //!
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 pub mod access;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 pub mod adapters;
 pub mod api;
 pub mod commands;

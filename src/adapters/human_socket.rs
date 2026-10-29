@@ -11,12 +11,14 @@ use crate::access::{
     provisioning::ProvisioningError,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "linux")]
+use std::os::fd::FromRawFd;
 use std::{
     fs,
     io::{Read, Write},
     net::Shutdown,
     os::{
-        fd::{AsRawFd, FromRawFd},
+        fd::AsRawFd,
         unix::{
             ffi::OsStrExt,
             fs::{FileTypeExt, MetadataExt, PermissionsExt},
@@ -128,6 +130,13 @@ pub struct HumanSocket {
 impl HumanSocket {
     /// Caller holds the provider's stable lifecycle lock before binding.
     pub fn bind(root: &Path) -> Result<Self, HumanTransportError> {
+        #[cfg(target_os = "macos")]
+        let _state_root = root;
+        #[cfg(target_os = "macos")]
+        let native_identity =
+            super::native::identity::load().map_err(|_error| HumanTransportError)?;
+        #[cfg(target_os = "macos")]
+        let root = native_identity.human_socket_dir.as_path();
         private_directory(root)?;
         let path = root.join(SOCKET_NAME);
         if let Some(metadata) = existing_socket_metadata(fs::symlink_metadata(&path))? {
@@ -146,8 +155,30 @@ impl HumanSocket {
             path,
             identity: (metadata.dev(), metadata.ino()),
         };
-        fs::set_permissions(&socket.path, fs::Permissions::from_mode(0o600))
-            .map_err(|_error| HumanTransportError)?;
+        fs::set_permissions(
+            &socket.path,
+            fs::Permissions::from_mode(if cfg!(target_os = "macos") {
+                0o660
+            } else {
+                0o600
+            }),
+        )
+        .map_err(|_error| HumanTransportError)?;
+        #[cfg(target_os = "macos")]
+        {
+            let path = std::ffi::CString::new(socket.path.as_os_str().as_bytes())
+                .map_err(|_error| HumanTransportError)?;
+            if unsafe {
+                libc::chown(
+                    path.as_ptr(),
+                    native_identity.provider_uid,
+                    native_identity.human_gid,
+                )
+            } != 0
+            {
+                return Err(HumanTransportError);
+            }
+        }
         socket
             .listener
             .set_nonblocking(true)
@@ -260,17 +291,22 @@ fn connect_private(path: &Path) -> std::io::Result<UnixStream> {
     for (destination, source) in address.sun_path.iter_mut().zip(bytes) {
         *destination = *source as libc::c_char;
     }
-    let fd = unsafe {
-        libc::socket(
-            libc::AF_UNIX,
-            libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC,
-            0,
-        )
+    #[cfg(target_os = "linux")]
+    let stream = {
+        let fd = unsafe {
+            libc::socket(
+                libc::AF_UNIX,
+                libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC,
+                0,
+            )
+        };
+        if fd < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        unsafe { UnixStream::from_raw_fd(fd) }
     };
-    if fd < 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let stream = unsafe { UnixStream::from_raw_fd(fd) };
+    #[cfg(target_os = "macos")]
+    let stream = super::native::platform::socket()?;
     let result = unsafe {
         libc::connect(
             stream.as_raw_fd(),
@@ -286,7 +322,15 @@ fn connect_private(path: &Path) -> std::io::Result<UnixStream> {
 }
 fn authenticate_peer(stream: &UnixStream) -> Result<AuthenticatedHuman, HumanTransportError> {
     let uid = peer_uid(stream)?;
+    #[cfg(target_os = "linux")]
     require_human_uid(uid, unsafe { libc::geteuid() })?;
+    #[cfg(target_os = "macos")]
+    require_human_uid(
+        uid,
+        super::native::identity::load()
+            .map_err(|_error| HumanTransportError)?
+            .operator_uid,
+    )?;
     Ok(AuthenticatedHuman::from_peer_uid(uid))
 }
 
@@ -308,6 +352,7 @@ fn private_metadata(
     }
     Ok(())
 }
+#[cfg(target_os = "linux")]
 fn private_directory(root: &Path) -> Result<(), HumanTransportError> {
     let metadata = fs::symlink_metadata(root).map_err(|_error| HumanTransportError)?;
     private_metadata(
@@ -318,6 +363,7 @@ fn private_directory(root: &Path) -> Result<(), HumanTransportError> {
         0o700,
     )
 }
+#[cfg(target_os = "linux")]
 fn private_socket(metadata: &fs::Metadata) -> Result<(), HumanTransportError> {
     private_metadata(
         metadata.file_type().is_socket(),
@@ -353,9 +399,42 @@ fn validated_peer_uid(
     }
     Ok(uid)
 }
-#[cfg(not(target_os = "linux"))]
-fn peer_uid(_: &UnixStream) -> Result<u32, HumanTransportError> {
-    Err(HumanTransportError)
+#[cfg(target_os = "macos")]
+fn peer_uid(stream: &UnixStream) -> Result<u32, HumanTransportError> {
+    let (mut uid, mut gid) = (0, 0);
+    if unsafe { libc::getpeereid(stream.as_raw_fd(), &mut uid, &mut gid) } != 0 {
+        Err(HumanTransportError)
+    } else {
+        Ok(uid)
+    }
+}
+#[cfg(target_os = "macos")]
+fn private_directory(root: &Path) -> Result<(), HumanTransportError> {
+    let config = super::native::identity::load().map_err(|_error| HumanTransportError)?;
+    if root != config.human_socket_dir {
+        return Err(HumanTransportError);
+    }
+    let file = super::native::platform::open_no_writers(root, false)
+        .map_err(|_error| HumanTransportError)?;
+    let m = file.metadata().map_err(|_error| HumanTransportError)?;
+    if m.gid() != config.human_gid {
+        return Err(HumanTransportError);
+    }
+    private_metadata(m.is_dir(), m.uid(), m.mode(), config.provider_uid, 0o750)
+}
+#[cfg(target_os = "macos")]
+fn private_socket(metadata: &fs::Metadata) -> Result<(), HumanTransportError> {
+    let config = super::native::identity::load().map_err(|_error| HumanTransportError)?;
+    if metadata.gid() != config.human_gid {
+        return Err(HumanTransportError);
+    }
+    private_metadata(
+        metadata.file_type().is_socket(),
+        metadata.uid(),
+        metadata.mode(),
+        config.provider_uid,
+        0o660,
+    )
 }
 
 fn read_frame(stream: &mut UnixStream, timeout: Duration) -> Result<Vec<u8>, HumanTransportError> {
@@ -423,7 +502,7 @@ fn serve_one(
             command,
         }) => match command {
             HumanCommand::ImageRegister { image } => {
-                match app.register_image(owner, image, &super::execution::LinuxExecutablePreparer) {
+                match app.register_image(owner, image, &super::PlatformExecutablePreparer) {
                     Ok(image) => HumanResponse::ImageRegistered { image },
                     Err(reason) => HumanResponse::ProvisioningRejected { reason },
                 }
@@ -513,7 +592,14 @@ pub fn exchange(root: &Path, command: HumanCommand) -> Result<HumanResponse, Hum
     let path = root.join(SOCKET_NAME);
     private_socket(&fs::symlink_metadata(&path).map_err(|_error| HumanTransportError)?)?;
     let mut stream = connect_private(&path).map_err(|_error| HumanTransportError)?;
+    #[cfg(target_os = "linux")]
     require_human_uid(peer_uid(&stream)?, unsafe { libc::geteuid() })?;
+    #[cfg(target_os = "macos")]
+    {
+        let config = super::native::identity::load().map_err(|_error| HumanTransportError)?;
+        require_human_uid(unsafe { libc::geteuid() }, config.operator_uid)?;
+        require_human_uid(peer_uid(&stream)?, config.provider_uid)?;
+    }
     let bytes = serde_json::to_vec(&HumanMessage {
         version: 1,
         command,
@@ -524,7 +610,7 @@ pub fn exchange(root: &Path, command: HumanCommand) -> Result<HumanResponse, Hum
         .map_err(|_error| HumanTransportError)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::access::{ports::*, provider::Provider};
@@ -1454,5 +1540,45 @@ mod tests {
             recovered,
             "released parsing capacity must accept a new request"
         );
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod native_tests {
+    use super::*;
+    #[test]
+    fn native_human_peer_requires_enrolled_operator_and_provider_endpoint() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), fs::Permissions::from_mode(0o750)).unwrap();
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+        super::super::native::identity::TEST_IDENTITIES.with(|v| {
+            *v.borrow_mut() = Some(super::super::native::identity::Identities {
+                provider_uid: uid,
+                provider_uuid: "synthetic".into(),
+                operator_uid: uid + 1,
+                operator_uuid: "synthetic".into(),
+                human_gid: gid,
+                agent_gid: gid + 1,
+                human_socket_dir: root.path().into(),
+                ssh_runtime_dir: root.path().join("unused"),
+            })
+        });
+        let socket = HumanSocket::bind(root.path()).unwrap();
+        let client = connect_private(&root.path().join(SOCKET_NAME)).unwrap();
+        let (server, _) = socket.listener.accept().unwrap();
+        assert_eq!(peer_uid(&client).unwrap(), uid);
+        assert!(authenticate_peer(&server).is_err());
+        // Test-only same-user kernel primitive; production enrollment forbids this identity collision.
+        super::super::native::identity::TEST_IDENTITIES
+            .with(|v| v.borrow_mut().as_mut().unwrap().operator_uid = uid);
+        assert_eq!(authenticate_peer(&server).unwrap().uid(), uid);
+        let metadata = fs::symlink_metadata(root.path().join(SOCKET_NAME)).unwrap();
+        assert!(private_socket(&metadata).is_ok());
+        super::super::native::identity::TEST_IDENTITIES
+            .with(|v| v.borrow_mut().as_mut().unwrap().provider_uid = uid + 1);
+        assert!(private_socket(&metadata).is_err());
+        assert!(private_directory(root.path()).is_err());
+        super::super::native::identity::TEST_IDENTITIES.with(|v| v.borrow_mut().take());
     }
 }

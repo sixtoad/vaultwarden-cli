@@ -14,14 +14,14 @@ use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod agent_binding;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod agent_binding_tests;
 pub mod application;
 pub mod direct_request;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) mod direct_request_tests;
 pub mod history;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod history_tests;
 pub mod policy;
 pub mod ports;
@@ -31,7 +31,7 @@ mod protocol_tests;
 pub mod provider;
 pub(crate) mod provider_store;
 pub mod provisioning;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod provisioning_tests;
 
 pub const PROTOCOL_VERSION: u8 = 1;

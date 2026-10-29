@@ -43,6 +43,8 @@ dbus = { version = "0.9.12", features = ["vendored"] }
 dbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust", "vendored"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+security-framework = "3.7"
 apple-native-keyring-store = { version = "1", features = ["keychain"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

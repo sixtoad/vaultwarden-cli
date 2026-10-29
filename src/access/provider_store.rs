@@ -112,7 +112,13 @@ impl ProviderState {
         }
     }
     pub(crate) fn validate(&self) -> Result<(), ProviderError> {
-        self.validate_for_owner(current_uid())
+        #[cfg(target_os = "linux")]
+        let owner = current_uid();
+        #[cfg(target_os = "macos")]
+        let owner = crate::adapters::native::identity::load()
+            .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?
+            .operator_uid;
+        self.validate_for_owner(owner)
     }
     fn validate_for_owner(&self, owner_uid: u32) -> Result<(), ProviderError> {
         if self.schema_version != STATE_SCHEMA_VERSION {
@@ -282,12 +288,14 @@ impl RequestLifecycleStatus {
 pub(crate) struct ProviderStore {
     root: PathBuf,
     owner_uid: u32,
+    #[cfg(target_os = "macos")]
+    administrator_uid: u32,
     poisoned: bool,
     _writer_lock: File,
 }
 
 impl ProviderStore {
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn open(root: impl Into<PathBuf>) -> Result<Self, ProviderError> {
         Self::open_with_cleanup(root, || Ok(()))
     }
@@ -310,7 +318,16 @@ impl ProviderStore {
         let lock = open_existing(&root.join(LOCK_FILE), true)?;
         validate_open_file(&lock, PRIVATE_FILE_MODE, owner_uid)?;
         try_lock_exclusive(&lock)?;
+        #[cfg(target_os = "macos")]
+        let identity = crate::adapters::native::identity::load()
+            .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
+        #[cfg(target_os = "macos")]
+        if identity.provider_uid != owner_uid {
+            return Err(error(ProviderDiagnostic::UnsafeState));
+        }
         let store = Self {
+            #[cfg(target_os = "macos")]
+            administrator_uid: identity.operator_uid,
             root,
             owner_uid,
             poisoned: false,
@@ -322,7 +339,14 @@ impl ProviderStore {
         store.read_state().map(|_| store)
     }
     pub(crate) fn owner_uid(&self) -> u32 {
-        self.owner_uid
+        #[cfg(target_os = "linux")]
+        {
+            self.owner_uid
+        }
+        #[cfg(target_os = "macos")]
+        {
+            self.administrator_uid
+        }
     }
     pub(crate) fn read_state(&self) -> Result<ProviderState, ProviderError> {
         #[cfg(test)]
@@ -340,7 +364,7 @@ impl ProviderStore {
         }
         let state: ProviderState =
             serde_json::from_str(&raw).map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
-        state.validate_for_owner(self.owner_uid)?;
+        state.validate_for_owner(self.owner_uid())?;
         Ok(state)
     }
     pub(crate) fn write_state(&mut self, state: &ProviderState) -> Result<(), ProviderError> {
@@ -352,7 +376,7 @@ impl ProviderStore {
         still_authorized: impl Fn() -> bool,
     ) -> Result<(), ProviderError> {
         self.ensure_healthy()?;
-        state.validate_for_owner(self.owner_uid)?;
+        state.validate_for_owner(self.owner_uid())?;
         validate_layout(&self.root, self.owner_uid)?;
         let encoded = serde_json::to_vec(state)
             .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
@@ -453,7 +477,7 @@ impl ProviderStore {
         self.write_state(&state)?;
         Ok(state)
     }
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn upsert_operation(
         &mut self,
         state: &ProviderState,
@@ -488,7 +512,7 @@ impl ProviderStore {
     fn temp_path(&self) -> PathBuf {
         self.root.join(TEMP_FILE)
     }
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn poison_for_test(&mut self) {
         self.poisoned = true;
     }
@@ -586,6 +610,9 @@ fn validate_dir(
     owner_uid: u32,
     exact_private_mode: bool,
 ) -> Result<(), ProviderError> {
+    #[cfg(target_os = "macos")]
+    let _checked = crate::adapters::native::platform::open_no_writers(path, false)
+        .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
     let metadata =
         fs::symlink_metadata(path).map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
     if metadata.file_type().is_symlink()
@@ -603,6 +630,9 @@ fn validate_dir(
     }
 }
 fn validate_regular_file(path: &Path, mode: u32, owner_uid: u32) -> Result<(), ProviderError> {
+    #[cfg(target_os = "macos")]
+    let _checked = crate::adapters::native::platform::open_no_writers(path, false)
+        .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
     let metadata =
         fs::symlink_metadata(path).map_err(|_error| error(ProviderDiagnostic::InvalidState))?;
     if metadata.file_type().is_symlink()
@@ -630,6 +660,9 @@ fn open_existing(path: &Path, write: bool) -> Result<File, ProviderError> {
     })
 }
 fn validate_open_file(file: &File, mode: u32, owner_uid: u32) -> Result<(), ProviderError> {
+    #[cfg(target_os = "macos")]
+    crate::adapters::native::platform::no_acl(file)
+        .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
     let metadata = file
         .metadata()
         .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))?;
@@ -643,7 +676,7 @@ fn validate_open_file(file: &File, mode: u32, owner_uid: u32) -> Result<(), Prov
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::access::policy::{

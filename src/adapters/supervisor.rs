@@ -529,5 +529,5 @@ impl ProcessSupervisor<LinuxExecutablePreparer> for FixtureProcessSupervisor {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod real_tests;

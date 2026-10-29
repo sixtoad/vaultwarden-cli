@@ -120,6 +120,7 @@ impl ProtectedExecution for LinuxExecutablePreparer {
         let argv = checked_arguments(argv)?;
         match image.profile {
             ExecutionProfile::ReviewedSelfContainedElf64V1 => {}
+            _ => return Err(ExecutionError::UnsupportedImage),
         }
         #[cfg(target_os = "linux")]
         {

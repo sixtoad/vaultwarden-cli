@@ -1,0 +1,43 @@
+Executable=/usr/bin/ssh
+Identifier=com.apple.ssh
+Format=Mach-O universal (arm64e arm64e.x1)
+CodeDirectory v=20500 size=1838 flags=0x10000(runtime) hashes=47+7 location=embedded
+Platform identifier=26
+Hash type=sha256 size=32
+CandidateCDHash sha256=498f8ef4ca3e343d103e032fd4d036658082edb0
+CandidateCDHashFull sha256=498f8ef4ca3e343d103e032fd4d036658082edb03cd1a503523ae1b60e23f2d6
+Hash choices=sha256
+CMSDigest=498f8ef4ca3e343d103e032fd4d036658082edb03cd1a503523ae1b60e23f2d6
+CMSDigestType=2
+CDHash=498f8ef4ca3e343d103e032fd4d036658082edb0
+Signature size=4202
+Authority=macOS Software Signing
+Authority=Apple Code Signing Certification Authority
+Authority=Apple Root CA
+Signed Time=9 Aug 2026 at 00:52:59
+Info.plist entries=17
+TeamIdentifier=not set
+Runtime Version=27.0.0
+Sealed Resources=none
+Internal requirements count=1 size=64
+warning: Specifying ':' in the path is deprecated and will not work in a future release
+Total signatures=1
+Chosen signature=1
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.private.amfi.version-restriction</key><integer>1</integer><key>keychain-access-groups</key><array><string>com.apple.ssh.passphrases</string></array></dict></plist>
+c7f9f9779c1dd141b04889c6cb214859d0702687e7fde34511bb5fa7af8951f1  /usr/bin/ssh
+/usr/bin/ssh:
+	/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation (compatibility version 300.0.0, current version 5027.0.69)
+	/System/Library/Frameworks/Kerberos.framework/Versions/A/Kerberos (compatibility version 5.0.0, current version 6.0.0)
+	/System/Library/Frameworks/OpenDirectory.framework/Versions/A/OpenDirectory (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libEndpointSecuritySystem.dylib (compatibility version 1.0.0, current version 0.0.0, weak)
+	/usr/lib/libManagedConfigurationFiles.dylib (compatibility version 1.0.0, current version 1.0.0, weak)
+	/usr/lib/libbsm.0.dylib (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libcrypto.46.dylib (compatibility version 47.0.0, current version 47.2.0)
+	/usr/lib/libpam.2.dylib (compatibility version 3.0.0, current version 3.0.0)
+	/usr/lib/libresolv.9.dylib (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)
+	/System/Library/Frameworks/Network.framework/Versions/A/Network (compatibility version 1.0.0, current version 6681.1.1)
+	/System/Library/Frameworks/Security.framework/Versions/A/Security (compatibility version 1.0.0, current version 62460.1.2)
+	/usr/lib/libobjc.A.dylib (compatibility version 1.0.0, current version 228.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1359.0.0)
+	/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 5027.0.69)

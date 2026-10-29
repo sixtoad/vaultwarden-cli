@@ -46,6 +46,8 @@ pub(crate) struct AgentBinding {
     pub(crate) uid: u32,
     pub(crate) gid: u32,
     pub(crate) status: AgentBindingStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) account_uuid: Option<String>,
 }
 
 impl AgentBinding {
@@ -62,6 +64,12 @@ impl AgentBinding {
             uid: input.uid,
             gid: input.gid,
             status: AgentBindingStatus::Enabled,
+            #[cfg(target_os = "linux")]
+            account_uuid: None,
+            #[cfg(target_os = "macos")]
+            account_uuid: Some(
+                crate::adapters::native::identity::uuid(input.uid).map_err(|_error| invalid())?,
+            ),
         };
         binding.validate(provider_uid)?;
         Ok(binding)
@@ -83,12 +91,43 @@ impl AgentBinding {
         {
             return Err(invalid());
         }
+        #[cfg(target_os = "macos")]
+        {
+            let identity = crate::adapters::native::identity::load().map_err(|_error| invalid())?;
+            if self.uid == identity.provider_uid
+                || self.uid == identity.operator_uid
+                || self.gid != identity.agent_gid
+                || !self.account_uuid.as_deref().is_some_and(|uuid| {
+                    uuid.len() == 32
+                        && uuid
+                            .bytes()
+                            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                })
+            {
+                return Err(invalid());
+            }
+        }
         Ok(())
+    }
+
+    /// A durable binding is current only while its enrolled account still exists unchanged.
+    pub(crate) fn enabled_current(&self) -> bool {
+        let enabled = self.status == AgentBindingStatus::Enabled;
+        #[cfg(target_os = "macos")]
+        {
+            // Historical entries survive account removal/reuse. Admission and final
+            // release independently check the current account, not just its numeric UID.
+            enabled
+                && crate::adapters::native::identity::uuid(self.uid)
+                    .is_ok_and(|current| self.account_uuid.as_deref() == Some(current.as_str()))
+        }
+        #[cfg(target_os = "linux")]
+        enabled
     }
 
     /// Membership and enabled status are prerequisites, never signature proof.
     pub(crate) fn matches_os(&self, uid: u32, groups: &[u32]) -> bool {
-        self.status == AgentBindingStatus::Enabled && self.uid == uid && groups.contains(&self.gid)
+        self.uid == uid && groups.contains(&self.gid) && self.enabled_current()
     }
 
     pub(crate) fn view(&self) -> AgentBindingView {

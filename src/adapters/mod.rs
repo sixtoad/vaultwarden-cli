@@ -1,20 +1,30 @@
-#[cfg(target_os = "linux")]
 pub mod agent_wait;
 pub mod companion;
 pub mod companion_identity;
 pub mod desktop_launch;
 // Descriptor preparation is shared by contained helper supervision.
 #[cfg_attr(not(test), allow(dead_code))]
+#[cfg(target_os = "linux")]
 pub(crate) mod execution;
 pub mod human_socket;
 pub mod loopback_ui;
+#[cfg(target_os = "macos")]
+pub mod native;
 pub mod session;
-#[cfg(target_os = "linux")]
 pub(crate) mod ssh_agent;
-#[cfg(target_os = "linux")]
 pub mod ssh_material;
-pub mod supervisor;
 #[cfg(target_os = "linux")]
+pub mod supervisor;
+pub mod platform_execution {
+    #[cfg(target_os = "macos")]
+    pub use super::native::{
+        ExecutionWorker, NativeProcessSupervisor as PlatformProcessSupervisor,
+    };
+    #[cfg(target_os = "linux")]
+    pub use super::supervisor::{
+        ExecutionWorker, SystemdProcessSupervisor as PlatformProcessSupervisor,
+    };
+}
 pub mod unix_socket;
 pub mod vaultwarden;
 
@@ -55,3 +65,8 @@ fn within_test_deadline<T: Send + 'static>(operation: impl FnOnce() -> T + Send 
         .recv_timeout(std::time::Duration::from_secs(2))
         .expect("unsafe file must be rejected without waiting for a FIFO writer")
 }
+
+#[cfg(target_os = "linux")]
+pub(crate) use execution::LinuxExecutablePreparer as PlatformExecutablePreparer;
+#[cfg(target_os = "macos")]
+pub(crate) use native::NativeExecutablePreparer as PlatformExecutablePreparer;

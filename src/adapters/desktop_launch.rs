@@ -14,7 +14,10 @@ pub(crate) struct SystemDesktop;
 impl DesktopOpener for SystemDesktop {
     fn open(&self, artifact: &Path) -> Result<(), DirectRequestError> {
         // No configuration or client field can replace this production executable.
+        #[cfg(target_os = "linux")]
         let launcher = Path::new("/usr/bin/xdg-open");
+        #[cfg(target_os = "macos")]
+        let launcher = Path::new("/usr/bin/open");
         let metadata = launcher.metadata().map_err(|_error| unavailable())?;
         if !trusted_launcher(metadata.is_file(), metadata.uid(), metadata.mode()) {
             return Err(unavailable());
@@ -76,7 +79,7 @@ fn unavailable() -> DirectRequestError {
     DirectRequestError::ReviewUnavailable
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;

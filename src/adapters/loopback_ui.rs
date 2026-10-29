@@ -719,11 +719,16 @@ fn accepted_connection(
 
 // Both PEM files are provisioned by the human outside agent-writable storage.
 fn identity_file(path: &Path) -> Result<Zeroizing<Vec<u8>>, SessionError> {
+    #[cfg(target_os = "macos")]
+    let _checked = super::native::platform::open_no_writers(path, false)
+        .map_err(|_error| SessionError::BackendUnavailable)?;
     let mut file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)
         .map_err(|_error| SessionError::BackendUnavailable)?;
+    #[cfg(target_os = "macos")]
+    super::native::platform::no_acl(&file).map_err(|_error| SessionError::BackendUnavailable)?;
     let meta = file
         .metadata()
         .map_err(|_error| SessionError::BackendUnavailable)?;
@@ -929,7 +934,7 @@ impl Response {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::access::{
