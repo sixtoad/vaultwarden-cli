@@ -228,6 +228,11 @@ pub(crate) trait ProcessSupervisor<P: ProtectedExecution> {
 }
 /// Bounded provider-owned dispatch; contains only a request identifier.
 pub trait ExecutionDispatcher: Send + Sync {
+    /// Read-only current runtime readiness, never inferred from configuration.
+    /// Adapters without a verified health/liveness probe remain unavailable.
+    fn available(&self) -> bool {
+        false
+    }
     fn dispatch(&self, request_id: &str) -> Result<(), SessionError>;
 }
 

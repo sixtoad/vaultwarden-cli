@@ -10,13 +10,14 @@ class RequestReview extends StatelessWidget {
     super.key,
     required this.state,
     required this.endpoint,
+    this.origin = '',
     required this.password,
     required this.onApprove,
     required this.onDeny,
     required this.onCancel,
   });
   final core.ProviderSnapshot state;
-  final String endpoint;
+  final String endpoint, origin;
   final TextEditingController password;
   final VoidCallback onApprove, onDeny, onCancel;
   @override
@@ -43,9 +44,11 @@ class RequestReview extends StatelessWidget {
             review.requester,
             key: const Key('review-requester'),
           ),
-          const FactRow(
-            'Originating device',
-            'Not supplied by provider protocol v1.',
+          FactRow(
+            origin.isEmpty
+                ? 'Originating device'
+                : 'Authenticated request origin',
+            origin.isEmpty ? 'Not supplied by provider protocol v1.' : origin,
           ),
           FactRow(
             'Operation',

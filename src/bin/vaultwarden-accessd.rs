@@ -71,6 +71,19 @@ struct Args {
     companion_revoke: Option<String>,
     #[arg(long, conflicts_with_all = ["companion_enroll_cert", "companion_revoke", "backend_config"])]
     companion_list: bool,
+    /// Explicit offline administrator grant for an already enrolled certificate.
+    #[arg(long, conflicts_with_all = ["companion_enroll_cert", "companion_revoke", "companion_list", "backend_config"])]
+    companion_grant_admin: Option<String>,
+    /// Explicit stopped-provider reconciliation; never claims the original remote action succeeded.
+    #[arg(long, requires_all = ["companion_reconcile_kind", "companion_reconcile_id"], conflicts_with_all = ["companion_enroll_cert", "companion_revoke", "companion_list", "companion_grant_admin", "backend_config"])]
+    companion_reconcile_action: Option<String>,
+    #[arg(long, requires = "companion_reconcile_action", value_parser = ["approval_client", "requester_agent"])]
+    companion_reconcile_kind: Option<String>,
+    #[arg(long, requires = "companion_reconcile_action")]
+    companion_reconcile_id: Option<String>,
+    /// Exact original client certificate; required when no action receipt exists.
+    #[arg(long, requires = "companion_reconcile_action")]
+    companion_reconcile_actor: Option<String>,
 }
 #[cfg(target_os = "linux")]
 fn main() -> ExitCode {
@@ -85,6 +98,22 @@ fn main() -> ExitCode {
 }
 #[cfg(target_os = "linux")]
 fn run(args: Args) -> Result<(), ()> {
+    if let Some(action) = &args.companion_reconcile_action {
+        let receipt = Companion::reconcile_management_action(
+            &args.state_root,
+            action,
+            args.companion_reconcile_kind.as_deref().ok_or(())?,
+            args.companion_reconcile_id.as_deref().ok_or(())?,
+            args.companion_reconcile_actor.as_deref(),
+        )
+        .map_err(|_| ())?;
+        println!("{receipt}");
+        return Ok(());
+    }
+    if let Some(fingerprint) = &args.companion_grant_admin {
+        return companion_identity::grant_administrator(&args.state_root, fingerprint)
+            .map_err(|_| ());
+    }
     if let Some(certificate) = &args.companion_enroll_cert {
         let fingerprint = companion_identity::enroll(
             &args.state_root,
@@ -144,6 +173,7 @@ fn run(args: Args) -> Result<(), ()> {
         )
         .map_err(|_error| ())?,
     );
+    Companion::enforce_management_recovery(&args.state_root, &app);
     let execution_worker = ExecutionWorker::start(app.clone(), supervisor).map_err(|_error| ())?;
     let human_socket = HumanSocket::bind(&args.state_root).map_err(|_error| ())?;
     let agent_socket = args

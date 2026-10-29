@@ -625,6 +625,38 @@ impl Provider {
             .map(|d| d.review.id.clone())
             .collect())
     }
+    pub(crate) fn request_origin(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+    ) -> Result<
+        Option<super::direct_request::RequestOrigin>,
+        super::direct_request::DirectRequestError,
+    > {
+        use super::direct_request::{DirectRequestError, RequestOrigin};
+        self.check_administrator(owner)?;
+        let state = self.store.read_state()?;
+        let record = state
+            .requests
+            .iter()
+            .find(|r| r.id == id)
+            .and_then(|r| r.direct.as_ref())
+            .ok_or(DirectRequestError::NotFound)?;
+        if !record.human_visible(owner, self.owner_uid()) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        Ok(record
+            .agent_owner
+            .as_ref()
+            .filter(|_| record.replay_digest.is_some())
+            .map(|o| RequestOrigin {
+                kind: "requester_agent",
+                binding_id: o.binding_id.clone(),
+                label: o.label.clone(),
+                fingerprint: o.fingerprint.clone(),
+                evidence: "signed_os_binding",
+            }))
+    }
     pub(crate) fn direct_review(
         &self,
         owner: super::direct_request::AuthenticatedHuman,

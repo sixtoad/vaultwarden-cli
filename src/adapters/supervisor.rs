@@ -12,7 +12,7 @@ use crate::access::{
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -65,6 +65,30 @@ impl SystemdProcessSupervisor {
             healthy: AtomicBool::new(true),
             material_root: Some(super::ssh_material::initialize(state_root)?),
         })
+    }
+    /// Trusted-console recovery only while the provider writer lock is held.
+    /// Also verifies the fixed service is stopped: an alternate state-root lock
+    /// cannot authorize cleanup of a live provider's global runtime/session.
+    pub(crate) fn recover_stopped(
+        state_root: &std::path::Path,
+        clear_session: impl FnOnce() -> Result<(), ExecutionError>,
+    ) -> Result<(), ExecutionError> {
+        const PROVIDER: &str = "vaultwarden-accessd.service";
+        let manager = Manager::connect()?;
+        manager.require_provider_stopped(PROVIDER)?;
+        let helper = std::env::current_exe()
+            .map_err(|_| ExecutionError::Unavailable)?
+            .parent()
+            .ok_or(ExecutionError::UnsafePath)?
+            .join("vaultwarden-access-exec");
+        let runtime = std::path::PathBuf::from(format!("/run/user/{}", unsafe { libc::geteuid() }));
+        let config = Config::new(PROVIDER.into(), helper, &runtime)?;
+        manager.recover_strict(&config)?;
+        let material = super::ssh_material::initialize(state_root)?;
+        super::ssh_material::recover_stopped(&material)?;
+        manager.require_provider_stopped(PROVIDER)?;
+        clear_session()?;
+        manager.require_provider_stopped(PROVIDER)
     }
     /// Isolated systemd namespace for the explicitly invoked companion acceptance test.
     #[cfg(test)]
@@ -316,16 +340,47 @@ impl ProcessSupervisor<LinuxExecutablePreparer> for SystemdProcessSupervisor {
 }
 
 /// One bounded provider worker: approving a request does not block the human transport.
+const EXECUTION_QUEUE_CAPACITY: usize = 8;
+#[derive(Default)]
+struct WorkerStatus {
+    alive: AtomicBool,
+    queued: AtomicUsize,
+}
+struct WorkerAlive(Arc<WorkerStatus>);
+impl Drop for WorkerAlive {
+    fn drop(&mut self) {
+        self.0.alive.store(false, Ordering::Release);
+    }
+}
 pub struct ExecutionWorker {
     sender: Option<std::sync::mpsc::SyncSender<String>>,
     worker: Option<std::thread::JoinHandle<()>>,
+    status: Arc<WorkerStatus>,
+    supervisor: Arc<SystemdProcessSupervisor>,
 }
-struct Dispatch(std::sync::mpsc::SyncSender<String>);
+struct Dispatch {
+    sender: std::sync::mpsc::SyncSender<String>,
+    status: Arc<WorkerStatus>,
+    supervisor: Arc<SystemdProcessSupervisor>,
+}
 impl ExecutionDispatcher for Dispatch {
+    fn available(&self) -> bool {
+        self.status.alive.load(Ordering::Acquire)
+            && self.status.queued.load(Ordering::Acquire) < EXECUTION_QUEUE_CAPACITY
+            && self.supervisor.available()
+    }
     fn dispatch(&self, id: &str) -> Result<(), SessionError> {
-        self.0
-            .try_send(id.to_owned())
-            .map_err(|_error| SessionError::BackendUnavailable)
+        self.status
+            .queued
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |queued| {
+                (queued < EXECUTION_QUEUE_CAPACITY).then_some(queued + 1)
+            })
+            .map_err(|_| SessionError::BackendUnavailable)?;
+        if self.sender.try_send(id.to_owned()).is_err() {
+            self.status.queued.fetch_sub(1, Ordering::AcqRel);
+            return Err(SessionError::BackendUnavailable);
+        }
+        Ok(())
     }
 }
 impl ExecutionWorker {
@@ -333,23 +388,31 @@ impl ExecutionWorker {
         app: Arc<ProviderApplication>,
         supervisor: Arc<SystemdProcessSupervisor>,
     ) -> Result<Self, SessionError> {
-        let (sender, receiver) = std::sync::mpsc::sync_channel::<String>(8);
+        let (sender, receiver) = std::sync::mpsc::sync_channel::<String>(EXECUTION_QUEUE_CAPACITY);
+        let status = Arc::new(WorkerStatus::default());
+        let worker_status = status.clone();
+        let worker_supervisor = supervisor.clone();
         let worker = std::thread::Builder::new()
             .name("protected-execution".into())
             .spawn(move || {
+                let _alive = WorkerAlive(worker_status.clone());
+                worker_status.alive.store(true, Ordering::Release);
                 while let Ok(id) = receiver.recv() {
+                    worker_status.queued.fetch_sub(1, Ordering::AcqRel);
                     let _result = app.run_execution(
                         app.human_owner(),
                         &id,
                         &LinuxExecutablePreparer,
-                        supervisor.as_ref(),
+                        worker_supervisor.as_ref(),
                     );
                 }
             })
-            .map_err(|_error| SessionError::BackendUnavailable)?;
+            .map_err(|_| SessionError::BackendUnavailable)?;
         Ok(Self {
             sender: Some(sender),
             worker: Some(worker),
+            status,
+            supervisor,
         })
     }
     pub fn is_finished(&self) -> bool {
@@ -358,9 +421,11 @@ impl ExecutionWorker {
             .is_none_or(std::thread::JoinHandle::is_finished)
     }
     pub fn dispatcher(&self) -> Arc<dyn ExecutionDispatcher> {
-        Arc::new(Dispatch(
-            self.sender.as_ref().expect("live execution worker").clone(),
-        ))
+        Arc::new(Dispatch {
+            sender: self.sender.as_ref().expect("live execution worker").clone(),
+            status: self.status.clone(),
+            supervisor: self.supervisor.clone(),
+        })
     }
     /// Call after transports release their dispatchers and shutdown has settled observers.
     pub fn join(mut self) -> Result<(), SessionError> {
@@ -369,7 +434,56 @@ impl ExecutionWorker {
             .take()
             .ok_or(SessionError::CleanupFailed)?
             .join()
-            .map_err(|_error| SessionError::CleanupFailed)
+            .map_err(|_| SessionError::CleanupFailed)
+    }
+}
+
+#[cfg(test)]
+mod dispatcher_tests {
+    use super::*;
+    fn supervisor() -> Arc<SystemdProcessSupervisor> {
+        Arc::new(SystemdProcessSupervisor {
+            config: Config {
+                provider: "unavailable.service".into(),
+                helper: "/unused".into(),
+                runtime: "/unused".into(),
+                prefix: "unused-".into(),
+                test_environment: Vec::new(),
+            },
+            healthy: AtomicBool::new(false),
+            material_root: None,
+        })
+    }
+    #[test]
+    fn management_dispatcher_reports_unhealthy_worker_and_bounds_real_queue() {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(EXECUTION_QUEUE_CAPACITY);
+        let status = Arc::new(WorkerStatus::default());
+        status.alive.store(true, Ordering::Release);
+        let dispatcher = Dispatch {
+            sender,
+            status: status.clone(),
+            supervisor: supervisor(),
+        };
+        assert!(!dispatcher.available()); // alive, but actual supervisor unhealthy
+        for _ in 0..EXECUTION_QUEUE_CAPACITY {
+            dispatcher.dispatch("request").unwrap();
+        }
+        assert!(dispatcher.dispatch("overflow").is_err());
+        assert_eq!(
+            status.queued.load(Ordering::Acquire),
+            EXECUTION_QUEUE_CAPACITY
+        );
+        receiver.recv().unwrap();
+        status.queued.fetch_sub(1, Ordering::AcqRel);
+        dispatcher.dispatch("replacement").unwrap();
+        drop(receiver);
+        status.queued.store(0, Ordering::Release);
+        assert!(dispatcher.dispatch("disconnected").is_err());
+        assert_eq!(status.queued.load(Ordering::Acquire), 0);
+        let guard = WorkerAlive(status.clone());
+        drop(guard);
+        assert!(!status.alive.load(Ordering::Acquire));
+        assert!(!dispatcher.available());
     }
 }
 

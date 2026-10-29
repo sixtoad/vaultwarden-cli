@@ -154,6 +154,30 @@ fn provider_harness() {
     supervisor.recover().unwrap();
     stage("recovered");
     if mode == "recover" {
+        // Reconciliation must not acknowledge cleanup when actual manager
+        // observation of a known owned lease is unavailable. No unit is started.
+        let manager = Manager::connect().unwrap();
+        // This is the actual active MainPID: alternate state-root ownership
+        // must never authorize stopped-provider cleanup of this namespace.
+        assert_eq!(
+            manager.require_provider_stopped(&supervisor.config.provider),
+            Err(ExecutionError::ManagerUnavailable)
+        );
+        let lease = manager.lease(supervisor.config.name().unwrap());
+        supervisor.config.record(&lease).unwrap();
+        manager::FAULT.with(|fault| fault.set(manager::Fault::Observe));
+        let refused = manager.recover_strict(&supervisor.config);
+        manager::FAULT.with(|fault| fault.set(manager::Fault::None));
+        assert_eq!(refused, Err(ExecutionError::CleanupUncertain));
+        assert!(
+            supervisor
+                .config
+                .leases()
+                .unwrap()
+                .iter()
+                .any(|entry| entry.name == lease.name)
+        );
+        manager.recover_strict(&supervisor.config).unwrap();
         finish(&root, b"recovered");
         return;
     }

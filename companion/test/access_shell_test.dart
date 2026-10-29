@@ -396,7 +396,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(
-        find.text('Known local connection and client identity'),
+        find.text('Authoritative provider identities · names are labels, not identity proof.'),
         findsOneWidget,
       );
       expect(

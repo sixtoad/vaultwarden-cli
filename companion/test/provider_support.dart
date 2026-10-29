@@ -92,6 +92,8 @@ class FixtureProviderPlatform implements ProviderPlatform {
         if (heldSession != null) return heldSession!.future;
         if (sessionReply != null) return sessionReply!;
         return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
+      case 'request_origin':
+        return encoded({'version': 1, 'error': 'invalid_request'});
       case 'unlock':
         return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
       case 'list':

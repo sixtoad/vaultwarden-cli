@@ -52,11 +52,13 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   provisioned CA/PKCS#12 (`companion/macos/Runner/ProviderAdapter.swift:47`). No
   nearby invitation, matching-code, QR or dual-human-authorization protocol exists
   in these surfaces. Advanced setup cannot satisfy guided enrollment acceptance.
-- [ ] **Trusted-device management:** the remote companion command schema has no
-  device listing/revocation API. Show only known local configuration initially.
-  Revocation requirements must be derived separately for approver certificates
-  and requester-agent identities, including active-work termination/invalidation;
-  never inherit the prototype's blanket statement that work can continue.
+- [ ] **Trusted-device management:** provider-backed inventory/detail, explicit
+  owner-granted remote administration, permanent revocation and action-bound
+  reconciliation are implemented in the device-management slice; final Linux,
+  native packaging and CI verification remains pending. See the
+  [identity management contract](issue-50-device-agent-management.md). Enrollment
+  remains separate. PR #55 requires future-access denial and provider-owned
+  cleanup without terminating consumer programs.
 - [ ] **Remote activity:** allowlisted durable history already exists in
   `src/access/history.rs`; `src/bin/vw-access.rs:108` exposes `history --limit`.
   Companion v1 has no history command. Slice one shows latest known status only;
@@ -76,8 +78,8 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
 
 | Destination | First slice | Completion dependency |
 |---|---|---|
-| Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and missing originating-device metadata |
-| Devices & agents | Configured client fingerprint and provider connection, explicit roles/limits | Trusted identities API and genuine mutual enrollment/revocation |
+| Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and signed-admission origin (legacy origin explicitly unavailable) |
+| Devices & agents | Provider-backed identities, granted roles/trust, exact-target permanent revocation and status-only recovery (management slice) | Final management verification; genuine mutual enrollment remains separate |
 | Activity | Latest known redacted status with exact request ID; fresh review on reopen | Bounded authenticated durable history |
 | Settings | Existing advanced setup, theme, actual capabilities, separate synthetic diagnostics | Version inspection, bundled CLI repair, native notification settings |
 

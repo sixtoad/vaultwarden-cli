@@ -28,7 +28,27 @@ pub struct EnrolledCompanion {
 struct Registry {
     version: u8,
     identities: Vec<EnrolledCompanion>,
+    #[serde(default)]
+    revoked: Vec<EnrolledCompanion>,
+    #[serde(default)]
+    administrators: Vec<String>,
+    #[serde(default)]
+    audit: Vec<IdentityAudit>,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IdentityAudit {
+    fingerprint: String,
+    actor: String,
+    action: IdentityAction,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum IdentityAction {
+    GrantedAdministrator,
+    Revoked,
+}
+
 fn unavailable<T>(_: T) -> SessionError {
     SessionError::BackendUnavailable
 }
@@ -124,22 +144,116 @@ pub(crate) fn verifier(
         .build()
         .map_err(unavailable)
 }
-pub(crate) fn enrolled(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
+fn registry(path: &Path) -> Result<Registry, SessionError> {
     private_directory(path.parent().ok_or(SessionError::BackendUnavailable)?)?;
     let bytes = private_file(path)?;
     let registry: Registry = serde_json::from_slice(&bytes).map_err(unavailable)?;
     let mut seen = std::collections::HashSet::new();
-    if registry.version != 1
-        || registry.identities.len() > MAX_IDENTITIES
-        || registry.identities.iter().any(|entry| {
-            !valid_fingerprint(&entry.fingerprint)
-                || !seen.insert(&entry.fingerprint)
-                || !valid_label(&entry.label)
+    let mut admins = std::collections::HashSet::new();
+    if !matches!(registry.version, 1 | 2)
+        || (registry.version == 1
+            && (!registry.revoked.is_empty()
+                || !registry.administrators.is_empty()
+                || !registry.audit.is_empty()))
+        || registry.identities.len() + registry.revoked.len() > MAX_IDENTITIES
+        || registry
+            .identities
+            .iter()
+            .chain(&registry.revoked)
+            .any(|entry| {
+                !valid_fingerprint(&entry.fingerprint)
+                    || !seen.insert(&entry.fingerprint)
+                    || !valid_label(&entry.label)
+            })
+        || registry.administrators.iter().any(|fp| {
+            !admins.insert(fp) || !registry.identities.iter().any(|i| &i.fingerprint == fp)
+        })
+        || registry.audit.len() > MAX_IDENTITIES * 2
+        || registry.audit.iter().any(|e| {
+            !valid_fingerprint(&e.fingerprint)
+                || (e.actor != "local_owner" && !valid_fingerprint(&e.actor))
         })
     {
         return Err(SessionError::BackendUnavailable);
     }
-    Ok(registry.identities)
+    Ok(registry)
+}
+pub(crate) fn enrolled(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
+    Ok(registry(path)?.identities)
+}
+pub(crate) fn management_records(
+    path: &Path,
+) -> Result<Vec<(EnrolledCompanion, bool, bool)>, SessionError> {
+    let registry = registry(path)?;
+    let mut result = registry
+        .identities
+        .into_iter()
+        .map(|entry| {
+            let admin = registry.administrators.contains(&entry.fingerprint);
+            (entry, false, admin)
+        })
+        .collect::<Vec<_>>();
+    result.extend(
+        registry
+            .revoked
+            .into_iter()
+            .map(|entry| (entry, true, false)),
+    );
+    Ok(result)
+}
+pub(crate) fn administrator(path: &Path, fingerprint: &str) -> bool {
+    registry(path).is_ok_and(|r| r.administrators.iter().any(|fp| fp == fingerprint))
+}
+/// Explicit local-owner grant. Enrollment alone never grants administration.
+pub fn grant_administrator(root: &Path, fingerprint: &str) -> Result<(), SessionError> {
+    let _lock = stopped_provider(root)?;
+    let mut registry = registry(&root.join(STORE_FILE))?;
+    if !registry
+        .identities
+        .iter()
+        .any(|i| i.fingerprint == fingerprint)
+    {
+        return Err(SessionError::InvalidRequest);
+    }
+    if !registry.administrators.iter().any(|fp| fp == fingerprint) {
+        registry.administrators.push(fingerprint.into());
+        registry.audit.push(IdentityAudit {
+            fingerprint: fingerprint.into(),
+            actor: "local_owner".into(),
+            action: IdentityAction::GrantedAdministrator,
+        });
+        persist_registry(root, registry)?;
+    }
+    Ok(())
+}
+/// Caller holds the companion management gate; offline writers require stopped provider.
+pub(crate) fn revoke_online(
+    root: &Path,
+    fingerprint: &str,
+    actor: &str,
+) -> Result<(), SessionError> {
+    let mut registry = registry(&root.join(STORE_FILE))?;
+    if registry
+        .revoked
+        .iter()
+        .any(|entry| entry.fingerprint == fingerprint)
+    {
+        return Ok(());
+    }
+    let position = registry
+        .identities
+        .iter()
+        .position(|entry| entry.fingerprint == fingerprint)
+        .ok_or(SessionError::InvalidRequest)?;
+    let entry = registry.identities.remove(position);
+    registry.revoked.push(entry);
+    registry.administrators.retain(|fp| fp != fingerprint);
+    registry.audit.push(IdentityAudit {
+        fingerprint: fingerprint.into(),
+        actor: actor.into(),
+        action: IdentityAction::Revoked,
+    });
+    persist_registry(root, registry)
 }
 fn valid_label(label: &str) -> bool {
     !label.is_empty() && label.len() <= 128 && !label.chars().any(char::is_control)
@@ -152,19 +266,35 @@ fn stopped_provider(root: &Path) -> Result<File, SessionError> {
     }
     Ok(lock)
 }
-fn read_or_initial(root: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
+fn read_or_initial(root: &Path) -> Result<Registry, SessionError> {
     let path = root.join(STORE_FILE);
     match std::fs::symlink_metadata(&path) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        _ => enrolled(&path),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Registry {
+            version: 2,
+            identities: Vec::new(),
+            revoked: Vec::new(),
+            administrators: Vec::new(),
+            audit: Vec::new(),
+        }),
+        _ => registry(&path),
     }
 }
+#[cfg(test)]
 fn persist(root: &Path, identities: Vec<EnrolledCompanion>) -> Result<(), SessionError> {
-    let bytes = serde_json::to_vec(&Registry {
-        version: 1,
-        identities,
-    })
-    .map_err(unavailable)?;
+    persist_registry(
+        root,
+        Registry {
+            version: 2,
+            identities,
+            revoked: Vec::new(),
+            administrators: Vec::new(),
+            audit: Vec::new(),
+        },
+    )
+}
+fn persist_registry(root: &Path, mut registry: Registry) -> Result<(), SessionError> {
+    registry.version = 2;
+    let bytes = serde_json::to_vec(&registry).map_err(unavailable)?;
     let mut nonce = [0; 16];
     getrandom::fill(&mut nonce).map_err(unavailable)?;
     let temporary = root.join(format!(".companion-{}.new", fingerprint(&nonce)));
@@ -210,19 +340,21 @@ pub fn enroll(
         .verify_client_cert(leaf, &chain[1..], UnixTime::now())
         .map_err(unavailable)?;
     let fingerprint = fingerprint(leaf);
-    let mut identities = read_or_initial(root)?;
-    if identities
+    let mut registry = read_or_initial(root)?;
+    if registry
+        .identities
         .iter()
+        .chain(&registry.revoked)
         .any(|entry| entry.fingerprint == fingerprint)
-        || identities.len() >= MAX_IDENTITIES
+        || registry.identities.len() + registry.revoked.len() >= MAX_IDENTITIES
     {
         return Err(SessionError::InvalidRequest);
     }
-    identities.push(EnrolledCompanion {
+    registry.identities.push(EnrolledCompanion {
         fingerprint: fingerprint.clone(),
         label: label.into(),
     });
-    persist(root, identities)?;
+    persist_registry(root, registry)?;
     Ok(fingerprint)
 }
 pub fn revoke(root: &Path, fingerprint: &str) -> Result<(), SessionError> {
@@ -230,13 +362,7 @@ pub fn revoke(root: &Path, fingerprint: &str) -> Result<(), SessionError> {
         return Err(SessionError::InvalidRequest);
     }
     let _lock = stopped_provider(root)?;
-    let mut identities = enrolled(&root.join(STORE_FILE))?;
-    let original = identities.len();
-    identities.retain(|entry| entry.fingerprint != fingerprint);
-    if original == identities.len() {
-        return Err(SessionError::InvalidRequest);
-    }
-    persist(root, identities)
+    revoke_online(root, fingerprint, "local_owner")
 }
 pub fn list(root: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
     enrolled(&root.join(STORE_FILE))
@@ -363,5 +489,41 @@ mod tests {
         ];
         persist(root.path(), entries).unwrap();
         assert!(list(root.path()).is_err());
+    }
+    #[test]
+    fn explicit_admin_grant_is_default_denied_and_revocation_is_permanent() {
+        let root = root();
+        let fp = "a".repeat(64);
+        persist(
+            root.path(),
+            vec![
+                EnrolledCompanion {
+                    fingerprint: fp.clone(),
+                    label: "Duplicate label".into(),
+                },
+                EnrolledCompanion {
+                    fingerprint: "b".repeat(64),
+                    label: "Duplicate label".into(),
+                },
+            ],
+        )
+        .unwrap();
+        let path = root.path().join(STORE_FILE);
+        assert!(!administrator(&path, &fp));
+        assert!(grant_administrator(root.path(), &"c".repeat(64)).is_err());
+        grant_administrator(root.path(), &fp).unwrap();
+        assert!(administrator(&path, &fp));
+        revoke(root.path(), &fp).unwrap();
+        assert!(!administrator(&path, &fp));
+        assert!(grant_administrator(root.path(), &fp).is_err());
+        assert_eq!(list(root.path()).unwrap()[0].fingerprint, "b".repeat(64));
+        let records = management_records(&path).unwrap();
+        assert!(
+            records
+                .iter()
+                .any(|(entry, revoked, admin)| entry.fingerprint == fp && *revoked && !admin)
+        );
+        let registry = registry(&path).unwrap();
+        assert_eq!(registry.audit.len(), 2);
     }
 }

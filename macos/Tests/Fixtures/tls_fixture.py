@@ -84,6 +84,8 @@ def serve(root, mode):
             if peer != expected_client:
                 return self.reply(403, {"version": 1, "error": "unauthorized"})
             command = body.get("command")
+            if command == "request_origin":
+                return self.reply(400, {"version": 1, "error": "invalid_request"})
             if mode in ["slow-unlock", "lost-unlock"]:
                 if command == "unlock":
                     with lock:
