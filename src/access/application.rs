@@ -32,6 +32,24 @@ pub enum SessionStatus {
     Locked,
     Unlocked,
 }
+/// Distinguishes refusal before any irreversible token/epoch mutation.
+#[derive(Debug)]
+pub(crate) enum ManagementMutationError {
+    NotStarted(DirectRequestError),
+    Uncertain(DirectRequestError),
+}
+impl ManagementMutationError {
+    fn into_error(self) -> DirectRequestError {
+        match self {
+            Self::NotStarted(e) | Self::Uncertain(e) => e,
+        }
+    }
+}
+impl From<DirectRequestError> for ManagementMutationError {
+    fn from(error: DirectRequestError) -> Self {
+        Self::Uncertain(error)
+    }
+}
 struct Authority {
     provider: Provider,
     backend: Box<dyn SecretBackend>,
@@ -410,19 +428,61 @@ impl ProviderApplication {
         human: AuthenticatedHuman,
         id: &str,
     ) -> Result<super::agent_binding::AgentBindingView, DirectRequestError> {
-        self.check_owner(human)?;
-        // Metadata lookup never acquires gate while holding release_gate. Tokens
-        // are immutable by binding ID, including tombstones and retries.
+        self.revoke_agent_checked(human, id, None)
+            .map_err(ManagementMutationError::into_error)
+            .and_then(|(view, complete)| {
+                if complete {
+                    Ok(view)
+                } else {
+                    Err(DirectRequestError::Unavailable)
+                }
+            })
+    }
+    pub(crate) fn revoke_agent_checked(
+        &self,
+        human: AuthenticatedHuman,
+        id: &str,
+        authority_binding: Option<(u64, u64, Duration)>,
+    ) -> Result<(super::agent_binding::AgentBindingView, bool), ManagementMutationError> {
+        self.check_owner(human)
+            .map_err(ManagementMutationError::NotStarted)?;
+        // Remote authorization must be checked atomically with token denial.
+        // Busy remote actions fail closed; the local emergency path remains
+        // token-before-gate so it can cancel a blocked resolver.
+        let mut checked_authority = if authority_binding.is_some() {
+            Some(self.gate.try_lock().map_err(|_error| {
+                ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
+            })?)
+        } else {
+            None
+        };
+        // Preserve token-before-gate cancellation even while a resolver owns gate.
         {
-            let _release = self
-                .release_gate
-                .lock()
-                .map_err(|_error| DirectRequestError::Unavailable)?;
-            let tokens = self
-                .agent_tokens
-                .lock()
-                .map_err(|_error| DirectRequestError::Unavailable)?;
-            let token = tokens.get(id).ok_or(DirectRequestError::NotFound)?;
+            let _release = self.release_gate.lock().map_err(|_error| {
+                ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
+            })?;
+            if authority_binding.is_some_and(|(generation, epoch, deadline)| {
+                checked_authority
+                    .as_ref()
+                    .is_none_or(|a| a.generation != generation)
+                    || self.revocation_epoch.load(Ordering::Acquire) != epoch
+                    || self.clock.now() >= deadline
+            }) {
+                return Err(ManagementMutationError::NotStarted(
+                    DirectRequestError::Unauthorized,
+                ));
+            }
+            let tokens = self.agent_tokens.lock().map_err(|_error| {
+                ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
+            })?;
+            let token = tokens.get(id).ok_or(ManagementMutationError::NotStarted(
+                DirectRequestError::NotFound,
+            ))?;
+            if authority_binding.is_some() && token.load(Ordering::Acquire) {
+                return Err(ManagementMutationError::NotStarted(
+                    DirectRequestError::StaleRevision,
+                ));
+            }
             token.store(true, Ordering::Release);
         }
         #[cfg(test)]
@@ -432,10 +492,13 @@ impl ProviderApplication {
             }
         });
         let (result, affected) = {
-            let mut authority = self
-                .gate
-                .lock()
-                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let mut authority = match checked_authority.take() {
+                Some(authority) => authority,
+                None => self
+                    .gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            };
             let result = self
                 .clock
                 .unix_seconds()
@@ -460,8 +523,10 @@ impl ProviderApplication {
         }
         // A claim holds gate until registration. No matching claim can appear
         // after this snapshot because its token was irreversibly denied above.
-        self.await_agent_cleanup(&affected)?;
+        let complete = self.await_agent_cleanup(&affected).is_ok();
         result
+            .map(|view| (view, complete))
+            .map_err(ManagementMutationError::Uncertain)
     }
     fn await_agent_cleanup(&self, ids: &[String]) -> Result<(), DirectRequestError> {
         let active = self
@@ -1088,6 +1153,49 @@ impl ProviderApplication {
         self.expire_requests(&mut authority)?;
         authority.provider.direct_review(owner, id)
     }
+    pub(crate) fn companion_origin(
+        &self,
+        id: &str,
+    ) -> Result<Option<super::direct_request::RequestOrigin>, DirectRequestError> {
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        authority.provider.request_origin(self.owner, id)
+    }
+    /// Retire all approval authority, checking the administrative ticket atomically.
+    pub(crate) fn management_retire(
+        &self,
+        generation: u64,
+        epoch: u64,
+        deadline: Duration,
+    ) -> Result<bool, ManagementMutationError> {
+        let mut authority = self.gate.try_lock().map_err(|_error| {
+            ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
+        })?;
+        if authority.generation != generation || self.clock.now() >= deadline {
+            return Err(ManagementMutationError::NotStarted(
+                DirectRequestError::Unauthorized,
+            ));
+        }
+        {
+            let _release = self.release_gate.lock().map_err(|_error| {
+                ManagementMutationError::NotStarted(DirectRequestError::Unavailable)
+            })?;
+            if self.revocation_epoch.load(Ordering::Acquire) != epoch
+                || self.clock.now() >= deadline
+            {
+                return Err(ManagementMutationError::NotStarted(
+                    DirectRequestError::Unauthorized,
+                ));
+            }
+            self.revocation_epoch.fetch_add(1, Ordering::AcqRel);
+        }
+        let result = Self::revoke(&mut authority);
+        drop(authority);
+        let cleanup = self.await_cleanup(None);
+        Ok(result.is_ok() && cleanup.is_ok())
+    }
     /// Authenticated companion inbox, read under the same expiry/authority gate.
     pub(crate) fn companion_pending(&self) -> Result<Vec<String>, DirectRequestError> {
         let mut authority = self
@@ -1153,6 +1261,29 @@ impl ProviderApplication {
         prepared: PreparedApproval,
     ) -> Result<DirectStatus, DirectRequestError> {
         self.commit_decision(prepared, false)
+    }
+    #[cfg(test)]
+    pub(crate) fn management_hold_gate_for_test(&self, action: impl FnOnce()) {
+        let _guard = self.gate.lock().unwrap();
+        action();
+    }
+    pub(crate) fn management_authority(&self) -> Result<(u64, u64), DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        let _release = self
+            .release_gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        Ok((
+            authority.generation,
+            self.revocation_epoch.load(Ordering::Acquire),
+        ))
     }
     pub(crate) fn decision_generation(&self) -> Result<u64, DirectRequestError> {
         let mut authority = self

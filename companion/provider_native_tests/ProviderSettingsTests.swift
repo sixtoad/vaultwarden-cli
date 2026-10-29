@@ -153,6 +153,26 @@ final class ProviderSettingsTests: XCTestCase {
         XCTAssertThrowsError(try relaunched.settle(String(repeating: "B", count: 43)))
         try relaunched.settle(id)
         XCTAssertNil(try ProviderSettings(directory: directory).pendingID())
+        let action = String(repeating: "C", count: 43)
+        let target: [String: String] = ["kind": "requester_agent", "id": id]
+        let revoke: [String: Any] = ["version": 2, "command": "identity_revoke", "target": target,
+                                   "action_id": action, "ticket": String(repeating: "d", count: 64),
+                                   "password": "synthetic-admin-only"]
+        try relaunched.beforeSend(JSONSerialization.data(withJSONObject: revoke))
+        let managementRelaunch = ProviderSettings(directory: directory)
+        XCTAssertTrue(try managementRelaunch.hasPending())
+        XCTAssertThrowsError(try managementRelaunch.beforeSend(JSONSerialization.data(withJSONObject: revoke)))
+        XCTAssertThrowsError(try managementRelaunch.beforeSend(Data(#"{"version":1,"command":"session"}"#.utf8)))
+        var query: [String: Any] = ["version": 2, "command": "identity_status", "target": target, "action_id": action]
+        try managementRelaunch.beforeSend(JSONSerialization.data(withJSONObject: query))
+        query["target"] = ["kind": "requester_agent", "id": String(repeating: "B", count: 43)]
+        XCTAssertThrowsError(try managementRelaunch.beforeSend(JSONSerialization.data(withJSONObject: query)))
+        XCTAssertThrowsError(try managementRelaunch.settle(id))
+        let managementBytes = try String(contentsOf: file)
+        XCTAssertFalse(managementBytes.contains("synthetic-admin-only"))
+        XCTAssertFalse(managementBytes.contains("ticket"))
+        try managementRelaunch.settle(action)
+        XCTAssertFalse(try ProviderSettings(directory: directory).hasPending())
         let saved = try String(contentsOf: file)
         XCTAssertFalse(saved.contains("password")); XCTAssertFalse(saved.contains("ticket"))
         XCTAssertFalse(saved.contains("PRIVATE KEY"))
@@ -183,6 +203,33 @@ final class ProviderSettingsTests: XCTestCase {
                 XCTAssertEqual((error as? ProviderSettingsError)?.code, "provider_configuration_invalid")
             }
         }
+    }
+    func testNativeAdministrativeTicketRetiresOnBackgroundAndIsSingleUse() throws {
+        let gate = ManagementTransportGate()
+        let target = ["kind":"requester_agent", "id":String(repeating:"A", count:43)]
+        let action = String(repeating:"C", count:43), ticket = String(repeating:"d", count:64)
+        let prepare = try JSONSerialization.data(withJSONObject:["command":"identity_prepare", "target":target])
+        let response = try JSONSerialization.data(withJSONObject:["version":2, "identity":target, "action_id":action, "ticket":ticket])
+        let revoke = try JSONSerialization.data(withJSONObject:["command":"identity_revoke", "target":target, "action_id":action, "ticket":ticket])
+        XCTAssertThrowsError(try gate.begin(prepare, foreground:false))
+        var epoch = try gate.begin(prepare, foreground:true)
+        gate.invalidate()
+        XCTAssertThrowsError(try gate.finish(prepare, response:response, started:epoch, foreground:true))
+        XCTAssertThrowsError(try gate.begin(revoke, foreground:true))
+        epoch = try gate.begin(prepare, foreground:true)
+        try gate.finish(prepare, response:response, started:epoch, foreground:true)
+        XCTAssertThrowsError(try gate.begin(revoke, foreground:false))
+        XCTAssertThrowsError(try gate.begin(revoke, foreground:true))
+        epoch = try gate.begin(prepare, foreground:true)
+        try gate.finish(prepare, response:response, started:epoch, foreground:true)
+        let other = try JSONSerialization.data(withJSONObject:["command":"identity_revoke", "target":["kind":"requester_agent","id":String(repeating:"B",count:43)], "action_id":action, "ticket":ticket])
+        XCTAssertThrowsError(try gate.begin(other, foreground:true))
+        XCTAssertThrowsError(try gate.begin(revoke, foreground:true))
+        epoch = try gate.begin(prepare, foreground:true)
+        try gate.finish(prepare, response:response, started:epoch, foreground:true)
+        XCTAssertNoThrow(try gate.begin(revoke, foreground:true))
+        XCTAssertThrowsError(try gate.begin(revoke, foreground:true))
+        XCTAssertNoThrow(try gate.begin(Data(#"{"command":"identity_status"}"#.utf8), foreground:false))
     }
     func testSettingsErrorVocabularyIsClosed() {
         XCTAssertEqual(ProviderSettingsError.unreadable.code, "provider_configuration_unreadable")

@@ -422,6 +422,19 @@ impl Manager {
             Err(e) => Err(failure(e)),
         }
     }
+    /// A state-root writer lock alone does not exclude the same fixed service
+    /// running with a different state root. Verify its actual manager identity.
+    pub fn require_provider_stopped(&self, provider: &str) -> Result<(), ExecutionError> {
+        let Some(path) = self.unit(provider)? else {
+            return Ok(());
+        };
+        let active: String = self.get(&path, UNIT, "ActiveState")?;
+        let pid: u32 = self.get(&path, SERVICE, "MainPID")?;
+        if !provider_is_stopped(&active, pid) {
+            return Err(ExecutionError::ManagerUnavailable);
+        }
+        Ok(())
+    }
     pub fn provider(&self, config: &Config) -> Result<(), ExecutionError> {
         #[cfg(test)]
         if FAULT.with(|f| f.get() == Fault::Monitor) {
@@ -652,6 +665,13 @@ impl Manager {
         )
     }
     pub fn recover(&self, config: &Config) -> Result<(), ExecutionError> {
+        self.recover_mode(config, false)
+    }
+    /// Owner reconciliation requires evidence, not best-effort startup cleanup.
+    pub fn recover_strict(&self, config: &Config) -> Result<(), ExecutionError> {
+        self.recover_mode(config, true)
+    }
+    fn recover_mode(&self, config: &Config, strict: bool) -> Result<(), ExecutionError> {
         // Recovery is called only under ProviderStore's exclusive writer lock.
         let mut leases = config.leases()?;
         let (units,): (Vec<ListedUnit>,) = self
@@ -676,7 +696,13 @@ impl Manager {
         }
         for lease in leases {
             // Legacy or live units are retained. Recovery never stops consumers.
-            if !matches!(self.unused(config, &lease), Ok(true)) {
+            let unused = self.unused(config, &lease);
+            let unused = if strict {
+                unused?
+            } else {
+                matches!(unused, Ok(true))
+            };
+            if !unused {
                 continue;
             }
             config.forget(&lease)?;
@@ -688,6 +714,10 @@ impl Manager {
         }
         Ok(())
     }
+}
+
+fn provider_is_stopped(active: &str, main_pid: u32) -> bool {
+    matches!(active, "inactive" | "failed") && main_pid == 0
 }
 
 pub(super) fn properties(
@@ -872,6 +902,25 @@ mod tests {
             runtime: "/run/user/1000/vw-access-test".into(),
             prefix: "vw-access-0123456789abcdef-".into(),
             test_environment: Vec::new(),
+        }
+    }
+    #[test]
+    fn stopped_provider_requires_inactive_or_failed_and_no_main_process() {
+        for state in ["inactive", "failed"] {
+            assert!(provider_is_stopped(state, 0));
+            assert!(!provider_is_stopped(state, 1234));
+        }
+        for state in [
+            "active",
+            "activating",
+            "deactivating",
+            "reloading",
+            "maintenance",
+            "unknown",
+            "",
+        ] {
+            assert!(!provider_is_stopped(state, 0));
+            assert!(!provider_is_stopped(state, 1234));
         }
     }
     #[test]

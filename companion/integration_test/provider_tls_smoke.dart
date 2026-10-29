@@ -8,6 +8,7 @@ import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/provider/controller.dart';
 import 'package:companion_slice/src/rust/api/provider.dart' as core;
+import 'package:companion_slice/src/rust/api/management.dart' as management;
 
 const id = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -28,6 +29,7 @@ enum ProbePhase {
   settle,
   shutdown,
   controller,
+  foreground,
 }
 
 enum ProbeCheck {
@@ -49,6 +51,11 @@ enum ProbeCheck {
   decisionStatus,
   inbox,
   terminalStatus,
+  foregroundWindow,
+  managementInventory,
+  managementDetail,
+  managementPrepared,
+  managementOutcome,
   history,
 }
 
@@ -137,7 +144,147 @@ Future<void> main() async {
           Platform.environment['COMPANION_EXPECT_CLIENT_SHA256'],
       ProbeCheck.fingerprint,
     );
-    if (scenario!.startsWith('controller-')) {
+    if (scenario!.startsWith('management-')) {
+      // Real UI lifecycle only: the external CI harness activates this existing
+      // app. Native prepare/revoke still require its actual MainFlutterWindow.
+      await progress(ProbePhase.foreground);
+      await WidgetsBinding.instance.endOfFrame;
+      stdout.writeln('COMPANION_PROVIDER_TLS_FOREGROUND_READY');
+      await stdout.flush();
+      final deadline = DateTime.now().add(const Duration(seconds: 15));
+      while (WidgetsBinding.instance.lifecycleState !=
+              AppLifecycleState.resumed &&
+          DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      check(
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+        ProbeCheck.foregroundWindow,
+      );
+      await progress(ProbePhase.foreground, complete: true);
+      management.managementConfigure(recovery: config.managementRecovery);
+      final self = scenario == 'management-self-revoke';
+      final targetKind = self
+          ? management.IdentityKind.approvalClient
+          : management.IdentityKind.requesterAgent;
+      final targetId = self ? config.fingerprint : id;
+      Future<void> manage(management.ManagementCommand command) async {
+        await progress(ProbePhase.begin);
+        final work = management.managementBegin(
+          command: command,
+          kind: targetKind,
+          id: targetId,
+          password: command == management.ManagementCommand.revoke
+              ? 'synthetic-management-only'
+              : '',
+        );
+        await progress(ProbePhase.begin, complete: true);
+        Uint8List reply;
+        try {
+          await progress(ProbePhase.nativeSend);
+          reply = await native.send(work.body);
+        } catch (_) {
+          stderr.writeln(
+            'COMPANION_PROVIDER_TLS_NATIVE_REJECTED:identity_${command.name}',
+          );
+          reply = Uint8List(0);
+        } finally {
+          work.body.fillRange(0, work.body.length, 0);
+        }
+        await progress(ProbePhase.nativeSend, complete: true);
+        await progress(ProbePhase.finish);
+        management.managementFinish(token: work.token, response: reply);
+        await progress(ProbePhase.finish, complete: true);
+      }
+
+      final recovering = scenario.startsWith('management-recover');
+      if (recovering) {
+        check(config.managementRecovery.isNotEmpty, ProbeCheck.recoveryMarker);
+        check(
+          management.managementSnapshot().recovery.isNotEmpty &&
+              !management.managementSnapshot().canRevoke,
+          ProbeCheck.pendingCoreMarker,
+        );
+        await manage(management.ManagementCommand.status);
+      } else {
+        check(
+          config.managementRecovery.isEmpty,
+          ProbeCheck.settledNativeMarker,
+        );
+        await manage(management.ManagementCommand.list);
+        final inventory = management.managementSnapshot();
+        check(
+          inventory.outcome == management.ManagementOutcome.accepted &&
+              inventory.identities.length == 2 &&
+              inventory.identities.first.thisClient &&
+              inventory.identities.first.id == config.fingerprint &&
+              inventory.identities.first.roles.contains(
+                management.IdentityRole.admin,
+              ) &&
+              inventory.identities.last.kind ==
+                  management.IdentityKind.requesterAgent &&
+              inventory.identities.last.id == id &&
+              inventory.providerFingerprint == 'e' * 64 &&
+              inventory.executionConfigured &&
+              inventory.executionAvailable,
+          ProbeCheck.managementInventory,
+        );
+        await manage(management.ManagementCommand.detail);
+        check(
+          management.managementSnapshot().detail?.id == targetId &&
+              management.managementSnapshot().detail?.kind == targetKind &&
+              !management.managementSnapshot().canRevoke,
+          ProbeCheck.managementDetail,
+        );
+        await manage(management.ManagementCommand.prepare);
+        check(
+          management.managementSnapshot().canRevoke,
+          ProbeCheck.managementPrepared,
+        );
+        await manage(management.ManagementCommand.revoke);
+      }
+      final result = management.managementSnapshot();
+      if (scenario == 'management-drop' ||
+          scenario == 'management-recover-pending') {
+        check(
+          result.recovery.isNotEmpty && !result.canRevoke,
+          ProbeCheck.pendingCoreMarker,
+        );
+        check(
+          (await configuration()).managementRecovery.isNotEmpty,
+          ProbeCheck.pendingNativeMarker,
+        );
+        if (recovering) {
+          check(
+            result.revocation == 'pending' && result.cleanup == 'unknown',
+            ProbeCheck.managementOutcome,
+          );
+        }
+        // Exit without settling: a new AOT process must read the durable marker
+        // and send only the exact action status, never prepare/revoke again.
+      } else {
+        check(
+          result.recovery.isEmpty && !result.canRevoke,
+          ProbeCheck.terminalCoreMarker,
+        );
+        check(
+          result.outcome == management.ManagementOutcome.accepted &&
+              result.revocation == 'recorded' &&
+              result.cleanup == 'complete',
+          ProbeCheck.managementOutcome,
+        );
+        await progress(ProbePhase.settle);
+        await native.settle(result.actionId);
+        await progress(ProbePhase.settle, complete: true);
+        check(
+          (await configuration()).managementRecovery.isEmpty,
+          ProbeCheck.settledNativeMarker,
+        );
+      }
+      await succeed();
+      return;
+    }
+    if (scenario.startsWith('controller-')) {
       await progress(ProbePhase.controller);
       final controller = ProviderController(native);
       try {

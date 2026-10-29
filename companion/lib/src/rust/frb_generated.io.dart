@@ -5,6 +5,7 @@
 
 import 'api.dart';
 import 'api/installation.dart';
+import 'api/management.dart';
 import 'api/provider.dart';
 
 import 'dart:async';
@@ -33,6 +34,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Completion dco_decode_box_autoadd_completion(dynamic raw);
 
   @protected
+  ManagedIdentity dco_decode_box_autoadd_managed_identity(dynamic raw);
+
+  @protected
   ProviderReview dco_decode_box_autoadd_provider_review(dynamic raw);
 
   @protected
@@ -48,10 +52,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  IdentityKind dco_decode_identity_kind(dynamic raw);
+
+  @protected
+  IdentityRole dco_decode_identity_role(dynamic raw);
+
+  @protected
+  IdentityTrust dco_decode_identity_trust(dynamic raw);
+
+  @protected
   Invalidation dco_decode_invalidation(dynamic raw);
 
   @protected
+  InventoryState dco_decode_inventory_state(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<IdentityRole> dco_decode_list_identity_role(dynamic raw);
+
+  @protected
+  List<ManagedIdentity> dco_decode_list_managed_identity(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -70,7 +92,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ManagedIdentity dco_decode_managed_identity(dynamic raw);
+
+  @protected
+  ManagementCommand dco_decode_management_command(dynamic raw);
+
+  @protected
+  ManagementOutcome dco_decode_management_outcome(dynamic raw);
+
+  @protected
+  ManagementSnapshot dco_decode_management_snapshot(dynamic raw);
+
+  @protected
   Operation dco_decode_operation(dynamic raw);
+
+  @protected
+  ManagedIdentity? dco_decode_opt_box_autoadd_managed_identity(dynamic raw);
 
   @protected
   ProviderReview? dco_decode_opt_box_autoadd_provider_review(dynamic raw);
@@ -139,6 +176,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Completion sse_decode_box_autoadd_completion(SseDeserializer deserializer);
 
   @protected
+  ManagedIdentity sse_decode_box_autoadd_managed_identity(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ProviderReview sse_decode_box_autoadd_provider_review(
     SseDeserializer deserializer,
   );
@@ -156,10 +198,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  IdentityKind sse_decode_identity_kind(SseDeserializer deserializer);
+
+  @protected
+  IdentityRole sse_decode_identity_role(SseDeserializer deserializer);
+
+  @protected
+  IdentityTrust sse_decode_identity_trust(SseDeserializer deserializer);
+
+  @protected
   Invalidation sse_decode_invalidation(SseDeserializer deserializer);
 
   @protected
+  InventoryState sse_decode_inventory_state(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<IdentityRole> sse_decode_list_identity_role(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ManagedIdentity> sse_decode_list_managed_identity(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -178,7 +242,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ManagedIdentity sse_decode_managed_identity(SseDeserializer deserializer);
+
+  @protected
+  ManagementCommand sse_decode_management_command(SseDeserializer deserializer);
+
+  @protected
+  ManagementOutcome sse_decode_management_outcome(SseDeserializer deserializer);
+
+  @protected
+  ManagementSnapshot sse_decode_management_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Operation sse_decode_operation(SseDeserializer deserializer);
+
+  @protected
+  ManagedIdentity? sse_decode_opt_box_autoadd_managed_identity(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProviderReview? sse_decode_opt_box_autoadd_provider_review(
@@ -262,6 +345,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_managed_identity(
+    ManagedIdentity self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_provider_review(
     ProviderReview self,
     SseSerializer serializer,
@@ -280,10 +369,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_identity_kind(IdentityKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_identity_role(IdentityRole self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_identity_trust(IdentityTrust self, SseSerializer serializer);
+
+  @protected
   void sse_encode_invalidation(Invalidation self, SseSerializer serializer);
 
   @protected
+  void sse_encode_inventory_state(
+    InventoryState self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_identity_role(
+    List<IdentityRole> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_managed_identity(
+    List<ManagedIdentity> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
@@ -307,7 +423,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_managed_identity(
+    ManagedIdentity self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_management_command(
+    ManagementCommand self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_management_outcome(
+    ManagementOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_management_snapshot(
+    ManagementSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_operation(Operation self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_managed_identity(
+    ManagedIdentity? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_provider_review(

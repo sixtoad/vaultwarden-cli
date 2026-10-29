@@ -1,6 +1,7 @@
 use crate::lifecycle::Core;
 use std::sync::{Mutex, OnceLock};
 pub mod installation;
+pub mod management;
 pub mod provider;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

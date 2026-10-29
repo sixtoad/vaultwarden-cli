@@ -160,6 +160,16 @@ pub struct DirectReview {
     pub one_time: String,
     pub status: DirectStatus,
 }
+/// Admission snapshot: a signed OS-bound requester identity, never a physical device claim.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RequestOrigin {
+    pub kind: &'static str,
+    pub binding_id: String,
+    pub label: String,
+    pub fingerprint: String,
+    pub evidence: &'static str,
+}
 /// Immutable attribution, not authentication proof. Only a verified future
 /// transport may authorize admission; a stored snapshot never grants it.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

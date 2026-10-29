@@ -16,14 +16,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
-PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle shutdown controller".split())
+PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle shutdown controller foreground".split())
 PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity persistentReference saveConfiguration savedConfiguration savedIdentity savedFingerprint savedMetadata".split())
-CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus history".split())
-COMMANDS = frozenset("session list unlock review decision status history".split())
-NATIVE_COMMANDS = frozenset("session list unlock review approve deny status history".split())
+CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus foregroundWindow managementInventory managementDetail managementPrepared managementOutcome history".split())
+COMMANDS = frozenset("session list unlock review decision status request_origin identity_list identity_detail identity_prepare identity_revoke identity_status history".split())
+NATIVE_COMMANDS = frozenset("session list unlock review approve deny status identity_list identity_detail identity_prepare identity_revoke identity_status history".split())
 
 
 def progress_diagnostics(stdout, stderr, prefix, phases):
@@ -88,12 +89,34 @@ def run_diagnosed(argv, diagnostics, **options):
 
 
 def launch_app(executable, environment):
+    if environment.get("COMPANION_PROVIDER_CASE", "").startswith("management-"):
+        # Activate an already-running, rendered real app through LaunchServices.
+        # Never weaken the native foreground gate or inject a production hook.
+        with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+            process = subprocess.Popen([str(executable)], env=environment, stdout=output, stderr=errors)
+            timed_out = False
+            try:
+                deadline = time.monotonic() + 15
+                while process.poll() is None and time.monotonic() < deadline:
+                    if b"COMPANION_PROVIDER_TLS_FOREGROUND_READY" in os.pread(output.fileno(), 65536, 0).splitlines():
+                        run(["open", "-a", executable.parents[2]])
+                        break
+                    time.sleep(0.05)
+                try:
+                    process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+            finally:
+                stop(process)
+            output.seek(0)
+            errors.seek(0)
+            return app_diagnostics(process.returncode, output.read(65536), errors.read(65536), timed_out)
     return run_diagnosed([executable], app_diagnostics, env=environment)
 
 
-def command_counts(path):
+def command_order(path):
     # A command name is the fixture's only recorded field; still allowlist it.
-    result = dict.fromkeys(sorted(COMMANDS), 0)
+    result = []
     if not path.is_file():
         return result
     with path.open("rb") as source:
@@ -105,10 +128,15 @@ def command_counts(path):
             command = json.loads(line)["command"]
             if command not in COMMANDS:
                 raise ValueError()
-            result[command] += 1
+            result.append(command)
     except (ValueError, TypeError, KeyError):
         raise RuntimeError("fixture command evidence invalid") from None
     return result
+
+
+def command_counts(path):
+    commands = command_order(path)
+    return {command: commands.count(command) for command in sorted(COMMANDS)}
 
 
 def run(argv, **kwargs):
@@ -190,11 +218,15 @@ def main():
         def launch(scenario, client):
             env = dict(os.environ, COMPANION_PROVIDER_CASE=scenario,
                        COMPANION_EXPECT_CLIENT_SHA256=hashlib.sha256((temporary / f"{client}.der").read_bytes()).hexdigest())
+            before = len(command_order(temporary / "requests.jsonl"))
             result = launch_app(executable, env)
+            result["commands"] = command_order(temporary / "requests.jsonl")[before:]
             report["cases"][name]["launches"].append(result)
             report["cases"][name]["observed_command_counts"] = command_counts(temporary / "requests.jsonl")
             if not result["passed"]:
                 raise RuntimeError("packaged application failed; see sanitized packaged-tls.json")
+            if scenario.startswith("management-recover") and result["commands"] != ["identity_status"]:
+                raise RuntimeError("management recovery sent more than original action status")
 
         cases = [
             ("approve", "normal", "client", "ca", "approve", ["session", "review", "decision"]),
@@ -211,15 +243,20 @@ def main():
             ("schema", "invalid-schema", "client", "ca", "negative", ["session"]),
             ("lost-response-relaunch", "drop", "client", "ca", "drop", ["session", "review", "decision", "status"]),
             ("pending-relaunch", "drop-pending", "client", "ca", "drop", ["session", "review", "decision", "status"]),
-            ("controller-unlock", "controller", "client", "ca", "controller-unlock", ["session", "unlock", "session", "list", "review", "decision", "status", "status"]),
+            ("controller-unlock", "controller", "client", "ca", "controller-unlock", ["session", "unlock", "session", "list", "review", "request_origin", "decision", "status", "status"]),
             ("controller-recovery", "drop", "client", "ca", "drop", ["session", "review", "decision", "status"]),
             ("controller-pending", "drop-pending", "client", "ca", "drop", ["session", "review", "decision", "status"]),
-            ("controller-history", "normal", "client", "ca", "controller-history", ["session", "list", "session", "list", "history", "review"]),
+            ("management-agent-revoke", "management", "client", "ca", "management-revoke", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke"]),
+            ("management-self-revoke", "management", "client", "ca", "management-self-revoke", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke"]),
+            ("management-lost-reply-relaunch", "management-drop", "client", "ca", "management-drop", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke", "identity_status"]),
+            ("management-pending-relaunch", "management-drop-pending", "client", "ca", "management-drop", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke", "identity_status"]),
+            ("controller-history", "normal", "client", "ca", "controller-history", ["session", "list", "session", "list", "history", "review", "request_origin"]),
             ("controller-history-unsupported", "history-unsupported", "client", "ca", "controller-history-unsupported", ["session", "list", "session", "list", "history"]),
             ("controller-history-invalid", "history-invalid", "client", "ca", "controller-history-invalid", ["session", "list", "session", "list", "history"]),
         ]
         for name, mode, client, ca, scenario, expected_commands in cases:
             report["cases"][name] = {"passed": False, "launches": [],
+                                     "expected_commands": expected_commands,
                                      "expected_command_counts": {command: expected_commands.count(command) for command in sorted(COMMANDS)}}
             server = subprocess.Popen([sys.executable, str(FIXTURE), "serve", str(temporary), "--mode", mode],
                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
@@ -239,12 +276,15 @@ def main():
             if not provision["passed"]:
                 raise RuntimeError("fixture provisioning failed; see sanitized packaged-tls.json")
             launch(scenario, client)
+            if mode in ["management-drop", "management-drop-pending"]:
+                recovery = "management-recover-pending" if mode == "management-drop-pending" else "management-recover"
+                launch(recovery, client)
             if mode in ["drop", "drop-pending"]:
                 # A separate AOT process reads the native durable marker and sends
                 # only status. Count bodies across both processes to catch replay.
                 recovery = "recover-pending" if mode == "drop-pending" else "recover"
                 launch("controller-" + recovery if name.startswith("controller-") else recovery, client)
-            commands = [json.loads(line)["command"] for line in (temporary / "requests.jsonl").read_text().splitlines()]
+            commands = command_order(temporary / "requests.jsonl")
             if commands != expected_commands:
                 raise RuntimeError(f"{name}: wrong command count/order")
             report["cases"][name].update(passed=True, commands=commands)

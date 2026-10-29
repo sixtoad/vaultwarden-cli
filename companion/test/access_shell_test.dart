@@ -114,7 +114,8 @@ void main() {
       await tester.ensureVisible(button);
       await tester.tap(button);
       await tester.pumpAndSettle();
-      expect(native.commands.last['command'], 'review');
+      expect(native.commands[native.commands.length - 2]['command'], 'review');
+      expect(native.commands.last['command'], 'request_origin');
       expect(native.commands.last['request_id'], secondId);
       expect(core.providerSnapshot().reviewId, secondId);
       expect(core.providerSnapshot().history, isEmpty);
@@ -517,7 +518,9 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(
-        find.text('Known local connection and client identity'),
+        find.text(
+          'Authoritative provider identities · names are labels, not identity proof.',
+        ),
         findsOneWidget,
       );
       expect(

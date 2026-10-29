@@ -9,6 +9,7 @@ import '../design/components.dart';
 import 'request_review.dart';
 import 'support_views.dart';
 import 'installation_settings.dart';
+import 'devices_view.dart';
 import 'controller.dart';
 import 'pilot_bundle.dart';
 
@@ -32,6 +33,7 @@ class _ProviderPageState extends State<ProviderPage>
       approvalPassword = TextEditingController(),
       unlockPassword = TextEditingController();
   final pilotBundle = TextEditingController();
+  final managementPassword = TextEditingController();
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
   bool detailOpen = false;
@@ -56,6 +58,7 @@ class _ProviderPageState extends State<ProviderPage>
     approvalPassword.clear();
     unlockPassword.clear();
     pilotBundle.clear();
+    managementPassword.clear();
   }
 
   @override
@@ -84,6 +87,7 @@ class _ProviderPageState extends State<ProviderPage>
       approvalPassword,
       unlockPassword,
       pilotBundle,
+      managementPassword,
     ]) {
       field.dispose();
     }
@@ -104,6 +108,7 @@ class _ProviderPageState extends State<ProviderPage>
   void navigate(AccessDestination next) {
     if (next == destination && !detailOpen) return;
     controller.invalidate(); // mutation: navigation retirement
+    controller.devicesVisible = next == AccessDestination.devices;
     controller.setActivityCurrent(next == AccessDestination.activity);
     setState(() {
       destination = next;
@@ -115,6 +120,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void backToRequests() {
     controller.invalidate(); // mutation: back retirement
+    controller.devicesVisible = false;
     controller.setActivityCurrent(false);
     setState(() {
       destination = AccessDestination.requests;
@@ -125,6 +131,7 @@ class _ProviderPageState extends State<ProviderPage>
   }
 
   void openRequest(String id) {
+    controller.devicesVisible = false;
     controller.setActivityCurrent(false);
     resetContentScroll();
     setState(() {
@@ -280,6 +287,9 @@ class _ProviderPageState extends State<ProviderPage>
     return RequestReview(
       state: state,
       endpoint: controller.configuration.endpoint,
+      origin: controller.management.originId == controller.state.reviewId
+          ? controller.management.originText
+          : '',
       password: approvalPassword, // secrets-ignore: UI controller
       onApprove: () {
         final secret = approvalPassword.text; // secrets-ignore: runtime input
@@ -405,7 +415,10 @@ class _ProviderPageState extends State<ProviderPage>
             ),
           const SizedBox(height: 24),
           OutlinedButton(
-            onPressed: controller.busy || controller.recoveryId.isNotEmpty
+            onPressed:
+                controller.busy ||
+                    controller.recoveryId.isNotEmpty ||
+                    controller.managementPending
                 ? null
                 : () async {
                     controller.setRouteCurrent(false);
@@ -461,21 +474,27 @@ class _ProviderPageState extends State<ProviderPage>
                   ? requestDetail()
                   : requestList(),
             AccessDestination.devices => ProviderDevices(
-              configuration: controller.configuration,
+              controller: controller,
+              password: managementPassword, // secrets-ignore: UI controller
             ),
             AccessDestination.activity => ProviderActivity(
               state: state,
               connected: controller.connected,
               configured: controller.configuration.configured,
               recoveryPending: controller.recoveryId.isNotEmpty,
-              onRefresh: controller.busy || !controller.eligible
+              managementPending: controller.managementPending,
+              onRefresh:
+                  controller.busy ||
+                      !controller.eligible ||
+                      controller.managementPending
                   ? null
                   : controller.refresh,
               onReopen:
                   !controller.connected ||
                       state.locked ||
                       controller.busy ||
-                      controller.recoveryId.isNotEmpty
+                      (controller.recoveryId.isNotEmpty ||
+                          controller.managementPending)
                   ? null
                   : openRequest,
             ),

@@ -8091,3 +8091,97 @@ fn running_execution_signature_release_rechecks_full_binding_and_withdrawal() {
         );
     }
 }
+
+#[test]
+fn management_origin_is_signed_snapshot_not_reused_label_or_current_binding() {
+    let f = fixture();
+    let a = agent_pair(&f, "same name", 201);
+    let id = f
+        .app
+        .submit_signed(
+            a.uid,
+            &[a.gid],
+            signed_input(&f, &a, 201, 41),
+            &Launcher::default(),
+        )
+        .unwrap();
+    let origin = f.app.companion_origin(&id).unwrap().unwrap();
+    assert_eq!(origin.binding_id, a.id);
+    assert_eq!(origin.fingerprint, a.fingerprint);
+    assert_eq!(origin.evidence, "signed_os_binding");
+    f.app.revoke_agent(f.app.human_owner(), &a.id).unwrap();
+    let replacement = agent_pair(&f, "same name", 202);
+    assert_ne!(replacement.id, origin.binding_id);
+    assert_eq!(f.app.companion_origin(&id).unwrap().unwrap(), origin);
+    let legacy = agent_pending(&f, &replacement);
+    assert_eq!(f.app.companion_origin(&legacy).unwrap(), None);
+}
+#[test]
+fn management_checked_revocation_rejects_stale_generation_deadline_owner_and_duplicate() {
+    let f = fixture();
+    let a = agent_pair(&f, "checked", 203);
+    let (generation, epoch) = f.app.management_authority().unwrap();
+    let deadline = f.app.companion_now() + Duration::from_secs(55);
+    assert!(
+        f.app
+            .revoke_agent_checked(
+                AuthenticatedHuman::from_peer_uid(f.app.human_owner().uid() + 1),
+                &a.id,
+                Some((generation, epoch, deadline))
+            )
+            .is_err()
+    );
+    assert!(
+        f.app
+            .revoke_agent_checked(
+                f.app.human_owner(),
+                &a.id,
+                Some((generation + 1, epoch, deadline))
+            )
+            .is_err()
+    );
+    assert!(
+        f.app
+            .revoke_agent_checked(
+                f.app.human_owner(),
+                &a.id,
+                Some((generation, epoch, f.app.companion_now()))
+            )
+            .is_err()
+    );
+    assert!(
+        f.app
+            .revoke_agent_checked(
+                f.app.human_owner(),
+                &a.id,
+                Some((generation, epoch + 1, deadline))
+            )
+            .is_err()
+    );
+    assert_eq!(
+        f.app.list_agents(f.app.human_owner()).unwrap()[0].status,
+        super::agent_binding::AgentBindingStatus::Enabled
+    );
+    let (recorded, complete) = f
+        .app
+        .revoke_agent_checked(
+            f.app.human_owner(),
+            &a.id,
+            Some((generation, epoch, deadline)),
+        )
+        .unwrap();
+    assert_eq!(
+        recorded.status,
+        super::agent_binding::AgentBindingStatus::Revoked
+    );
+    assert!(complete);
+    assert!(
+        f.app
+            .revoke_agent_checked(
+                f.app.human_owner(),
+                &a.id,
+                Some((generation, epoch, deadline))
+            )
+            .is_err()
+    );
+}

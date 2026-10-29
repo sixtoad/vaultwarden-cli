@@ -406,6 +406,20 @@ This supersedes earlier statements that bundled command inspection/repair is
 absent. Development signing and missing native platform roles remain explicit;
 this does not qualify native macOS provider execution or replace installed apps.
 
+## Authoritative Devices & agents (issue #50)
+
+The management slice adds closed version-2 commands over the existing authenticated
+transport; existing v1 responses remain unchanged. Explicit owner-console
+administrative grants are separate from enrollment and approval rights. The
+Flutter view uses bounded provider records, exact-target revocation tickets and
+native durable original-action recovery. Request origin is a separate versioned
+projection of signed-admission history, never an inferred physical device.
+
+See the [identity management contract](implementation/issue-50-device-agent-management.md)
+for authority, paging/freshness, permanent revocation, separate cleanup evidence,
+owner reconciliation and current verification boundaries. PR #55's no-consumer-
+termination boundary applies. The management UI does not enroll clients, discover
+peers, install desktop tools or implement Activity history.
 ## Durable Activity history compatibility
 
 Activity uses authenticated `history` reads and a separate display-only bridge

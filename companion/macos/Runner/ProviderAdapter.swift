@@ -8,6 +8,7 @@ import Security
     private let channel: FlutterMethodChannel
     private let settings: ProviderSettings
     private var active = false
+    private let managementGate = ManagementTransportGate()
     private var observers: [NSObjectProtocol] = []
 
     init(messenger: FlutterBinaryMessenger) {
@@ -18,11 +19,14 @@ import Security
             Task { @MainActor in await self.handle(call, result: result) }
         }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.channel.invokeMethod("invalidate", arguments: "sleep") }
+            MainActor.assumeIsolated { self?.managementGate.invalidate(); self?.channel.invokeMethod("invalidate", arguments: "sleep") }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [weak self] notification in
             guard notification.object is MainFlutterWindow else { return }
-            Task { @MainActor in self?.channel.invokeMethod("invalidate", arguments: "close") }
+            MainActor.assumeIsolated { self?.managementGate.invalidate(); self?.channel.invokeMethod("invalidate", arguments: "close") }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.managementGate.invalidate(); self?.channel.invokeMethod("invalidate", arguments: "inactive") }
         })
     }
     deinit {
@@ -45,7 +49,7 @@ import Security
                 result(try settings.metadata())
             #endif
             case "setup":
-                guard !active, try settings.pendingID() == nil,
+                guard !active, try !settings.hasPending(),
                       let args = call.arguments as? [String: Any], Set(args.keys) == ["endpoint", "pin", "passphrase"],
                       let endpoint = args["endpoint"] as? String, endpoint.utf8.count <= 2048,
                       let pin = args["pin"] as? String, validHex(pin, count: 64),
@@ -59,6 +63,7 @@ import Security
             case "send":
                 guard !active, let bytes = call.arguments as? FlutterStandardTypedData,
                       bytes.data.count <= 16_384 else { throw CompanionError.configuration }
+                let managementEpoch = try managementGate.begin(bytes.data, foreground: NSApplication.shared.isActive && NSApplication.shared.keyWindow is MainFlutterWindow)
                 let configuration = try settings.configuration()
                 let transport = try PinnedTransport(configuration: configuration)
                 // Persist before send. Even a process/window close remains uncertain.
@@ -66,6 +71,7 @@ import Security
                 active = true
                 defer { active = false }
                 let response = try await transport.send(bytes.data)
+                try managementGate.finish(bytes.data, response: response, started: managementEpoch, foreground: NSApplication.shared.isActive && NSApplication.shared.keyWindow is MainFlutterWindow)
                 result(FlutterStandardTypedData(bytes: response))
             case "settle":
                 guard let id = call.arguments as? String, validRequestID(id) else { throw CompanionError.configuration }

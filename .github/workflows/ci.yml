@@ -100,6 +100,7 @@ jobs:
       - run: cargo test --locked --manifest-path companion/rust/Cargo.toml
       - run: python3 scripts/mutate-desktop-companion.py "$RUNNER_TEMP/companion-mutations"
       - run: python3 scripts/mutate-provider-companion.py "$RUNNER_TEMP/companion-mutations/provider"
+      - run: python3 scripts/mutate-management-client.py "$RUNNER_TEMP/companion-mutations/management"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -187,6 +188,15 @@ jobs:
         run: cargo fetch --locked
       - name: Default features
         run: ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --offline --locked
+      - name: Identity management security mutations
+        if: matrix.os == 'ubuntu-24.04' && matrix.rust == 'stable'
+        run: python3 scripts/mutate-identity-management.py "$RUNNER_TEMP/identity-management-mutations"
+      - name: Preserve identity management mutation evidence
+        if: always() && matrix.os == 'ubuntu-24.04' && matrix.rust == 'stable'
+        uses: actions/upload-artifact@v4
+        with:
+          name: identity-management-mutations
+          path: ${{ runner.temp }}/identity-management-mutations
       - name: All features
         run: ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --all-targets --all-features --offline --locked
       - name: No-default features
