@@ -35,6 +35,11 @@ enum Command {
     List {
         version: u8,
     },
+    History {
+        version: u8,
+        #[serde(default, deserialize_with = "history_limit")]
+        limit: Option<u32>,
+    },
     Review {
         version: u8,
         request_id: String,
@@ -71,10 +76,19 @@ fn optional_password<'de, D: serde::Deserializer<'de>>(
 ) -> Result<Option<SensitiveString>, D::Error> {
     password(de).map(Some)
 }
+fn history_limit<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Option<u32>, D::Error> {
+    u32::deserialize(de).map(Some)
+}
 impl Command {
     fn valid(&self) -> bool {
         let (version, id) = match self {
             Self::Session { version } | Self::List { version } => (*version, None),
+            Self::History { version, limit } => {
+                if crate::access::history::limit(*limit).is_err() {
+                    return false;
+                }
+                (*version, None)
+            }
             Self::Review {
                 version,
                 request_id,
@@ -190,6 +204,7 @@ impl FixtureTraffic {
         let name = match command {
             Command::Session { .. } => "session",
             Command::List { .. } => "list",
+            Command::History { .. } => "history",
             Command::Review { .. } => "review",
             Command::Status { .. } => "status",
             Command::Decision { .. } => "decision",
@@ -310,6 +325,17 @@ impl Companion {
             Command::Session { .. } => Self::session(app),
             Command::List { .. } => match app.companion_pending() {
                 Ok(requests) => Response::ok(serde_json::json!({"version":1,"requests":requests})),
+                Err(_) => Response::error(Error::Unavailable),
+            },
+            Command::History { limit, .. } => match app.companion_history(limit) {
+                Ok(events) => {
+                    // Enrollment can change while durable state is being read.
+                    // A previously authenticated certificate is not sufficient.
+                    if !self.authorized(device) {
+                        return Response::error(Error::Unauthorized);
+                    }
+                    Response::history(&events)
+                }
                 Err(_) => Response::error(Error::Unavailable),
             },
             Command::Status { request_id, .. } => {
@@ -663,7 +689,46 @@ struct Response {
     status: u16,
     body: String,
 }
+/// A deliberately smaller wire model than the canonical audit record. Adding
+/// fields to storage cannot silently expose them to a remote companion.
+#[derive(serde::Serialize)]
+struct HistoryDisplayEvent<'a> {
+    request_id: &'a str,
+    operation: &'a str,
+    at_unix_seconds: Option<u64>,
+    ordinal: u32,
+    outcome: crate::access::history::HistoryOutcome,
+}
+#[derive(serde::Serialize)]
+struct HistoryResponse<'a> {
+    version: u8,
+    history_version: u8,
+    events: Vec<HistoryDisplayEvent<'a>>,
+}
 impl Response {
+    fn history(events: &[crate::access::history::HistoryEvent]) -> Self {
+        if events.len() > crate::access::history::MAX_HISTORY_LIMIT as usize {
+            return Self::error(Error::Unavailable);
+        }
+        let display = HistoryResponse {
+            version: 1,
+            history_version: 1,
+            events: events
+                .iter()
+                .map(|event| HistoryDisplayEvent {
+                    request_id: &event.request_id,
+                    operation: &event.operation,
+                    at_unix_seconds: event.at_unix_seconds,
+                    ordinal: event.ordinal,
+                    outcome: event.outcome,
+                })
+                .collect(),
+        };
+        // Canonical IDs/operations and the 200-event cap bound this projection.
+        // Keep the shared full-response cap too: overflow is unavailable, never
+        // a silently shortened event selection or partial JSON document.
+        Self::ok(serde_json::to_value(display).expect("history display serialization"))
+    }
     fn error(error: Error) -> Self {
         let (status, error) = match error {
             Error::Invalid => (400, "invalid_request"),
@@ -703,6 +768,7 @@ mod tests {
     use super::*;
     use crate::access::direct_request_tests::{Fixture, fixture, input};
     use std::{os::unix::fs::PermissionsExt, sync::atomic::AtomicUsize};
+    include!("companion_history_tests.rs");
     const CLIENT: &[u8] = include_bytes!("../../tests/companion-tls/client.pem");
     const CLIENT_KEY: &[u8] = include_bytes!("../../tests/companion-tls/client-key.pem");
     const CLIENT_CA: &[u8] = include_bytes!("../../tests/companion-tls/ca.pem");

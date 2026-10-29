@@ -60,12 +60,17 @@ class ControllerFixtureTests(unittest.TestCase):
                 self.assertEqual(send("session")["state"], "unlocked")
                 request_id = "A" * 43
                 self.assertEqual(send("list")["requests"], [request_id])
+                events = send("history", limit=50)["events"]
+                self.assertEqual(len(events), 2)
+                self.assertEqual(events[0]["request_id"], request_id)
+                self.assertEqual(events[1]["at_unix_seconds"], None)
+                self.assertEqual(set(events[0]), {"request_id", "operation", "at_unix_seconds", "ordinal", "outcome"})
                 self.assertEqual(send("review", request_id=request_id)["review"]["id"], request_id)
                 self.assertEqual(send("decision", request_id=request_id, decision="approve", password="synthetic-only")["status"]["status"], "approved")
                 self.assertEqual(send("status", request_id=request_id)["status"]["status"], "running")
                 self.assertEqual(send("status", request_id=request_id)["status"], {"status": "completed", "exit_code": 0})
                 commands = [json.loads(line)["command"] for line in (root / "requests.jsonl").read_text().splitlines()]
-                self.assertEqual(commands, ["session", *rejected, "unlock", "session", "list", "review", "decision", "status", "status"])
+                self.assertEqual(commands, ["session", *rejected, "unlock", "session", "list", "history", "review", "decision", "status", "status"])
                 self.assertNotIn(password, (root / "requests.jsonl").read_text())
             finally:
                 server.terminate()

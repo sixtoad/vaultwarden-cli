@@ -425,16 +425,32 @@ impl Provider {
         }
         let limit = super::history::limit(limit)?;
         let state = self.store.read_state()?;
-        Ok(super::history::newest(
-            state
-                .requests
-                .into_iter()
-                .filter_map(|r| r.direct)
-                .filter(|d| d.human_visible(owner, self.owner_uid()))
-                .flat_map(|d| d.audit)
-                .collect(),
-            limit,
-        ))
+        // The canonical store still loads its database, but selecting history
+        // retains at most `limit` events instead of copying every audit record.
+        // Keep the same descending timestamp/ID/ordinal ordering as `newest`.
+        let mut recent: Vec<super::history::HistoryEvent> = Vec::with_capacity(limit);
+        for event in state
+            .requests
+            .into_iter()
+            .filter_map(|r| r.direct)
+            .filter(|d| d.human_visible(owner, self.owner_uid()))
+            .flat_map(|d| d.audit)
+        {
+            let position = recent.partition_point(|previous| {
+                (
+                    previous.at_unix_seconds,
+                    &previous.request_id,
+                    previous.ordinal,
+                ) > (event.at_unix_seconds, &event.request_id, event.ordinal)
+            });
+            if position < limit {
+                if recent.len() == limit {
+                    recent.pop();
+                }
+                recent.insert(position, event);
+            }
+        }
+        Ok(super::history::newest(recent, limit))
     }
     pub(crate) fn create_direct(
         &mut self,
