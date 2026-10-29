@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -500380321;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -165941870;
 
 // Section: executor
 
@@ -308,6 +308,39 @@ fn wire__crate__api__provider__provider_finish_impl(
                 ))?;
                 std::result::Result::Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__provider__provider_history_state_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "provider_history_state_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Ok::<_, ()>(crate::api::provider::ProviderHistoryState::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
         },
     )
 }
@@ -584,6 +617,20 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Vec<crate::api::provider::ProviderHistoryEvent> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::provider::ProviderHistoryEvent>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::provider::ProviderReviewCredential> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -624,6 +671,17 @@ impl SseDecode for Option<crate::api::provider::ProviderReview> {
     }
 }
 
+impl SseDecode for Option<u64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for crate::api::Outcome {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -655,12 +713,72 @@ impl SseDecode for crate::api::provider::ProviderCommand {
         return match inner {
             0 => crate::api::provider::ProviderCommand::Session,
             1 => crate::api::provider::ProviderCommand::List,
-            2 => crate::api::provider::ProviderCommand::Review,
-            3 => crate::api::provider::ProviderCommand::Approve,
-            4 => crate::api::provider::ProviderCommand::Deny,
-            5 => crate::api::provider::ProviderCommand::Unlock,
-            6 => crate::api::provider::ProviderCommand::Status,
+            2 => crate::api::provider::ProviderCommand::History,
+            3 => crate::api::provider::ProviderCommand::Review,
+            4 => crate::api::provider::ProviderCommand::Approve,
+            5 => crate::api::provider::ProviderCommand::Deny,
+            6 => crate::api::provider::ProviderCommand::Unlock,
+            7 => crate::api::provider::ProviderCommand::Status,
             _ => unreachable!("Invalid variant for ProviderCommand: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::provider::ProviderHistoryEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_requestId = <String>::sse_decode(deserializer);
+        let mut var_operation = <String>::sse_decode(deserializer);
+        let mut var_atUnixSeconds = <Option<u64>>::sse_decode(deserializer);
+        let mut var_ordinal = <u32>::sse_decode(deserializer);
+        let mut var_outcome =
+            <crate::api::provider::ProviderHistoryOutcome>::sse_decode(deserializer);
+        return crate::api::provider::ProviderHistoryEvent {
+            request_id: var_requestId,
+            operation: var_operation,
+            at_unix_seconds: var_atUnixSeconds,
+            ordinal: var_ordinal,
+            outcome: var_outcome,
+        };
+    }
+}
+
+impl SseDecode for crate::api::provider::ProviderHistoryOutcome {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::provider::ProviderHistoryOutcome::Submitted,
+            1 => crate::api::provider::ProviderHistoryOutcome::Approved,
+            2 => crate::api::provider::ProviderHistoryOutcome::Denied,
+            3 => crate::api::provider::ProviderHistoryOutcome::Expired,
+            4 => crate::api::provider::ProviderHistoryOutcome::ReviewUnavailable,
+            5 => crate::api::provider::ProviderHistoryOutcome::ExecutionStarted,
+            6 => crate::api::provider::ProviderHistoryOutcome::Succeeded,
+            7 => crate::api::provider::ProviderHistoryOutcome::ExecutionNonzero,
+            8 => crate::api::provider::ProviderHistoryOutcome::ExecutionSignaled,
+            9 => crate::api::provider::ProviderHistoryOutcome::ExecutionRejected,
+            10 => crate::api::provider::ProviderHistoryOutcome::ExecutionUnavailable,
+            11 => crate::api::provider::ProviderHistoryOutcome::Invalidated,
+            12 => crate::api::provider::ProviderHistoryOutcome::Recovered,
+            13 => crate::api::provider::ProviderHistoryOutcome::LegacyUnknown,
+            14 => crate::api::provider::ProviderHistoryOutcome::Reconciled,
+            15 => crate::api::provider::ProviderHistoryOutcome::ObservationLost,
+            _ => unreachable!("Invalid variant for ProviderHistoryOutcome: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::provider::ProviderHistoryState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::provider::ProviderHistoryState::Idle,
+            1 => crate::api::provider::ProviderHistoryState::Loading,
+            2 => crate::api::provider::ProviderHistoryState::Available,
+            3 => crate::api::provider::ProviderHistoryState::Unavailable,
+            _ => unreachable!("Invalid variant for ProviderHistoryState: {}", inner),
         };
     }
 }
@@ -736,6 +854,11 @@ impl SseDecode for crate::api::provider::ProviderSnapshot {
         let mut var_configured = <bool>::sse_decode(deserializer);
         let mut var_busy = <bool>::sse_decode(deserializer);
         let mut var_locked = <bool>::sse_decode(deserializer);
+        let mut var_authorityKnown = <bool>::sse_decode(deserializer);
+        let mut var_historyState =
+            <crate::api::provider::ProviderHistoryState>::sse_decode(deserializer);
+        let mut var_history =
+            <Vec<crate::api::provider::ProviderHistoryEvent>>::sse_decode(deserializer);
         let mut var_requests = <Vec<String>>::sse_decode(deserializer);
         let mut var_reviewText = <String>::sse_decode(deserializer);
         let mut var_review =
@@ -752,6 +875,9 @@ impl SseDecode for crate::api::provider::ProviderSnapshot {
             configured: var_configured,
             busy: var_busy,
             locked: var_locked,
+            authority_known: var_authorityKnown,
+            history_state: var_historyState,
+            history: var_history,
             requests: var_requests,
             review_text: var_reviewText,
             review: var_review,
@@ -883,13 +1009,19 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        10 => wire__crate__api__provider__provider_outcome_default_impl(
+        9 => wire__crate__api__provider__provider_history_state_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__provider__provider_status_progress_default_impl(
+        11 => wire__crate__api__provider__provider_outcome_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        13 => wire__crate__api__provider__provider_status_progress_default_impl(
             port,
             ptr,
             rust_vec_len,
@@ -913,10 +1045,10 @@ fn pde_ffi_dispatcher_sync_impl(
         6 => wire__crate__api__provider__provider_begin_impl(ptr, rust_vec_len, data_len),
         7 => wire__crate__api__provider__provider_configure_impl(ptr, rust_vec_len, data_len),
         8 => wire__crate__api__provider__provider_finish_impl(ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__provider__provider_invalidate_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__provider__provider_snapshot_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__select_fixture_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__snapshot_impl(ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__provider__provider_invalidate_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__provider__provider_snapshot_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__select_fixture_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__snapshot_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1028,11 +1160,12 @@ impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderCommand {
         match self {
             Self::Session => 0.into_dart(),
             Self::List => 1.into_dart(),
-            Self::Review => 2.into_dart(),
-            Self::Approve => 3.into_dart(),
-            Self::Deny => 4.into_dart(),
-            Self::Unlock => 5.into_dart(),
-            Self::Status => 6.into_dart(),
+            Self::History => 2.into_dart(),
+            Self::Review => 3.into_dart(),
+            Self::Approve => 4.into_dart(),
+            Self::Deny => 5.into_dart(),
+            Self::Unlock => 6.into_dart(),
+            Self::Status => 7.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1045,6 +1178,88 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::provider::ProviderCommand>
     for crate::api::provider::ProviderCommand
 {
     fn into_into_dart(self) -> crate::api::provider::ProviderCommand {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderHistoryEvent {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.request_id.into_into_dart().into_dart(),
+            self.operation.into_into_dart().into_dart(),
+            self.at_unix_seconds.into_into_dart().into_dart(),
+            self.ordinal.into_into_dart().into_dart(),
+            self.outcome.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::provider::ProviderHistoryEvent
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::provider::ProviderHistoryEvent>
+    for crate::api::provider::ProviderHistoryEvent
+{
+    fn into_into_dart(self) -> crate::api::provider::ProviderHistoryEvent {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderHistoryOutcome {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Submitted => 0.into_dart(),
+            Self::Approved => 1.into_dart(),
+            Self::Denied => 2.into_dart(),
+            Self::Expired => 3.into_dart(),
+            Self::ReviewUnavailable => 4.into_dart(),
+            Self::ExecutionStarted => 5.into_dart(),
+            Self::Succeeded => 6.into_dart(),
+            Self::ExecutionNonzero => 7.into_dart(),
+            Self::ExecutionSignaled => 8.into_dart(),
+            Self::ExecutionRejected => 9.into_dart(),
+            Self::ExecutionUnavailable => 10.into_dart(),
+            Self::Invalidated => 11.into_dart(),
+            Self::Recovered => 12.into_dart(),
+            Self::LegacyUnknown => 13.into_dart(),
+            Self::Reconciled => 14.into_dart(),
+            Self::ObservationLost => 15.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::provider::ProviderHistoryOutcome
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::provider::ProviderHistoryOutcome>
+    for crate::api::provider::ProviderHistoryOutcome
+{
+    fn into_into_dart(self) -> crate::api::provider::ProviderHistoryOutcome {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderHistoryState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Idle => 0.into_dart(),
+            Self::Loading => 1.into_dart(),
+            Self::Available => 2.into_dart(),
+            Self::Unavailable => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::provider::ProviderHistoryState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::provider::ProviderHistoryState>
+    for crate::api::provider::ProviderHistoryState
+{
+    fn into_into_dart(self) -> crate::api::provider::ProviderHistoryState {
         self
     }
 }
@@ -1134,6 +1349,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderSnapshot {
             self.configured.into_into_dart().into_dart(),
             self.busy.into_into_dart().into_dart(),
             self.locked.into_into_dart().into_dart(),
+            self.authority_known.into_into_dart().into_dart(),
+            self.history_state.into_into_dart().into_dart(),
+            self.history.into_into_dart().into_dart(),
             self.requests.into_into_dart().into_dart(),
             self.review_text.into_into_dart().into_dart(),
             self.review.into_into_dart().into_dart(),
@@ -1326,6 +1544,16 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Vec<crate::api::provider::ProviderHistoryEvent> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::provider::ProviderHistoryEvent>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::provider::ProviderReviewCredential> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1365,6 +1593,16 @@ impl SseEncode for Option<crate::api::provider::ProviderReview> {
     }
 }
 
+impl SseEncode for Option<u64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u64>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for crate::api::Outcome {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1400,11 +1638,71 @@ impl SseEncode for crate::api::provider::ProviderCommand {
             match self {
                 crate::api::provider::ProviderCommand::Session => 0,
                 crate::api::provider::ProviderCommand::List => 1,
-                crate::api::provider::ProviderCommand::Review => 2,
-                crate::api::provider::ProviderCommand::Approve => 3,
-                crate::api::provider::ProviderCommand::Deny => 4,
-                crate::api::provider::ProviderCommand::Unlock => 5,
-                crate::api::provider::ProviderCommand::Status => 6,
+                crate::api::provider::ProviderCommand::History => 2,
+                crate::api::provider::ProviderCommand::Review => 3,
+                crate::api::provider::ProviderCommand::Approve => 4,
+                crate::api::provider::ProviderCommand::Deny => 5,
+                crate::api::provider::ProviderCommand::Unlock => 6,
+                crate::api::provider::ProviderCommand::Status => 7,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::provider::ProviderHistoryEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.request_id, serializer);
+        <String>::sse_encode(self.operation, serializer);
+        <Option<u64>>::sse_encode(self.at_unix_seconds, serializer);
+        <u32>::sse_encode(self.ordinal, serializer);
+        <crate::api::provider::ProviderHistoryOutcome>::sse_encode(self.outcome, serializer);
+    }
+}
+
+impl SseEncode for crate::api::provider::ProviderHistoryOutcome {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::provider::ProviderHistoryOutcome::Submitted => 0,
+                crate::api::provider::ProviderHistoryOutcome::Approved => 1,
+                crate::api::provider::ProviderHistoryOutcome::Denied => 2,
+                crate::api::provider::ProviderHistoryOutcome::Expired => 3,
+                crate::api::provider::ProviderHistoryOutcome::ReviewUnavailable => 4,
+                crate::api::provider::ProviderHistoryOutcome::ExecutionStarted => 5,
+                crate::api::provider::ProviderHistoryOutcome::Succeeded => 6,
+                crate::api::provider::ProviderHistoryOutcome::ExecutionNonzero => 7,
+                crate::api::provider::ProviderHistoryOutcome::ExecutionSignaled => 8,
+                crate::api::provider::ProviderHistoryOutcome::ExecutionRejected => 9,
+                crate::api::provider::ProviderHistoryOutcome::ExecutionUnavailable => 10,
+                crate::api::provider::ProviderHistoryOutcome::Invalidated => 11,
+                crate::api::provider::ProviderHistoryOutcome::Recovered => 12,
+                crate::api::provider::ProviderHistoryOutcome::LegacyUnknown => 13,
+                crate::api::provider::ProviderHistoryOutcome::Reconciled => 14,
+                crate::api::provider::ProviderHistoryOutcome::ObservationLost => 15,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::provider::ProviderHistoryState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::provider::ProviderHistoryState::Idle => 0,
+                crate::api::provider::ProviderHistoryState::Loading => 1,
+                crate::api::provider::ProviderHistoryState::Available => 2,
+                crate::api::provider::ProviderHistoryState::Unavailable => 3,
                 _ => {
                     unimplemented!("");
                 }
@@ -1474,6 +1772,9 @@ impl SseEncode for crate::api::provider::ProviderSnapshot {
         <bool>::sse_encode(self.configured, serializer);
         <bool>::sse_encode(self.busy, serializer);
         <bool>::sse_encode(self.locked, serializer);
+        <bool>::sse_encode(self.authority_known, serializer);
+        <crate::api::provider::ProviderHistoryState>::sse_encode(self.history_state, serializer);
+        <Vec<crate::api::provider::ProviderHistoryEvent>>::sse_encode(self.history, serializer);
         <Vec<String>>::sse_encode(self.requests, serializer);
         <String>::sse_encode(self.review_text, serializer);
         <Option<crate::api::provider::ProviderReview>>::sse_encode(self.review, serializer);

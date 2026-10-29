@@ -28,10 +28,13 @@ class DiagnosticsTests(unittest.TestCase):
         cases = next(ast.literal_eval(node.value) for node in ast.walk(tree)
                      if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "cases" for target in node.targets))
         self.assertEqual([case[0] for case in cases[:14]], ["approve", "deny", "wrong-password", "pin", "ca", "foreign-client", "unenrolled-client", "hostname", "expired", "redirect", "oversized", "schema", "lost-response-relaunch", "pending-relaunch"])
-        self.assertEqual(len(cases), 17)
+        self.assertEqual(len(cases), 20)
         self.assertEqual(cases[14][-1], ["session", "unlock", "session", "list", "review", "decision", "status", "status"])
-        for case in cases[15:]:
+        for case in cases[15:17]:
             self.assertEqual(case[-1], ["session", "review", "decision", "status"])
+        self.assertEqual(cases[17][-1], ["session", "list", "session", "list", "history", "review"])
+        for case in cases[18:]:
+            self.assertEqual(case[-1], ["session", "list", "session", "list", "history"])
         dart = (PROBE.ROOT / "companion/integration_test/provider_tls_smoke.dart").read_text()
         for call in ["ProviderController(native)", "await controller.initialize()", "await controller.unlock(", "await controller.refresh()"]:
             self.assertIn(call, dart)

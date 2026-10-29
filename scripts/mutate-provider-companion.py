@@ -22,6 +22,12 @@ evidence = args.evidence.resolve()
 evidence.mkdir(parents=True, exist_ok=True)
 command = ["cargo", "test", "--locked", "--offline", "--manifest-path", str(root / "companion/rust/Cargo.toml")]
 mutations = {
+    "history-schema": ("protocol.rs", [("#[serde(deny_unknown_fields)]\npub struct HistoryEvent", "pub struct HistoryEvent")]),
+    "history-version": ("protocol.rs", [("&& self.history_version == 1", "&& true")]),
+    "history-order": ("protocol.rs", [("pair[0].key() > pair[1].key()", "true")]),
+    "history-request-limit": ("protocol.rs", [("self.events.len() <= requested", "true")]),
+    "history-retirement": ("session.rs", [("self.history.clear();\n        self.history_state = ProviderHistoryState::Idle;", "self.history_state = ProviderHistoryState::Idle;")]),
+    "history-display-only": ("session.rs", [("self.history_state = ProviderHistoryState::Available;", "self.history_state = ProviderHistoryState::Available; self.status_id = flight.id.clone(); self.status_progress = ProviderStatusProgress::Terminal;")]),
     "review-argument-count": ("protocol.rs", [("self.arguments.len() <= MAX_ARGUMENTS", "true")]),
     "review-credential-count": ("protocol.rs", [("self.credentials.len() <= MAX_CREDENTIALS", "true")]),
     "typed-requester-escape": ("protocol.rs", [("requester: visible(&self.requester),", "requester: self.requester.clone(),")]),

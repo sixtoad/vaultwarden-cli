@@ -1,7 +1,7 @@
 use super::protocol::*;
 use crate::api::provider::{
-    ProviderCommand as Command, ProviderOutcome, ProviderSnapshot, ProviderStatusProgress,
-    ProviderWork,
+    ProviderCommand as Command, ProviderHistoryEvent, ProviderHistoryState, ProviderOutcome,
+    ProviderSnapshot, ProviderStatusProgress, ProviderWork,
 };
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
@@ -27,6 +27,8 @@ pub struct ProviderSession {
     serial: u32,
     authority: Option<(SessionState, u64)>,
     requests: Vec<String>,
+    history_state: ProviderHistoryState,
+    history: Vec<ProviderHistoryEvent>,
     reviewed: Option<Reviewed>,
     flight: Option<Flight>,
     unresolved: Option<String>,
@@ -60,6 +62,8 @@ impl ProviderSession {
     pub fn invalidate(&mut self) {
         self.epoch = self.epoch.checked_add(1).expect("provider epoch exhausted");
         self.reviewed = None;
+        self.history.clear();
+        self.history_state = ProviderHistoryState::Idle;
     }
     fn can_decide(&self) -> bool {
         self.flight.is_none()
@@ -86,6 +90,9 @@ impl ProviderSession {
             configured: self.configured,
             busy: self.flight.is_some(),
             locked: self.authority.map(|a| a.0) != Some(SessionState::Unlocked),
+            authority_known: self.authority.is_some(),
+            history_state: self.history_state,
+            history: self.history.clone(),
             requests: self.requests.clone(),
             review_text: self
                 .reviewed
@@ -136,6 +143,15 @@ impl ProviderSession {
         match command {
             Command::Session => request["command"] = "session".into(),
             Command::List => request["command"] = "list".into(),
+            Command::History => {
+                if self.authority.map(|a| a.0) != Some(SessionState::Unlocked) {
+                    return Err("Refresh unlocked provider authority before reading history.");
+                }
+                self.history.clear();
+                self.history_state = ProviderHistoryState::Loading;
+                request["command"] = "history".into();
+                request["limit"] = DEFAULT_HISTORY_LIMIT.into();
+            }
             Command::Review => {
                 self.invalidate();
                 request["command"] = "review".into();
@@ -230,6 +246,12 @@ impl ProviderSession {
                 self.authority = None;
                 self.requests.clear();
                 self.outcome = ProviderOutcome::Rejected;
+                if flight.command == Command::History {
+                    self.history_state = ProviderHistoryState::Unavailable;
+                    self.message =
+                        "Activity unavailable from this provider. Refresh to reconnect.".into();
+                    return;
+                }
                 if decision && error.error.definite_rejection() {
                     self.unresolved = None;
                     self.message = "Decision rejected. Obtain a new review and fresh password before trying again.".into();
@@ -250,6 +272,9 @@ impl ProviderSession {
             self.authority = None;
             self.requests.clear();
             self.outcome = ProviderOutcome::Invalid;
+            if flight.command == Command::History {
+                self.history_state = ProviderHistoryState::Unavailable;
+            }
             self.message = if self.unresolved.is_some() {
                 "Outcome uncertain: status unavailable. No decision was resent."
             } else {
@@ -281,6 +306,19 @@ impl ProviderSession {
                     "Provider unlocked. Refresh the inbox and review a request."
                 }
                 .into();
+            }
+            Command::History => {
+                let reply: HistoryResponse = decode(bytes)?;
+                if !reply.valid(DEFAULT_HISTORY_LIMIT)
+                    || self.authority.map(|a| a.0) != Some(SessionState::Unlocked)
+                {
+                    return Err("history");
+                }
+                self.history = reply.events.iter().map(HistoryEvent::projection).collect();
+                self.history_state = ProviderHistoryState::Available;
+                self.message =
+                    "Recent redacted provider activity. History does not authorize operations."
+                        .into();
             }
             Command::List => {
                 let reply: ListResponse = decode(bytes)?;
