@@ -600,7 +600,7 @@ impl ProviderApplication {
         if self.admission_closed() {
             return Err(DirectRequestError::Unavailable);
         }
-        let token = self.agent_token(&Some(owner.clone()))?;
+        let token = self.agent_token(&Some(owner.clone()))?; // secrets-ignore: runtime value, not a credential literal
         if !Self::token_live(&token) {
             return Err(DirectRequestError::Unauthorized);
         }
@@ -688,7 +688,7 @@ impl ProviderApplication {
                 return Err(AgentRejection::Locked);
             }
             let owner = authority.provider.authenticate_agent(uid, groups, &input)?;
-            let token = self.agent_token(&Some(owner.clone()))?;
+            let token = self.agent_token(&Some(owner.clone()))?; // secrets-ignore: runtime value, not a credential literal
             if !Self::token_live(&token) {
                 return Err(AgentRejection::Unauthorized);
             }
@@ -789,7 +789,7 @@ impl ProviderApplication {
             let owner = authority
                 .provider
                 .authenticate_status_query(uid, groups, query)?;
-            let token = self.agent_token(&Some(owner.clone()))?;
+            let token = self.agent_token(&Some(owner.clone()))?; // secrets-ignore: runtime value, not a credential literal
             // Storage must not retain release_gate: control intent can be
             // published even while refresh or nonce persistence is stalled.
             if !Self::token_live(&token) {
@@ -952,7 +952,7 @@ impl ProviderApplication {
         launcher: &dyn DirectReviewLauncher,
     ) -> Result<SubmissionReceipt, DirectRequestError> {
         self.check_owner(owner)?;
-        let token = self.agent_token(&agent_owner)?;
+        let token = self.agent_token(&agent_owner)?; // secrets-ignore: runtime value, not a credential literal
         if !Self::token_live(&token) {
             return Err(DirectRequestError::Unauthorized);
         }
@@ -1862,7 +1862,7 @@ impl ProviderApplication {
         if binding.agent_owner.is_none() {
             self.check_owner(AuthenticatedHuman::from_peer_uid(binding.requester_uid))?;
         }
-        let token = self.agent_token(&binding.agent_owner)?;
+        let token = self.agent_token(&binding.agent_owner)?; // secrets-ignore: runtime value, not a credential literal
         if !Self::token_live(&token) {
             return Err(DirectRequestError::Unauthorized);
         }

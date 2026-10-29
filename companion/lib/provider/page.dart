@@ -8,6 +8,7 @@ import '../design/access_theme.dart';
 import '../design/components.dart';
 import 'request_review.dart';
 import 'support_views.dart';
+import 'installation_settings.dart';
 import 'devices_view.dart';
 import 'controller.dart';
 import 'pilot_bundle.dart';
@@ -289,10 +290,9 @@ class _ProviderPageState extends State<ProviderPage>
       origin: controller.management.originId == controller.state.reviewId
           ? controller.management.originText
           : '',
-      password: approvalPassword,
+      password: approvalPassword, // secrets-ignore: UI controller
       onApprove: () {
-        final secret = approvalPassword
-            .text; // secrets-ignore: runtime input, not a credential literal
+        final secret = approvalPassword.text; // secrets-ignore: runtime input
         clearPasswords();
         unawaited(controller.decide(true, secret));
       },
@@ -328,6 +328,7 @@ class _ProviderPageState extends State<ProviderPage>
             },
           ),
           const SizedBox(height: 24),
+          const InstallationSettings(),
           const ProviderCapabilities(),
           const SizedBox(height: 24),
           if (disposablePilotEnabled &&
@@ -474,7 +475,7 @@ class _ProviderPageState extends State<ProviderPage>
                   : requestList(),
             AccessDestination.devices => ProviderDevices(
               controller: controller,
-              password: managementPassword,
+              password: managementPassword, // secrets-ignore: UI controller
             ),
             AccessDestination.activity => ProviderActivity(
               state: state,

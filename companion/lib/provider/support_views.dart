@@ -164,7 +164,7 @@ class ProviderCapabilities extends StatelessWidget {
       ),
       SizedBox(height: 8),
       Text(
-        'Guided enrollment, notifications, bundled CLI inspection and repair are not available. This development application does not replace the installed companion.',
+        'Guided enrollment and notifications are not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
       ),
     ],
   );

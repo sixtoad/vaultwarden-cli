@@ -67,12 +67,16 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   times, clears on lifecycle/provider changes, and opens an exact-ID fresh review.
   Older providers report unavailable. History cannot settle an uncertain decision
   or authorize execution. See the contract and evidence section below.
-- [ ] **Single installation and repair:** Flutter artifacts are development/CI
-  bundles (`docs/companion-migration.md:386`). The existing DMG packaging script
-  packages the Swift app, not a complete Flutter/CLI installation contract.
-  `vw-access` has a version flag, but the app has no CLI inspection/repair API.
-  `.github/workflows/release.yml:69` selects one binary; required bundle contents,
-  version compatibility, user-level command repair and rollback need explicit work.
+- [x] **Single installation and repair implementation:** desktop bundles include
+  the normal Flutter app, versioned manifest, applicable CLI/helpers and a native
+  command launcher. Settings inspects integrity/compatibility and PATH separately,
+  then explicitly enables/repairs a user directory with whole-bundle activation.
+  macOS/Windows contain working `vaultwarden-cli`; Linux additionally contains
+  `vw-access` and its provider/helper. Unsupported protected-command stubs are not
+  distributed as functioning roles. See [installation and isolated verification](../desktop-installation.md).
+  The Windows line-ending cause is diagnosed and fixed; matching platform CI remains an evidence gate;
+  implementation alone does not establish completed platform acceptance.
+
 - [ ] **Notifications:** the Swift app has generic notifications
   (`macos/Sources/ApprovalCompanion/App.swift:155`); Flutter has no equivalent
   notification/background API. Exact-request navigation needs a native entrypoint,
@@ -85,7 +89,8 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
 | Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and signed-admission origin (legacy origin explicitly unavailable) |
 | Devices & agents | Provider-backed identities, granted roles/trust, exact-target permanent revocation and status-only recovery (management slice) | Genuine mutual enrollment remains separate; runtime evidence is recorded in PR #57 |
 | Activity | Bounded durable redacted history; exact-ID fresh review; explicit unavailable/locked/recovery states | Matching-platform and hardware evidence as recorded below |
-| Settings | Existing advanced setup, theme, actual capabilities, separate synthetic diagnostics | Version inspection, bundled CLI repair, native notification settings |
+| Settings | Advanced setup, theme, actual capabilities, bundle/version integrity and user command repair, separate synthetic diagnostics | Matching platform verification; native notification settings |
+
 
 Desktop uses sidebar/master-detail; compact uses bottom navigation/list-to-detail,
 safe areas and back. Both need keyboard/semantic labels, non-color status, visible

@@ -1,5 +1,6 @@
 use crate::lifecycle::Core;
 use std::sync::{Mutex, OnceLock};
+pub mod installation;
 pub mod management;
 pub mod provider;
 

@@ -17,6 +17,8 @@ use zeroize::Zeroizing;
 
 pub const STORE_FILE: &str = "companion-identities.json";
 const MAX_IDENTITIES: usize = 64;
+const STOPPED_PROVIDER_ATTEMPTS: u32 = 50;
+const STOPPED_PROVIDER_RETRY: std::time::Duration = std::time::Duration::from_millis(10);
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnrolledCompanion {
@@ -261,10 +263,15 @@ fn valid_label(label: &str) -> bool {
 fn stopped_provider(root: &Path) -> Result<File, SessionError> {
     private_directory(root)?;
     let lock = private_open(&root.join(".provider-state.lock"), true)?;
-    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        return Err(SessionError::BackendUnavailable);
+    // A child spawned between our open and its exec briefly shares the lock;
+    // a running provider holds it far longer than this bounded wait.
+    for _ in 0..STOPPED_PROVIDER_ATTEMPTS {
+        if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+            return Ok(lock);
+        }
+        std::thread::sleep(STOPPED_PROVIDER_RETRY);
     }
-    Ok(lock)
+    Err(SessionError::BackendUnavailable)
 }
 fn read_or_initial(root: &Path) -> Result<Registry, SessionError> {
     let path = root.join(STORE_FILE);
@@ -525,5 +532,17 @@ mod tests {
         );
         let registry = registry(&path).unwrap();
         assert_eq!(registry.audit.len(), 2);
+    }
+    #[test]
+    fn stopped_provider_waits_out_a_transient_lock_holder() {
+        // A child spawned by another thread inherits the lock until it execs.
+        let root = root();
+        let held = stopped_provider(root.path()).unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            drop(held);
+        });
+        assert!(stopped_provider(root.path()).is_ok());
+        release.join().unwrap();
     }
 }

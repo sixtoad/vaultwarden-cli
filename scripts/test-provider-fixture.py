@@ -55,7 +55,7 @@ class ControllerFixtureTests(unittest.TestCase):
                         self.assertEqual(send("unlock", expected_status=422, **arguments)["error"], "authentication_failed")
                         self.assertEqual(send("session")["state"], "locked")
                         rejected += ["unlock", "session"]
-                password = "synthetic-pilot-unlock-only" if mode == "pilot" else "synthetic-only"
+                password = "synthetic-pilot-unlock-only" if mode == "pilot" else "synthetic-only"  # secrets-ignore: synthetic test fixture
                 self.assertEqual(send("unlock", password=password)["state"], "unlocked")
                 self.assertEqual(send("session")["state"], "unlocked")
                 request_id = "A" * 43

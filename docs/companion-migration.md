@@ -396,6 +396,15 @@ Evidence for those capabilities is pending, not assumed from Flutter's support.
 SwiftUI removal and installed-app replacement remain blocked until the parity
 checklist and coordinated native acceptance are complete.
 
+## Desktop bundle installation slice (#50)
+
+The portable desktop artifact now includes the platform-applicable CLI/helpers,
+a build-derived component/compatibility manifest and native user command
+activation. See [desktop installation](desktop-installation.md) for actual roles,
+prerequisites, repair, rollback, signing boundaries and isolated test instructions.
+This supersedes earlier statements that bundled command inspection/repair is
+absent. Development signing and missing native platform roles remain explicit;
+this does not qualify native macOS provider execution or replace installed apps.
 
 ## Authoritative Devices & agents (issue #50)
 
