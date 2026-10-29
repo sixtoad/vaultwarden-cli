@@ -121,7 +121,7 @@ fn management_mtls_certificate_revocation_retires_session_and_is_exact_single_us
     assert_eq!(management_exchange(&service, &f, wrong_status).0, 403);
     let (_, reconciled) = management_exchange(&service, &f, query.clone());
     assert_eq!(completed, reconciled);
-    service.management.lock().unwrap().tickets.clear();
+    *service.management.lock().unwrap() = management::State::default();
     assert_eq!(management_exchange(&service, &f, query).1, completed);
     assert_eq!(check.calls.load(Ordering::SeqCst), 1);
     assert!(!service.authorized(&"b".repeat(64)));

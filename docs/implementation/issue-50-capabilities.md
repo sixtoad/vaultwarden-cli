@@ -52,7 +52,7 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   provisioned CA/PKCS#12 (`companion/macos/Runner/ProviderAdapter.swift:47`). No
   nearby invitation, matching-code, QR or dual-human-authorization protocol exists
   in these surfaces. Advanced setup cannot satisfy guided enrollment acceptance.
-- [ ] **Trusted-device management:** provider-backed inventory/detail, explicit
+- [x] **Trusted-device management (implementation):** provider-backed inventory/detail, explicit
   owner-granted remote administration, permanent revocation and action-bound
   reconciliation are implemented in the device-management slice; final Linux,
   native packaging and CI verification remains pending. See the

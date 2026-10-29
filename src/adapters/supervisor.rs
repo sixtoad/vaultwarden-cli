@@ -370,12 +370,21 @@ impl ExecutionDispatcher for Dispatch {
             && self.supervisor.available()
     }
     fn dispatch(&self, id: &str) -> Result<(), SessionError> {
-        self.status
-            .queued
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |queued| {
-                (queued < EXECUTION_QUEUE_CAPACITY).then_some(queued + 1)
-            })
-            .map_err(|_| SessionError::BackendUnavailable)?;
+        let mut queued = self.status.queued.load(Ordering::Acquire);
+        loop {
+            if queued >= EXECUTION_QUEUE_CAPACITY {
+                return Err(SessionError::BackendUnavailable);
+            }
+            match self.status.queued.compare_exchange_weak(
+                queued,
+                queued + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => break,
+                Err(actual) => queued = actual,
+            }
+        }
         if self.sender.try_send(id.to_owned()).is_err() {
             self.status.queued.fetch_sub(1, Ordering::AcqRel);
             return Err(SessionError::BackendUnavailable);

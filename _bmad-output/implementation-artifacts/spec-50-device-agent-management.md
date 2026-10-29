@@ -2,7 +2,7 @@
 title: Authoritative device and agent management
 type: feature
 created: 2026-10-29
-status: in-review
+status: done
 baseline_commit: 60fadd6251cafb08e91ef2856f82ef44dfe164f5
 context: [docs/secret-access-boundary.md, AGENTS.md]
 ---
@@ -115,3 +115,45 @@ registry has no small cardinality cap, certificate deletion has no tombstone,
 and revoked inventory alone cannot prove cleanup completion. These findings
 drive the contract above. No installed identity, service or application changes
 are authorized by this source implementation.
+
+## Review repairs
+
+Independent blind, edge-case and acceptance reviewers verified repairs for
+absent-journal recovery, automatic pagination resets, live signing-socket cleanup
+and invalid action-fact pairs. Additional security review required real dispatcher
+availability and stopped fixed-service verification. Regression tests cover these
+boundaries. Final runtime delivery remains subject to PR #57 CI; this status
+records implementation and source-review completion, not an unrun CI result.
+
+## Suggested Review Order
+
+**Authority and consequences**
+
+- Start with authenticated dispatch and exact-target authorization.
+  [management.rs:268](../../src/adapters/companion/management.rs#L268)
+- Inspect explicit grants and permanent identity records.
+  [companion_identity.rs:184](../../src/adapters/companion_identity.rs#L184)
+- Follow owner recovery without inventing original success.
+  [management.rs:562](../../src/adapters/companion/management.rs#L562)
+- Check stopped-provider cleanup without consumer termination.
+  [supervisor.rs:72](../../src/adapters/supervisor.rs#L72)
+
+**Client lifecycle and evidence**
+
+- Validate action facts before clearing durable recovery.
+  [management.rs:133](../../companion/rust/src/provider/management.rs#L133)
+- Follow serialized transport and original-provider reconciliation.
+  [controller.dart:467](../../companion/lib/provider/controller.dart#L467)
+- Inspect durable pre-send markers and native foreground gates.
+  [ProviderSettings.swift:107](../../companion/macos/Runner/ProviderSettings.swift#L107)
+- Review identity roles, stable IDs and explicit consequences.
+  [devices_view.dart:7](../../companion/lib/provider/devices_view.dart#L7)
+
+**Verification**
+
+- Inspect transport-level authorization and recovery regressions.
+  [management_tests.rs:1](../../src/adapters/companion/management_tests.rs#L1)
+- Exercise generated bridge validation and impossible outcome pairs.
+  [management.rs:1](../../companion/rust/tests/management.rs#L1)
+- Check packaged native TLS, foreground and process-relaunch assertions.
+  [provider_tls_smoke.dart:1](../../companion/integration_test/provider_tls_smoke.dart#L1)

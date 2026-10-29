@@ -9,11 +9,11 @@ The final source revision and CI run are recorded in the draft pull request.
 
 ## Local evidence (macOS, 2026-10-29)
 
-- Pinned Rust 1.88 core: 45 tests passed; stable Clippy and formatting passed.
+- Pinned Rust 1.88 core: 46 tests passed; stable Clippy and formatting passed.
 - Flutter 3.47.7 / Dart 3.13.5: 81 tests passed, including real generated FFI,
   provider replacement, process-recreation recovery, paginated polling, stale completions,
   malformed origin, expiry/password clearing, themes and 200% text scaling.
-- Management core mutations: 6/6 detected after successful compilation, with
+- Management core mutations: 7/7 detected after successful compilation, with
   exact source restoration and a passing restored baseline.
 - Existing controller mutations: 12/12 detected; source/page hashes restored,
   restored baseline passed. Initial sandbox socket denial was infrastructure,
