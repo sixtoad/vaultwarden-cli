@@ -5,7 +5,7 @@ type Result<T> = std::result::Result<T, anyhow::Error>;
 
 /// CLI client for Vaultwarden - retrieve secrets for batch files and environment variables
 #[derive(Parser)]
-#[command(name = "vaultwarden-cli")]
+#[command(name = "vaultwarden-cli", version)]
 struct Cli {
     /// allow insecure HTTP connections (secrets sent unencrypted).
     /// also settable via `VAULTWARDEN_ALLOW_HTTP=1` env var.

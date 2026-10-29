@@ -7,6 +7,13 @@ mkdir -p "$evidence"
 evidence=$(cd "$evidence" && pwd)
 exec > >(tee "$evidence/desktop.log") 2>&1
 
+case "$(uname -s)" in
+  Linux*) target=linux ;;
+  Darwin*) target=macos ;;
+  MINGW*|MSYS*|CYGWIN*) target=windows ;;
+  *) echo 'Unsupported build host' >&2; exit 1 ;;
+esac
+python3 "$repo/scripts/desktop-bundle.py" before "$target" "$evidence"
 flutter --version
 cargo --version
 cargo test --locked --manifest-path rust/Cargo.toml
@@ -18,6 +25,7 @@ flutter analyze
 flutter test
 flutter test --dart-define=COMPANION_DISPOSABLE_PILOT=true test/pilot_setup_test.dart
 python3 "$repo/scripts/test-desktop-companion-artifact.py"
+python3 "$repo/scripts/test-desktop-bundle.py"
 python3 "$repo/scripts/test-provider-packaged-diagnostics.py"
 
 case "$(uname -s)" in
@@ -61,4 +69,5 @@ if [[ "$target" == macos ]]; then
 fi
 # Never publish the self-exiting smoke harness as the operator's application.
 flutter build "$target" --release --target lib/main.dart
-python3 "$repo/scripts/desktop-companion-artifact.py" package "$target" "$evidence"
+python3 "$repo/scripts/desktop-bundle.py" commands "$target" "$evidence"
+python3 "$repo/scripts/desktop-bundle.py" package "$target" "$evidence"
