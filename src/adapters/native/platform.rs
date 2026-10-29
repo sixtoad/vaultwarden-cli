@@ -48,6 +48,57 @@ pub(crate) fn descriptor_path(file: &File) -> Result<PathBuf, ExecutionError> {
     Ok(path)
 }
 
+// <sys/proc_info.h> proc_listpids selectors: effective and real UID.
+const PROC_UID_ONLY: u32 = 4;
+const PROC_RUID_ONLY: u32 = 5;
+
+/// Whether a process other than the caller, with effective or real `uid`, executes
+/// a file named `name`. Kernel evidence only; any listing or path failure other
+/// than the process having exited is uncertain and fails closed.
+pub(crate) fn other_process_named(
+    uid: u32,
+    name: &std::ffi::OsStr,
+) -> Result<bool, ExecutionError> {
+    let own = std::process::id() as libc::pid_t;
+    for kind in [PROC_UID_ONLY, PROC_RUID_ONLY] {
+        for pid in pids(kind, uid)? {
+            if pid == own || pid == 0 {
+                continue;
+            }
+            let mut bytes = [0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+            let length =
+                unsafe { libc::proc_pidpath(pid, bytes.as_mut_ptr().cast(), bytes.len() as u32) };
+            if length <= 0 {
+                if std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH) {
+                    continue;
+                }
+                return Err(ExecutionError::ManagerUnavailable);
+            }
+            let path = Path::new(std::ffi::OsStr::from_bytes(&bytes[..length as usize]));
+            if path.file_name() == Some(name) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+fn pids(kind: u32, uid: u32) -> Result<Vec<libc::pid_t>, ExecutionError> {
+    const PID: usize = std::mem::size_of::<libc::pid_t>();
+    let estimate = unsafe { libc::proc_listpids(kind, uid, std::ptr::null_mut(), 0) };
+    if estimate <= 0 {
+        return Err(ExecutionError::ManagerUnavailable);
+    }
+    // Headroom for processes started between calls; a full buffer may be truncated.
+    let mut pids: Vec<libc::pid_t> = vec![0; estimate as usize / PID + 64];
+    let capacity = (pids.len() * PID) as libc::c_int;
+    let written = unsafe { libc::proc_listpids(kind, uid, pids.as_mut_ptr().cast(), capacity) };
+    if written < 0 || written >= capacity {
+        return Err(ExecutionError::ManagerUnavailable);
+    }
+    pids.truncate(written as usize / PID);
+    Ok(pids)
+}
+
 unsafe extern "C" {
     fn acl_get_fd_np(fd: libc::c_int, kind: libc::c_int) -> *mut libc::c_void;
     fn acl_get_entry(

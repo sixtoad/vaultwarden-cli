@@ -498,7 +498,6 @@ pub fn recover(root: &Path) -> Result<(), ExecutionError> {
 }
 /// Owner reconciliation must prove the old signing endpoint is closed; ordinary
 /// startup preserves live endpoints instead of affecting another consumer.
-#[cfg(target_os = "linux")]
 pub(crate) fn recover_stopped(root: &Path) -> Result<(), ExecutionError> {
     recover_mode(root, &runtime_path(), true)
 }

@@ -140,6 +140,8 @@ impl Recipient {
         })
     }
 }
+/// Installed daemon file name; a concurrent reconcile under the lock also counts.
+const PROVIDER_EXECUTABLE: &str = "vaultwarden-accessd";
 pub struct NativeProcessSupervisor {
     material: PathBuf,
 }
@@ -175,14 +177,35 @@ impl NativeProcessSupervisor {
         let _retained = super::ssh_material::recover(&self.material);
         Ok(())
     }
-    /// Trusted-console recovery requires proving the fixed provider is stopped
-    /// before global runtime/session cleanup; no native proof exists yet, so
-    /// refuse and leave the management fence in place.
+    /// Trusted-console recovery only while the provider writer lock is held.
+    /// An alternate state-root lock cannot authorize cleanup of a live provider's
+    /// global SSH runtime/Keychain session, so no other provider process may run
+    /// as the enrolled account before, between or after cleanup. launchd output
+    /// is not an API; kernel process evidence also covers a provider started
+    /// outside launchd. Consumers are distinct images and are never signalled.
     pub(crate) fn recover_stopped(
-        _state_root: &Path,
-        _clear_session: impl FnOnce() -> Result<(), ExecutionError>,
+        state_root: &Path,
+        clear_session: impl FnOnce() -> Result<(), ExecutionError>,
     ) -> Result<(), ExecutionError> {
-        Err(ExecutionError::Unavailable)
+        let identity = identity::load()?;
+        if !platform::available() || identity.provider_uid != unsafe { libc::geteuid() } {
+            return Err(ExecutionError::Unavailable);
+        }
+        let stopped = || {
+            if platform::other_process_named(
+                identity.provider_uid,
+                std::ffi::OsStr::new(PROVIDER_EXECUTABLE),
+            )? {
+                return Err(ExecutionError::ManagerUnavailable);
+            }
+            Ok(())
+        };
+        stopped()?;
+        let material = super::ssh_material::initialize(state_root)?;
+        super::ssh_material::recover_stopped(&material)?;
+        stopped()?;
+        clear_session()?;
+        stopped()
     }
 }
 impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor {

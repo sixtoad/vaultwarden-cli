@@ -761,3 +761,45 @@ fn native_reaper_capacity_denies_execution_before_backend_resolution() {
     drop(reservations);
     assert!(super::reaper::reserve().is_ok());
 }
+
+/// Real kernel listing: the caller is excluded, and a copied system binary
+/// running under the provider file name is observed until it exits.
+#[test]
+fn native_stopped_provider_proof_observes_other_provider_processes() {
+    use std::ffi::OsStr;
+    let uid = unsafe { libc::geteuid() };
+    let name = OsStr::new(PROVIDER_EXECUTABLE);
+    assert!(!platform::other_process_named(uid, name).unwrap());
+    let dir = tempfile::tempdir().unwrap();
+    let copy = dir.path().join(PROVIDER_EXECUTABLE);
+    std::fs::copy("/bin/sleep", &copy).unwrap();
+    let mut running = std::process::Command::new(&copy).arg("30").spawn().unwrap();
+    let observed = platform::other_process_named(uid, name);
+    let elsewhere = platform::other_process_named(uid.wrapping_add(1), name);
+    let state_root = tempfile::tempdir().unwrap();
+    identity::TEST_IDENTITIES.with(|v| {
+        *v.borrow_mut() = Some(identity::Identities {
+            provider_uid: uid,
+            provider_uuid: "synthetic-provider".into(),
+            operator_uid: 42001,
+            operator_uuid: "synthetic-operator".into(),
+            human_gid: 20,
+            agent_gid: 1,
+            human_socket_dir: state_root.path().join("human"),
+            ssh_runtime_dir: state_root.path().into(),
+        })
+    });
+    let mut cleared = false;
+    let refused = NativeProcessSupervisor::recover_stopped(state_root.path(), || {
+        cleared = true;
+        Ok(())
+    });
+    identity::TEST_IDENTITIES.with(|v| v.borrow_mut().take());
+    running.kill().unwrap();
+    running.wait().unwrap();
+    assert!(observed.unwrap());
+    assert!(!elsewhere.unwrap());
+    assert!(matches!(refused, Err(ExecutionError::ManagerUnavailable)));
+    assert!(!cleared);
+    assert!(!platform::other_process_named(uid, name).unwrap());
+}
