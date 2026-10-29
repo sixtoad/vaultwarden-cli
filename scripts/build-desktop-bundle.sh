@@ -15,5 +15,5 @@ python3 "$repo/scripts/desktop-bundle.py" before "$target" "$evidence"
 python3 "$repo/scripts/desktop-bundle.py" commands "$target" "$evidence"
 cd "$repo/companion"
 flutter pub get --enforce-lockfile
-flutter build "$target" --release --target lib/main.dart
+python3 "$repo/scripts/desktop-bundle.py" app "$target" "$evidence"
 python3 "$repo/scripts/desktop-bundle.py" package "$target" "$evidence"

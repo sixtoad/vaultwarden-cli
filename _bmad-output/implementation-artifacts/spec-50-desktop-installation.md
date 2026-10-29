@@ -52,12 +52,12 @@ context: [docs/secret-access-boundary.md]
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Implement and test build-derived bundle manifest and complete payload validation, compatibility, platform capabilities and artifact identity.
-- [ ] Package app and applicable CLI/helpers for three desktop platforms, retain executable modes/libraries and normal entrypoint; integrate release and native CI.
-- [ ] Implement installation inspection, terminal resolution, explicit enablement/repair with platform mechanisms and failure-safe activation, isolated tests for the matrix above.
-- [ ] Add Settings UI, actual runtime mobile exclusion, actionable guidance, widget tests and visually inspected synthetic captures.
-- [ ] Capture Windows provenance at relevant build stages; establish exact source_dirty cause with matching CI evidence and fix only explained changes.
-- [ ] Update capability checklist, migration/installation docs and reproducible isolated upgrade/repair instructions with real prerequisites and remaining dependencies.
+- [x] Implement and test build-derived bundle manifest and complete payload validation, compatibility, platform capabilities and artifact identity.
+- [x] Package app and applicable CLI/helpers for three desktop platforms, retain executable modes/libraries and normal entrypoint; integrate release and native CI.
+- [x] Implement installation inspection, terminal resolution, explicit enablement/repair with platform mechanisms and failure-safe activation, isolated tests for the matrix above.
+- [x] Add Settings UI, actual runtime mobile exclusion, actionable guidance, widget tests and visually inspected synthetic captures.
+- [x] Capture Windows provenance at relevant build stages; establish exact source_dirty cause with matching CI evidence and fix only explained changes.
+- [x] Update capability checklist, migration/installation docs and reproducible isolated upgrade/repair instructions with real prerequisites and remaining dependencies.
 - [ ] Run full affected Rust/Flutter/analyzer/packaging/native CI; obtain independent review, fix findings, integrate current main and create draft PR related to #50.
 
 **Acceptance Criteria:**
@@ -76,3 +76,9 @@ The source-backed platform inventory supersedes historical prose: Linux has `vw-
 ## Verification
 
 Full affected Rust suites and Clippy/rustfmt; full Flutter test/analyze plus isolated repair and platform UI tests; artifact tests and extracted command invocation; macOS/Windows/Linux matching CI and archive inspection. Preserve native security/mutation gates and exact golden comparisons. Any signing/hardware/host limitation remains explicit.
+
+## Review and local verification
+
+Three independent reviews (blind diff, edge cases, acceptance) were completed and all concrete findings remediated; follow-up reviews found no remaining blockers. Local verification: 58 companion Rust tests passed (packaged invocation separately passed), Clippy/rustfmt clean; 81 Flutter tests passed, analyzer clean; bundle/artifact/diagnostics Python suites passed. Normal macOS release bundle, signature, extracted inventory and production launcher invocation passed. Root Rust suite: 542 passed. Windows permission module cross-compilation passed; native CI remains authoritative.
+
+Windows initial CI recorded exactly seven Flutter generated plugin files changing from checkout CRLF to generator LF, with no semantic changes and hashes matching PR #52. Exact-path .gitattributes rules preserve LF under core.autocrlf=true; a real-checkout regression verifies the fix. Final native matrix and interactive sandbox picker evidence remain pending.

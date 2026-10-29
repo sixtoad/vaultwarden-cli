@@ -22,7 +22,7 @@ The manifest records the actual app, core and CLI versions separately: currently
 Bundle schema 1, launcher ABI 1, the expected runtime platform/architecture and
 running app/core versions are checked. Old ABI-1 command launchers can select
 new compatible app/core versions. A bundle records its host command architecture;
-a universal macOS Flutter/core build does not make its command tools universal.
+the normal macOS app is built for the same host architecture as its commands. The core may retain universal library slices, but the application is explicitly single-architecture. An Intel archive on Apple Silicon requires an already available Rosetta environment; the package never installs Rosetta or claims a native ARM command.
 
 `bundle.json` (macOS: `Contents/Resources/bundle.json`) binds every regular
 payload, required runtime libraries, command paths, supported roles and internal
@@ -38,12 +38,17 @@ trusted release channel before opening an archive.
 ## First installation
 
 Extract the archive into a fresh folder inside your home. Preserve the complete
-app structure, libraries, executable modes and links. On Linux the host needs a
-compatible GTK 3/glibc desktop runtime; protected provider operation additionally
-needs the existing Linux systemd/DBus setup and independently authorized provider
-configuration. Installation does not start or configure a privileged service.
+app structure, libraries, executable modes and links. Linux desktop CI/release archives target Ubuntu 24.04 with its GTK 3 and glibc runtime (the Flutter engine/AOT library and ICU data are bundled). Other distributions require matching native runtime compatibility; the package does not install desktop OS libraries. Protected provider operation has additional, source-enforced prerequisites:
+
+- Linux **6.3+**, permitted executable memfds with WRITE/GROW/SHRINK/EXEC/SEAL support, and permitted parent/child ptrace exec-event observation.
+- Unified **cgroup v2**, **systemd 255+**, and the provider user's D-Bus user-manager connection at `/run/user/<uid>/bus`. There is no separately enforced minimum D-Bus daemon version.
+- The supplied `vaultwarden-accessd.service` user unit and independently authorized provider setup. An arbitrary shell-launched daemon is not an authorized provider instance.
+- A native little-endian x86-64 or AArch64 reviewed self-contained ELF64 ET_EXEC operation image under the existing policy; scripts, dynamic executables and static PIE are not admitted by that profile.
+- Provider-owned helper and installation ancestors with the required ownership/modes; restricted agents run under separate OS principals. See [the current protected-access contract](access-mvp.md#supported-platform) and its executable/runtime sections. These are delivery prerequisites, not a promise to supervise or terminate consumers.
+
+ Installation does not start or configure a privileged service.
 Windows ships the app-local MSVC runtime with Flutter and statically links the CRT
-for copied Rust command launchers/tools. macOS preserves the app sandbox.
+for copied Rust command launchers/tools. macOS preserves the app sandbox. Explicit folder selection grants only user-selected read/write and executable-file access. Apple's [sandbox file-access documentation](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox) requires the `com.apple.security.files.user-selected.executable` entitlement for this executable-publication flow; packaging checks it in the actual signed bundle alongside the sandbox/read-write entitlements. NSOpenPanel starts the selected scope, which is released after activation; no extra unbalanced scope is opened.
 
 Open the normal application, then Settings → Desktop installation. Inspection
 shows the bundled tool path and version separately from terminal PATH resolution.
@@ -54,10 +59,9 @@ Choose **Enable / repair user commands**. On macOS a native folder chooser grant
 write access to the selected directory for this operation only; select or create
 a bin directory inside your home. Linux/Windows show the exact destination and
 create the selected user directory on the explicit action. Directories outside
-your account home, unsafe links and unrelated commands are refused. A directory
-must be owned by you and not writable by other users on Unix.
+your account home, unsafe links and unrelated commands are refused. Every directory from the account home to the destination must be owned by you and not writable by other users on Unix. Windows validates owner/DACL permissions, allowing writes only by the account, SYSTEM or Administrators. Reparse points and complex unsupported access rules fail closed.
 
-The operation publishes native command launchers and one activation receipt.
+The operation publishes native command launchers and one activation receipt. Unix publication is relative to opened, no-follow directory descriptors; Windows pins all directory ancestors against renaming. Unix launchers replace themselves with the CLI so PID, signals and terminal job control remain intact.
 The launchers select only the complete validated bundle; Linux provider/helper
 binaries remain adjacent inside it. No shell wrapper is used, so spaces, Unicode
 paths and arguments do not undergo shell interpolation. Add the displayed
@@ -90,9 +94,9 @@ a narrow desktop window still does.
 Kernel locks release on process death. An interrupted first activation can leave
 inactive launcher files or uniquely named staging files; rerunning enablement
 accepts only byte-identical launchers and never treats a stage as authority.
-Recovery does not execute or delete unrelated files. Retained ABI-1 launchers
-are compatible with newer component versions; a future launcher ABI requires a
-separately qualified migration.
+Recovery does not execute or delete unrelated files. Retained ABI-1 launchers are compatible with newer component versions on the same architecture. Retention requires either byte identity with the current bundled launcher or full validation of the recorded original bundle/manifest and its launcher payload hash; a receipt alone cannot bless a discovered executable. Keep that original proof bundle if retaining its different launcher bytes. If it is missing or damaged, preserve the current setup and enable a fresh user folder. An architecture change requires a fresh user command directory, preserving the previous setup. A future launcher ABI requires a separately qualified migration. Lost executable permissions are repaired by replacing only the verified managed directory entry; permissions of unrelated hard links are never changed.
+
+If the active command setup is malformed but the saved previous setup and managed launchers validate, explicit Repair retains the unexplained bytes in a uniquely named `.vaultwarden-quarantine-*` file and recovers safely. Without a valid previous setup, preserve the folder and enable a new empty user folder; the error states this recovery path. Payloads, final modes and directory entries are synchronized before activation. If the final durability confirmation fails after switching, Settings reports that the new setup is active but storage durability is uncertain, rather than falsely claiming the old setup remains selected.
 
 ## Reproducible isolated verification
 
@@ -118,9 +122,6 @@ processes use production integrity/signature validation. No production vault,
 trust store, installed app or service is touched.
 
 `source-before.json` and `source-after.json` preserve exact porcelain status,
-tracked diffs, all tracked/untracked input paths and hashes. Packaging refuses
+tracked diffs, all tracked/untracked input paths, file/link kinds, modes and hashes. Packaging refuses
 if any source input changes during build, recording `source-changed-paths.json`.
-The historic PR #52 Windows `source_dirty=true` artifact did not retain paths;
-it cannot establish a cause. A matching instrumented Windows run must identify
-and explain it before clean provenance is claimed. Never force the flag false
-or broadly ignore files to make the report clean.
+The historic PR #52 Windows artifact did not retain changed paths. Instrumented Windows CI run **40867575316**, job **123426118530**, on this slice's first commit reproduced the report and refused packaging. Exactly seven Flutter-generated registrant/CMake files changed from checkout CRLF bytes to generator LF bytes. Each before hash equals the committed LF bytes converted to CRLF; each after hash equals the exact committed LF bytes. Those seven LF hashes also match PR #52 commit `93431e6460f5a73c1d0f2e8d8fd087bade4e2f54`, so the reproduction uses the exact historical inputs rather than inferring a cause from the old boolean alone. Git's normalized diff was empty despite seven modified status entries. The narrow `.gitattributes` rules fix checkout normalization for those exact seven files only. A regression checks `core.autocrlf=true` checkout and regeneration without source drift. Final matching Windows CI must still show clean provenance; no flag is forced false and no files are discarded or ignored.

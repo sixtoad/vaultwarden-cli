@@ -6,8 +6,10 @@ import importlib.util
 import json
 import os
 import platform as host_platform
+import plistlib
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tomllib
@@ -30,7 +32,12 @@ def provenance(repo):
             continue
         name = os.fsdecode(raw)
         path = repo / name
-        inputs[name] = artifact.digest(path) if path.is_file() else None
+        if path.is_symlink():
+            inputs[name] = {'kind': 'symlink', 'mode': stat.S_IMODE(path.lstat().st_mode), 'target': os.readlink(path)}
+        elif path.is_file():
+            inputs[name] = {'kind': 'file', 'mode': stat.S_IMODE(path.stat().st_mode), 'sha256': artifact.digest(path)}
+        else:
+            inputs[name] = None
     status = git(repo, 'status', '--porcelain=v1', '-z')
     return {
         'revision': git(repo, 'rev-parse', 'HEAD').decode().strip(),
@@ -59,8 +66,30 @@ def build_commands(repo, platform):
     if platform == 'linux':
         commands += ['vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']
     subprocess.run(['cargo', 'build', '--release', '--locked', *sum((['--bin', name] for name in commands), [])], cwd=repo, env=environment, check=True)
-    subprocess.run(['cargo', 'build', '--release', '--locked', '--manifest-path', str(repo / 'companion/rust/Cargo.toml'), '--bin', 'companion-command', '--target-dir', str(repo / 'companion/rust/target')], cwd=repo, env=environment, check=True)
+    subprocess.run(['cargo', 'build', '--release', '--locked', '--manifest-path', str(repo / 'companion/rust/Cargo.toml'), '--bin', 'companion-command', '--target-dir', str(repo / 'companion/rust/target/command-launcher')], cwd=repo, env=environment, check=True)
     return commands
+
+
+def build_app(repo, platform, evidence):
+    environment = dict(os.environ)
+    if platform == 'macos':
+        # Flutter defaults to a universal app. Its commands are host-native, so
+        # make the app's launch architecture coherent with the whole package.
+        architecture = {'aarch64': 'arm64', 'x86_64': 'x86_64'}.get(host_platform.machine(), host_platform.machine())
+        if architecture not in ('arm64', 'x86_64'):
+            raise ValueError('unsupported macOS architecture')
+        lines = []
+        previous = environment.get('XCODE_XCCONFIG_FILE')
+        if previous:
+            previous = str(Path(previous).resolve())
+            if any(c in previous for c in '\n\r"'):
+                raise ValueError('unsafe Xcode configuration path')
+            lines.append(f'#include "{previous}"')
+        lines += [f'ARCHS = {architecture}', 'ONLY_ACTIVE_ARCH = YES']
+        config = evidence / 'desktop-architecture.xcconfig'
+        config.write_text('\n'.join(lines) + '\n')
+        environment['XCODE_XCCONFIG_FILE'] = str(config)
+    subprocess.run(['flutter', 'build', platform, '--release', '--target', 'lib/main.dart'], cwd=repo / 'companion', env=environment, check=True)
 
 
 def populate(repo, root, platform, source):
@@ -71,11 +100,16 @@ def populate(repo, root, platform, source):
     cargo_target = Path(os.environ.get('CARGO_TARGET_DIR', str(repo / 'target')))
     for command in commands:
         shutil.copy2(cargo_target / 'release' / (command + suffix), command_dir / (command + suffix))
-    shutil.copy2(repo / 'companion/rust/target/release' / ('companion-command' + suffix), command_dir / ('companion-command' + suffix))
+    shutil.copy2(repo / 'companion/rust/target/command-launcher/release' / ('companion-command' + suffix), command_dir / ('companion-command' + suffix))
     if platform == 'macos':
         signing = subprocess.run(['/usr/bin/codesign', '-dv', str(root)], capture_output=True, text=True, check=True)
         if 'Signature=adhoc' not in signing.stderr:
             raise ValueError('Development bundler refuses to replace a distribution signature; use the publisher signing pipeline')
+        expected_arch = {'aarch64': 'arm64'}.get(host_platform.machine(), host_platform.machine())
+        for executable in [root / 'Contents/MacOS/companion_slice', *command_dir.iterdir()]:
+            actual = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
+            if actual != [expected_arch]:
+                raise ValueError(f'Application/command architecture mismatch: {executable}: {actual}; expected {expected_arch}')
         for command in command_dir.iterdir():
             subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(command)], check=True)
     app = {'macos': 'Contents/MacOS/companion_slice', 'windows': 'companion_slice.exe', 'linux': 'companion_slice'}[platform]
@@ -114,8 +148,17 @@ def populate(repo, root, platform, source):
         # is signed before manifest hashing; only the outer app is resealed.
         subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=identifier,entitlements,flags,runtime', str(root)], check=True)
         subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(root)], check=True)
+        verify_macos_entitlements(root)
     verify(root, manifest)
     return manifest
+
+
+def verify_macos_entitlements(root):
+    result = subprocess.run(['/usr/bin/codesign', '-d', '--entitlements', ':-', str(root)], capture_output=True, check=True)
+    entitlements = plistlib.loads(result.stdout)
+    for key in ['com.apple.security.app-sandbox', 'com.apple.security.files.user-selected.read-write', 'com.apple.security.files.user-selected.executable']:
+        if entitlements.get(key) is not True:
+            raise ValueError('Missing required sandbox/user-selected executable entitlement: ' + key)
 
 
 def verify(root, manifest):
@@ -133,7 +176,7 @@ def verify(root, manifest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['before', 'commands', 'package'])
+    parser.add_argument('action', choices=['before', 'commands', 'app', 'package'])
     parser.add_argument('platform', choices=['macos', 'windows', 'linux'])
     parser.add_argument('evidence', type=Path)
     args = parser.parse_args()
@@ -141,6 +184,8 @@ def main():
     evidence = args.evidence.resolve()
     if args.action == 'before':
         checkpoint(repo, evidence, 'before')
+    elif args.action == 'app':
+        build_app(repo, args.platform, evidence)
     elif args.action == 'commands':
         build_commands(repo, args.platform)
     else:

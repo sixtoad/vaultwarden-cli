@@ -30,8 +30,8 @@ class MainFlutterWindow: NSWindow {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { result(nil); return }
-        // NSOpenPanel grants sandbox access to this user-selected directory.
-        _ = url.startAccessingSecurityScopedResource()
+        // NSOpenPanel starts access to the user-selected directory.
+        // releaseCommandDirectory balances that grant after the Rust operation.
         self.commandDirectory = url
         result(url.path)
       case "releaseCommandDirectory":

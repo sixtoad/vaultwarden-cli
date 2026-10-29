@@ -68,6 +68,6 @@ if [[ "$target" == macos ]]; then
   flutter test integration_test/bridge_test.dart -d macos
 fi
 # Never publish the self-exiting smoke harness as the operator's application.
-flutter build "$target" --release --target lib/main.dart
+python3 "$repo/scripts/desktop-bundle.py" app "$target" "$evidence"
 python3 "$repo/scripts/desktop-bundle.py" commands "$target" "$evidence"
 python3 "$repo/scripts/desktop-bundle.py" package "$target" "$evidence"
