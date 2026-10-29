@@ -1,0 +1,11 @@
+--- a/src/adapters/supervisor/manager.rs
++++ b/src/adapters/supervisor/manager.rs
+@@ -721,7 +721,7 @@
+         property("Slice", "app.slice".to_owned()),
+         property("Type", "exec".to_owned()),
+         property("ExitType", "cgroup".to_owned()),
+-        property("KillMode", "none".to_owned()),
++        property("KillMode", "control-group".to_owned()),
+         property("CollectMode", "inactive-or-failed".to_owned()),
+         property("SendSIGKILL", false),
+         property("Restart", "no".to_owned()),

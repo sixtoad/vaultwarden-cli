@@ -395,6 +395,7 @@ fn signed_status_projection_is_closed_and_validates_every_lifecycle() {
         AgentFailure::ExecutionRejected,
         AgentFailure::ExecutionNonzero,
         AgentFailure::ExecutionSignaled,
+        AgentFailure::ObservationLost,
     ] {
         states.push(AgentStatus::Failed { category });
     }

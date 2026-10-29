@@ -205,6 +205,14 @@ fn companion_history_projection_omits_internal_fields_preserves_unknown_time_and
         })
     );
     assert!(!response.body.contains("SENTINEL"));
+    event.outcome = crate::access::history::HistoryOutcome::ObservationLost;
+    event.at_unix_seconds = Some(1700000000);
+    let observed = Response::history(std::slice::from_ref(&event));
+    assert_eq!(observed.status, 200);
+    let observed: serde_json::Value = serde_json::from_str(&observed.body).unwrap();
+    assert_eq!(observed["events"][0]["outcome"], "observation_lost");
+    assert_eq!(observed["events"][0].as_object().unwrap().len(), 5);
+    assert!(!observed.to_string().contains("SENTINEL"));
     assert_eq!(Response::history(&vec![event.clone(); 201]).status, 503);
     // Defense in depth in the shared serializer, independent of canonical field
     // validation. Never send a partial list if the byte budget is exceeded.

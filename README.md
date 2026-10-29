@@ -25,6 +25,14 @@ Additionally, this uses the system certificate store for TLS verification, not a
 See [secret storage](docs/secret-storage.md) for trusted imports, protected producer
 policies, namespace bindings, selected reads, and uncertain-write recovery.
 
+See [secret access and execution ownership](docs/secret-access-boundary.md) for
+the accepted product boundary: this CLI controls secret delivery; consumer
+execution and sandbox management are outside its scope. Approval does not
+authorize the CLI to stop consumer programs. Protected SSH uses a request-specific
+agent with the private key held in memory. Removing access prevents new key use;
+it does not close established SSH connections. The document explains delivery,
+resource cleanup and upgrade limitations.
+
 ## Installation
 
 ### From GitHub Releases

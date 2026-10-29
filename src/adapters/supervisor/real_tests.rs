@@ -207,8 +207,15 @@ fn provider_harness() {
         let second = manager.owned(&supervisor.config, &lease).unwrap().unwrap();
         assert_eq!(first.pid, second.pid);
         assert_eq!(first.invocation, second.invocation);
-        manager.stop_reap(&supervisor.config, &lease).unwrap();
-        manager.stop_reap(&supervisor.config, &lease).unwrap();
+        drop(_listener);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !matches!(manager.unused(&supervisor.config, &lease), Ok(true)) {
+            assert!(
+                Instant::now() < deadline,
+                "unreleased helper should finish without termination"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
         supervisor.config.forget(&lease).unwrap();
         finish(&root, b"collision-refused-and-reaped");
         return;
@@ -245,11 +252,11 @@ fn provider_harness() {
             "fault-missing" => FAULT.with(|f| f.set(Fault::Missing)),
             "fault-job" => FAULT.with(|f| f.set(Fault::Job)),
             "fault-exec" => FAULT.with(|f| f.set(Fault::Exec)),
-            "fault-monitor" | "fault-stop" => {
+            "fault-monitor" | "fault-observe" => {
                 let fault = if mode == "fault-monitor" {
                     Fault::Monitor
                 } else {
-                    Fault::Stop
+                    Fault::Observe
                 };
                 PHASE_HOOK.with(|hook| {
                     *hook.borrow_mut() = Some(Box::new(move |phase| {
@@ -262,7 +269,7 @@ fn provider_harness() {
             _ => panic!("unknown fault"),
         }
     }
-    if mode == "fault-stop" {
+    if mode == "fault-observe" {
         std::fs::write(root.join("stop-after-exec"), b"stop").unwrap();
     }
     let image = root.join("image");
@@ -277,7 +284,7 @@ fn provider_harness() {
         } else if mode == "exit"
             || mode == "helper-environment"
             || mode.starts_with("phase-")
-            || (mode.starts_with("fault-") && mode != "fault-stop")
+            || (mode.starts_with("fault-") && mode != "fault-observe")
         {
             "exit"
         } else {
@@ -330,22 +337,22 @@ fn provider_harness() {
                 ExecutionError::ManagerUnavailable,
                 CleanupEvidence::NotStarted,
             ),
-            "fault-job" | "fault-exec" => {
-                (ExecutionError::ExecutionFailed, CleanupEvidence::Reaped)
+            "fault-job" => (ExecutionError::ExecutionFailed, CleanupEvidence::Reaped),
+            "fault-exec" | "fault-monitor" => {
+                (ExecutionError::ObservationLost, CleanupEvidence::Reaped)
             }
-            "fault-monitor" => (ExecutionError::ManagerUnavailable, CleanupEvidence::Reaped),
-            "fault-stop" => (ExecutionError::CleanupUncertain, CleanupEvidence::Uncertain),
+            "fault-observe" => (ExecutionError::ObservationLost, CleanupEvidence::Detached),
             _ => panic!("unknown fault scenario"),
         };
         assert_eq!(result.outcome, Err(error));
         assert_eq!(result.cleanup, cleanup);
-        if matches!(mode.as_str(), "fault-stop" | "fault-monitor") {
+        if mode == "fault-monitor" {
             assert!(!supervisor.available());
         }
         if mode == "fault-exec" {
             assert!(!root.join("started").exists());
         }
-        if mode == "fault-stop" {
+        if mode == "fault-observe" {
             let leases = supervisor.config.leases().unwrap();
             assert_eq!(leases.len(), 1);
             assert!(
@@ -355,23 +362,43 @@ fn provider_harness() {
         }
         FAULT.with(|f| f.set(Fault::None));
         supervisor.recover().unwrap();
-        assert!(supervisor.config.leases().unwrap().is_empty());
+        assert_eq!(
+            supervisor.config.leases().unwrap().len(),
+            usize::from(mode == "fault-observe")
+        );
         finish(&root, b"failed-closed-and-recovered");
         return;
     }
-    assert_eq!(result.cleanup, CleanupEvidence::Reaped);
+    assert_eq!(
+        result.cleanup,
+        if matches!(mode.as_str(), "cancel" | "orphan" | "helper-crash") {
+            CleanupEvidence::Detached
+        } else {
+            CleanupEvidence::Reaped
+        }
+    );
     if mode == "exit" {
         assert!(
             result.helper_reaped,
             "normal completion carries helper ECHILD evidence"
         );
     }
-    if matches!(mode.as_str(), "exit" | "orphan" | "helper-environment") {
+    if matches!(
+        mode.as_str(),
+        "exit" | "orphan" | "helper-environment" | "phase-exit"
+    ) {
         assert_eq!(result.outcome, Ok(ExecutionOutcome::ExitedZero));
     } else if mode == "helper-failure" {
         assert_eq!(result.outcome, Err(ExecutionError::ExecutionFailed));
     } else {
-        assert_eq!(result.outcome, Err(ExecutionError::Cancelled));
+        assert_eq!(
+            result.outcome,
+            Err(if matches!(mode.as_str(), "cancel" | "helper-crash") {
+                ExecutionError::ObservationLost
+            } else {
+                ExecutionError::Cancelled
+            })
+        );
     }
     if mode.starts_with("phase-") && mode != "phase-exit" {
         assert!(
@@ -427,9 +454,32 @@ fn application_scenario(
         "app-exit" | "app-worker-exit" => "exit",
         "app-nonzero" => "nonzero",
         "app-signal" => "signal",
+        "app-agent-revoke" => "multi-tree",
         _ => "tree",
     };
     let marker = root.join("app-tree-ready").to_str().unwrap().to_owned();
+    let mut credentials = vec![LoginCredentialDraft {
+        namespace: None,
+        item_id: "11111111-1111-1111-1111-111111111111".into(),
+        label: "Synthetic login".into(),
+        use_type: CredentialUse::Login,
+        field_mappings: vec![LoginFieldMapping {
+            field: LoginField::Password,
+            environment: "LOGIN_TOKEN".into(),
+        }],
+    }];
+    if mode == "app-agent-revoke" {
+        credentials.push(LoginCredentialDraft {
+            namespace: None,
+            item_id: "22222222-2222-2222-2222-222222222222".into(),
+            label: "Second synthetic login".into(),
+            use_type: CredentialUse::Login,
+            field_mappings: vec![LoginFieldMapping {
+                field: LoginField::Password,
+                environment: "LOGIN_TOKEN_TWO".into(),
+            }],
+        });
+    }
     f.app
         .activate_operation(OperationPolicyDraft {
             create: None,
@@ -451,16 +501,7 @@ fn application_scenario(
                     },
                 },
             ],
-            credentials: vec![LoginCredentialDraft {
-                namespace: None,
-                item_id: "11111111-1111-1111-1111-111111111111".into(),
-                label: "Synthetic login".into(),
-                use_type: CredentialUse::Login,
-                field_mappings: vec![LoginFieldMapping {
-                    field: LoginField::Password,
-                    environment: "LOGIN_TOKEN".into(),
-                }],
-            }],
+            credentials,
         })
         .unwrap();
     let owner = f.app.human_owner();
@@ -662,7 +703,10 @@ fn scoped_agent_revocation(
                 DirectSubmission {
                     operation: "deploy".into(),
                     revision: None,
-                    values: vec!["tree".into(), root.join(marker).to_str().unwrap().into()],
+                    values: vec![
+                        "multi-tree".into(),
+                        root.join(marker).to_str().unwrap().into(),
+                    ],
                 },
                 &Launcher::default(),
             )
@@ -722,7 +766,7 @@ fn scoped_agent_revocation(
     assert_eq!(
         f.app.direct_status(human, &a_id).unwrap(),
         DirectStatus::Failed {
-            reason: DirectFailure::ExecutionUnavailable,
+            reason: DirectFailure::ObservationLost,
         }
     );
     assert_eq!(
@@ -735,9 +779,9 @@ fn scoped_agent_revocation(
         serde_json::to_vec(&leases).unwrap(),
     )
     .unwrap();
-    std::fs::write(root.join("agent-revoked"), b"revoked-after-cleanup").unwrap();
-    // The independent integration process must observe A empty and B populated
-    // before we permit B cleanup or provider exit to change that observation.
+    std::fs::write(root.join("agent-revoked"), b"future-access-revoked").unwrap();
+    // The independent integration process must observe both released consumers alive
+    // before ending its fixture. Neither scoped revocation can terminate a consumer.
     let deadline = Instant::now() + Duration::from_secs(15);
     while !root.join("scoped-observation-complete").exists() {
         assert!(
@@ -928,7 +972,24 @@ fn ssh_scenario(root: &std::path::Path, mode: &str, supervisor: &SystemdProcessS
         .prepare_ssh(&mut prepared, &root.join("ssh"), &ssh)
         .unwrap();
     material.install_key(SensitiveString::new(key)).unwrap();
-    let request = std::fs::read_dir(root.join("ssh/requests"))
+    let socket = prepared
+        .descriptor_and_arguments()
+        .1
+        .iter()
+        .find_map(|arg| {
+            arg.to_str()
+                .ok()?
+                .strip_prefix("IdentityAgent=\"")?
+                .strip_suffix('"')
+        })
+        .map(std::path::PathBuf::from)
+        .unwrap();
+    std::fs::write(
+        root.join("agent-path"),
+        socket.as_os_str().as_encoded_bytes(),
+    )
+    .unwrap();
+    let request = std::fs::read_dir(root.join("ssh/agents"))
         .unwrap()
         .next()
         .unwrap()
@@ -939,15 +1000,7 @@ fn ssh_scenario(root: &std::path::Path, mode: &str, supervisor: &SystemdProcessS
         request.as_os_str().as_encoded_bytes(),
     )
     .unwrap();
-    if mode == "ssh-uncertain" {
-        PHASE_HOOK.with(|hook| {
-            *hook.borrow_mut() = Some(Box::new(|phase| {
-                if phase == LaunchPhase::NaturalExit {
-                    manager::FAULT.with(|f| f.set(manager::Fault::Stop));
-                }
-            }));
-        });
-    }
+    material.mark_in_use().unwrap();
     let report = supervisor.supervise_controlled(
         prepared,
         ChildEnvironment::from_mappings([]).unwrap(),
@@ -958,82 +1011,125 @@ fn ssh_scenario(root: &std::path::Path, mode: &str, supervisor: &SystemdProcessS
         "native child must verify stdout and stderr both resolve to /dev/null"
     );
     assert!(
-        root.join("ssh-material-readable").exists(),
-        "native descendant must read both request files"
+        root.join("ssh-agent-ready").exists(),
+        "approved main process must obtain its public identity through the agent"
     );
-    if mode == "ssh-uncertain" {
-        assert_eq!(report.cleanup, CleanupEvidence::Uncertain);
-        assert!(material.finalize(report.cleanup).is_err());
-        assert!(request.join("identity").exists());
-        assert!(crate::adapters::ssh_material::prepare(&root.join("ssh"), &ssh).is_err());
+    if mode == "ssh-detached-recovery" {
+        assert_eq!(report.cleanup, CleanupEvidence::Detached);
+        material.finalize(report.cleanup).unwrap();
+        assert!(!request.exists());
+        let (mut next, _, _) =
+            crate::adapters::ssh_material::prepare(&root.join("ssh"), &ssh).unwrap();
+        use crate::access::ports::SshMaterial;
+        // Cleanup fault injection may retain public files, but never blocks admission.
+        let _public_cleanup = next.finalize(CleanupEvidence::NotStarted);
         let leases = supervisor.config.leases().unwrap();
         assert_eq!(leases.len(), 1);
-        assert!(
-            !manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap(),
-            "failed reap must leave real containment alive for this recovery-order oracle"
-        );
-        let identity = std::fs::read(request.join("identity")).unwrap();
-        let pin = std::fs::read(request.join("known_hosts")).unwrap();
-        // A fresh composition follows the actual provider startup writer-lock path.
         let restarted = SystemdProcessSupervisor {
             config: supervisor.config.clone(),
             healthy: AtomicBool::new(true),
             material_root: Some(root.join("ssh")),
         };
-        let recovery_state = root.join("recovery-provider");
-        let failed = crate::access::provider::Provider::start_with_cleanup(&recovery_state, || {
-            restarted.recover().map_err(|_error| ())
-        });
-        assert!(
-            failed.is_err(),
-            "startup cannot admit while containment recovery fails"
-        );
+        let recovered = crate::access::provider::Provider::start_with_cleanup(
+            root.join("recovery-provider"),
+            || restarted.recover().map_err(|_error| ()),
+        )
+        .unwrap();
         assert!(!manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap());
-        assert_eq!(
-            std::fs::read(request.join("identity")).unwrap(),
-            identity,
-            "failed startup must not remove live descendants' identity"
+        assert!(
+            std::os::unix::net::UnixStream::connect(&socket).is_err(),
+            "detachment must close signing authority"
         );
-        assert_eq!(
-            std::fs::read(request.join("known_hosts")).unwrap(),
-            pin,
-            "failed startup must retain connection-time pin"
+        assert!(
+            !request.exists(),
+            "public resources can be removed without stopping consumers"
         );
         assert_eq!(restarted.config.leases().unwrap().len(), 1);
-        manager::FAULT.with(|f| f.set(manager::Fault::None));
-        let recovered =
-            crate::access::provider::Provider::start_with_cleanup(&recovery_state, || {
-                restarted.recover().map_err(|_error| ())
-            })
-            .unwrap();
-        assert!(manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap());
-        assert!(!request.exists());
+        assert!(
+            restarted.available(),
+            "retained public SSH resources must not disable delivery"
+        );
         drop(recovered);
     } else if mode == "ssh-cleanup-failure" {
         assert_eq!(report.cleanup, CleanupEvidence::Reaped);
         crate::adapters::ssh_material::TEST_FAIL_REMOVE.with(|fail| fail.set(true));
         assert!(material.finalize(report.cleanup).is_err());
-        assert!(request.join("identity").exists());
-        assert!(crate::adapters::ssh_material::prepare(&root.join("ssh"), &ssh).is_err());
-        assert!(supervisor.recover().is_err());
-        assert!(request.join("identity").exists());
-        crate::adapters::ssh_material::TEST_FAIL_REMOVE.with(|fail| fail.set(false));
+        assert!(!request.join("identity").exists());
+        let (mut next, _, _) =
+            crate::adapters::ssh_material::prepare(&root.join("ssh"), &ssh).unwrap();
+        use crate::access::ports::SshMaterial;
+        // Cleanup fault injection may retain public files, but never blocks admission.
+        let _public_cleanup = next.finalize(CleanupEvidence::NotStarted);
         supervisor.recover().unwrap();
-        assert!(!request.exists());
-    } else {
-        assert_eq!(report.cleanup, CleanupEvidence::Reaped);
+        assert!(!request.join("identity").exists());
+        crate::adapters::ssh_material::TEST_FAIL_REMOVE.with(|fail| fail.set(false));
         material.finalize(report.cleanup).unwrap();
         assert!(!request.exists());
-        if mode == "ssh-exit" {
-            assert_eq!(
-                report.outcome,
-                Ok(crate::access::ports::ExecutionOutcome::ExitedZero)
-            );
-        } else {
-            assert_eq!(report.outcome, Err(ExecutionError::Cancelled));
-        }
+    } else {
+        assert_eq!(
+            report.cleanup,
+            if mode == "ssh-clean-exit" {
+                CleanupEvidence::Reaped
+            } else {
+                CleanupEvidence::Detached
+            }
+        );
+        material.finalize(report.cleanup).unwrap();
+        assert!(!request.exists());
+        assert_eq!(
+            report.outcome,
+            if matches!(mode, "ssh-exit" | "ssh-clean-exit") {
+                Ok(ExecutionOutcome::ExitedZero)
+            } else {
+                Err(ExecutionError::ObservationLost)
+            }
+        );
     }
-    finish(root, b"ssh-contained-material-reaped");
+    assert!(std::os::unix::net::UnixStream::connect(&socket).is_err());
+    finish(root, b"ssh-agent-authority-ended-consumers-independent");
+}
+
+/// Public synthetic server proof and userauth request; no private key enters these files.
+fn prepare_agent_exchange(root: &std::path::Path, key: &str) -> Vec<u8> {
+    use signature::Signer;
+    use ssh_key::encoding::Encode;
+    fn field(out: &mut Vec<u8>, value: &[u8]) {
+        out.extend_from_slice(&(value.len() as u32).to_be_bytes());
+        out.extend_from_slice(value);
+    }
+    fn packet(value: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        field(&mut out, value);
+        out
+    }
+    let key = ssh_key::PrivateKey::from_openssh(key).unwrap();
+    let public = key.public_key().to_bytes().unwrap();
+    let session = [17u8; 32];
+    let signature: ssh_key::Signature = key.try_sign(&session).unwrap();
+    let mut encoded = Vec::new();
+    signature.encode(&mut encoded).unwrap();
+    let mut binding = vec![27];
+    field(&mut binding, b"session-bind@openssh.com");
+    field(&mut binding, &public);
+    field(&mut binding, &session);
+    field(&mut binding, &encoded);
+    binding.push(0);
+    std::fs::write(root.join("ssh-bind-request"), packet(&binding)).unwrap();
+    let mut data = Vec::new();
+    field(&mut data, &session);
+    data.push(50);
+    field(&mut data, b"backup");
+    field(&mut data, b"ssh-connection");
+    field(&mut data, b"publickey");
+    data.push(1);
+    field(&mut data, b"ssh-ed25519");
+    field(&mut data, &public);
+    let mut request = vec![13];
+    field(&mut request, &public);
+    field(&mut request, &data);
+    request.extend_from_slice(&0u32.to_be_bytes());
+    std::fs::write(root.join("ssh-sign-request"), packet(&request)).unwrap();
+    data
 }
 
 fn ssh_application_scenario(
@@ -1079,6 +1175,11 @@ fn ssh_application_scenario(
     std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
     let (mut ssh, key) = crate::adapters::ssh_material::fixture(root);
     ssh.destination.resource_path = format!("/srv/{}", mode.strip_prefix("app-").unwrap());
+    let signing_data = if mode == "app-ssh-nonzero" {
+        Some(prepare_agent_exchange(root, &key))
+    } else {
+        None
+    };
     let mut draft = test_ssh_draft();
     draft.ssh = Some(ssh);
     let revision = f.app.activate_operation(draft).unwrap();
@@ -1124,49 +1225,79 @@ fn ssh_application_scenario(
     });
     if matches!(mode, "app-ssh-lock" | "app-ssh-cancel") {
         let deadline = Instant::now() + Duration::from_secs(10);
-        while !root.join("ssh-material-readable").exists()
+        while !root.join("ssh-agent-ready").exists()
             || f.app.direct_status(owner, &id).unwrap() != DirectStatus::Running
         {
             assert!(
                 Instant::now() < deadline,
-                "SSH application must reach a live material-reading descendant"
+                "SSH application must discover its public identity and remain running"
             );
             std::thread::sleep(Duration::from_millis(20));
         }
         let leases = supervisor.config.leases().unwrap();
         assert_eq!(leases.len(), 1);
         assert!(!manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap());
-        let material = std::fs::read_dir(root.join("ssh/requests"))
+        let material = std::fs::read_dir(root.join("ssh/agents"))
             .unwrap()
             .next()
             .unwrap()
             .unwrap()
             .path();
-        assert!(material.join("identity").exists());
+        assert!(!material.join("identity").exists());
+        let socket =
+            std::path::PathBuf::from(std::fs::read_to_string(root.join("agent-path")).unwrap());
+        assert!(socket.exists());
         if mode == "app-ssh-lock" {
             f.app.lock().unwrap();
         } else {
             f.app.cancel_execution(owner, &id).unwrap();
         }
         assert!(
-            manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap(),
-            "authority-loss acknowledgment must wait for all descendants"
+            !manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap(),
+            "authority-loss acknowledgment must preserve released descendants"
         );
+        assert!(std::os::unix::net::UnixStream::connect(&socket).is_err());
         assert!(
-            !material.exists(),
-            "authority-loss acknowledgment must wait for private material cleanup"
+            !material.join("identity").exists(),
+            "managed agent must never create a private-key file"
         );
+        if mode == "app-ssh-cancel" {
+            supervisor.recover().unwrap();
+            assert!(
+                !manager::proc_empty(std::path::Path::new("/proc"), &leases[0].cgroup).unwrap()
+            );
+            assert!(!material.join("identity").exists());
+        }
     }
     assert_eq!(work.join().unwrap(), Err(DirectRequestError::Unavailable));
+    for entry in std::fs::read_dir(root.join("ssh/agents")).unwrap() {
+        let path = entry.unwrap().path();
+        assert!(!path.join("identity").exists());
+    }
     assert!(
         root.join("ssh-output-sinks-verified").exists(),
         "native child must verify stdout and stderr both resolve to /dev/null"
     );
-    assert!(root.join("ssh-material-readable").exists());
+    assert!(root.join("ssh-agent-ready").exists());
+    if let Some(data) = signing_data {
+        use signature::Verifier;
+        use ssh_key::encoding::Decode;
+        let response = std::fs::read(root.join("ssh-sign-response")).unwrap();
+        assert_eq!(
+            u32::from_be_bytes(response[..4].try_into().unwrap()) as usize,
+            response.len() - 4
+        );
+        assert_eq!(response[4], 14);
+        let length = u32::from_be_bytes(response[5..9].try_into().unwrap()) as usize;
+        assert_eq!(length, response.len() - 9);
+        let mut encoded = &response[9..];
+        let signature = ssh_key::Signature::decode(&mut encoded).unwrap();
+        assert!(encoded.is_empty());
+        let parsed = ssh_key::PrivateKey::from_openssh(&key).unwrap();
+        Verifier::verify(parsed.public_key(), &data, &signature).unwrap();
+    }
     assert_eq!(
-        std::fs::read_dir(root.join("ssh/requests"))
-            .unwrap()
-            .count(),
+        std::fs::read_dir(root.join("ssh/agents")).unwrap().count(),
         0
     );
     let status = f.app.direct_status(owner, &id).unwrap();

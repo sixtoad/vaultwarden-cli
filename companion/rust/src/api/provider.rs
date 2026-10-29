@@ -91,6 +91,7 @@ pub enum ProviderHistoryOutcome {
     Recovered,
     LegacyUnknown,
     Reconciled,
+    ObservationLost,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

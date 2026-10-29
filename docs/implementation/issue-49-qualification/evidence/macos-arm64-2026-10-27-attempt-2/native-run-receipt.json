@@ -1,0 +1,8 @@
+{
+  "exit_code": 2,
+  "finished_utc": "2026-10-27T15:36:28.729908+00:00",
+  "reason_for_new_attempt": "diagnosed-python39-kqueue-compatibility-and-failure-accounting-correction",
+  "source_manifest_sha256": "66c08ffd5deb9b0033c97bab66f6b4225b319c2e3d1d9984a761580bf6047d4a",
+  "source_unchanged": true,
+  "started_utc": "2026-10-27T15:36:24.596117+00:00"
+}

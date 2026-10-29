@@ -1,0 +1,25 @@
+{
+  "architecture": "arm64",
+  "cargo_version": "cargo 1.99.1 (5f94df478 2026-08-27)",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--test",
+    "unsupported_provider_platform"
+  ],
+  "exit_code": 101,
+  "finished_utc": "2026-10-27T15:34:12.996655+00:00",
+  "os_build": "26A434",
+  "os_version": "27.0.1",
+  "outcome": "unavailable",
+  "qualification_source_hashes_sha256": "3dfdb970fe044ee7eca3869f859665ea521bb5350ff82034d30fa6fa2b3291c6",
+  "reason": "offline-dependencies-unavailable",
+  "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "source_manifest_sha256_after": "b8b9979610a8fdebc3e35d641b0f1235ed2f54bd404ec0eecd3573389bce498d",
+  "source_manifest_sha256_before": "b8b9979610a8fdebc3e35d641b0f1235ed2f54bd404ec0eecd3573389bce498d",
+  "source_revision": null,
+  "source_unchanged": true,
+  "started_utc": "2026-10-27T15:34:12.808932+00:00",
+  "tests_executed": 0
+}

@@ -42,6 +42,8 @@ pub(crate) struct PreparedExecutable {
     cwd: Option<std::fs::File>,
     #[cfg(target_os = "linux")]
     producer: Option<std::fs::File>,
+    #[cfg(target_os = "linux")]
+    pub(crate) ssh_agent: Option<std::rc::Rc<std::cell::RefCell<super::ssh_agent::Agent>>>,
 }
 impl fmt::Debug for PreparedExecutable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -101,6 +103,7 @@ impl ProtectedExecution for LinuxExecutablePreparer {
             Ok(argv) => {
                 prepared.argv = argv;
                 prepared.cwd = Some(cwd);
+                prepared.ssh_agent = Some(material.agent.clone());
                 Ok(Box::new(material))
             }
             Err(error) => {
@@ -524,6 +527,7 @@ mod linux {
             argv,
             cwd: None,
             producer: None,
+            ssh_agent: None,
         })
     }
 

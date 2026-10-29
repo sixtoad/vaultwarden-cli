@@ -1,0 +1,9 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 08s
+     Running unittests src/lib.rs (target/debug/deps/vaultwarden_cli-cb3f0780aa2a6d54)
+
+running 1 test
+test access::direct_request_tests::protected_create_final_post_serializes_both_cancellation_orderings ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 776 filtered out; finished in 1.07s
+

@@ -54,9 +54,10 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   in these surfaces. Advanced setup cannot satisfy guided enrollment acceptance.
 - [ ] **Trusted-device management:** the remote companion command schema has no
   device listing/revocation API. Show only known local configuration initially.
-  Revocation requirements must be derived separately for approver certificates
-  and requester-agent identities, including active-work termination/invalidation;
-  never inherit the prototype's blanket statement that work can continue.
+  Revocation requirements must distinguish approver certificates from requester-agent
+  identities and prevent future unauthorized access. Consumer execution remains with
+  its execution owner: lock or access removal must not terminate consumer programs
+  or claim to recall delivered secrets. See [the governing boundary](../secret-access-boundary.md).
 - [x] **Remote activity:** authenticated companion history now uses the canonical
   durable store (50 default, 200 maximum), with a closed display-only projection.
   Activity fetches up to 50 events, preserves canonical ordering and unknown legacy
@@ -245,3 +246,9 @@ Verification for the final revision is recorded in the PR and the accompanying
 [Activity evidence document](issue-50-activity-evidence.md). Physical lifecycle/assistive-technology checks and
 native phone support remain separate requirements; synthetic responsive captures
 do not establish hardware acceptance.
+
+Current-main integration: PR #55’s canonical `observation_lost` history outcome is
+accepted explicitly and displayed as “Result unknown.” It conveys no consumer
+termination, secret recall, completion or decision authority. Older clients that
+lack this closed enum member fail closed as unavailable; upgrade provider and client
+together. The version and five-field display projection remain unchanged.

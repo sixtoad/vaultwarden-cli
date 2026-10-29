@@ -26,6 +26,7 @@ pub enum HistoryOutcome {
     Succeeded,
     ExecutionNonzero,
     ExecutionSignaled,
+    ObservationLost,
     ExecutionRejected,
     ExecutionUnavailable,
     Invalidated,
@@ -214,8 +215,15 @@ impl HistoryEvent {
                             S::Expired
                                 | S::Failed {
                                     reason: DirectFailure::ExecutionUnavailable
+                                        | DirectFailure::ObservationLost
                                 }
                         )
+                    )
+                    | (
+                        O::ObservationLost,
+                        Some(S::Failed {
+                            reason: DirectFailure::ObservationLost
+                        })
                     )
                     | (O::LegacyUnknown, _)
             )
@@ -287,6 +295,8 @@ pub(crate) fn outcome(
             DirectFailure::ExecutionRejected => O::ExecutionRejected,
             DirectFailure::ExecutionNonzero => O::ExecutionNonzero,
             DirectFailure::ExecutionSignaled => O::ExecutionSignaled,
+            DirectFailure::ObservationLost if decision == D::Recovered => O::Recovered,
+            DirectFailure::ObservationLost => O::ObservationLost,
         },
         S::Expired => match decision {
             D::ReviewUnavailable => O::ReviewUnavailable,

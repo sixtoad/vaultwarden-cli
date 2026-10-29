@@ -693,6 +693,7 @@ impl SseDecode for crate::api::provider::ProviderHistoryOutcome {
             12 => crate::api::provider::ProviderHistoryOutcome::Recovered,
             13 => crate::api::provider::ProviderHistoryOutcome::LegacyUnknown,
             14 => crate::api::provider::ProviderHistoryOutcome::Reconciled,
+            15 => crate::api::provider::ProviderHistoryOutcome::ObservationLost,
             _ => unreachable!("Invalid variant for ProviderHistoryOutcome: {}", inner),
         };
     }
@@ -1144,6 +1145,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderHistoryOutc
             Self::Recovered => 12.into_dart(),
             Self::LegacyUnknown => 13.into_dart(),
             Self::Reconciled => 14.into_dart(),
+            Self::ObservationLost => 15.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1603,6 +1605,7 @@ impl SseEncode for crate::api::provider::ProviderHistoryOutcome {
                 crate::api::provider::ProviderHistoryOutcome::Recovered => 12,
                 crate::api::provider::ProviderHistoryOutcome::LegacyUnknown => 13,
                 crate::api::provider::ProviderHistoryOutcome::Reconciled => 14,
+                crate::api::provider::ProviderHistoryOutcome::ObservationLost => 15,
                 _ => {
                     unimplemented!("");
                 }

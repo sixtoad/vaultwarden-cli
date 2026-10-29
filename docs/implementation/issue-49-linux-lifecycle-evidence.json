@@ -1,0 +1,196 @@
+{
+  "baseline_commit": "476bf3f506aad6f52628ad32a6ef34e31172d1ba",
+  "state": "uncommitted working tree; Linux lifecycle migration",
+  "architecture": "x86_64",
+  "source_sha256": {
+    "companion/rust/src/provider/protocol.rs": "e6119e9466b3d72b1f9e647f05ab9255b3e643a7cdf5f6418e73f5141d638122",
+    "src/access/application.rs": "6c47cfcd143871e52f6518147aee567b406a1ce1d595b1fa9b3fc32a4b9c6a53",
+    "src/access/direct_request.rs": "17b31a6beceef1b2358e0d948df22d6fae57dae47f388a69879968536ae41b83",
+    "src/access/direct_request_tests.rs": "6274d99f027e970c13a74dc1dfbad8c4fa00ea21f68d5b0b318bcaba5df78030",
+    "src/access/history.rs": "0011fa79a67aee7a591a0d075896832e1cf806d457bcb38e2708ae3c17ae5e71",
+    "src/access/ports.rs": "a6d1260b6b328f4c12386fe87f2e4b6dde8b44835f15f0e525fe091f29c595f4",
+    "src/access/protocol.rs": "c50d949df24d2cab6d6850b8647724b897f8c5f0e2e4bc35b9617941dba9c716",
+    "src/access/protocol_tests.rs": "6c6c925fbf0a68ad15c6249b6faa80a289e6a656d2fda123466a1ac7d6185568",
+    "src/access/provider.rs": "a6d07846a6edaee8a24050fbe6722530a205286582211008175144c9ab3dafe6",
+    "src/access/provider_store.rs": "e421c076aab553c9ec3f49dd612e49a053a04ddfb37bf4976f7741a6a7162bf4",
+    "src/adapters/human_socket.rs": "8688259ce435d24d1f9070c3be230052d5cbd5187588645b86cc163a5db10a58",
+    "src/adapters/ssh_material.rs": "f93c1359f98f6ea3184e4045cd2429a67e7acec5e1363f4319cb325b9d0cfdc5",
+    "src/adapters/supervisor.rs": "164d2f82207fca90a9f8a685a2578c5be3071a9a23b2960e8711cb4548a3b309",
+    "src/adapters/supervisor/bridge.rs": "a429d155776262a83dc613474e1bcd6a69664232d10889fc73c13a8ceba32790",
+    "src/adapters/supervisor/manager.rs": "6dd1b4452fd2462b1eacbded0da3f2b57678e1534a4b90469b70d7a3bc03bbf1",
+    "src/adapters/supervisor/real_tests.rs": "94a0d8e8d44a233d5526f3ca2f77ef5e2f67a3d2c6845c91ce7bf281f5e5b36d",
+    "src/bin/vw-access.rs": "37e391fe19914ce4f3c533ed91f310d02fd75c6e1b0b1b3cf2d61f6139e05d9b",
+    "systemd/user/vaultwarden-accessd.service": "51c7362a30952cd71ffe8b68b5168bc25abac5a0a89ab39d5e02cdf0d039bf3c",
+    "tests/fixtures/protected-tree.c": "b177083d772fb15b3e09fd342b5c313ce18493e0f5c5b56d8c1694ed48882803",
+    "tests/systemd_supervisor.rs": "d99cdcf685c0a5e1a0468a0a8750e20a9dbcf31587edc61fbd4075e8f8063e1a"
+  },
+  "default_rust_tests": {
+    "passed": 1090,
+    "failed": 0,
+    "ignored": 23
+  },
+  "companion_rust_tests": {
+    "passed": 29,
+    "failed": 0
+  },
+  "systemd_scenarios": [
+    "exit",
+    "orphan",
+    "cancel",
+    "crash",
+    "helper-crash",
+    "collision",
+    "helper-failure",
+    "failed-launch-recovery",
+    "helper-environment",
+    "app-worker-exit",
+    "app-worker-shutdown",
+    "app-exit",
+    "app-nonzero",
+    "app-signal",
+    "app-lock",
+    "app-cancel",
+    "app-revoke",
+    "app-agent-revoke",
+    "app-shutdown",
+    "app-ssh-nonzero",
+    "app-ssh-signal",
+    "app-ssh-lock",
+    "app-ssh-cancel",
+    "ssh-exit",
+    "ssh-clean-exit",
+    "ssh-cancel",
+    "ssh-crash",
+    "ssh-detached-recovery",
+    "ssh-cleanup-failure",
+    "app-deadline",
+    "app-persistence",
+    "phase-job",
+    "phase-helper",
+    "phase-transfer",
+    "phase-release",
+    "phase-exit",
+    "fault-missing",
+    "fault-job",
+    "fault-exec",
+    "fault-monitor",
+    "fault-observe"
+  ],
+  "systemd_integration_tests_passed": 2,
+  "separate_cross_account_ssh_test_passed": true,
+  "fmt": "passed",
+  "clippy_all_targets_deny_warnings": "passed",
+  "mutations": {
+    "source_sha256": {
+      "src/access/application.rs": "96d29d699d0060d2b9369bcb30a3ad07f51f8c71ac5c5f9c41d795704df75f47",
+      "src/adapters/supervisor/manager.rs": "1e76b4acb11e61785afc453ba29c6d54574b1dca2d66a32064ac08960ab1f2e9"
+    },
+    "cases": {
+      "release-bypasses-cancellation": {
+        "exit_code": 101,
+        "caught_by_test": true,
+        "test": "access::direct_request_tests::final_release_revalidates_authority_after_supervisor_setup"
+      },
+      "consumer-control-group-stop": {
+        "exit_code": 101,
+        "caught_by_test": true,
+        "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties"
+      },
+      "provider-dependency-stop": {
+        "exit_code": 101,
+        "caught_by_test": true,
+        "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties"
+      },
+      "consumer-runtime-expiry": {
+        "exit_code": 101,
+        "caught_by_test": true,
+        "test": "adapters::supervisor::manager::tests::exact_typed_manager_contract_and_no_secret_properties"
+      }
+    },
+    "worktree_untouched": true
+  },
+  "limitations": [
+    "Linux x86_64 only; native macOS remains disabled",
+    "Detached/legacy SSH resources are deliberately retained; new SSH requests remain unavailable until safe cleanup is established",
+    "Historical native qualification evidence is not current runtime qualification"
+  ],
+  "environment": {
+    "kernel": "Linux 6.18.7-76061807-generic",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "systemd": "systemd 255 (255.4-1ubuntu8.15pop0~1778766128~24.04~85b5073)"
+  },
+  "commands": [
+    "scripts/with-secure-test-tmpdir.sh cargo test --no-fail-fast",
+    "scripts/with-secure-test-tmpdir.sh scripts/test-systemd-supervisor.sh",
+    "cargo fmt --check",
+    "cargo clippy --all-targets --offline --locked -- -D warnings"
+  ],
+  "focused_final_bridge_tests_passed": 13,
+  "focused_final_producer_tests_passed": 9,
+  "portable_qualification_harness_tests_passed": 16,
+  "review_mutations": {
+    "record": "issue-49-linux-lifecycle-mutations/review-fixes/report.json",
+    "cases": {
+      "baseline-producer-gate": {
+        "exit_code": 0,
+        "caught_by_test": null,
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--lib",
+          "access::direct_request_tests::protected_create_final_post_serializes_both_cancellation_orderings",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ]
+      },
+      "producer-write-gate-removed": {
+        "exit_code": 101,
+        "caught_by_test": true,
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--lib",
+          "access::direct_request_tests::protected_create_final_post_serializes_both_cancellation_orderings",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "expected_assertion": "cancel_first=false: cancellation publication was observed during an authorized blocked POST"
+      },
+      "baseline-ssh-marker": {
+        "exit_code": 0,
+        "caught_by_test": null,
+        "command": [
+          "scripts/test-systemd-supervisor.sh"
+        ],
+        "environment": {
+          "VW18_SCENARIO": "app-ssh-cancel"
+        }
+      },
+      "application-ssh-mark-in-use-removed": {
+        "exit_code": 101,
+        "caught_by_test": true,
+        "command": [
+          "scripts/test-systemd-supervisor.sh"
+        ],
+        "expected_assertion": "recovery must retain application-handed-off material: NotFound",
+        "provider_assertion_log": "application-ssh-mark-in-use-removed-provider.log",
+        "environment": {
+          "VW18_SCENARIO": "app-ssh-cancel"
+        }
+      }
+    }
+  },
+  "verification_order": "Full Rust and complete systemd suites passed after all production changes. Two test-only lint corrections and an isolated pipe fixture correction followed; final bridge (13), producer (9), formatting and all-targets lint checks cover the final test source.",
+  "test_log_sha256": {
+    "vw49-final-rust-tests.log": "593749e93079b74271736300072010aa5057983f784fa83a1bb4c56f60e595d5",
+    "vw49-final-systemd-tests.log": "e83a1dd417f590ad38313fd6f3829f3955f8ad54af121daece252d5cda66708c",
+    "vw49-final-bridge-tests-2.log": "c33eb3897c53ad0b8bde9160564a3db66e709f946c373341b85008dfa39c9c37",
+    "vw49-final-producer-tests.log": "35ac7b3b94c654f672ac8671b126aa5dbaaba74ac4e980c42e653938c561143a",
+    "vw49-harness-policy-tests.log": "cf95e2f07aa2a44ef49ad4e91ae7c94afa91915e42ba353c8bfa5c3ec12e347c"
+  }
+}

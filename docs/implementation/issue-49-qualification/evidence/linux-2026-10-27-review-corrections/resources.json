@@ -1,0 +1,80 @@
+{
+  "files": [
+    {
+      "device": 2051,
+      "inode": 4651623,
+      "kind": "retained-task-artifact",
+      "mode": "0o700",
+      "path": "source-snapshot",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651630,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "source-hashes.json",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651624,
+      "kind": "retained-task-artifact",
+      "mode": "0o400",
+      "path": "source-snapshot/probe.c",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651628,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "environment.json",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651626,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "resources.json",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651627,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "cleanup.json",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651625,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "observations.json",
+      "retained": true,
+      "uid": 1000
+    },
+    {
+      "device": 2051,
+      "inode": 4651629,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "matrix.json",
+      "retained": true,
+      "uid": 1000
+    }
+  ],
+  "owner_uid": 1000,
+  "processes": [],
+  "protected_material_reusable": false,
+  "schema": 1
+}

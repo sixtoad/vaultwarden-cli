@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-28",
+  "status": "passed",
+  "scope": "Local Linux managed SSH-agent implementation; synthetic credentials only",
+  "base_commit": "476bf3f506aad6f52628ad32a6ef34e31172d1ba",
+  "worktree_dirty": true,
+  "platform": "Linux-6.18.7-76061807-generic-x86_64-with-glibc2.39",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "checks": {
+    "full_regression": {
+      "command": "scripts/with-secure-test-tmpdir.sh cargo test --offline --locked",
+      "exit_code": 0,
+      "local_log": "/tmp/vw49-agent-reviewed-tests.log",
+      "log_sha256": "72a090be0287ba24b5a74e0eec214badbe0d6835f71e24545a96573e277ce158",
+      "test_counts": {
+        "passed": 1101,
+        "failed": 0,
+        "ignored": 24
+      }
+    },
+    "linux_lifecycle_and_openssh": {
+      "command": "scripts/with-secure-test-tmpdir.sh scripts/test-systemd-supervisor.sh",
+      "exit_code": 0,
+      "local_log": "/tmp/vw49-agent-reviewed-systemd-2.log",
+      "log_sha256": "4ebe3f5335e66cbe35537013916fc33f46e4adb47366a0ef40b7c5c2b5125f49",
+      "test_counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      "lifecycle_scenarios": 41,
+      "openssh_cases": [
+        "Ed25519",
+        "ECDSA P-256",
+        "ECDSA P-384",
+        "ECDSA P-521",
+        "RSA SHA-256",
+        "RSA SHA-512"
+      ]
+    },
+    "clippy": {
+      "command": "cargo clippy --offline --locked --all-targets -- -D warnings",
+      "exit_code": 0,
+      "local_log": "/tmp/vw49-agent-reviewed-clippy-2.log",
+      "log_sha256": "69000f21d9063af3d5ab464e707654f9744d6516d860b19479713d09c9c77b1b"
+    }
+  },
+  "format_and_diff_check": "passed",
+  "review": {
+    "independent_lenses": 3,
+    "actionable_findings": "all addressed",
+    "deferred_findings": []
+  },
+  "limits": [
+    "Native macOS protected delivery remains unimplemented and unqualified.",
+    "Real system OpenSSH adapter interoperability does not relax the production reviewed self-contained ELF requirement.",
+    "No installed service, real vault, remote host or hosted CI run changed.",
+    "General regression suite passed before final test-only socket-path capture correction; complete lifecycle/OpenSSH script and clippy passed afterward."
+  ],
+  "corrected_failure": {
+    "log": "/tmp/vw49-agent-reviewed-systemd.log",
+    "cause": "SSH-lock test guessed previous socket naming; fixture now records actual endpoint",
+    "rerun": "linux_lifecycle_and_openssh"
+  },
+  "source_sha256": {
+    ".github/workflows/ci.yml": "083c1dd5f2dbeb7a356e448a494fd200bf07ce9187265c74d32c41192888fb56",
+    "Cargo.lock": "6087815ea666ada8670bc3bcf89467906a3cc0a44e9f8ea47f7a34e6056e728e",
+    "Cargo.toml": "eecc9366abab25ad3fb5c86c7edf44f742d10388dd46a151c33582fbd0ae2076",
+    "scripts/test-systemd-supervisor.sh": "dfbf8fb5d91607ea1f363aa6ab213689a5de2948dccf369f846338a499cae514",
+    "src/access/application.rs": "3364f290286313106d46f7f10c92b8a1386305c97592905a7842d4c5c8c5ac78",
+    "src/access/direct_request_tests.rs": "2553d423110549a53f3f782488bed21cff4d888190e580c471eea7ccdf1b0cad",
+    "src/access/ports.rs": "85ff8527319d4fa1afb16ef660ab7a986469a0fb2eb0d1040490205a48175932",
+    "src/access/provider.rs": "1899917d96aacf1cee7ea5041e76ae52c0ececd05bf738a56a13cfe58dac34a0",
+    "src/adapters/execution.rs": "e90ba8f530e795fc831a8ea4a984a0cd031e4620703bf319271f87b0a6bb1c66",
+    "src/adapters/mod.rs": "67016d298ecda4714c5cf8f66cc315f5a4aca40e1040bbbd601eec728eb6d483",
+    "src/adapters/ssh_agent.rs": "3b4e7bcf5b5db6afae38bc0da0bcfdd1918cc08019b941aeee51ea9ea42ed86d",
+    "src/adapters/ssh_agent/openssh_tests.rs": "926d1591ce92333f8cbb7fc892ab08828fa06540377c4b7602ce69bd9f55a0e5",
+    "src/adapters/ssh_material.rs": "6b21e155b926a799a2f9837c0ccf21c6e7bc714902cd44ea66c2c39f789c53c7",
+    "src/adapters/supervisor.rs": "1d396c4ecf63b7c88de68812e5d9702e129024394f196109f286f18793b41cbc",
+    "src/adapters/supervisor/bridge.rs": "e839d45f12dca047cc6afe44479405b4b93c34da0b4d08c703cf405d49d05de1",
+    "src/adapters/supervisor/real_tests.rs": "d953c3d3cb3328c259d2203f8e3f7a6729c233c713c1fdd7aa62bd8eda111edc",
+    "tests/fixtures/protected-tree.c": "c941691a9a0f77ff79b31b5f5b5fb5dcb66fb5d06140e93950e2d56e7a421923",
+    "tests/systemd_supervisor.rs": "056abb1ac76ec4ad3566890dfa20aaa300a0f7dd8de137a13a93fcbceb629a52"
+  }
+}

@@ -1,0 +1,11 @@
+--- a/src/adapters/supervisor/manager.rs
++++ b/src/adapters/supervisor/manager.rs
+@@ -727,7 +727,7 @@
+         property("Restart", "no".to_owned()),
+         property("TimeoutStartUSec", 5_000_000u64),
+         property("TimeoutStopUSec", 2_000_000u64),
+-        property("RuntimeMaxUSec", u64::MAX),
++        property("RuntimeMaxUSec", 1_000_000u64),
+         property("StandardInput", "null".to_owned()),
+         property("StandardOutput", "null".to_owned()),
+         property("StandardError", "null".to_owned()),

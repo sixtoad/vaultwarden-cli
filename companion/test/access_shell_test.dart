@@ -57,6 +57,29 @@ void main() {
   setUp(resetProvider);
 
   testWidgets(
+    'observation loss shows an unknown result without decision authority',
+    (tester) async {
+      final native = FixtureProviderPlatform();
+      final history = providerHistory();
+      (history['events'] as List).first['outcome'] = 'observation_lost';
+      native.historyReply = encoded(history);
+      await showShell(tester, native);
+      await destination(tester, 'activity');
+      expect(find.text('Result unknown'), findsOneWidget);
+      expect(find.text('Completed successfully'), findsNothing);
+      expect(
+        core.providerSnapshot().history.single.outcome,
+        core.ProviderHistoryOutcome.observationLost,
+      );
+      expect(core.providerSnapshot().canDecide, isFalse);
+      expect(core.providerSnapshot().statusId, isEmpty);
+      expect(native.commands.where((c) => c['command'] == 'decision'), isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'history preserves order, legacy unknown time and exact second-event reopening',
     (tester) async {
       const secondId = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';

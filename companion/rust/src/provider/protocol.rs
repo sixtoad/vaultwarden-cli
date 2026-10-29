@@ -44,6 +44,7 @@ pub enum Failure {
     ExecutionRejected,
     ExecutionNonzero,
     ExecutionSignaled,
+    ObservationLost,
 }
 impl Status {
     pub fn summary(&self) -> String {
@@ -329,5 +330,29 @@ impl HistoryResponse {
                 .collect::<HashSet<_>>()
                 .len()
                 == self.events.len()
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn observation_loss_is_closed_redacted_status_not_process_completion() {
+        let status: Status = decode(br#"{"status":"failed","reason":"observation_lost"}"#).unwrap();
+        assert_eq!(
+            status,
+            Status::Failed {
+                reason: Failure::ObservationLost
+            }
+        );
+        assert_eq!(
+            status.summary(),
+            r#"{"status":"failed","reason":"observation_lost"}"#
+        );
+        assert!(decode::<Status>(
+            br#"{"status":"failed","reason":"observation_lost","secret":"sentinel"}"#
+        )
+        .is_err());
+        assert!(decode::<Status>(br#"{"status":"failed","reason":"consumer_killed"}"#).is_err());
     }
 }

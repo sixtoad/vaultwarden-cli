@@ -1,7 +1,7 @@
 # Activity history verification and handoff
 
-Scope: bounded durable Activity for issue #50, based on main `93431e6` (merged
-PR #52). The parent issue remains open. No installation, enrollment, native adapter
+Scope: bounded durable Activity for issue #50, initially based on main `93431e6`
+(PR #52), with current main `60fadd6` (PR #55) integrated before final verification. The parent issue remains open. No installation, enrollment, native adapter
 or abuse-protection changes are included.
 
 ## Local evidence (2026-10-28)
@@ -74,6 +74,17 @@ run passed 73 tests and failed only those six absent references. Existing
 review/action references passed unchanged. The golden README records host and
 capture provenance. Final acceptance requires CI after adoption; the PR records
 that revision and outcome, without substituting earlier evidence.
+
+## Current-main integration (2026-10-29)
+
+PR #55 adds the canonical `observation_lost` outcome. Activity accepts it as an
+explicit closed enum member and displays “Result unknown”; it does not imply
+consumer termination, success, recalled secrets or decision authority. The protocol
+merge preserves both bounded history validation and main’s closed status regression.
+Both generated bridge outputs were regenerated with pinned tools. Provider projection,
+Rust session and generated-bridge widget regressions cover the new display outcome.
+The six reviewed ARM references remain unchanged. Final CI and integration-review
+results are recorded in the PR and durable evidence directory.
 
 ## Independent review
 

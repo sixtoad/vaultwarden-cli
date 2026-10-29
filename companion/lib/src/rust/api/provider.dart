@@ -101,6 +101,7 @@ enum ProviderHistoryOutcome {
   recovered,
   legacyUnknown,
   reconciled,
+  observationLost,
 }
 
 /// History is display-only; none of these values convey decision authority.

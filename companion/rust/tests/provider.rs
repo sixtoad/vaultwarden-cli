@@ -683,6 +683,31 @@ fn history_uses_closed_bounded_display_and_preserves_canonical_order() {
         .is_err());
 }
 #[test]
+fn history_observation_loss_is_display_only_and_not_a_completion_result() {
+    use companion_core::api::provider::{ProviderHistoryOutcome, ProviderHistoryState};
+    let mut session = connected();
+    reply(
+        &mut session,
+        Command::History,
+        "",
+        history_response(vec![history_event(ID, Some(9), 1, "observation_lost")]),
+    );
+    let snapshot = session.snapshot();
+    assert_eq!(snapshot.history_state, ProviderHistoryState::Available);
+    assert_eq!(
+        snapshot.history[0].outcome,
+        ProviderHistoryOutcome::ObservationLost
+    );
+    assert_eq!(snapshot.status_progress, ProviderStatusProgress::None);
+    assert!(snapshot.status_id.is_empty());
+    assert!(snapshot.review.is_none());
+    assert!(!snapshot.can_decide);
+    assert!(session
+        .begin(Command::Approve, String::new(), "fresh".into())
+        .is_err());
+}
+
+#[test]
 fn history_rejects_unknown_sensitive_missing_and_malformed_fields() {
     let base = history_response(vec![history_event(ID, Some(3), 0, "submitted")]);
     let mut invalid = Vec::new();
@@ -720,7 +745,13 @@ fn history_rejects_unknown_sensitive_missing_and_malformed_fields() {
         value["events"][0].as_object_mut().unwrap().remove(field);
         invalid.push(value);
     }
-    for outcome in ["completed", "unknown", "execution_secret", ""] {
+    for outcome in [
+        "completed",
+        "unknown",
+        "execution_secret",
+        "consumer_killed",
+        "",
+    ] {
         let mut value = base.clone();
         value["events"][0]["outcome"] = json!(outcome);
         invalid.push(value);

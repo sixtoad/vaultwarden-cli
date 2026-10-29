@@ -1,5 +1,10 @@
 # Human-approved Vaultwarden Access
 
+The CLI controls approval and secret delivery. Removing access prevents future
+delivery without stopping programs that already received secrets. Read
+[Secret access is not execution authority](secret-access-boundary.md) for the
+responsibility boundary, retained SSH resources and legacy-upgrade limitations.
+
 `vaultwarden-accessd` runs in the human's desktop OS account. Agents must run
 under distinct restricted OS principals. A same-UID agent can read the human's
 memory and keyring and is not a supported secret boundary. The existing direct
@@ -7,7 +12,7 @@ memory and keyring and is not a supported secret boundary. The existing direct
 
 Stories 1.1–1.9 provide private state, constrained operation policy, a protected
 provider session, authenticated one-time browser decisions and immutable executable
-preparation, login-backed execution, descendant containment and redacted history.
+preparation, login-backed delivery and redacted history.
 Story 2.1 adds durable restricted-agent pairing and selective revocation. Story 2.2
 adds signed noninteractive agent submission over a bounded Unix socket. Story 2.3
 adds owner-authenticated polling and interruptible noninteractive waiting.
@@ -139,9 +144,8 @@ scope, and must not expose them to clients.
 SIGINT/SIGTERM remains responsive while backend or status work is delayed. In
 configured mode it irreversibly closes admission before waiting, joins every accepted UI
 worker, clears authority again after joining even on worker failure, and removes
-the launch artifact. Delayed unlock cannot recreate authority after shutdown. Process-manager crash containment for protected children is
-implemented with the later execution/supervisor stories; this story starts no
-protected processes.
+the launch artifact. Delayed unlock cannot recreate authority after shutdown.
+Already-released consumers continue independently of provider shutdown.
 
 ## Human operator provisioning
 
@@ -237,7 +241,29 @@ SSH eligibility checks the SSH-key item type/body; it does not substitute a Logi
 or apply Login markers to SSH-key items. Provisioning does not install an SSH
 client or make ordinary OpenSSH compatible with the self-contained image profile.
 The operator must supply and review a compatible artifact; destination controls,
-private key material handling and execution containment restrictions still apply.
+private key material handling and authenticated delivery restrictions still apply.
+
+Protected SSH uses a provider-managed agent for each approved request. The
+private key stays in provider memory and is never written to a temporary key
+file or handed to the SSH client. The client asks the agent for an authentication
+signature. The agent checks the approved process, selected key, pinned host and
+remote username, and permits one authentication signature for that request.
+It is not a general shared agent and does not support agent forwarding.
+
+Locking the vault, cancelling the request or removing app access prevents new
+signing after that change wins the final authorization check. An existing SSH
+connection can continue: the provider does not stop the client or disconnect
+remote sessions. A signature already delivered cannot be recalled. Starting a
+new authentication requires a new request and approval.
+
+The local socket and public host-key files contain no private-key material.
+Closing the signing socket and discarding the key do not wait for consumers to
+exit. Their public files are cleaned up independently of workload lifetime; cleanup
+failures and old private-key files do not block new agent requests. Existing files from
+older versions are preserved when safe cleanup cannot be proven. Upgrade the
+provider and its execution helper together; these source changes do not modify
+installed services. See [the agent implementation notes](implementation/issue-49-managed-ssh-agent.md)
+for protocol compatibility, supported key formats and verification.
 
 Registration and creation are atomic and create-only. Every existing ID conflicts,
 including an identical retry; there is no replace/delete command. On a timeout or
@@ -379,13 +405,12 @@ reuse a revoked label, pair a fresh key; this creates a fresh immutable ID.
 
 Revoke uses that ID rather than the label. Retrying an old ID cannot revoke a
 replacement with the same label. Revocation denies further authority, expires
-the binding's unclaimed work and cancels its claimed/running executions. A
-successful response waits for confirmed affected-process cleanup; repeats also
-wait for outstanding cleanup. Other agents and human work retain authority
-after a successful scoped revoke. Uncertain persistence or containment closes
-admission and returns a failure rather than claiming cleanup succeeded. The
-client allows 30 seconds for a revocation response; transport failure is not
-proof of success, so retry the same immutable ID. Bindings and tombstones
+the binding's unclaimed work and prevents claimed work from releasing new secrets.
+Programs already released continue, including their descendants. A successful
+response acknowledges denial of future access, not program termination or password
+recall. Other agents and human work retain authority after scoped revocation.
+Uncertain persistence closes admission and returns a failure. Transport failure is
+not proof of success, so retry the same immutable ID. Bindings and tombstones
 survive restart, and historical requester snapshots retain their original
 identity. Signed submission and owner-authenticated polling are described below.
 
@@ -409,7 +434,7 @@ The daemon validates the preprovisioned directory, creates `agent.sock` with mod
 removes only a verified stale socket and unlinks only its own socket inode on
 shutdown. Directory descriptors pin path resolution and cleanup. Omitting both
 agent flags preserves human-only operation. The existing service supervision and
-execution containment requirements still apply; these flags do not create an OS
+authenticated execution and private-delivery requirements still apply; these flags do not create an OS
 account, change group memberships or grant access to provider state.
 
 Pair the agent's public key through the human interface described above. Provision
@@ -533,11 +558,16 @@ receive the redacted usage error (exit 2).
 The closed states are `pending`, `approved`, `running`, `denied`, `expired`,
 `completed` (exit code 0–255), and `failed` with one category:
 `review_unavailable`, `execution_unavailable`, `execution_rejected`,
-`execution_nonzero`, or `execution_signaled`. Responses contain no operation,
+`execution_nonzero`, `execution_signaled`, or `observation_lost`. Responses contain no operation,
 arguments, labels, timestamps, secret/output data, history, URLs or capabilities.
-Provider clocks determine expiry. Running work remains nonterminal until existing
-cleanup and reaping requirements are confirmed. Terminal request/audit content is
+Provider clocks determine access expiry. A main-process result may be recorded
+while descendants continue. `observation_lost` records loss of result observation
+after release or recovery of an interrupted claim; it does not establish whether
+the consumer started or stopped. Terminal request/audit content is
 immutable, and enabled owners can observe terminal work after lock/restart.
+Update the provider and its clients together: older clients and provider binaries
+may reject the new `observation_lost` category in responses or saved history.
+Do not remove history or consumed approvals to make an older binary accept state.
 
 Each query rechecks kernel UID/group evidence, the enabled stored key, strict
 signature, immutable request ownership and revocation. Unknown, other-owner,
@@ -585,8 +615,8 @@ requester kind/identity/label, original policy revision, original credential
 labels/use types, creation/expiry/event times, per-request ordinal, lifecycle
 status and stable outcome. Submission, approval, denial, expiry, execution start,
 success, nonzero exit, signal, rejected/unavailable execution, invalidation and
-recovery have distinct outcomes. Confirmed cleanup and reaping still precede
-terminal execution records. Historical labels never join the current policy.
+recovery have distinct outcomes. Result observation and resource cleanup are
+separate: a terminal record does not claim that all descendants have stopped. Historical labels never join the current policy.
 No argument values, targets, environment mappings, backend item IDs, secrets,
 process streams, sessions, browser/launch capabilities or reusable approval
 material enter history. Agent work records immutable requester label/fingerprint
@@ -670,9 +700,8 @@ change retained bytes. Errors close descriptors and expose fixed redacted catego
 
 The execution primitive consumes this descriptor with `execveat(AT_EMPTY_PATH)`,
 explicit policy-derived arguments and an empty environment. It replaces its already
-supervised calling process and has no production spawn path. Secret injection,
-approval consumption, process supervision and descendant containment remain in
-Stories 1.7/1.8. Unsupported kernels, disabled executable memfds, seccomp or LSM
+prepared calling process and has no standalone production spawn path. Secret
+injection, approval consumption and result observation use the delivery helper. Unsupported kernels, disabled executable memfds, seccomp or LSM
 refusal fail closed without a pathname or legacy-command fallback.
 
 Existing populated image bindings lack the required declaration and must be
@@ -702,17 +731,16 @@ the wrapper never changes shared directory permissions. Linux 6.3+ executable
 memfd support is required for the positive adapter tests; unavailable fixtures
 fail instead of being silently skipped.
 
-## Protected process containment (Story 1.8)
+## Protected delivery and result observation
 
-One-time approval now queues work on a bounded provider worker. `Approved` means
-queued; `Running` is written only after the contained helper observes the kernel's
-successful protected-image exec event. Lock, request cancellation, requester
-revocation, session/request deadlines, transport failure and shutdown revoke
-launch authority independently of the worker. Terminal results require confirmed
-cleanup, even when launch authority has expired. Uncertain cleanup closes admission
-and leaves the durable record nonterminal for startup recovery.
-Cancellation also invalidates an approved request still waiting in the queue,
-under the same claim/release serialization, so its queued ID cannot execute later.
+One-time approval queues work on a bounded provider worker. `Approved` means
+queued; `Running` is written only after the helper observes successful protected
+exec. Lock, request cancellation, requester revocation and access deadlines revoke
+future delivery independently of the worker. Queued IDs cannot revive a cancelled
+approval. After final release, these actions end observation without stopping
+consumers. Shutdown joins the provider's workers, not the consumer process tree.
+A confirmed main exit retains its result; an unavailable post-delivery result is
+reported as `failed` with reason `observation_lost`.
 
 Install `vaultwarden-access-exec` beside `vaultwarden-accessd`, owned by the provider
 UID, executable and without group/other write or special permission bits. Every
@@ -724,25 +752,19 @@ connectivity, Linux 6.3+ executable memfds, unified cgroup v2, systemd 255+ and
 permitted parent/child ptrace exec-event observation are required; unsupported
 setups fail closed.
 
-Reviewed protected operations and their descendants are trusted code running as
-the provider UID. Containment manages their lifecycle; it is not a hostile same-UID
-sandbox. Deliberate user-manager or cgroup manipulation is outside this guarantee.
-Agents must still run under separate restricted OS principals without provider-UID
-or user-manager access.
+Reviewed protected operations are trusted code running as the provider UID.
+Agents must run under separate restricted OS principals without provider-UID or
+user-manager access. The delivery helper is not a sandbox or execution manager.
 
-Each random transient service has `BindsTo`, `PartOf` and `After` dependencies on
-the provider, `KillMode=control-group`, `CollectMode=inactive-or-failed`, finite
-timeouts, `Restart=no`, null streams,
-zero core limit and no injected manager environment. The checked private runtime
+Each random transient service has no provider stop dependencies, no access-derived
+runtime limit and no consumer-killing policy. It retains `Restart=no`, null streams,
+zero core limit and an explicit environment-removal policy. The checked runtime
 directory is `/run/user/<uid>/vw-access-<provider-namespace>`. An authenticated Unix
-SEQPACKET channel transfers the sealed executable FD and bounded, zeroizing argv
+SEQPACKET channel transfers the sealed executable FD, bounded zeroizing arguments
 and explicit environment. A separate guarded message releases execution. The
-single-threaded helper forks, establishes parent-death SIGKILL and verifies its
-actual helper parent, then executes the descriptor. A kernel `PTRACE_EVENT_EXEC`
-and CLOEXEC error pipe distinguish protected exec from helper start and pre-exec
-signal death. Tracing detaches before workload instructions run. Standard streams
-go directly to `/dev/null`; output is discarded by the kernel without decoded or
-retained buffers.
+helper confirms protected exec through a kernel event and a CLOEXEC error pipe;
+there is no consumer parent-death or tracer-exit kill hook. Standard streams go
+directly to `/dev/null`, without decoded or retained buffers.
 
 The manager-launched helper also has an explicit environment boundary. Typed
 `UnsetEnvironment` contains only names: the manager's current inherited names,
@@ -756,27 +778,30 @@ Recovery validates the stable removal contract without comparing old units to a
 new manager-environment snapshot. See the authoritative
 [systemd v255 environment semantics](https://raw.githubusercontent.com/systemd/systemd/v255/man/systemd.exec.xml).
 
-The helper adopts/reaps descendants as a subreaper. Normal completion carries
-its ECHILD report. The manager stops the entire request cgroup; a separate bounded
-`/proc` scan checks the exact cgroup/subtree, including zombies and deleted cgroup
-paths, while comparing process start times. Forced cleanup and provider crash use
-that independent observation. A retained lease preserves the exact cgroup identity
-for cleanup proof even after a failed unit is unloaded. Empty `cgroup.procs` alone
-is never completion.
-Nonsecret per-unit cleanup identities survive provider death and manager unit
-unloading. Recovery validates exact ownership and stops only owned services under
-the exclusive provider writer lock, before durable startup reconciliation or
-transport admission.
+The helper can reap descendants that exit naturally. Resource cleanup requires
+positive evidence of disuse; main-process completion alone is insufficient.
+Nonsecret per-unit identities survive provider death. Recovery observes them
+without stopping services and retains live or uncertain identities. SSH files
+marked as possibly in use are preserved across detachment and restart; residuals
+make new SSH requests unavailable while ordinary password delivery remains usable.
+Producer output remains private, and later vault writes require current authority.
+
+Legacy workloads started before this change retain their original termination
+hooks. Let that work finish before stopping/upgrading its old provider. See the
+[responsibility boundary](secret-access-boundary.md) for the upgrade limitation.
+
 Recovery records are fully written and synced before atomic, no-replace
 publication. Precisely owned abandoned staging files can be removed at restart;
 unrelated files and existing leases remain untouched.
 
-See `docs/implementation/1-8-test-evidence.md` for the tested platform, completed
-commands and any outstanding acceptance evidence. The real manager suite is
+The earlier `docs/implementation/1-8-test-evidence.md` records the historical
+termination contract. See the [Linux migration record](implementation/issue-49-future-access-only-linux.md)
+for current verification. The real manager suite is
 `scripts/with-secure-test-tmpdir.sh scripts/test-systemd-supervisor.sh`; it uses
 only synthetic credentials and uniquely named provider/request harness units.
-Its syscall fixture requires x86-64 and rejects other test architectures early;
-AArch64 runtime support remains unverified. Journal evidence uses successful reads
+Its syscall fixture supports x86-64 and AArch64; report the architecture actually
+tested rather than assuming both passed. Journal evidence uses successful reads
 and unique markers on both provider streams to prove visibility of prior output,
 alongside null request streams. It does not claim a privileged global journal
-flush. Exact recorded test resources are stopped and cleaned even on assertions.
+flush. The fixture owner ends its recorded synthetic consumers only after survival
+assertions, and also cleans them on assertion failure.

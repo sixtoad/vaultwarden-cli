@@ -1,0 +1,420 @@
+{
+  "files": [
+    {
+      "device": 16777234,
+      "inode": 447888296,
+      "kind": "ad-hoc-hardened-runtime-fixture",
+      "mode": "0o700",
+      "path": "probe-original",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888310,
+      "kind": "ad-hoc-hardened-runtime-fixture",
+      "mode": "0o700",
+      "path": "probe-replacement",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888331,
+      "kind": "deliberately-writable-path-candidate",
+      "mode": "0o700",
+      "path": "path-launch",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888338,
+      "kind": "deliberate-invalid-image",
+      "mode": "0o600",
+      "path": "mutated-image",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888344,
+      "kind": "synthetic-protected-material-retain-on-uncertainty",
+      "mode": "0o600",
+      "path": "synthetic-material.private",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888269,
+      "kind": "retained-task-artifact",
+      "mode": "0o700",
+      "path": "source-snapshot",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888419,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "source-hashes.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888415,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "resources.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888322,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "signatures.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888336,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "replacement.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888420,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "observations.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888270,
+      "kind": "retained-task-artifact",
+      "mode": "0o400",
+      "path": "source-snapshot/probe.c",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888416,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "cleanup.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888418,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "matrix.json",
+      "retained": true,
+      "uid": 501
+    },
+    {
+      "device": 16777234,
+      "inode": 447888417,
+      "kind": "retained-task-artifact",
+      "mode": "0o600",
+      "path": "environment.json",
+      "retained": true,
+      "uid": 501
+    }
+  ],
+  "owner_uid": 501,
+  "processes": [
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65394,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65395,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65396,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65397,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65398,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65399,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65416,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65419,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65420,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65423,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65424,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65425,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65426,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "peer-fixture",
+      "pid": 65427,
+      "waited": true
+    },
+    {
+      "exit_code": 77,
+      "kind": "peer-fixture",
+      "pid": 65428,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65429,
+      "waited": true
+    },
+    {
+      "exit_code": 1,
+      "kind": "direct-tool",
+      "pid": 65430,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "fixture-parent",
+      "pid": 65431,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65432,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65431,
+      "pid": 65431,
+      "ppid": 65390,
+      "released": true,
+      "start_sec": 1793115385,
+      "start_usec": 512845,
+      "uid": 501,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65433,
+      "waited": true
+    },
+    {
+      "exit_code": -6,
+      "kind": "fixture-parent",
+      "pid": 65434,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65435,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65434,
+      "pid": 65434,
+      "ppid": 65390,
+      "released": true,
+      "start_sec": 1793115385,
+      "start_usec": 530153,
+      "uid": 501,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "fixture-parent",
+      "pid": 65437,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65438,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65437,
+      "pid": 65437,
+      "ppid": 65390,
+      "released": true,
+      "start_sec": 1793115385,
+      "start_usec": 541540,
+      "uid": 501,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65440,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65439,
+      "pid": 65439,
+      "ppid": 65437,
+      "released": true,
+      "start_sec": 1793115385,
+      "start_usec": 550847,
+      "uid": 501,
+      "waited": false
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65442,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65439,
+      "pid": 65441,
+      "ppid": 1,
+      "released": true,
+      "start_sec": 1793115385,
+      "start_usec": 557102,
+      "uid": 501,
+      "waited": false
+    },
+    {
+      "exit_code": -9,
+      "kind": "fixture-parent",
+      "pid": 65512,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65513,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65512,
+      "pid": 65512,
+      "ppid": 65390,
+      "released": true,
+      "start_sec": 1793115387,
+      "start_usec": 74804,
+      "uid": 501,
+      "waited": true
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65515,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65514,
+      "pid": 65514,
+      "ppid": 65512,
+      "released": true,
+      "start_sec": 1793115387,
+      "start_usec": 102737,
+      "uid": 501,
+      "waited": false
+    },
+    {
+      "exit_code": 0,
+      "kind": "direct-tool",
+      "pid": 65517,
+      "waited": true
+    },
+    {
+      "kernel_exit_observed": true,
+      "kind": "fixture",
+      "pgid": 65514,
+      "pid": 65516,
+      "ppid": 1,
+      "released": true,
+      "start_sec": 1793115387,
+      "start_usec": 117036,
+      "uid": 501,
+      "waited": false
+    }
+  ],
+  "protected_material_reusable": false,
+  "schema": 1
+}

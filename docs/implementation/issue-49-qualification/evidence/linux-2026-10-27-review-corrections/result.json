@@ -1,0 +1,11 @@
+{
+  "certified_versions": [],
+  "failures": [],
+  "mechanism_selected": null,
+  "observations": 0,
+  "outcome": "blocked",
+  "production_enabled": false,
+  "reason": "native-macos-arm64-required",
+  "schema": 1,
+  "source_manifest_complete": true
+}

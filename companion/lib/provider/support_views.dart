@@ -72,6 +72,7 @@ class ProviderActivity extends StatelessWidget {
     core.ProviderHistoryOutcome.legacyUnknown =>
       'Legacy event · outcome unknown',
     core.ProviderHistoryOutcome.reconciled => 'Reconciled',
+    core.ProviderHistoryOutcome.observationLost => 'Result unknown',
   };
 
   String eventTime(BigInt? seconds) {

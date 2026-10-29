@@ -86,16 +86,18 @@ impl SystemdProcessSupervisor {
         let manager = Manager::connect()?;
         manager.recover(&self.config)?;
         if let Some(root) = &self.material_root {
-            super::ssh_material::recover(root)?;
+            // Residual SSH resources restrict SSH admission, not ordinary delivery.
+            let _ssh_residual = super::ssh_material::recover(root);
         }
         Ok(())
     }
     fn execute(
         &self,
-        prepared: PreparedExecutable,
+        mut prepared: PreparedExecutable,
         environment: ChildEnvironment,
         control: &dyn ExecutionControl,
     ) -> Supervision {
+        let agent = prepared.ssh_agent.take();
         let not_started = |error| Supervision {
             outcome: Err(error),
             cleanup: CleanupEvidence::NotStarted,
@@ -124,6 +126,7 @@ impl SystemdProcessSupervisor {
             return not_started(e);
         }
         let mut observed_channel = None;
+        let mut released = false;
         let result = (|| {
             if !control.live() {
                 return Err(ExecutionError::Cancelled);
@@ -192,6 +195,7 @@ impl SystemdProcessSupervisor {
                     .release()
                     .map_err(|_error| ExecutionError::ExecutionFailed)
             })?;
+            released = true;
             let exec_deadline = Instant::now() + Duration::from_secs(5);
             let mut executed = false;
             loop {
@@ -202,15 +206,18 @@ impl SystemdProcessSupervisor {
                     Some(Report::ExecConfirmed) if !executed => {
                         executed = true;
                         control.started()?;
+                        if let Some(agent) = &agent {
+                            agent.borrow_mut().recipient(
+                                channel
+                                    .take_recipient()
+                                    .ok_or(ExecutionError::ExecutionFailed)?,
+                            )?;
+                        }
                     }
                     Some(Report::Outcome(outcome)) if executed => {
                         #[cfg(test)]
                         phase(LaunchPhase::NaturalExit);
-                        return if control.live() {
-                            Ok(outcome)
-                        } else {
-                            Err(ExecutionError::Cancelled)
-                        };
+                        return Ok(outcome);
                     }
                     None => {}
                     _ => return Err(ExecutionError::ExecutionFailed),
@@ -221,9 +228,15 @@ impl SystemdProcessSupervisor {
                 if !executed && Instant::now() >= exec_deadline {
                     return Err(ExecutionError::ExecutionFailed);
                 }
+                if executed && let Some(agent) = &agent {
+                    agent.borrow_mut().poll(control)?;
+                }
                 manager.provider(&self.config)?;
             }
         })();
+        if let Some(agent) = &agent {
+            agent.borrow_mut().close();
+        }
         if result == Err(ExecutionError::UnitCollision) {
             if self.config.forget(&lease).is_err() {
                 self.healthy.store(false, Ordering::Release);
@@ -233,27 +246,43 @@ impl SystemdProcessSupervisor {
         if result == Err(ExecutionError::ManagerUnavailable) {
             self.healthy.store(false, Ordering::Release);
         }
-        // Cleanup has its own authority and is attempted even after launch authority disappears.
-        let cleanup = manager
-            .stop_reap(&self.config, &lease)
-            .or_else(|_| Manager::connect()?.stop_reap(&self.config, &lease));
-        if cleanup.is_err() || self.config.forget(&lease).is_err() {
-            self.healthy.store(false, Ordering::Release);
-            return Supervision {
-                outcome: Err(ExecutionError::CleanupUncertain),
-                cleanup: CleanupEvidence::Uncertain,
-                helper_reaped: false,
-            };
-        }
+        // Closing our private channel cancels a helper that has not received release.
+        // It never signals a consumer. A released helper may continue observing on its own.
         let helper_reaped = observed_channel.as_mut().is_some_and(|channel| {
             matches!(
                 channel.receive(Duration::from_millis(20)),
                 Ok(Some(Report::Reaped))
             )
         });
+        drop(observed_channel);
+        // A helper can already be connected in the listener backlog when
+        // cancellation wins before accept. Close that provider-owned endpoint
+        // too, so the unreleased helper observes EOF instead of its timeout.
+        drop(listener);
+        let deadline = Instant::now() + Duration::from_millis(if released { 200 } else { 1000 });
+        let unused = loop {
+            if matches!(manager.unused(&self.config, &lease), Ok(true)) {
+                break true;
+            }
+            if Instant::now() >= deadline {
+                break false;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        if unused && self.config.forget(&lease).is_err() {
+            self.healthy.store(false, Ordering::Release);
+        }
         Supervision {
-            outcome: result,
-            cleanup: CleanupEvidence::Reaped,
+            outcome: if released && result.is_err() {
+                Err(ExecutionError::ObservationLost)
+            } else {
+                result
+            },
+            cleanup: if unused {
+                CleanupEvidence::Reaped
+            } else {
+                CleanupEvidence::Detached
+            },
             helper_reaped,
         }
     }
@@ -333,7 +362,7 @@ impl ExecutionWorker {
             self.sender.as_ref().expect("live execution worker").clone(),
         ))
     }
-    /// Call after transports release their dispatcher handles and application shutdown has reaped work.
+    /// Call after transports release their dispatchers and shutdown has settled observers.
     pub fn join(mut self) -> Result<(), SessionError> {
         self.sender.take();
         self.worker

@@ -19,6 +19,12 @@ thread_local! { pub(crate) static AGENT_REVOKE_HOOK: CleanupWaitHook = std::cell
 thread_local! { pub(crate) static SIGNED_COMMIT_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
 #[cfg(test)]
 thread_local! { static PAIR_AGENT_GATE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static PRODUCER_WRITE_GATE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static PRODUCER_WRITE_FINISHED_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static EXECUTION_CANCEL_PUBLISHED_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
 
 pub const MAX_SESSION: Duration = Duration::from_secs(15 * 60);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,13 +108,16 @@ impl ExecutionControl for ApplicationExecution<'_> {
             .lock()
             .map_err(|_error| ExecutionError::Cancelled)?;
         self.app
-            .execution_authority_current(
+            .execution_authority(
                 &mut authority,
                 self.owner,
                 &self.binding.request_id,
                 Some(self.binding),
-                self.epoch,
+                true,
             )
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        self.app
+            .execution_live_current(&mut authority, &self.binding.request_id, self.epoch)
             .map_err(|_error| ExecutionError::Cancelled)?;
         let _release = self
             .app
@@ -244,7 +253,7 @@ impl ProviderApplication {
         self.lock()
     }
     pub fn close_admission(&self) {
-        // A release already linearized before this lock is stopped by its monitor.
+        // A release already linearized remains valid; its observer may detach.
         let _release = self.release_gate.lock().unwrap_or_else(|e| e.into_inner());
         self.closing.store(true, Ordering::Release);
     }
@@ -294,6 +303,12 @@ impl ProviderApplication {
                 .map_err(|_error| DirectRequestError::Unavailable)?;
             if let Some(cancel) = active.get(id) {
                 cancel.cancel.store(true, Ordering::Release);
+                #[cfg(test)]
+                EXECUTION_CANCEL_PUBLISHED_HOOK.with(|hook| {
+                    if let Some(observe) = hook.borrow_mut().take() {
+                        observe();
+                    }
+                });
                 drop(active);
                 drop(_release);
                 return self.await_cleanup(Some(id)).map_err(Into::into);
@@ -792,6 +807,7 @@ impl ProviderApplication {
                         DirectFailure::ExecutionRejected => F::ExecutionRejected,
                         DirectFailure::ExecutionNonzero => F::ExecutionNonzero,
                         DirectFailure::ExecutionSignaled => F::ExecutionSignaled,
+                        DirectFailure::ObservationLost => F::ObservationLost,
                     },
                 },
             })
@@ -1301,14 +1317,11 @@ impl ProviderApplication {
                 let root = supervisor
                     .ssh_material_root()
                     .ok_or(DirectRequestError::Unavailable)?;
-                material = Some(preparer.prepare_ssh(&mut prepared, root, ssh).map_err(
-                    |error| {
-                        if error == ExecutionError::CleanupUncertain {
-                            self.close_admission();
-                        }
-                        DirectRequestError::Unavailable
-                    },
-                )?);
+                material = Some(
+                    preparer
+                        .prepare_ssh(&mut prepared, root, ssh)
+                        .map_err(|_error| DirectRequestError::Unavailable)?,
+                );
                 self.execution_authority_current(
                     &mut authority,
                     owner,
@@ -1392,7 +1405,18 @@ impl ProviderApplication {
         };
         let mut report = match result {
             Ok((prepared, environment)) => {
-                supervisor.supervise_controlled(prepared, environment, &control)
+                if material
+                    .as_mut()
+                    .is_some_and(|material| material.mark_in_use().is_err())
+                {
+                    Supervision {
+                        outcome: Err(ExecutionError::ExecutionFailed),
+                        cleanup: CleanupEvidence::NotStarted,
+                        helper_reaped: false,
+                    }
+                } else {
+                    supervisor.supervise_controlled(prepared, environment, &control)
+                }
             }
             Err(_error) => Supervision {
                 outcome: Err(ExecutionError::ExecutionFailed),
@@ -1400,12 +1424,10 @@ impl ProviderApplication {
                 helper_reaped: false,
             },
         };
-        if let Some(material) = material.as_mut()
-            && material.finalize(report.cleanup).is_err()
-        {
-            report.outcome = Err(ExecutionError::CleanupUncertain);
-            self.cleanup_uncertain.store(true, Ordering::Release);
-            self.close_admission();
+        if let Some(material) = material.as_mut() {
+            // Always end provider-owned signing authority, even after detach.
+            // Public resource cleanup failure never blocks an independent request.
+            let _material_retained = material.finalize(report.cleanup);
         }
         let _helper_reaping_observed = report.helper_reaped;
         if report.outcome == Err(ExecutionError::ManagerUnavailable) {
@@ -1443,9 +1465,32 @@ impl ProviderApplication {
                 authority.backend.create_eligible(&effect)?;
                 self.execution_live_current(&mut authority, id, revocation_epoch)?;
                 authority.provider.begin_write(&binding)?;
+                // Serialize the irreversible backend write with cancellation, just
+                // like consumer delivery. An approval or successful producer alone
+                // cannot reserve a later POST after access has ended.
+                #[cfg(test)]
+                PRODUCER_WRITE_GATE_HOOK.with(|hook| {
+                    if let Some(observe) = hook.borrow_mut().take() {
+                        observe();
+                    }
+                });
+                let write_gate = self
+                    .release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                if !control.live_fast() {
+                    return Err(DirectRequestError::Unavailable);
+                }
                 let result = authority
                     .backend
                     .create_secret(&effect, &input, &|| control.live_fast());
+                drop(write_gate);
+                #[cfg(test)]
+                PRODUCER_WRITE_FINISHED_HOOK.with(|hook| {
+                    if let Some(observe) = hook.borrow_mut().take() {
+                        observe();
+                    }
+                });
                 match result {
                     Ok(item_id) => {
                         authority.provider.record_write(
@@ -1477,7 +1522,7 @@ impl ProviderApplication {
                 }
             })();
 
-            if write.is_err() {
+            if write.is_err() && report.outcome == Ok(ExecutionOutcome::ExitedZero) {
                 report.outcome = Err(ExecutionError::ExecutionFailed);
             }
         }
@@ -1494,13 +1539,14 @@ impl ProviderApplication {
                 return Err(DirectRequestError::Unavailable);
             }
             let terminal = match (live, report.outcome) {
-                (true, Ok(ExecutionOutcome::ExitedZero)) => {
-                    DirectStatus::Completed { exit_code: 0 }
-                }
-                (true, Ok(ExecutionOutcome::ExitedNonZero)) => DirectStatus::Failed {
+                (_, Err(ExecutionError::ObservationLost)) => DirectStatus::Failed {
+                    reason: DirectFailure::ObservationLost,
+                },
+                (_, Ok(ExecutionOutcome::ExitedZero)) => DirectStatus::Completed { exit_code: 0 },
+                (_, Ok(ExecutionOutcome::ExitedNonZero)) => DirectStatus::Failed {
                     reason: DirectFailure::ExecutionNonzero,
                 },
-                (true, Ok(ExecutionOutcome::Signaled)) => DirectStatus::Failed {
+                (_, Ok(ExecutionOutcome::Signaled)) => DirectStatus::Failed {
                     reason: DirectFailure::ExecutionSignaled,
                 },
                 _ => DirectStatus::Failed {
@@ -1550,12 +1596,13 @@ impl ProviderApplication {
             .gate
             .lock()
             .map_err(|_error| DirectRequestError::Unavailable)?;
-        let (binding, policy, argv) = self.execution_authority(&mut authority, owner, id, None)?;
+        let (binding, policy, argv) =
+            self.execution_authority(&mut authority, owner, id, None, false)?;
         if policy.ssh().is_some() || policy.create().is_some() {
             return Err(DirectRequestError::Unavailable);
         }
         let preparation = preparer.prepare(policy.execution_image(), argv);
-        self.execution_authority(&mut authority, owner, id, Some(&binding))?;
+        self.execution_authority(&mut authority, owner, id, Some(&binding), false)?;
         let prepared = preparation.map_err(|_error| DirectRequestError::Unavailable)?;
 
         self.execution_live(&mut authority, id)?;
@@ -1576,7 +1623,7 @@ impl ProviderApplication {
                 return Err(DirectRequestError::Unavailable);
             }
         }
-        self.execution_authority(&mut authority, owner, id, Some(&binding))?;
+        self.execution_authority(&mut authority, owner, id, Some(&binding), false)?;
         Ok(prepared)
     }
     fn execution_authority(
@@ -1585,10 +1632,15 @@ impl ProviderApplication {
         owner: AuthenticatedHuman,
         id: &str,
         expected: Option<&ApprovalBinding>,
+        claimed: bool,
     ) -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError>
     {
         self.execution_live(authority, id)?;
-        let candidate = authority.provider.approved_execution(owner, id);
+        let candidate = if claimed {
+            authority.provider.claimed_execution(owner, id)
+        } else {
+            authority.provider.approved_execution(owner, id)
+        };
         // Durable reads can themselves take time; never start the next I/O on
         // the strength of authority checked before that read.
         self.execution_live(authority, id)?;
@@ -1616,7 +1668,7 @@ impl ProviderApplication {
         revocation_epoch: u64,
     ) -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError>
     {
-        let candidate = self.execution_authority(authority, owner, id, expected)?;
+        let candidate = self.execution_authority(authority, owner, id, expected, false)?;
         self.execution_live_current(authority, id, revocation_epoch)?;
         Ok(candidate)
     }
