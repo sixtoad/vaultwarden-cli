@@ -16,6 +16,219 @@ void main() {
   setUpAll(() async => RustLib.init());
   setUp(resetProvider);
 
+  test(
+    'generated history bridge preserves events and never supplies authority',
+    () async {
+      final native = FixtureProviderPlatform()
+        ..historyReply = encoded(providerHistory());
+      final controller = ProviderController(native);
+      await controller.initialize();
+      expect(native.commands.where((c) => c['command'] == 'history'), isEmpty);
+      controller.setActivityCurrent(true);
+      await controller.refresh();
+      expect(
+        controller.state.historyState,
+        core.ProviderHistoryState.available,
+      );
+      expect(controller.state.history.single.requestId, providerId);
+      expect(
+        controller.state.history.single.outcome,
+        core.ProviderHistoryOutcome.succeeded,
+      );
+      expect(
+        controller.state.history.single.atUnixSeconds,
+        BigInt.from(1700000000),
+      );
+      expect(controller.state.canDecide, false);
+      expect(controller.state.statusId, isEmpty);
+      expect(native.settlementAttempts, isEmpty);
+      expect(native.commands.last, {
+        'version': 1,
+        'command': 'history',
+        'limit': 50,
+      });
+      await controller.perform(
+        core.ProviderCommand.approve,
+        password: 'synthetic',
+      );
+      expect(native.commands.where((c) => c['command'] == 'decision'), isEmpty);
+      controller.dispose();
+    },
+  );
+
+  test('history clears on navigation, suspension, failed metadata and provider change', () async {
+    for (final transition in [
+      'navigation',
+      'suspend',
+      'metadata',
+      'provider',
+      'route',
+    ]) {
+      final native = FixtureProviderPlatform();
+      final controller = ProviderController(native);
+      await controller.initialize();
+      controller.setActivityCurrent(true);
+      await controller.refresh();
+      expect(controller.state.history, isNotEmpty);
+      if (transition == 'navigation') {
+        controller.setActivityCurrent(false);
+        controller.invalidate();
+      } else if (transition == 'route') {
+        controller.setRouteCurrent(false);
+      } else {
+        controller.suspend();
+      }
+      expect(controller.state.history, isEmpty);
+      if (transition == 'metadata') {
+        native.failConfiguration = true;
+        controller.resume();
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.connected, false);
+        expect(controller.state.history, isEmpty);
+      }
+      if (transition == 'provider') {
+        native.saved = ProviderConfiguration(
+          configured: true,
+          endpoint: 'https://new.example',
+          pin: 'c' * 64,
+          fingerprint: 'd' * 64,
+        );
+        native.historyReply = encoded({
+          'version': 1,
+          'history_version': 1,
+          'events': [],
+        });
+        controller.resume();
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.configuration.endpoint, 'https://new.example');
+        expect(controller.state.history, isEmpty);
+      }
+      controller.dispose();
+    }
+  });
+
+  test('late history after lifecycle retirement cannot restore display or authority', () async {
+    for (final transition in ['navigation', 'background', 'route', 'dispose']) {
+      final native = FixtureProviderPlatform()
+        ..heldHistory = Completer<Uint8List>();
+      final controller = ProviderController(native);
+      await controller.initialize();
+      final read = controller.perform(core.ProviderCommand.history);
+      expect(controller.state.historyState, core.ProviderHistoryState.loading);
+      switch (transition) {
+        case 'navigation':
+          controller.invalidate();
+        case 'background':
+          controller.suspend();
+        case 'route':
+          controller.setRouteCurrent(false);
+        case 'dispose':
+          controller.dispose();
+      }
+      native.heldHistory!.complete(encoded(providerHistory()));
+      expect(await read, false);
+      expect(controller.state.history, isEmpty);
+      expect(controller.state.canDecide, false);
+      expect(controller.state.outcome, core.ProviderOutcome.stale);
+      if (transition != 'dispose') controller.dispose();
+    }
+  });
+
+  test('old malformed and sensitive history responses are unavailable without permissive parsing', () async {
+    final sensitive = providerHistory();
+    (sensitive['events'] as List).first['password'] = 'synthetic-forbidden';
+    for (final response in [
+      encoded({'version': 1, 'error': 'invalid_request'}),
+      encoded({'version': 1, 'history_version': 9, 'events': []}),
+      encoded(sensitive),
+      Uint8List(1048577),
+    ]) {
+      final native = FixtureProviderPlatform()..historyReply = response;
+      final controller = ProviderController(native);
+      await controller.initialize();
+      controller.setActivityCurrent(true);
+      await controller.refresh();
+      expect(
+        controller.state.historyState,
+        core.ProviderHistoryState.unavailable,
+      );
+      expect(controller.state.history, isEmpty);
+      expect(controller.state.canDecide, false);
+      expect(native.settlementAttempts, isEmpty);
+      controller.dispose();
+    }
+  });
+
+  test(
+    'completed history cannot settle or bypass uncertain decision recovery',
+    () async {
+      final native = FixtureProviderPlatform()..loseDecision = true;
+      native.historyReply = encoded(providerHistory(outcome: 'succeeded'));
+      final controller = ProviderController(native);
+      await controller.initialize();
+      await controller.review(providerId);
+      await controller.decide(true, 'synthetic');
+      final count = native.commands.length;
+      controller.setActivityCurrent(true);
+      expect(await controller.perform(core.ProviderCommand.history), false);
+      await controller.refresh();
+      expect(controller.recoveryId, providerId);
+      expect(native.saved.uncertainId, providerId);
+      expect(native.settlementAttempts, isEmpty);
+      expect(
+        native.commands
+            .skip(count)
+            .every(
+              (c) => c['command'] == 'status' && c['request_id'] == providerId,
+            ),
+        true,
+      );
+      expect(
+        native.commands.where((c) => c['command'] == 'decision'),
+        hasLength(1),
+      );
+      expect(controller.state.history, isEmpty);
+      controller.dispose();
+    },
+  );
+
+  test('activity follows committed execution after durable recovery under fresh authority', () async {
+    final native = FixtureProviderPlatform();
+    final controller = ProviderController(native);
+    await controller.initialize();
+    await controller.review(providerId);
+    await controller.decide(true, 'synthetic');
+    expect(controller.recoveryId, isEmpty);
+    expect(native.settled, [providerId]);
+    expect(
+      controller.state.statusProgress,
+      core.ProviderStatusProgress.committed,
+    );
+    controller.setActivityCurrent(true);
+    final count = native.commands.length;
+    await controller.refresh();
+    expect(native.commands.skip(count).map((c) => c['command']), [
+      'status',
+      'session',
+      'history',
+    ]);
+    expect(controller.state.history, isNotEmpty);
+    expect(controller.state.statusId, providerId);
+    expect(
+      controller.state.statusProgress,
+      core.ProviderStatusProgress.committed,
+    );
+    final next = native.commands.length;
+    await controller.refresh();
+    expect(native.commands[next]['command'], 'status');
+    expect(native.settlementAttempts, [providerId]);
+    expect(
+      native.commands.where((c) => c['command'] == 'decision'),
+      hasLength(1),
+    );
+    controller.dispose();
+  });
+
   test('clear-then-throw settlement recovers only after same-provider empty metadata', () async {
     final native = FixtureProviderPlatform()..clearThenFailSettlement = true;
     final controller = ProviderController(native);

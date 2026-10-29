@@ -56,6 +56,7 @@ enum ProbeCheck {
   managementDetail,
   managementPrepared,
   managementOutcome,
+  history,
 }
 
 var phase = ProbePhase.startup;
@@ -292,7 +293,44 @@ Future<void> main() async {
           controller.configuration.configured,
           ProbeCheck.configuredLoopback,
         );
-        if (scenario == 'controller-unlock') {
+        if (scenario.startsWith('controller-history')) {
+          controller.setActivityCurrent(true);
+          await controller.refresh();
+          if (scenario == 'controller-history') {
+            check(
+              controller.state.historyState ==
+                      core.ProviderHistoryState.available &&
+                  controller.state.history.length == 2 &&
+                  controller.state.history.first.requestId == id &&
+                  controller.state.history.first.outcome ==
+                      core.ProviderHistoryOutcome.succeeded &&
+                  controller.state.history.last.atUnixSeconds == null &&
+                  controller.state.history.last.requestId == 'B' * 43 &&
+                  controller.state.statusId.isEmpty &&
+                  controller.state.uncertainId.isEmpty &&
+                  !controller.state.canDecide,
+              ProbeCheck.history,
+            );
+            controller.setActivityCurrent(false);
+            await controller.review(controller.state.history.first.requestId);
+            check(
+              controller.state.reviewId == id && controller.state.canDecide,
+              ProbeCheck.reviewDecidable,
+            );
+          } else {
+            check(
+              controller.state.historyState ==
+                      core.ProviderHistoryState.unavailable &&
+                  controller.state.history.isEmpty &&
+                  !controller.state.canDecide,
+              ProbeCheck.history,
+            );
+          }
+          check(
+            (await configuration()).uncertainId.isEmpty,
+            ProbeCheck.settledNativeMarker,
+          );
+        } else if (scenario == 'controller-unlock') {
           check(controller.state.locked, ProbeCheck.negativeClosed);
           await controller.unlock('synthetic-only');
           check(!controller.state.locked, ProbeCheck.sessionUnlocked);

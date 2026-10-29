@@ -108,6 +108,7 @@ class _ProviderPageState extends State<ProviderPage>
     if (next == destination && !detailOpen) return;
     controller.invalidate(); // mutation: navigation retirement
     controller.devicesVisible = next == AccessDestination.devices;
+    controller.setActivityCurrent(next == AccessDestination.activity);
     setState(() {
       destination = next;
       detailOpen = false;
@@ -119,6 +120,7 @@ class _ProviderPageState extends State<ProviderPage>
   void backToRequests() {
     controller.invalidate(); // mutation: back retirement
     controller.devicesVisible = false;
+    controller.setActivityCurrent(false);
     setState(() {
       destination = AccessDestination.requests;
       detailOpen = false;
@@ -129,6 +131,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void openRequest(String id) {
     controller.devicesVisible = false;
+    controller.setActivityCurrent(false);
     resetContentScroll();
     setState(() {
       destination = AccessDestination.requests;
@@ -475,13 +478,24 @@ class _ProviderPageState extends State<ProviderPage>
             ),
             AccessDestination.activity => ProviderActivity(
               state: state,
+              connected: controller.connected,
+              configured: controller.configuration.configured,
+              recoveryPending: controller.recoveryId.isNotEmpty,
+              managementPending: controller.managementPending,
+              onRefresh:
+                  controller.busy ||
+                      !controller.eligible ||
+                      controller.managementPending
+                  ? null
+                  : controller.refresh,
               onReopen:
-                  state.statusId.isEmpty ||
+                  !controller.connected ||
                       state.locked ||
                       controller.busy ||
-                      controller.recoveryId.isNotEmpty
+                      (controller.recoveryId.isNotEmpty ||
+                          controller.managementPending)
                   ? null
-                  : () => openRequest(state.statusId),
+                  : openRequest,
             ),
             AccessDestination.settings => settings(),
           };

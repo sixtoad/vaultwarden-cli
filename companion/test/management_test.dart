@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/provider/controller.dart';
 import 'package:companion_slice/provider/devices_view.dart';
+import 'package:companion_slice/provider/support_views.dart';
 import 'package:companion_slice/design/access_theme.dart';
 import 'package:companion_slice/src/rust/api/management.dart' as management;
 import 'package:companion_slice/src/rust/frb_generated.dart';
@@ -227,6 +228,49 @@ void main() {
         p.commands.where((v) => ['decision', 'unlock'].contains(v['command'])),
         isEmpty,
       );
+      c.dispose();
+    },
+  );
+  testWidgets(
+    'Activity explains administrative recovery and sends only status',
+    (tester) async {
+      final p = ManagementPlatform()
+        ..lost = true
+        ..cleanup = 'unknown';
+      final c = ProviderController(p);
+      await c.initialize();
+      await prepare(c);
+      await c.revokeIdentity('synthetic');
+      c.setActivityCurrent(true);
+      c.invalidate();
+      final before = p.commands.length;
+      await c.refresh();
+      expect(p.commands.skip(before).map((v) => v['command']), [
+        'identity_status',
+      ]);
+      expect(c.managementPending, true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ProviderActivity(
+              state: c.state,
+              connected: c.connected,
+              configured: true,
+              recoveryPending: false,
+              managementPending: c.managementPending,
+              onRefresh: null,
+              onReopen: null,
+            ),
+          ),
+        ),
+      );
+      expect(
+        find.textContaining('original administrative action is unresolved'),
+        findsOneWidget,
+      );
+      expect(find.text('Open request with fresh review'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
       c.dispose();
     },
   );

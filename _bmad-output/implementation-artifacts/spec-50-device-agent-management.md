@@ -125,6 +125,11 @@ availability and stopped fixed-service verification. Regression tests cover thes
 boundaries. Final runtime delivery remains subject to PR #57 CI; this status
 records implementation and source-review completion, not an unrun CI result.
 
+Current main `07b10e7` was integrated after Activity #54 merged. Independent
+integration review required Activity to expose administrative recovery explicitly;
+the combined controller/UI regression verifies status-only traffic and blocks
+history/reopening until that action is reconciled. Both APIs were regenerated.
+
 ## Suggested Review Order
 
 **Authority and consequences**

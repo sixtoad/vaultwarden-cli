@@ -49,7 +49,8 @@ class FixtureProviderPlatform implements ProviderPlatform {
   final List<Map<String, dynamic>> commands = [];
   final List<String> settled = [];
   final List<String> settlementAttempts = [];
-  Completer<Uint8List>? heldReview, heldDecision, heldSession;
+  Completer<Uint8List>? heldReview, heldDecision, heldSession, heldHistory;
+  Uint8List? historyReply;
   Completer<ProviderConfiguration>? heldConfiguration, heldSetup;
   Completer<void>? heldSettlement;
   bool failSettlement = false, failConfiguration = false;
@@ -98,6 +99,14 @@ class FixtureProviderPlatform implements ProviderPlatform {
         return encoded({'version': 1, 'state': 'unlocked', 'generation': 1});
       case 'list':
         return encoded({'version': 1, 'requests': requestIds});
+      case 'history':
+        if (heldHistory != null) return heldHistory!.future;
+        return historyReply ??
+            encoded(
+              providerHistory(
+                outcome: status == 'denied' ? 'denied' : 'submitted',
+              ),
+            );
       case 'review':
         return heldReview == null
             ? encoded(reviewReply ?? providerReview())
@@ -156,3 +165,20 @@ class FixtureProviderPlatform implements ProviderPlatform {
     return () => invalidate = null;
   }
 }
+
+Map<String, dynamic> providerHistory({
+  String outcome = 'succeeded',
+  String id = providerId,
+}) => {
+  'version': 1,
+  'history_version': 1,
+  'events': <Map<String, dynamic>>[
+    {
+      'request_id': id,
+      'operation': 'deploy',
+      'at_unix_seconds': 1700000000,
+      'ordinal': 1,
+      'outcome': outcome,
+    },
+  ],
+};

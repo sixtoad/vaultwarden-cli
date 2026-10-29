@@ -39,6 +39,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProviderReview dco_decode_box_autoadd_provider_review(dynamic raw);
 
   @protected
+  BigInt dco_decode_box_autoadd_u_64(dynamic raw);
+
+  @protected
   Completion dco_decode_completion(dynamic raw);
 
   @protected
@@ -78,6 +81,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<ProviderHistoryEvent> dco_decode_list_provider_history_event(
+    dynamic raw,
+  );
+
+  @protected
   List<ProviderReviewCredential> dco_decode_list_provider_review_credential(
     dynamic raw,
   );
@@ -104,10 +112,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProviderReview? dco_decode_opt_box_autoadd_provider_review(dynamic raw);
 
   @protected
+  BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
+
+  @protected
   Outcome dco_decode_outcome(dynamic raw);
 
   @protected
   ProviderCommand dco_decode_provider_command(dynamic raw);
+
+  @protected
+  ProviderHistoryEvent dco_decode_provider_history_event(dynamic raw);
+
+  @protected
+  ProviderHistoryOutcome dco_decode_provider_history_outcome(dynamic raw);
+
+  @protected
+  ProviderHistoryState dco_decode_provider_history_state(dynamic raw);
 
   @protected
   ProviderOutcome dco_decode_provider_outcome(dynamic raw);
@@ -165,6 +185,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
   Completion sse_decode_completion(SseDeserializer deserializer);
 
   @protected
@@ -208,6 +231,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<ProviderHistoryEvent> sse_decode_list_provider_history_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ProviderReviewCredential> sse_decode_list_provider_review_credential(
     SseDeserializer deserializer,
   );
@@ -240,10 +268,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
   Outcome sse_decode_outcome(SseDeserializer deserializer);
 
   @protected
   ProviderCommand sse_decode_provider_command(SseDeserializer deserializer);
+
+  @protected
+  ProviderHistoryEvent sse_decode_provider_history_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ProviderHistoryOutcome sse_decode_provider_history_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ProviderHistoryState sse_decode_provider_history_state(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProviderOutcome sse_decode_provider_outcome(SseDeserializer deserializer);
@@ -310,6 +356,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
   void sse_encode_completion(Completion self, SseSerializer serializer);
 
   @protected
@@ -361,6 +410,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_provider_history_event(
+    List<ProviderHistoryEvent> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_provider_review_credential(
     List<ProviderReviewCredential> self,
     SseSerializer serializer,
@@ -406,11 +461,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_outcome(Outcome self, SseSerializer serializer);
 
   @protected
   void sse_encode_provider_command(
     ProviderCommand self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_provider_history_event(
+    ProviderHistoryEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_provider_history_outcome(
+    ProviderHistoryOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_provider_history_state(
+    ProviderHistoryState self,
     SseSerializer serializer,
   );
 

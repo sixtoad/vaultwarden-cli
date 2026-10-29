@@ -9,8 +9,8 @@ The final source revision and CI run are recorded in the draft pull request.
 
 ## Local evidence (macOS, 2026-10-29)
 
-- Pinned Rust 1.88 core: 46 tests passed; stable Clippy and formatting passed.
-- Flutter 3.47.7 / Dart 3.13.5: 81 tests passed, including real generated FFI,
+- Pinned Rust 1.88 core: 51 tests passed; stable Clippy and formatting passed.
+- Flutter 3.47.7 / Dart 3.13.5: 92 tests passed, including real generated FFI,
   provider replacement, process-recreation recovery, paginated polling, stale completions,
   malformed origin, expiry/password clearing, themes and 200% text scaling.
 - Management core mutations: 7/7 detected after successful compilation, with
@@ -61,7 +61,10 @@ with dispatcher liveness, queue capacity and supervisor readiness.
 
 ## Integration notes
 
-PR #54 owns Activity and PR #56 owns installation. This slice adds management
+Current main `07b10e7` (merged Activity PR #54) was integrated before final
+verification; shared controller navigation and pending-management Activity states
+were reviewed and regression-tested. Rust/Dart bindings were regenerated from
+both APIs with pinned tools. PR #56 continues to own installation. This slice adds management
 v2 commands, additive `managementRecovery` native metadata and origin reads;
 it does not own their features. Merge shared controller/configuration changes
 deliberately and regenerate FRB bindings with pinned tools. Preserve both

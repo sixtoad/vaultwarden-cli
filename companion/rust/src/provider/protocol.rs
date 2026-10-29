@@ -1,5 +1,7 @@
 //! Frozen v1 wire contract. No provider authority or synthetic proofs live here.
-use crate::api::provider::{ProviderReview, ProviderReviewCredential};
+use crate::api::provider::{
+    ProviderHistoryEvent, ProviderHistoryOutcome, ProviderReview, ProviderReviewCredential,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -234,6 +236,101 @@ pub fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, &'stati
         return Err("Provider response exceeded the size limit.");
     }
     serde_json::from_slice(bytes).map_err(|_| "Provider returned an invalid response.")
+}
+
+// Keep these in sync with the provider's canonical history limits. The companion
+// requests 50; accepting a larger unsolicited result is not pagination.
+pub const DEFAULT_HISTORY_LIMIT: usize = 50;
+pub const MAX_HISTORY_LIMIT: usize = 200;
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryResponse {
+    pub version: u8,
+    pub history_version: u8,
+    #[serde(deserialize_with = "bounded_history")]
+    pub events: Vec<HistoryEvent>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryEvent {
+    pub request_id: String,
+    pub operation: String,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub at_unix_seconds: Option<u64>,
+    pub ordinal: u32,
+    pub outcome: ProviderHistoryOutcome,
+}
+fn bounded_history<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<HistoryEvent>, D::Error> {
+    struct Bounded;
+    impl<'de> serde::de::Visitor<'de> for Bounded {
+        type Value = Vec<HistoryEvent>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("at most 200 history events")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(
+            self,
+            mut seq: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut events = Vec::new();
+            while let Some(event) = seq.next_element()? {
+                if events.len() == MAX_HISTORY_LIMIT {
+                    return Err(serde::de::Error::custom("history limit"));
+                }
+                events.push(event);
+            }
+            Ok(events)
+        }
+    }
+    de.deserialize_seq(Bounded)
+}
+impl HistoryEvent {
+    fn key(&self) -> (Option<u64>, &str, u32) {
+        (self.at_unix_seconds, &self.request_id, self.ordinal)
+    }
+    fn valid(&self) -> bool {
+        valid_id(&self.request_id)
+            && !self.operation.is_empty()
+            && self.operation.len() <= 64
+            && self.operation.bytes().enumerate().all(|(i, b)| {
+                (i == 0 && b.is_ascii_lowercase())
+                    || (i > 0
+                        && (b.is_ascii_lowercase()
+                            || b.is_ascii_digit()
+                            || (b == b'-' && self.operation.as_bytes()[i - 1] != b'-')))
+            })
+            && !self.operation.ends_with('-')
+            && (self.at_unix_seconds.is_some()
+                || self.outcome == ProviderHistoryOutcome::LegacyUnknown)
+    }
+    pub fn projection(&self) -> ProviderHistoryEvent {
+        ProviderHistoryEvent {
+            request_id: self.request_id.clone(),
+            operation: self.operation.clone(),
+            at_unix_seconds: self.at_unix_seconds,
+            ordinal: self.ordinal,
+            outcome: self.outcome,
+        }
+    }
+}
+impl HistoryResponse {
+    pub fn valid(&self, requested: usize) -> bool {
+        self.version == 1
+            && self.history_version == 1
+            && (1..=MAX_HISTORY_LIMIT).contains(&requested)
+            && self.events.len() <= requested
+            && self.events.iter().all(HistoryEvent::valid)
+            && self
+                .events
+                .windows(2)
+                .all(|pair| pair[0].key() > pair[1].key())
+            && self
+                .events
+                .iter()
+                .map(|e| (&e.request_id, e.ordinal))
+                .collect::<HashSet<_>>()
+                .len()
+                == self.events.len()
+    }
 }
 
 #[cfg(test)]

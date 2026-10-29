@@ -59,10 +59,12 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   [identity management contract](issue-50-device-agent-management.md). Enrollment
   remains separate. PR #55 requires future-access denial and provider-owned
   cleanup without terminating consumer programs.
-- [ ] **Remote activity:** allowlisted durable history already exists in
-  `src/access/history.rs`; `src/bin/vw-access.rs:108` exposes `history --limit`.
-  Companion v1 has no history command. Slice one shows latest known status only;
-  a bounded authenticated history endpoint is needed for complete activity.
+- [x] **Remote activity:** authenticated companion history now uses the canonical
+  durable store (50 default, 200 maximum), with a closed display-only projection.
+  Activity fetches up to 50 events, preserves canonical ordering and unknown legacy
+  times, clears on lifecycle/provider changes, and opens an exact-ID fresh review.
+  Older providers report unavailable. History cannot settle an uncertain decision
+  or authorize execution. See the contract and evidence section below.
 - [ ] **Single installation and repair:** Flutter artifacts are development/CI
   bundles (`docs/companion-migration.md:386`). The existing DMG packaging script
   packages the Swift app, not a complete Flutter/CLI installation contract.
@@ -80,7 +82,7 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
 |---|---|---|
 | Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and signed-admission origin (legacy origin explicitly unavailable) |
 | Devices & agents | Provider-backed identities, granted roles/trust, exact-target permanent revocation and status-only recovery (management slice) | Final management verification; genuine mutual enrollment remains separate |
-| Activity | Latest known redacted status with exact request ID; fresh review on reopen | Bounded authenticated durable history |
+| Activity | Bounded durable redacted history; exact-ID fresh review; explicit unavailable/locked/recovery states | Matching-platform and hardware evidence as recorded below |
 | Settings | Existing advanced setup, theme, actual capabilities, separate synthetic diagnostics | Version inspection, bundled CLI repair, native notification settings |
 
 Desktop uses sidebar/master-detail; compact uses bottom navigation/list-to-detail,
@@ -190,3 +192,64 @@ not establish native phone support. These limits keep #50 open.
 Rollback is source/build reversion; no credential or persistent protocol migration
 was introduced. Isolated builds must not replace the installed app or import
 production credentials.
+
+
+## Activity history slice (issue #50)
+
+This slice starts at merged PR #52 (`93431e6460f5a73c1d0f2e8d8fd087bade4e2f54`).
+Earlier first-slice evidence above is historical, not evidence for this change.
+
+The additive command is `{"version":1,"command":"history","limit":50}`.
+Omitting `limit` uses 50; integer values 1–200 are accepted; null, fractional,
+negative, excessive and unknown fields are rejected. Existing v1 commands and
+response shapes remain unchanged. The response contains exactly `version:1`,
+`history_version:1` and `events`. An event contains exactly `request_id`,
+`operation`, nullable `at_unix_seconds`, `ordinal` and the closed canonical
+`outcome` enum. No internal record is serialized directly. Requester UID,
+fingerprint/label, credential metadata, policy digests, tickets, create/SSH
+extensions, write receipts, raw output and diagnostic detail are excluded.
+
+The application uses its established owner through the existing lifecycle gate;
+the caller never supplies an OS identity. The mTLS transport checks enrollment
+before dispatch and again after reading history. History remains available in the
+canonical locked store, but the companion deliberately clears and hides it while
+locked, suspended or disconnected and requires fresh unlocked authority to reload.
+Navigation, replacement, failed metadata reads and stale completions clear or
+reject history. Generation changes retire it with review state.
+
+Ordering is descending `(event time, request ID, ordinal)`, with unknown legacy
+times last. Rust rejects out-of-order and duplicate event identities rather than
+silently sorting untrusted data. Normal timestamps display in UTC; unrepresentable
+Dart dates retain exact Unix seconds. Missing legacy timestamps say unknown.
+
+The client requests 50 and rejects larger unsolicited selections. The provider
+retains at most the requested number during selection (maximum 200). Requests stay
+under 16 KiB and responses under 1 MiB; overflow returns the closed unavailable
+error, never a partial list. The preexisting canonical JSON store still loads its
+whole database: these wire/selection/display bounds are not a claim of bounded
+whole-store memory. No pagination or all-time completeness is claimed.
+
+Older providers reject the additive command using the existing closed v1 error;
+Activity reports unavailable. Unknown versions, fields, outcomes and malformed
+replies fail strict validation. No fallback relaxes the existing review schema.
+History is separate from status/recovery fields and cannot clear native or Rust
+uncertainty. Recovery permits only original-ID status reads; after durable
+settlement, Activity can refresh authority and history while continuing to follow
+committed execution status. Event opening uses the normal exact-ID review path.
+
+Shared seams for later work: `ProviderCommand.history`, `ProviderHistoryEvent`,
+`ProviderHistoryState`, snapshot `authorityKnown/history/historyState`, and
+`ProviderController.setActivityCurrent`. Native adapters and their status-only
+recovery admission are unchanged. No enrollment, Settings, installation or #53
+abuse-protection work is included. The parent issue remains open.
+
+Verification for the final revision is recorded in the PR and the accompanying
+[Activity evidence document](issue-50-activity-evidence.md). Physical lifecycle/assistive-technology checks and
+native phone support remain separate requirements; synthetic responsive captures
+do not establish hardware acceptance.
+
+Current-main integration: PR #55’s canonical `observation_lost` history outcome is
+accepted explicitly and displayed as “Result unknown.” It conveys no consumer
+termination, secret recall, completion or decision authority. Older clients that
+lack this closed enum member fail closed as unavailable; upgrade provider and client
+together. The version and five-field display projection remain unchanged.

@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `session`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 ProviderSnapshot providerSnapshot() =>
     RustLib.instance.api.crateApiProviderProviderSnapshot();
@@ -39,7 +39,81 @@ ProviderSnapshot providerFinish({
   response: response,
 );
 
-enum ProviderCommand { session, list, review, approve, deny, unlock, status }
+enum ProviderCommand {
+  session,
+  list,
+  history,
+  review,
+  approve,
+  deny,
+  unlock,
+  status,
+}
+
+class ProviderHistoryEvent {
+  final String requestId;
+  final String operation;
+  final BigInt? atUnixSeconds;
+  final int ordinal;
+  final ProviderHistoryOutcome outcome;
+
+  const ProviderHistoryEvent({
+    required this.requestId,
+    required this.operation,
+    this.atUnixSeconds,
+    required this.ordinal,
+    required this.outcome,
+  });
+
+  @override
+  int get hashCode =>
+      requestId.hashCode ^
+      operation.hashCode ^
+      atUnixSeconds.hashCode ^
+      ordinal.hashCode ^
+      outcome.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProviderHistoryEvent &&
+          runtimeType == other.runtimeType &&
+          requestId == other.requestId &&
+          operation == other.operation &&
+          atUnixSeconds == other.atUnixSeconds &&
+          ordinal == other.ordinal &&
+          outcome == other.outcome;
+}
+
+enum ProviderHistoryOutcome {
+  submitted,
+  approved,
+  denied,
+  expired,
+  reviewUnavailable,
+  executionStarted,
+  succeeded,
+  executionNonzero,
+  executionSignaled,
+  executionRejected,
+  executionUnavailable,
+  invalidated,
+  recovered,
+  legacyUnknown,
+  reconciled,
+  observationLost,
+}
+
+/// History is display-only; none of these values convey decision authority.
+enum ProviderHistoryState {
+  idle,
+  loading,
+  available,
+  unavailable;
+
+  static Future<ProviderHistoryState> default_() =>
+      RustLib.instance.api.crateApiProviderProviderHistoryStateDefault();
+}
 
 enum ProviderOutcome {
   none,
@@ -146,6 +220,9 @@ class ProviderSnapshot {
   final bool configured;
   final bool busy;
   final bool locked;
+  final bool authorityKnown;
+  final ProviderHistoryState historyState;
+  final List<ProviderHistoryEvent> history;
   final List<String> requests;
   final String reviewText;
   final ProviderReview? review;
@@ -162,6 +239,9 @@ class ProviderSnapshot {
     required this.configured,
     required this.busy,
     required this.locked,
+    required this.authorityKnown,
+    required this.historyState,
+    required this.history,
     required this.requests,
     required this.reviewText,
     this.review,
@@ -180,6 +260,9 @@ class ProviderSnapshot {
       configured.hashCode ^
       busy.hashCode ^
       locked.hashCode ^
+      authorityKnown.hashCode ^
+      historyState.hashCode ^
+      history.hashCode ^
       requests.hashCode ^
       reviewText.hashCode ^
       review.hashCode ^
@@ -200,6 +283,9 @@ class ProviderSnapshot {
           configured == other.configured &&
           busy == other.busy &&
           locked == other.locked &&
+          authorityKnown == other.authorityKnown &&
+          historyState == other.historyState &&
+          history == other.history &&
           requests == other.requests &&
           reviewText == other.reviewText &&
           review == other.review &&

@@ -28,16 +28,19 @@ class DiagnosticsTests(unittest.TestCase):
         cases = next(ast.literal_eval(node.value) for node in ast.walk(tree)
                      if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "cases" for target in node.targets))
         self.assertEqual([case[0] for case in cases[:14]], ["approve", "deny", "wrong-password", "pin", "ca", "foreign-client", "unenrolled-client", "hostname", "expired", "redirect", "oversized", "schema", "lost-response-relaunch", "pending-relaunch"])
-        self.assertEqual(len(cases), 21)
+        self.assertEqual(len(cases), 24)
         self.assertEqual(cases[14][-1], ["session", "unlock", "session", "list", "review", "request_origin", "decision", "status", "status"])
         for case in cases[15:17]:
             self.assertEqual(case[-1], ["session", "review", "decision", "status"])
-        self.assertEqual([case[0] for case in cases[17:]], ["management-agent-revoke", "management-self-revoke", "management-lost-reply-relaunch", "management-pending-relaunch"])
-        for case in cases[17:]:
+        self.assertEqual([case[0] for case in cases[17:21]], ["management-agent-revoke", "management-self-revoke", "management-lost-reply-relaunch", "management-pending-relaunch"])
+        for case in cases[17:21]:
             expected = ["identity_list", "identity_detail", "identity_prepare", "identity_revoke"]
             if "relaunch" in case[0]:
                 expected.append("identity_status")
             self.assertEqual(case[-1], expected)
+        self.assertEqual(cases[21][-1], ["session", "list", "session", "list", "history", "review", "request_origin"])
+        for case in cases[22:]:
+            self.assertEqual(case[-1], ["session", "list", "session", "list", "history"])
         dart = (PROBE.ROOT / "companion/integration_test/provider_tls_smoke.dart").read_text()
         for call in ["ProviderController(native)", "await controller.initialize()", "await controller.unlock(", "await controller.refresh()"]:
             self.assertIn(call, dart)

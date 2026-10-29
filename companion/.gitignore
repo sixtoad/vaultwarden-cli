@@ -12,3 +12,5 @@ macos/Runner.xcworkspace/xcuserdata/
 *.iml
 .build/
 .swiftpm/
+# Diagnostic actual images; reviewed golden references stay under test/goldens/.
+test/failures/

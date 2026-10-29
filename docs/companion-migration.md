@@ -2,8 +2,8 @@
 
 This is a separate development application, not a replacement for the existing
 Swift companion. It shares a Flutter UI and an independent Rust core across
-macOS, Windows and Linux. macOS now connects to the existing Linux provider using
-the unchanged v1 protocol. Windows and Linux clearly report provider transport
+macOS, Windows and Linux. macOS connects to the Linux provider using strict v1 commands, including the
+additive versioned history command described below. Windows and Linux clearly report provider transport
 unavailable. The previous synthetic signing demonstration remains available as a
 separate mode. Existing CLI, Linux secret custody/execution, restricted agent
 identity and production provider sources are unchanged.
@@ -411,3 +411,17 @@ for authority, paging/freshness, permanent revocation, separate cleanup evidence
 owner reconciliation and current verification boundaries. PR #55's no-consumer-
 termination boundary applies. The management UI does not enroll clients, discover
 peers, install desktop tools or implement Activity history.
+## Durable Activity history compatibility
+
+Activity uses authenticated `history` reads and a separate display-only bridge
+model. The complete contract, privacy field review, canonical limits and shared
+seams are documented in [the issue 50 capability checklist](implementation/issue-50-capabilities.md#activity-history-slice-issue-50).
+Old providers remain usable for existing commands; history is honestly unavailable
+when they reject the new command. Session/review shapes are unchanged and unknown
+response fields remain errors. No history entry is authority or settlement proof.
+
+The packaged AOT mTLS fixture adds supported-history, old-provider and malformed
+history scenarios through the generated Rust/Dart bridge and native transport.
+Linux provider tests separately exercise the real provider command, canonical
+store, owner filtering and certificate revocation. These two fixtures establish
+different boundaries; neither claims physical biometric or live production use.

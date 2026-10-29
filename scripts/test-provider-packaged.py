@@ -22,9 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "companion/fixtures/provider_tls.py"
 PHASES = frozenset("startup initializeCore configuration configurationNative configurationDecode configurationUnreadable configurationInvalid configurationIdentity configureCore begin nativeSend finish settle shutdown controller foreground".split())
 PROVISION_PHASES = frozenset("input openKeychain readCertificate findIdentity persistentReference saveConfiguration savedConfiguration savedIdentity savedFingerprint savedMetadata".split())
-CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus foregroundWindow managementInventory managementDetail managementPrepared managementOutcome".split())
-COMMANDS = frozenset("session list unlock review decision status request_origin identity_list identity_detail identity_prepare identity_revoke identity_status".split())
-NATIVE_COMMANDS = frozenset("session list unlock review approve deny status identity_list identity_detail identity_prepare identity_revoke identity_status".split())
+CHECKS = frozenset("none releaseMac ciEnvironment configuredLoopback fingerprint recoveryMarker pendingCoreMarker pendingNativeMarker terminalCoreMarker approvedStatus settledNativeMarker negativeClosed sessionUnlocked reviewDecidable completeArguments decisionStatus inbox terminalStatus foregroundWindow managementInventory managementDetail managementPrepared managementOutcome history".split())
+COMMANDS = frozenset("session list unlock review decision status request_origin identity_list identity_detail identity_prepare identity_revoke identity_status history".split())
+NATIVE_COMMANDS = frozenset("session list unlock review approve deny status identity_list identity_detail identity_prepare identity_revoke identity_status history".split())
 
 
 def progress_diagnostics(stdout, stderr, prefix, phases):
@@ -250,6 +250,9 @@ def main():
             ("management-self-revoke", "management", "client", "ca", "management-self-revoke", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke"]),
             ("management-lost-reply-relaunch", "management-drop", "client", "ca", "management-drop", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke", "identity_status"]),
             ("management-pending-relaunch", "management-drop-pending", "client", "ca", "management-drop", ["identity_list", "identity_detail", "identity_prepare", "identity_revoke", "identity_status"]),
+            ("controller-history", "normal", "client", "ca", "controller-history", ["session", "list", "session", "list", "history", "review", "request_origin"]),
+            ("controller-history-unsupported", "history-unsupported", "client", "ca", "controller-history-unsupported", ["session", "list", "session", "list", "history"]),
+            ("controller-history-invalid", "history-invalid", "client", "ca", "controller-history-invalid", ["session", "list", "session", "list", "history"]),
         ]
         for name, mode, client, ca, scenario, expected_commands in cases:
             report["cases"][name] = {"passed": False, "launches": [],
