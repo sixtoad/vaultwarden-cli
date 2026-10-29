@@ -1,0 +1,11 @@
+{
+  "outcome": "failed",
+  "native_exit_code": 1,
+  "completed_observations": 5,
+  "failure": "python39-kqueue-context-manager-unsupported",
+  "original_result_reporting_defect": "uncaught-runtime-exception-left-blocked-result-without-failure-accounting",
+  "original_reports_preserved": true,
+  "unwaited_direct_children": 0,
+  "registered_descendant_fixtures": 0,
+  "corrected_attempt": "macos-arm64-2026-10-27-attempt-2"
+}

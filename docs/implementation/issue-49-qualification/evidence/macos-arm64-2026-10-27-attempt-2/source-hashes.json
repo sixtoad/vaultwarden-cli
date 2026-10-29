@@ -1,0 +1,16 @@
+{
+  "companion/macos/Runner/NativeTestKey.swift": "469af4cbdc3e79869c02f0612095097d3da7e3956a815b8101d98a7ac7703cfa",
+  "docs/implementation/issue-49-qualification/README.md": "f712895a3e836714c18ea04ca1993e4dea8e89f4557e076c42e761f17c12c034",
+  "docs/implementation/issue-49-qualification/privileged-setup-plan.md": "19da2546f2ac48a4507418743a74fde3a023ea0d4435278190ac823a4d930753",
+  "docs/native-macos-plan.md": "efd61df08c752edd59d046297667f3bcb51d2195b29837364d6757290172c8f1",
+  "scripts/test-macos-boundary.sh": "0665ebbf9cacf2ec39aad2811e611d486b7a4d0df6323ad70180e2fffb40c214",
+  "src/access/ports.rs": "ebe6742171db182986f329a8f87fb5ada340bf30e502524fc9319929c0aa15ad",
+  "src/adapters/execution.rs": "d7c7c36fe0302e0186867b8a7e6488c8806173011ee9de0c1710211d1d0305ba",
+  "src/adapters/supervisor.rs": "bcdaf35e3a5000de3ec1d3e7ba397afe45421953ed2217100f1eaca9ba67d6c1",
+  "src/lib.rs": "7d11c37934ca76d45291fa8d18890fb04b11c25800a4e407fd3403d0a2fdf944",
+  "tests/fixtures/macos-boundary/README.md": "9910949ef6231d4c93c3242bdc9cad0193e277098b86f37f4c037eb8be57a739",
+  "tests/fixtures/macos-boundary/probe.c": "2b5da2ecc39ab211ec052e24890a81b65e6daf1e5d859beac579337ee250c321",
+  "tests/fixtures/macos-boundary/qualify.py": "53195f20645cd2db97546295bf89bb883fadc9ab433a3f85167a55fe90bb4dd4",
+  "tests/fixtures/macos-boundary/test_qualify.py": "e3deaec92a25c0f8f6b5dc951da3d9d4ee65535aaa81db422e39a0aa162ef942",
+  "tests/unsupported_provider_platform.rs": "799b607f110045f8af037c0e215d1fd25e5a980d410afca2c3723ec39713d417"
+}

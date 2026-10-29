@@ -1,0 +1,32 @@
+[
+  {
+    "codesign_fields": {
+      "CDHash": "8e2ef210d86299f4b8b2f95f67bbd8e668af98a1",
+      "Identifier": "probe-original-555549447e6e7a22200031fc976771936853c940",
+      "Signature": "adhoc",
+      "TeamIdentifier": "not set"
+    },
+    "entitlements_requested": {},
+    "hardened_runtime_requested": true,
+    "path": "probe-original",
+    "production_distribution_evidence": false,
+    "sha256": "4c7a91d59019f38f85d57e3392966fc0eba071438219456a0ece87ec24663c91",
+    "signature": "ad-hoc",
+    "strict_verification": "pass"
+  },
+  {
+    "codesign_fields": {
+      "CDHash": "52006be87a6f67e02efb85bae10832d0d0d76742",
+      "Identifier": "probe-replacement-5555494470bc9f883b3e3a638877309fc5d41b9e",
+      "Signature": "adhoc",
+      "TeamIdentifier": "not set"
+    },
+    "entitlements_requested": {},
+    "hardened_runtime_requested": true,
+    "path": "probe-replacement",
+    "production_distribution_evidence": false,
+    "sha256": "e381b9966d7492b06f36e52453e7c7ef50c9041c30a52323b795feabb0efee96",
+    "signature": "ad-hoc",
+    "strict_verification": "pass"
+  }
+]

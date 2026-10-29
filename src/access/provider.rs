@@ -716,6 +716,35 @@ impl Provider {
         ),
         super::direct_request::DirectRequestError,
     > {
+        self.execution_delivery(owner, id, false)
+    }
+    pub(crate) fn claimed_execution(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+    ) -> Result<
+        (
+            super::direct_request::ApprovalBinding,
+            OperationPolicy,
+            Vec<String>,
+        ),
+        super::direct_request::DirectRequestError,
+    > {
+        self.execution_delivery(owner, id, true)
+    }
+    fn execution_delivery(
+        &self,
+        owner: super::direct_request::AuthenticatedHuman,
+        id: &str,
+        claimed: bool,
+    ) -> Result<
+        (
+            super::direct_request::ApprovalBinding,
+            OperationPolicy,
+            Vec<String>,
+        ),
+        super::direct_request::DirectRequestError,
+    > {
         use super::direct_request::*;
         let state = self.store.read_state()?;
         let direct = state
@@ -728,7 +757,10 @@ impl Provider {
         if !Self::agent_current(&state, &direct.agent_owner) {
             return Err(DirectRequestError::Unauthorized);
         }
-        if direct.review.status != DirectStatus::Approved {
+        if (claimed && !direct.execution_claimed)
+            || !(direct.review.status == DirectStatus::Approved
+                || (claimed && direct.review.status == DirectStatus::Running))
+        {
             return Err(DirectRequestError::AlreadyDecided);
         }
         let binding = direct.approval_binding();
@@ -754,7 +786,7 @@ impl Provider {
             arguments.clone(),
             direct.review.expires_at_unix_seconds,
         );
-        expected.status = DirectStatus::Approved;
+        expected.status = direct.review.status.clone();
         expected.requester = direct.review.requester.clone();
         if arguments != direct.review.arguments || expected != direct.review {
             return Err(DirectRequestError::InvalidRequest);
@@ -1091,9 +1123,10 @@ impl Provider {
                 direct.review.status,
                 DirectStatus::Approved | DirectStatus::Running
             )
-            || (direct.review.status == DirectStatus::Running && cleanup != CleanupEvidence::Reaped)
+            || (direct.review.status == DirectStatus::Running
+                && cleanup == CleanupEvidence::NotStarted)
             || (matches!(status, DirectStatus::Completed { .. })
-                && (cleanup != CleanupEvidence::Reaped
+                && (!matches!(cleanup, CleanupEvidence::Reaped | CleanupEvidence::Detached)
                     || direct.review.status != DirectStatus::Running))
         {
             return Err(DirectRequestError::Unavailable);

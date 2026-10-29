@@ -1,0 +1,36 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.48s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.75s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+warning: method `mark_in_use` is never used
+  --> src/access/ports.rs:68:8
+   |
+66 | pub(crate) trait SshMaterial {
+   |                  ----------- method in this trait
+67 |     /// Persist potential consumer ownership before handing material to a helper.
+68 |     fn mark_in_use(&mut self) -> Result<(), ExecutionError> {
+   |        ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `vaultwarden-cli` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.04s
+     Running tests/systemd_supervisor.rs (target/debug/deps/systemd_supervisor-86e7c83b1f689afe)
+
+running 1 test
+real-manager scenario: app-ssh-cancel; provider: vw18-harness-105929-.tmpfWDQVd-app-ssh-cancel.service
+
+thread 'independent_descendants_provider_crash_and_recovery' (105930) panicked at tests/systemd_supervisor.rs:249:9:
+real-manager barrier deadline; stage=Ok("recovered")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test independent_descendants_provider_crash_and_recovery ... FAILED
+
+failures:
+
+failures:
+    independent_descendants_provider_crash_and_recovery
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 40.12s
+
+error: test failed, to rerun pass `--test systemd_supervisor`

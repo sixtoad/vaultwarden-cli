@@ -1,0 +1,62 @@
+{
+  "source_sha256": {
+    "src/access/application.rs": "6c47cfcd143871e52f6518147aee567b406a1ce1d595b1fa9b3fc32a4b9c6a53",
+    "src/access/direct_request_tests.rs": "9b5f57f4d6e30275b6fc134589eca63290dfe9a770e78b77e3c29dfd73900562",
+    "src/adapters/supervisor/real_tests.rs": "94a0d8e8d44a233d5526f3ca2f77ef5e2f67a3d2c6845c91ce7bf281f5e5b36d"
+  },
+  "cases": {
+    "baseline-producer-gate": {
+      "exit_code": 0,
+      "caught_by_test": null,
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--lib",
+        "access::direct_request_tests::protected_create_final_post_serializes_both_cancellation_orderings",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    "producer-write-gate-removed": {
+      "exit_code": 101,
+      "caught_by_test": true,
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--lib",
+        "access::direct_request_tests::protected_create_final_post_serializes_both_cancellation_orderings",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "expected_assertion": "cancel_first=false: cancellation publication was observed during an authorized blocked POST"
+    },
+    "baseline-ssh-marker": {
+      "exit_code": 0,
+      "caught_by_test": null,
+      "command": [
+        "scripts/test-systemd-supervisor.sh"
+      ],
+      "environment": {
+        "VW18_SCENARIO": "app-ssh-cancel"
+      }
+    },
+    "application-ssh-mark-in-use-removed": {
+      "exit_code": 101,
+      "caught_by_test": true,
+      "command": [
+        "scripts/test-systemd-supervisor.sh"
+      ],
+      "expected_assertion": "recovery must retain application-handed-off material: NotFound",
+      "provider_assertion_log": "application-ssh-mark-in-use-removed-provider.log",
+      "environment": {
+        "VW18_SCENARIO": "app-ssh-cancel"
+      }
+    }
+  },
+  "worktree_untouched": true,
+  "source_snapshot_note": "Baseline sources retained under source-snapshot. Root subsequently made test-only clippy/style and descriptor-test isolation changes; application production source is unchanged."
+}

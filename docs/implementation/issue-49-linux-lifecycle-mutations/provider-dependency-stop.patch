@@ -1,0 +1,10 @@
+--- a/src/adapters/supervisor/manager.rs
++++ b/src/adapters/supervisor/manager.rs
+@@ -720,6 +720,7 @@
+         property("ExecStart", vec![(helper, args, false)]),
+         property("Slice", "app.slice".to_owned()),
+         property("Type", "exec".to_owned()),
++        property("BindsTo", vec![config.provider.clone()]),
+         property("ExitType", "cgroup".to_owned()),
+         property("KillMode", "none".to_owned()),
+         property("CollectMode", "inactive-or-failed".to_owned()),

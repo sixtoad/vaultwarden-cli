@@ -1,0 +1,5 @@
+{
+  "src/access/direct_request_tests.rs": "9b5f57f4d6e30275b6fc134589eca63290dfe9a770e78b77e3c29dfd73900562",
+  "src/access/application.rs": "6c47cfcd143871e52f6518147aee567b406a1ce1d595b1fa9b3fc32a4b9c6a53",
+  "src/adapters/supervisor/real_tests.rs": "94a0d8e8d44a233d5526f3ca2f77ef5e2f67a3d2c6845c91ce7bf281f5e5b36d"
+}

@@ -1,0 +1,3219 @@
+//! Serialized session authority. No adapter or caller can obtain resolved values.
+use super::provisioning::{ProvisioningError, bounded};
+use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider::Provider};
+use std::{
+    sync::{
+        Arc, Condvar, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+    time::Duration,
+};
+
+#[cfg(test)]
+type CleanupWaitHook = std::cell::RefCell<Option<Box<dyn FnOnce()>>>;
+#[cfg(test)]
+thread_local! { static CLEANUP_WAIT_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static AGENT_REVOKE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static SIGNED_COMMIT_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { static PAIR_AGENT_GATE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static PRODUCER_WRITE_GATE_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static PRODUCER_WRITE_FINISHED_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+#[cfg(test)]
+thread_local! { pub(crate) static EXECUTION_CANCEL_PUBLISHED_HOOK: CleanupWaitHook = std::cell::RefCell::new(None); }
+
+pub const MAX_SESSION: Duration = Duration::from_secs(15 * 60);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SessionStatus {
+    Locked,
+    Unlocked,
+}
+struct Authority {
+    provider: Provider,
+    backend: Box<dyn SecretBackend>,
+    deadline: Option<Duration>,
+    cleanup_failed: bool,
+    generation: u64,
+    session_epoch: u64,
+    request_deadlines: std::collections::HashMap<String, Duration>,
+    request_agents: std::collections::HashMap<String, String>,
+}
+pub struct ProviderApplication {
+    gate: Mutex<Authority>,
+    clock: Box<dyn SessionClock>,
+    closing: AtomicBool,
+    /// Published before `lock` waits for the serialized backend gate. A
+    /// resolver which started before that request must not launch afterwards.
+    revocation_epoch: AtomicU64,
+    request_lifetime: Duration,
+    owner: AuthenticatedHuman,
+    release_gate: Mutex<()>,
+    executions: Mutex<std::collections::HashMap<String, ActiveExecution>>,
+    agent_tokens: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+    reaped: Condvar,
+    cleanup_uncertain: AtomicBool,
+}
+struct ActiveExecution {
+    cancel: Arc<AtomicBool>,
+    agent_id: Option<String>,
+}
+struct ApplicationExecution<'a> {
+    app: &'a ProviderApplication,
+    owner: AuthenticatedHuman,
+    binding: &'a ApprovalBinding,
+    epoch: u64,
+    deadline: Duration,
+    cancel: Arc<AtomicBool>,
+    agent_token: Option<Arc<AtomicBool>>,
+}
+impl ApplicationExecution<'_> {
+    fn live_fast(&self) -> bool {
+        !self.cancel.load(Ordering::Acquire)
+            && self
+                .agent_token
+                .as_ref()
+                .is_none_or(|token| !token.load(Ordering::Acquire))
+            && !self.app.closing.load(Ordering::Acquire)
+            && self.app.revocation_epoch.load(Ordering::Acquire) == self.epoch
+            && self.app.clock.now() < self.deadline
+    }
+}
+impl ExecutionControl for ApplicationExecution<'_> {
+    fn live(&self) -> bool {
+        if !self.live_fast() {
+            return false;
+        }
+        match self.app.gate.lock() {
+            Ok(authority) => authority
+                .provider
+                .execution_matches(self.binding)
+                .unwrap_or(false),
+            Err(_) => false,
+        }
+    }
+    fn remaining(&self) -> Duration {
+        self.deadline.saturating_sub(self.app.clock.now())
+    }
+    fn release(
+        &self,
+        action: &mut dyn FnMut() -> Result<(), ExecutionError>,
+    ) -> Result<(), ExecutionError> {
+        let mut authority = self
+            .app
+            .gate
+            .lock()
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        self.app
+            .execution_authority_current(
+                &mut authority,
+                self.owner,
+                &self.binding.request_id,
+                Some(self.binding),
+                self.epoch,
+            )
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        let _release = self
+            .app
+            .release_gate
+            .lock()
+            .map_err(|_error| ExecutionError::Cancelled)?;
+        if !self.live_fast() {
+            return Err(ExecutionError::Cancelled);
+        }
+        action()
+    }
+    fn started(&self) -> Result<(), ExecutionError> {
+        let result = self
+            .app
+            .gate
+            .lock()
+            .map_err(|_error| ExecutionError::ExecutionFailed)?
+            .provider
+            .execution_started(self.binding);
+        if result.is_err() {
+            self.app.close_admission();
+        }
+        result.map_err(|_error| ExecutionError::ExecutionFailed)
+    }
+}
+impl ProviderApplication {
+    pub fn new(
+        provider: Provider,
+        backend: Box<dyn SecretBackend>,
+        clock: Box<dyn SessionClock>,
+    ) -> Result<Self, SessionError> {
+        Self::new_with_request_lifetime(provider, backend, clock, DEFAULT_REQUEST_LIFETIME)
+    }
+    pub fn new_with_request_lifetime(
+        provider: Provider,
+        backend: Box<dyn SecretBackend>,
+        clock: Box<dyn SessionClock>,
+        request_lifetime: Duration,
+    ) -> Result<Self, SessionError> {
+        if request_lifetime.as_secs() == 0 || request_lifetime > Duration::from_secs(86400) {
+            return Err(SessionError::InvalidRequest);
+        }
+        let owner = AuthenticatedHuman::from_peer_uid(provider.owner_uid());
+        let agent_tokens = provider
+            .list_agents(owner)
+            .map_err(|_error| SessionError::CleanupFailed)?
+            .into_iter()
+            .map(|binding| {
+                (
+                    binding.id,
+                    Arc::new(AtomicBool::new(
+                        binding.status == super::agent_binding::AgentBindingStatus::Revoked,
+                    )),
+                )
+            })
+            .collect();
+        let app = Self {
+            gate: Mutex::new(Authority {
+                provider,
+                backend,
+                deadline: None,
+                cleanup_failed: true,
+                generation: 0,
+                session_epoch: 0,
+                request_deadlines: std::collections::HashMap::new(),
+                request_agents: std::collections::HashMap::new(),
+            }),
+            clock,
+            closing: AtomicBool::new(false),
+            revocation_epoch: AtomicU64::new(0),
+            request_lifetime,
+            owner,
+            release_gate: Mutex::new(()),
+            executions: Mutex::new(std::collections::HashMap::new()),
+            agent_tokens: Mutex::new(agent_tokens),
+            reaped: Condvar::new(),
+            cleanup_uncertain: AtomicBool::new(false),
+        };
+        app.lock()?;
+        Ok(app)
+    }
+    fn revoke(authority: &mut Authority) -> Result<(), SessionError> {
+        authority.generation = authority
+            .generation
+            .checked_add(1)
+            .ok_or(SessionError::CleanupFailed)?;
+        authority.deadline = None;
+        authority.request_deadlines.clear();
+        authority.cleanup_failed = true;
+        // Attempt both cleanups even if either fails. Revocation precedes fallible I/O.
+        let backend = authority.backend.clear();
+        let store = authority.provider.lock();
+        if backend.is_err() || store.is_err() {
+            return Err(SessionError::CleanupFailed);
+        }
+        authority.cleanup_failed = false;
+        Ok(())
+    }
+    fn admit(&self, authority: &mut Authority) -> Result<(), SessionError> {
+        if self.closing.load(Ordering::Acquire) {
+            Self::revoke(authority)?;
+            return Err(SessionError::Locked);
+        }
+        match authority.deadline {
+            Some(deadline) if self.clock.now() < deadline && !authority.cleanup_failed => Ok(()),
+            Some(_) => {
+                Self::revoke(authority)?;
+                Err(SessionError::Locked)
+            }
+            None => Err(SessionError::Locked),
+        }
+    }
+    pub fn lock(&self) -> Result<(), SessionError> {
+        {
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| SessionError::CleanupFailed)?;
+            self.revocation_epoch.fetch_add(1, Ordering::AcqRel);
+        }
+        let result = {
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| SessionError::CleanupFailed)?;
+            Self::revoke(&mut authority)
+        };
+        self.await_cleanup(None)?;
+        result
+    }
+    pub fn shutdown(&self) -> Result<(), SessionError> {
+        self.close_admission();
+        self.lock()
+    }
+    pub fn close_admission(&self) {
+        // A release already linearized remains valid; its observer may detach.
+        let _release = self.release_gate.lock().unwrap_or_else(|e| e.into_inner());
+        self.closing.store(true, Ordering::Release);
+    }
+    fn await_cleanup(&self, id: Option<&str>) -> Result<(), SessionError> {
+        let active = self
+            .executions
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        let (active, wait) = self
+            .reaped
+            .wait_timeout_while(active, Duration::from_secs(20), |active| {
+                id.map_or(!active.is_empty(), |id| active.contains_key(id))
+            })
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        let uncertain = wait.timed_out()
+            && id.map_or(!active.is_empty(), |id| active.contains_key(id))
+            || self.cleanup_uncertain.load(Ordering::Acquire);
+        // Cancellation acquires release_gate before executions; never invert it.
+        drop(active);
+        #[cfg(test)]
+        CLEANUP_WAIT_HOOK.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe();
+            }
+        });
+        if uncertain {
+            self.close_admission();
+            return Err(SessionError::CleanupFailed);
+        }
+        Ok(())
+    }
+    /// Lifecycle hook for an authenticated request transport, separate from UI authentication cancellation.
+    pub fn cancel_execution(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<(), DirectRequestError> {
+        self.check_owner(owner)?;
+        {
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let active = self
+                .executions
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if let Some(cancel) = active.get(id) {
+                cancel.cancel.store(true, Ordering::Release);
+                #[cfg(test)]
+                EXECUTION_CANCEL_PUBLISHED_HOOK.with(|hook| {
+                    if let Some(observe) = hook.borrow_mut().take() {
+                        observe();
+                    }
+                });
+                drop(active);
+                drop(_release);
+                return self.await_cleanup(Some(id)).map_err(Into::into);
+            }
+        }
+        // Claim holds authority through registration. Recheck after acquiring it:
+        // either claim won and we cancel active work, or the durable approval is
+        // invalidated before a queued worker can claim it. Match release's lock
+        // order; never wait for authority while retaining release_gate.
+        let result = {
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let active = self
+                .executions
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if let Some(cancel) = active.get(id) {
+                cancel.cancel.store(true, Ordering::Release);
+                Ok(())
+            } else {
+                authority.provider.cancel_unclaimed_execution(owner, id)
+            }
+        };
+        if result == Err(DirectRequestError::Unavailable) {
+            self.close_admission();
+        }
+        result?;
+        self.await_cleanup(Some(id)).map_err(Into::into)
+    }
+    pub fn pair_agent(
+        &self,
+        human: AuthenticatedHuman,
+        input: super::agent_binding::AgentPairing,
+    ) -> Result<super::agent_binding::AgentBindingView, DirectRequestError> {
+        self.check_owner(human)?;
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        #[cfg(test)]
+        PAIR_AGENT_GATE_HOOK.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe();
+            }
+        });
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let result = authority
+            .provider
+            .pair_agent(human, input, self.clock.unix_seconds()?);
+        match &result {
+            Ok(binding) => {
+                // Publish only after the durable transaction, in gate -> release order.
+                let _release = self
+                    .release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                if self.admission_closed() {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                self.agent_tokens
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?
+                    .insert(binding.id.clone(), Arc::new(AtomicBool::new(false)));
+            }
+            Err(DirectRequestError::Unavailable) => self.close_admission(),
+            _ => {}
+        }
+        result
+    }
+    pub fn list_agents(
+        &self,
+        human: AuthenticatedHuman,
+    ) -> Result<Vec<super::agent_binding::AgentBindingView>, DirectRequestError> {
+        self.check_owner(human)?;
+        let result = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .provider
+            .list_agents(human);
+        if result == Err(DirectRequestError::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+    pub fn revoke_agent(
+        &self,
+        human: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::agent_binding::AgentBindingView, DirectRequestError> {
+        self.check_owner(human)?;
+        // Metadata lookup never acquires gate while holding release_gate. Tokens
+        // are immutable by binding ID, including tombstones and retries.
+        {
+            let _release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let tokens = self
+                .agent_tokens
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let token = tokens.get(id).ok_or(DirectRequestError::NotFound)?;
+            token.store(true, Ordering::Release);
+        }
+        #[cfg(test)]
+        AGENT_REVOKE_HOOK.with(|hook| {
+            if let Some(observe) = hook.borrow_mut().take() {
+                observe();
+            }
+        });
+        let (result, affected) = {
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let result = self
+                .clock
+                .unix_seconds()
+                .map_err(DirectRequestError::from)
+                .and_then(|now| authority.provider.revoke_agent(human, id, now));
+            let active = self
+                .executions
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let mut affected = Vec::new();
+            for (request, execution) in active
+                .iter()
+                .filter(|(_, execution)| execution.agent_id.as_deref() == Some(id))
+            {
+                execution.cancel.store(true, Ordering::Release);
+                affected.push(request.clone());
+            }
+            (result, affected)
+        };
+        if result.is_err() {
+            self.close_admission();
+        }
+        // A claim holds gate until registration. No matching claim can appear
+        // after this snapshot because its token was irreversibly denied above.
+        self.await_agent_cleanup(&affected)?;
+        result
+    }
+    fn await_agent_cleanup(&self, ids: &[String]) -> Result<(), DirectRequestError> {
+        let active = self
+            .executions
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let (active, _wait) = self
+            .reaped
+            .wait_timeout_while(active, Duration::from_secs(20), |active| {
+                ids.iter().any(|id| active.contains_key(id))
+            })
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let uncertain = ids.iter().any(|id| active.contains_key(id))
+            || self.cleanup_uncertain.load(Ordering::Acquire)
+            || self.admission_closed();
+        drop(active);
+        if uncertain {
+            self.close_admission();
+            return Err(DirectRequestError::Unavailable);
+        }
+        Ok(())
+    }
+    fn agent_token(
+        &self,
+        owner: &Option<AgentOwner>,
+    ) -> Result<Option<Arc<AtomicBool>>, DirectRequestError> {
+        owner
+            .as_ref()
+            .map(|owner| {
+                self.agent_tokens
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?
+                    .get(&owner.binding_id)
+                    .cloned()
+                    .ok_or(DirectRequestError::Unauthorized)
+            })
+            .transpose()
+    }
+    fn token_live(token: &Option<Arc<AtomicBool>>) -> bool {
+        token
+            .as_ref()
+            .is_none_or(|token| !token.load(Ordering::Acquire))
+    }
+    fn request_agent_live(
+        &self,
+        authority: &Authority,
+        id: &str,
+    ) -> Result<(), DirectRequestError> {
+        if let Some(agent) = authority.request_agents.get(id) {
+            let tokens = self
+                .agent_tokens
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if tokens
+                .get(agent)
+                .is_none_or(|token| token.load(Ordering::Acquire))
+            {
+                return Err(DirectRequestError::Unauthorized);
+            }
+        }
+        Ok(())
+    }
+    #[allow(dead_code)] // Exact poll ownership shared with the later authenticated transport.
+    pub(crate) fn agent_status(
+        &self,
+        owner: &AgentOwner,
+        uid: u32,
+        groups: &[u32],
+        id: &str,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let token = self.agent_token(&Some(owner.clone()))?;
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let result = (|| {
+            match self.admit(&mut authority) {
+                Ok(()) | Err(SessionError::Locked) => {}
+                Err(error) => return Err(error.into()),
+            }
+            self.expire_requests(&mut authority)?;
+            authority.provider.agent_status(owner, uid, groups, id)
+        })();
+        if result == Err(DirectRequestError::Unavailable) {
+            self.close_admission();
+        }
+        if self.admission_closed() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        result
+    }
+    /// The adapter must obtain both primary and supplementary groups from the kernel
+    /// and call this before reading or parsing any agent payload.
+    pub fn agent_peer_eligible(
+        &self,
+        uid: u32,
+        groups: &[u32],
+    ) -> Result<(), super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        let result = (|| {
+            if self.admission_closed() {
+                return Err(AgentRejection::Unavailable);
+            }
+            let authority = self.gate.try_lock().map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => AgentRejection::Busy,
+                std::sync::TryLockError::Poisoned(_) => AgentRejection::Unavailable,
+            })?;
+            let ids = authority.provider.eligible_agent_ids(uid, groups)?;
+            let tokens = self
+                .agent_tokens
+                .lock()
+                .map_err(|_error| AgentRejection::Unavailable)?;
+            if !ids.iter().any(|id| {
+                tokens
+                    .get(id)
+                    .is_some_and(|token| !token.load(Ordering::Acquire))
+            }) {
+                return Err(AgentRejection::Unauthorized);
+            }
+            Ok(())
+        })();
+        if result == Err(AgentRejection::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+
+    /// Returns only the ID of the committed pending snapshot. Later lifecycle
+    /// changes are intentionally not observable through this submission response.
+    pub fn submit_signed(
+        &self,
+        uid: u32,
+        groups: &[u32],
+        input: super::protocol::SignedSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<String, super::protocol::AgentRejection> {
+        use super::protocol::AgentRejection;
+        let result = (|| {
+            if self.admission_closed() {
+                return Err(AgentRejection::Unavailable);
+            }
+            let mut authority = self.gate.try_lock().map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => AgentRejection::Busy,
+                std::sync::TryLockError::Poisoned(_) => AgentRejection::Unavailable,
+            })?;
+            self.admit(&mut authority)?;
+            self.expire_requests(&mut authority)?;
+            let epoch = authority.session_epoch;
+            if self.revocation_epoch.load(Ordering::Acquire) != epoch {
+                return Err(AgentRejection::Locked);
+            }
+            let owner = authority.provider.authenticate_agent(uid, groups, &input)?;
+            let token = self.agent_token(&Some(owner.clone()))?;
+            if !Self::token_live(&token) {
+                return Err(AgentRejection::Unauthorized);
+            }
+            let deadline = self
+                .clock
+                .now()
+                .checked_add(self.request_lifetime)
+                .ok_or(AgentRejection::Unavailable)?;
+            let now = self.clock.unix_seconds()?;
+            let expires = now
+                .checked_add(self.request_lifetime.as_secs())
+                .ok_or(AgentRejection::Unavailable)?;
+            let session_deadline = authority.deadline.ok_or(AgentRejection::Locked)?;
+            let live = || {
+                !self.admission_closed()
+                    && Self::token_live(&token)
+                    && self.revocation_epoch.load(Ordering::Acquire) == epoch
+                    && self.clock.now() < session_deadline
+                    && self.clock.now() < deadline
+            };
+            // Same gate -> release order as execution. Revocation intent either
+            // wins before this check, or waits until the guarded snapshot commits.
+            let release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| AgentRejection::Unavailable)?;
+            if !Self::token_live(&token) {
+                return Err(AgentRejection::Unauthorized);
+            }
+            if !live() {
+                return Err(AgentRejection::Locked);
+            }
+            let review =
+                authority
+                    .provider
+                    .create_signed(owner.clone(), input, now, expires, live)?;
+            drop(release);
+            #[cfg(test)]
+            SIGNED_COMMIT_HOOK.with(|hook| {
+                if let Some(observe) = hook.borrow_mut().take() {
+                    observe();
+                }
+            });
+            authority
+                .request_agents
+                .insert(review.id.clone(), owner.binding_id);
+            authority
+                .request_deadlines
+                .insert(review.id.clone(), deadline);
+            // Keep launch linearized with lock/revoke; its capability remains
+            // exclusively in the human adapter. Slow launch retains one bounded job.
+            let release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| AgentRejection::Unavailable)?;
+            if live() && launcher.launch(&review.id).is_err() {
+                authority
+                    .provider
+                    .fail_direct_launch(&review.id)
+                    .map_err(|_error| AgentRejection::Unavailable)?;
+            }
+            drop(release);
+            if self.revocation_epoch.load(Ordering::Acquire) != epoch {
+                Self::revoke(&mut authority)?;
+            } else {
+                match self.admit(&mut authority) {
+                    Ok(()) | Err(SessionError::Locked) => {}
+                    Err(error) => return Err(error.into()),
+                }
+                self.expire_requests(&mut authority)?;
+            }
+            Ok(review.id)
+        })();
+        if result == Err(AgentRejection::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+
+    /// Authenticate every observation and durably consume its nonce before
+    /// returning only the agent lifecycle projection. A locked vault does not
+    /// prevent its still-enabled owner from observing historical work.
+    pub fn signed_agent_status(
+        &self,
+        uid: u32,
+        groups: &[u32],
+        query: &super::protocol::SignedStatusQuery,
+    ) -> Result<super::protocol::AgentStatus, super::protocol::AgentRejection> {
+        use super::protocol::{AgentFailure as F, AgentRejection as E, AgentStatus as S};
+        let result = (|| {
+            if self.admission_closed() {
+                return Err(E::Unavailable);
+            }
+            let mut authority = self.gate.try_lock().map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => E::Busy,
+                std::sync::TryLockError::Poisoned(_) => E::Unavailable,
+            })?;
+            let owner = authority
+                .provider
+                .authenticate_status_query(uid, groups, query)?;
+            let token = self.agent_token(&Some(owner.clone()))?;
+            // Storage must not retain release_gate: control intent can be
+            // published even while refresh or nonce persistence is stalled.
+            if !Self::token_live(&token) {
+                return Err(E::Unauthorized);
+            }
+            if self.admission_closed() {
+                return Err(E::Unavailable);
+            }
+            let refresh = |authority: &mut Authority| -> Result<(), E> {
+                if authority.deadline.is_some()
+                    && self.revocation_epoch.load(Ordering::Acquire) != authority.session_epoch
+                {
+                    Self::revoke(authority)?;
+                }
+                match self.admit(authority) {
+                    Ok(()) | Err(SessionError::Locked) => {}
+                    Err(error) => return Err(error.into()),
+                }
+                self.expire_requests(authority)?;
+                Ok(())
+            };
+            refresh(&mut authority)?;
+            authority.provider.consume_status_query(&owner, query, || {
+                !self.admission_closed() && Self::token_live(&token)
+            })?;
+            // Persistence can be slow: read provider clocks again before taking
+            // the final snapshot. Terminal records remain immutable.
+            refresh(&mut authority)?;
+            let (status, _release) = loop {
+                let status = authority
+                    .provider
+                    .agent_status(&owner, uid, groups, &query.request_id)
+                    .map_err(|error| match error {
+                        DirectRequestError::NotFound | DirectRequestError::Unauthorized => {
+                            E::Unauthorized
+                        }
+                        _ => E::Unavailable,
+                    })?;
+                // Only the in-memory final checks/projection retain the control
+                // gate. If control intent crossed a storage read, refresh outside it.
+                let release = self.release_gate.lock().map_err(|_error| E::Unavailable)?;
+                let now = self.clock.now();
+                let session_expired = authority.deadline.is_some_and(|deadline| now >= deadline);
+                let request_expired =
+                    matches!(status, DirectStatus::Pending | DirectStatus::Approved)
+                        && authority
+                            .request_deadlines
+                            .get(&query.request_id)
+                            .is_some_and(|deadline| now >= *deadline);
+                let session_revoked = authority.deadline.is_some()
+                    && self.revocation_epoch.load(Ordering::Acquire) != authority.session_epoch;
+                if !session_expired && !request_expired && !session_revoked {
+                    break (status, release);
+                }
+                drop(release);
+                // Refresh removes crossed deadlines, so this loop cannot spin
+                // on claimed executions whose nonterminal state must be retained.
+                refresh(&mut authority)?;
+            };
+            if !Self::token_live(&token) {
+                return Err(E::Unauthorized);
+            }
+            if self.admission_closed() {
+                return Err(E::Unavailable);
+            }
+            Ok(match status {
+                DirectStatus::Pending => S::Pending,
+                DirectStatus::Approved => S::Approved,
+                DirectStatus::Running => S::Running,
+                DirectStatus::Denied => S::Denied,
+                DirectStatus::Expired => S::Expired,
+                DirectStatus::Completed { exit_code } if (0..=255).contains(&exit_code) => {
+                    S::Completed { exit_code }
+                }
+                DirectStatus::Completed { .. } => return Err(E::Unavailable),
+                DirectStatus::Failed { reason } => S::Failed {
+                    category: match reason {
+                        DirectFailure::ReviewUnavailable => F::ReviewUnavailable,
+                        DirectFailure::ExecutionUnavailable => F::ExecutionUnavailable,
+                        DirectFailure::ExecutionRejected => F::ExecutionRejected,
+                        DirectFailure::ExecutionNonzero => F::ExecutionNonzero,
+                        DirectFailure::ExecutionSignaled => F::ExecutionSignaled,
+                        DirectFailure::ObservationLost => F::ObservationLost,
+                    },
+                },
+            })
+        })();
+        if result == Err(E::Unavailable) {
+            self.close_admission();
+        }
+        result
+    }
+
+    #[cfg(test)]
+    pub(crate) fn submit_agent_for_test(
+        &self,
+        binding_id: &str,
+        uid: u32,
+        groups: &[u32],
+        input: DirectSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<SubmissionReceipt, DirectRequestError> {
+        let owner = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .provider
+            .agent_binding_for_peer(binding_id, uid, groups)?;
+        self.submit_owned(self.owner, Some(owner), input, launcher)
+    }
+    /// Legacy global human lifecycle hook. Agent administration uses `revoke_agent`.
+    pub fn revoke_requester(&self, owner: AuthenticatedHuman) -> Result<(), DirectRequestError> {
+        self.check_owner(owner)?;
+        self.lock().map_err(Into::into)
+    }
+    pub fn admission_closed(&self) -> bool {
+        self.closing.load(Ordering::Acquire)
+    }
+    pub(crate) fn human_owner(&self) -> AuthenticatedHuman {
+        self.owner
+    }
+    #[cfg(test)]
+    pub(crate) fn revocation_epoch_for_test(&self) -> u64 {
+        self.revocation_epoch.load(Ordering::Acquire)
+    }
+    fn check_owner(&self, owner: AuthenticatedHuman) -> Result<(), DirectRequestError> {
+        if owner != self.owner {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        Ok(())
+    }
+    fn expire_requests(&self, authority: &mut Authority) -> Result<(), SessionError> {
+        let now = self.clock.now();
+        authority
+            .provider
+            .expire_direct(
+                now,
+                || self.clock.unix_seconds(),
+                &authority.request_deadlines,
+            )
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        authority
+            .request_deadlines
+            .retain(|_, deadline| now < *deadline);
+        Ok(())
+    }
+    pub fn submit_direct(
+        &self,
+        owner: AuthenticatedHuman,
+        input: DirectSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<SubmissionReceipt, DirectRequestError> {
+        self.submit_owned(owner, None, input, launcher)
+    }
+    fn submit_owned(
+        &self,
+        owner: AuthenticatedHuman,
+        agent_owner: Option<AgentOwner>,
+        input: DirectSubmission,
+        launcher: &dyn DirectReviewLauncher,
+    ) -> Result<SubmissionReceipt, DirectRequestError> {
+        self.check_owner(owner)?;
+        let token = self.agent_token(&agent_owner)?;
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let mut authority = self
+            .gate
+            .try_lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        let started = self.clock.now();
+        let deadline = started
+            .checked_add(self.request_lifetime)
+            .ok_or(DirectRequestError::Unavailable)?;
+        let now = self.clock.unix_seconds()?;
+        let expires = now
+            .checked_add(self.request_lifetime.as_secs())
+            .ok_or(DirectRequestError::Unavailable)?;
+        let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let live = || {
+            !self.closing.load(Ordering::Acquire)
+                && Self::token_live(&token)
+                && self.clock.now() < session_deadline
+                && self.clock.now() < deadline
+        };
+        let release = if agent_owner.is_some() {
+            Some(
+                self.release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            )
+        } else {
+            None
+        };
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let result = match &agent_owner {
+            None => authority
+                .provider
+                .create_direct(owner, input, now, expires, live),
+            #[cfg(test)]
+            Some(agent) => {
+                authority
+                    .provider
+                    .create_agent_for_test(agent.clone(), input, now, expires, live)
+            }
+            #[cfg(not(test))]
+            Some(_) => return Err(DirectRequestError::Unauthorized),
+        };
+        drop(release);
+        // Once creation succeeds, lifecycle revocation must preserve its receipt.
+        // Observe the deadline before admission so closing during a slow clock or
+        // durable write is checked before any desktop handoff.
+        let request_expired = self.clock.now() >= deadline;
+        let admission = self.admit(&mut authority);
+        let review = match result {
+            Ok(review) => review,
+            Err(error) => {
+                if error == DirectRequestError::Unavailable {
+                    self.close_admission();
+                }
+                admission?;
+                return Err(error);
+            }
+        };
+        if let Some(agent) = &agent_owner {
+            authority
+                .request_agents
+                .insert(review.id.clone(), agent.binding_id.clone());
+        }
+        match admission {
+            Ok(()) => {
+                authority
+                    .request_deadlines
+                    .insert(review.id.clone(), deadline);
+            }
+            Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        if admission.is_err() || request_expired || !Self::token_live(&token) {
+            self.expire_requests(&mut authority)?;
+        } else {
+            let launched = launcher.launch(&review.id);
+            if launched.is_err() {
+                authority.provider.fail_direct_launch(&review.id)?;
+            }
+            // A slow desktop can cross either deadline. A handed-off capability
+            // still has to pass the same authority/status check on exchange.
+            match self.admit(&mut authority) {
+                Ok(()) | Err(SessionError::Locked) => {}
+                Err(e) => return Err(e.into()),
+            }
+            self.expire_requests(&mut authority)?;
+        }
+        let review = authority.provider.direct_review(owner, &review.id)?;
+        Ok(SubmissionReceipt {
+            id: review.id,
+            revision: review.policy_digest,
+            arguments_digest: review.arguments_digest,
+            expires_at_unix_seconds: review.expires_at_unix_seconds,
+            status: review.status,
+        })
+    }
+    /// Human-only read reconciliation; this path has no creation capability.
+    /// # Errors
+    /// Returns an error when validation, authorization, cryptography or backend access fails.
+    pub fn reconcile_write(
+        &self,
+        owner: AuthenticatedHuman,
+        request_id: &str,
+        item_id: &str,
+    ) -> Result<crate::secret_storage::WriteReceipt, DirectRequestError> {
+        self.check_owner(owner)?;
+        if !crate::secret_storage::valid_id(item_id) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        let (effect, receipt) = authority.provider.write_reconciliation(request_id)?;
+        if receipt.item_id.as_ref().is_some_and(|old| old != item_id) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        authority.backend.probe_compatibility()?;
+        self.admit(&mut authority)?;
+        authority.backend.reconcile_secret(&effect, item_id)?;
+        self.admit(&mut authority)?;
+        authority.provider.reconcile_write(request_id, item_id)
+    }
+    pub fn history(
+        &self,
+        owner: AuthenticatedHuman,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        self.check_owner(owner)?;
+        self.history_current(None, limit)
+    }
+    /// Only the browser adapter supplies a generation from a verified cookie/proof session.
+    pub(crate) fn browser_history(
+        &self,
+        generation: u64,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        self.history_current(Some(generation), limit)
+    }
+    fn history_current(
+        &self,
+        generation: Option<u64>,
+        limit: Option<u32>,
+    ) -> Result<Vec<super::history::HistoryEvent>, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        if generation.is_some_and(|g| g != authority.generation) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        super::history::limit(limit)?;
+        self.expire_requests(&mut authority)?;
+        authority.provider.history(self.owner, limit)
+    }
+    pub fn direct_status(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.review_direct(owner, id).map(|r| r.status)
+    }
+    pub fn review_direct(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<DirectReview, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        self.expire_requests(&mut authority)?;
+        authority.provider.direct_review(owner, id)
+    }
+    /// Authenticated companion inbox, read under the same expiry/authority gate.
+    pub(crate) fn companion_pending(&self) -> Result<Vec<String>, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.expire_requests(&mut authority)?;
+        authority.provider.pending_direct_ids(self.owner)
+    }
+    /// Snapshot and generation are captured atomically; no capability leaves core.
+    pub(crate) fn companion_review(
+        &self,
+        id: &str,
+    ) -> Result<(DirectReview, u64), DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.expire_requests(&mut authority)?;
+        Ok((
+            authority.provider.direct_review(self.owner, id)?,
+            authority.generation,
+        ))
+    }
+    pub(crate) fn companion_now(&self) -> Duration {
+        self.clock.now()
+    }
+    pub(crate) fn companion_prepare(
+        &self,
+        id: &str,
+        review: &DirectReview,
+        generation: u64,
+        deadline: Duration,
+    ) -> Result<PreparedApproval, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        self.request_agent_live(&authority, id)?;
+        if authority.generation != generation
+            || authority.provider.direct_review(self.owner, id)? != *review
+        {
+            return Err(DirectRequestError::StaleRevision);
+        }
+        Ok(PreparedApproval {
+            binding: authority.provider.prepare_direct(self.owner, id)?,
+            generation,
+            companion_deadline: Some(deadline),
+        })
+    }
+    pub(crate) fn companion_deny(
+        &self,
+        prepared: PreparedApproval,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.commit_decision(prepared, false)
+    }
+    pub(crate) fn decision_generation(&self) -> Result<u64, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(e) => return Err(e.into()),
+        }
+        Ok(authority.generation)
+    }
+    pub(crate) fn prepare_approval(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<PreparedApproval, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        self.request_agent_live(&authority, id)?;
+        Ok(PreparedApproval {
+            binding: authority.provider.prepare_direct(owner, id)?,
+            generation: authority.generation,
+            companion_deadline: None,
+        })
+    }
+    pub(crate) fn commit_approval(
+        &self,
+        authenticated: AuthenticatedApproval,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.commit_decision(authenticated.into_prepared(), true)
+    }
+    pub(crate) fn deny_direct(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.commit_decision(self.prepare_approval(owner, id)?, false)
+    }
+    /// Claims an approved decision exactly once, then resolves only its policy
+    /// selected values into an explicit child environment.  A production caller
+    /// with no containment supervisor is rejected before any secret lookup.
+    #[allow(dead_code)] // Wired by the containment composition in Story 1.8.
+    pub(crate) fn run_execution<P: ProtectedExecution, S: ProcessSupervisor<P>>(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+        preparer: &P,
+        supervisor: &S,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        self.check_owner(owner)?;
+        if !supervisor.available() {
+            self.close_admission();
+            return Err(DirectRequestError::Unavailable);
+        }
+        // Capture before waiting for the serialized gate. `lock` publishes its
+        // revocation first, so a lock request racing with this admission makes
+        // this execution stale even if the caller has not acquired the gate.
+        let revocation_epoch = self.revocation_epoch.load(Ordering::Acquire);
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.execution_live_current(&mut authority, id, revocation_epoch)?;
+        let deadline = *authority
+            .request_deadlines
+            .get(id)
+            .ok_or(DirectRequestError::AlreadyDecided)?;
+        let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let agent_id = authority.request_agents.get(id).cloned();
+        let agent_token = agent_id
+            .as_ref()
+            .map(|id| {
+                self.agent_tokens
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?
+                    .get(id)
+                    .cloned()
+                    .ok_or(DirectRequestError::Unauthorized)
+            })
+            .transpose()?;
+        let live = || {
+            Self::token_live(&agent_token)
+                && !self.closing.load(Ordering::Acquire)
+                && self.revocation_epoch.load(Ordering::Acquire) == revocation_epoch
+                && self.clock.now() < deadline
+                && self.clock.now() < session_deadline
+        };
+        let claim_release = if agent_id.is_some() {
+            Some(
+                self.release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            )
+        } else {
+            None
+        };
+        if !Self::token_live(&agent_token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let binding = authority.provider.claim_execution(owner, id, live)?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.executions
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .insert(
+                id.to_owned(),
+                ActiveExecution {
+                    cancel: cancel.clone(),
+                    agent_id,
+                },
+            );
+        drop(claim_release);
+        let candidate = self.execution_authority_current(
+            &mut authority,
+            owner,
+            id,
+            Some(&binding),
+            revocation_epoch,
+        );
+        drop(authority);
+        let preparation = candidate.and_then(|(_, policy, argv)| {
+            if policy.ssh().is_some() && supervisor.ssh_material_root().is_none() {
+                return Err(DirectRequestError::Unavailable);
+            }
+            let prepared = preparer
+                .prepare(policy.execution_image(), argv)
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            Ok((policy, prepared))
+        });
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let mut material: Option<Box<dyn SshMaterial>> = None;
+        let mut producer: Option<Box<dyn ProducerOutput>> = None;
+        let mut create_effect = None;
+        let result = (|| {
+            let (policy, mut prepared) = preparation?;
+            if let Some(effect) = policy.create() {
+                producer = Some(
+                    preparer
+                        .prepare_producer(&mut prepared)
+                        .map_err(|_error| DirectRequestError::Unavailable)?,
+                );
+                authority.backend.create_eligible(effect)?;
+                create_effect = Some(effect.clone());
+            }
+            self.execution_authority_current(
+                &mut authority,
+                owner,
+                id,
+                Some(&binding),
+                revocation_epoch,
+            )?;
+            if let Some(ssh) = policy.ssh() {
+                let root = supervisor
+                    .ssh_material_root()
+                    .ok_or(DirectRequestError::Unavailable)?;
+                material = Some(
+                    preparer
+                        .prepare_ssh(&mut prepared, root, ssh)
+                        .map_err(|_error| DirectRequestError::Unavailable)?,
+                );
+                self.execution_authority_current(
+                    &mut authority,
+                    owner,
+                    id,
+                    Some(&binding),
+                    revocation_epoch,
+                )?;
+            }
+            authority.backend.probe_compatibility()?;
+            self.execution_live_current(&mut authority, id, revocation_epoch)?;
+            if let Some(ssh) = policy.ssh() {
+                let key = authority.backend.resolve_ssh(&ssh.credential.item_id)?;
+                self.execution_authority_current(
+                    &mut authority,
+                    owner,
+                    id,
+                    Some(&binding),
+                    revocation_epoch,
+                )?;
+                material
+                    .as_mut()
+                    .ok_or(DirectRequestError::Unavailable)?
+                    .install_key(key)
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                self.execution_authority_current(
+                    &mut authority,
+                    owner,
+                    id,
+                    Some(&binding),
+                    revocation_epoch,
+                )?;
+            }
+            let marker = format!("vw-access={}", policy.id());
+            let mut mappings = Vec::new();
+            for login in policy.login_bindings() {
+                let credential = CredentialBinding {
+                    namespace: login.namespace,
+                    immutable_item_id: login.item_id,
+                    fields: &login.required_fields,
+                    marker: &marker,
+                };
+                let eligible = authority.backend.eligible(&credential).unwrap_or(false);
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                if !eligible {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                let values = authority.backend.resolve(&credential)?;
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                if values.len() != login.mappings.len() {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                mappings.extend(
+                    login
+                        .mappings
+                        .iter()
+                        .map(|mapping| mapping.environment.clone())
+                        .zip(values),
+                );
+            }
+            let environment = ChildEnvironment::from_mappings(mappings)
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            self.execution_authority_current(
+                &mut authority,
+                owner,
+                id,
+                Some(&binding),
+                revocation_epoch,
+            )?;
+            Ok((prepared, environment))
+        })();
+        // No provider-state or backend lock is held across manager operations.
+        drop(authority);
+        let control = ApplicationExecution {
+            app: self,
+            owner,
+            binding: &binding,
+            epoch: revocation_epoch,
+            deadline: deadline.min(session_deadline),
+            cancel,
+            agent_token,
+        };
+        let mut report = match result {
+            Ok((prepared, environment)) => {
+                if material
+                    .as_mut()
+                    .is_some_and(|material| material.mark_in_use().is_err())
+                {
+                    Supervision {
+                        outcome: Err(ExecutionError::ExecutionFailed),
+                        cleanup: CleanupEvidence::NotStarted,
+                        helper_reaped: false,
+                    }
+                } else {
+                    supervisor.supervise_controlled(prepared, environment, &control)
+                }
+            }
+            Err(_error) => Supervision {
+                outcome: Err(ExecutionError::ExecutionFailed),
+                cleanup: CleanupEvidence::NotStarted,
+                helper_reaped: false,
+            },
+        };
+        if let Some(material) = material.as_mut()
+            && report.cleanup != CleanupEvidence::Detached
+        {
+            // Failed resource cleanup retains the SSH interlock, independently
+            // of the already-observed main process outcome.
+            let _material_retained = material.finalize(report.cleanup);
+        }
+        let _helper_reaping_observed = report.helper_reaped;
+        if report.outcome == Err(ExecutionError::ManagerUnavailable) {
+            self.close_admission();
+        }
+        // Producer memory stays provider-private; POST is possible only after successful,
+        // fully reaped execution and a second check of this exact one-shot approval.
+        if let Some(effect) = create_effect {
+            let write = (|| -> Result<(), DirectRequestError> {
+                use crate::secret_storage::WriteStatus;
+                if report.outcome != Ok(ExecutionOutcome::ExitedZero)
+                    || report.cleanup != CleanupEvidence::Reaped
+                    || !control.live()
+                {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                let input = producer
+                    .as_mut()
+                    .ok_or(DirectRequestError::Unavailable)?
+                    .read(report.cleanup)
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                let mut expected = effect.fields.clone();
+                expected.sort();
+                if input.selectors() != expected {
+                    return Err(DirectRequestError::InvalidRequest);
+                }
+                let mut authority = self
+                    .gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                if !authority.provider.execution_matches(&binding)? {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                authority.backend.create_eligible(&effect)?;
+                self.execution_live_current(&mut authority, id, revocation_epoch)?;
+                authority.provider.begin_write(&binding)?;
+                // Serialize the irreversible backend write with cancellation, just
+                // like consumer delivery. An approval or successful producer alone
+                // cannot reserve a later POST after access has ended.
+                #[cfg(test)]
+                PRODUCER_WRITE_GATE_HOOK.with(|hook| {
+                    if let Some(observe) = hook.borrow_mut().take() {
+                        observe();
+                    }
+                });
+                let write_gate = self
+                    .release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                if !control.live_fast() {
+                    return Err(DirectRequestError::Unavailable);
+                }
+                let result = authority
+                    .backend
+                    .create_secret(&effect, &input, &|| control.live_fast());
+                drop(write_gate);
+                #[cfg(test)]
+                PRODUCER_WRITE_FINISHED_HOOK.with(|hook| {
+                    if let Some(observe) = hook.borrow_mut().take() {
+                        observe();
+                    }
+                });
+                match result {
+                    Ok(item_id) => {
+                        authority.provider.record_write(
+                            &binding,
+                            Some(item_id.clone()),
+                            WriteStatus::CreatedUnverified,
+                        )?;
+                        if !control.live_fast()
+                            || authority
+                                .backend
+                                .verify_secret(&effect, &item_id, &input)
+                                .is_err()
+                        {
+                            return Err(DirectRequestError::Unavailable);
+                        }
+                        authority.provider.record_write(
+                            &binding,
+                            Some(item_id),
+                            WriteStatus::Verified,
+                        )?;
+                        drop(authority);
+                        Ok(())
+                    }
+                    Err(status) => {
+                        authority.provider.record_write(&binding, None, status)?;
+                        drop(authority);
+                        Err(DirectRequestError::Unavailable)
+                    }
+                }
+            })();
+
+            if write.is_err() && report.outcome == Ok(ExecutionOutcome::ExitedZero) {
+                report.outcome = Err(ExecutionError::ExecutionFailed);
+            }
+        }
+        let finish = (|| {
+            let durable_live = control.live();
+            let release = self
+                .release_gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            let live = durable_live && control.live_fast();
+            if report.cleanup == CleanupEvidence::Uncertain {
+                self.cleanup_uncertain.store(true, Ordering::Release);
+                self.closing.store(true, Ordering::Release);
+                return Err(DirectRequestError::Unavailable);
+            }
+            let terminal = match (live, report.outcome) {
+                (_, Err(ExecutionError::ObservationLost)) => DirectStatus::Failed {
+                    reason: DirectFailure::ObservationLost,
+                },
+                (_, Ok(ExecutionOutcome::ExitedZero)) => DirectStatus::Completed { exit_code: 0 },
+                (_, Ok(ExecutionOutcome::ExitedNonZero)) => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionNonzero,
+                },
+                (_, Ok(ExecutionOutcome::Signaled)) => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionSignaled,
+                },
+                _ => DirectStatus::Failed {
+                    reason: DirectFailure::ExecutionUnavailable,
+                },
+            };
+            drop(release);
+            let mut authority = self
+                .gate
+                .lock()
+                .map_err(|_error| DirectRequestError::Unavailable)?;
+            if authority
+                .provider
+                .finish_execution(&binding, terminal.clone(), report.cleanup)
+                .is_err()
+            {
+                self.closing.store(true, Ordering::Release);
+                let _ignored = Self::revoke(&mut authority);
+                return Err(DirectRequestError::Unavailable);
+            }
+            if matches!(terminal, DirectStatus::Completed { .. }) {
+                Ok(terminal)
+            } else {
+                Err(DirectRequestError::Unavailable)
+            }
+        })();
+        self.executions
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?
+            .remove(id);
+        self.reaped.notify_all();
+        finish
+    }
+
+    /// Compatibility helper retained for Story 1.6 test evidence.  It verifies
+    /// an approved request but cannot consume it; new code must use
+    /// `run_execution` with a supervisor.
+    #[allow(dead_code)]
+    pub(crate) fn prepare_execution<P: ProtectedExecution>(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+        preparer: &P,
+    ) -> Result<P::Prepared, DirectRequestError> {
+        self.check_owner(owner)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        let (binding, policy, argv) = self.execution_authority(&mut authority, owner, id, None)?;
+        if policy.ssh().is_some() || policy.create().is_some() {
+            return Err(DirectRequestError::Unavailable);
+        }
+        let preparation = preparer.prepare(policy.execution_image(), argv);
+        self.execution_authority(&mut authority, owner, id, Some(&binding))?;
+        let prepared = preparation.map_err(|_error| DirectRequestError::Unavailable)?;
+
+        self.execution_live(&mut authority, id)?;
+        let compatibility = authority.backend.probe_compatibility();
+        self.execution_live(&mut authority, id)?;
+        compatibility?;
+        let marker = format!("vw-access={}", policy.id());
+        for login in policy.login_bindings() {
+            self.execution_live(&mut authority, id)?;
+            let eligible = authority.backend.eligible(&CredentialBinding {
+                namespace: login.namespace,
+                immutable_item_id: login.item_id,
+                fields: &login.required_fields,
+                marker: &marker,
+            });
+            self.execution_live(&mut authority, id)?;
+            if !eligible.unwrap_or(false) {
+                return Err(DirectRequestError::Unavailable);
+            }
+        }
+        self.execution_authority(&mut authority, owner, id, Some(&binding))?;
+        Ok(prepared)
+    }
+    fn execution_authority(
+        &self,
+        authority: &mut Authority,
+        owner: AuthenticatedHuman,
+        id: &str,
+        expected: Option<&ApprovalBinding>,
+    ) -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError>
+    {
+        self.execution_live(authority, id)?;
+        let candidate = authority.provider.approved_execution(owner, id);
+        // Durable reads can themselves take time; never start the next I/O on
+        // the strength of authority checked before that read.
+        self.execution_live(authority, id)?;
+        let candidate = candidate?;
+        if candidate
+            .0
+            .agent_owner
+            .as_ref()
+            .map(|owner| owner.binding_id.as_str())
+            != authority.request_agents.get(id).map(String::as_str)
+        {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        if expected.is_some_and(|binding| binding != &candidate.0) {
+            return Err(DirectRequestError::InvalidRequest);
+        }
+        Ok(candidate)
+    }
+    fn execution_authority_current(
+        &self,
+        authority: &mut Authority,
+        owner: AuthenticatedHuman,
+        id: &str,
+        expected: Option<&ApprovalBinding>,
+        revocation_epoch: u64,
+    ) -> Result<(ApprovalBinding, super::policy::OperationPolicy, Vec<String>), DirectRequestError>
+    {
+        let candidate = self.execution_authority(authority, owner, id, expected)?;
+        self.execution_live_current(authority, id, revocation_epoch)?;
+        Ok(candidate)
+    }
+    // Backend calls need live admission and this request's monotonic deadline,
+    // not another full registry read/hash. Durable binding checks surround image
+    // preparation and successful return, independently of credential count.
+    fn execution_live(
+        &self,
+        authority: &mut Authority,
+        id: &str,
+    ) -> Result<(), DirectRequestError> {
+        self.admit(authority)?;
+        self.request_agent_live(authority, id)?;
+        if authority
+            .request_deadlines
+            .get(id)
+            .is_none_or(|deadline| self.clock.now() >= *deadline)
+        {
+            let expiry = self.expire_requests(authority);
+            // Cleanup must run even when expiry persistence failed while the
+            // session expired or admission closed during that I/O.
+            self.admit(authority)?;
+            expiry?;
+            return Err(DirectRequestError::AlreadyDecided);
+        }
+        Ok(())
+    }
+    fn execution_live_current(
+        &self,
+        authority: &mut Authority,
+        id: &str,
+        revocation_epoch: u64,
+    ) -> Result<(), DirectRequestError> {
+        self.execution_live(authority, id)?;
+        if self.revocation_epoch.load(Ordering::Acquire) != revocation_epoch {
+            return Err(DirectRequestError::Locked);
+        }
+        Ok(())
+    }
+    #[allow(clippy::too_many_lines)] // Keep the atomic approval checks and commit in one auditable sequence.
+    fn commit_decision(
+        &self,
+        prepared: PreparedApproval,
+        approve: bool,
+    ) -> Result<DirectStatus, DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        if authority.generation != prepared.generation
+            || prepared
+                .companion_deadline
+                .is_some_and(|deadline| self.clock.now() >= deadline)
+        {
+            return Err(DirectRequestError::Locked);
+        }
+        let binding = &prepared.binding;
+        if binding.agent_owner.is_none() {
+            self.check_owner(AuthenticatedHuman::from_peer_uid(binding.requester_uid))?;
+        }
+        let token = self.agent_token(&binding.agent_owner)?;
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let policy = authority.provider.decision_policy(binding)?;
+        if approve {
+            let probe = authority.backend.probe_compatibility();
+            self.admit(&mut authority)?;
+            self.expire_requests(&mut authority)?;
+            if !Self::token_live(&token) {
+                return Err(DirectRequestError::Unauthorized);
+            }
+            probe?;
+            if let Some(effect) = policy.create() {
+                authority.backend.create_eligible(effect)?;
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
+            }
+            if let Some(ssh) = policy.ssh() {
+                let eligible = authority.backend.ssh_eligible(&ssh.credential.item_id);
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
+                if !eligible.unwrap_or(false) {
+                    return Err(DirectRequestError::Unavailable);
+                }
+            }
+            let marker = format!("vw-access={}", policy.id());
+            for login in policy.login_bindings() {
+                let eligible = authority.backend.eligible(&CredentialBinding {
+                    namespace: login.namespace,
+                    immutable_item_id: login.item_id,
+                    fields: &login.required_fields,
+                    marker: &marker,
+                });
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
+                if !eligible.unwrap_or(false) {
+                    return Err(DirectRequestError::Unavailable);
+                }
+            }
+        }
+        let deadline = *authority
+            .request_deadlines
+            .get(&binding.request_id)
+            .ok_or(DirectRequestError::AlreadyDecided)?;
+        let session_deadline = authority.deadline.ok_or(DirectRequestError::Locked)?;
+        let now = self.clock.unix_seconds()?;
+        // Revalidate the exact durable binding after potentially slow eligibility.
+        let decision_release = if binding.agent_owner.is_some() {
+            Some(
+                self.release_gate
+                    .lock()
+                    .map_err(|_error| DirectRequestError::Unavailable)?,
+            )
+        } else {
+            None
+        };
+        if !Self::token_live(&token) {
+            return Err(DirectRequestError::Unauthorized);
+        }
+        let result = authority.provider.decide_direct(binding, approve, now, || {
+            prepared
+                .companion_deadline
+                .is_none_or(|deadline| self.clock.now() < deadline)
+                && !self.closing.load(Ordering::Acquire)
+                && Self::token_live(&token)
+                && self.clock.now() < deadline
+                && self.clock.now() < session_deadline
+        });
+        drop(decision_release);
+        if result == Err(DirectRequestError::Unavailable) {
+            // All persistence failures close process authority, including uncertain rename durability.
+            self.close_admission();
+            let _ignored = Self::revoke(&mut authority);
+        }
+        self.admit(&mut authority)?;
+        self.expire_requests(&mut authority)?;
+        result
+    }
+    pub fn status(&self) -> Result<SessionStatus, SessionError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        let admission = self.admit(&mut authority);
+        self.expire_requests(&mut authority)?;
+        match admission {
+            Ok(()) => Ok(SessionStatus::Unlocked),
+            Err(SessionError::Locked) => Ok(SessionStatus::Locked),
+            Err(e) => Err(e),
+        }
+    }
+    /// Registry validation still precedes eligibility; the backend is held behind
+    /// the same gate as unlock, expiry, lock and future scoped consumption.
+    pub fn activate_operation(&self, draft: OperationPolicyDraft) -> Result<String, SessionError> {
+        self.provision_operation(draft, false)
+            .map_err(|error| match error {
+                ProvisioningError::Locked => SessionError::Locked,
+                ProvisioningError::Unavailable => SessionError::CleanupFailed,
+                ProvisioningError::Incompatible => SessionError::Incompatible,
+                _ => SessionError::InvalidRequest,
+            })
+    }
+
+    pub fn create_operation(
+        &self,
+        owner: AuthenticatedHuman,
+        draft: OperationPolicyDraft,
+    ) -> Result<super::policy::OperationSummary, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        if serde_json::to_vec(&draft)
+            .map_err(|_error| ProvisioningError::InvalidInput)?
+            .len()
+            > super::provisioning::MAX_POLICY_BYTES
+        {
+            return Err(ProvisioningError::InvalidInput);
+        }
+        let id = draft.id.clone();
+        let image_id = draft.image_id.clone();
+        let revision = self.provision_operation(draft, true)?;
+        Ok(super::policy::OperationSummary {
+            id,
+            image_id,
+            revision,
+        })
+    }
+
+    fn provisioning_result<T>(
+        &self,
+        authority: &mut Authority,
+        result: Result<T, ProvisioningError>,
+    ) -> Result<T, ProvisioningError> {
+        if matches!(result, Err(ProvisioningError::Unavailable)) {
+            self.close_admission();
+            let _ignored = Self::revoke(authority);
+            return result;
+        }
+        if self.revocation_epoch.load(Ordering::Acquire) != authority.session_epoch {
+            Self::revoke(authority)?;
+            return Err(ProvisioningError::Locked);
+        }
+        self.admit(authority)?;
+        result
+    }
+
+    pub(crate) fn register_image(
+        &self,
+        owner: AuthenticatedHuman,
+        input: super::policy::ImageRegistration,
+        verifier: &dyn ImageVerifier,
+    ) -> Result<super::policy::ImageRegistration, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        self.admit(&mut authority)?;
+        let deadline = authority.deadline.ok_or(ProvisioningError::Locked)?;
+        let epoch = authority.session_epoch;
+        if epoch != self.revocation_epoch.load(Ordering::Acquire) {
+            return Err(ProvisioningError::Locked);
+        }
+        let result = authority
+            .provider
+            .register_image(input, verifier, || {
+                !self.closing.load(Ordering::Acquire)
+                    && self.clock.now() < deadline
+                    && self.revocation_epoch.load(Ordering::Acquire) == epoch
+            })
+            .map_err(Into::into);
+        self.provisioning_result(&mut authority, result)
+    }
+
+    pub fn list_images(
+        &self,
+        owner: AuthenticatedHuman,
+    ) -> Result<Vec<super::policy::ImageRegistration>, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(authority.provider.images()?)
+    }
+    pub fn show_image(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::policy::ImageRegistration, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        if !super::valid_operation_id(id) {
+            return Err(ProvisioningError::InvalidInput);
+        }
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(
+            authority
+                .provider
+                .images()?
+                .into_iter()
+                .find(|image| image.id == id)
+                .ok_or(ProvisioningError::NotFound)?,
+        )
+    }
+    pub fn list_operations(
+        &self,
+        owner: AuthenticatedHuman,
+    ) -> Result<Vec<super::policy::OperationSummary>, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(authority.provider.operations()?)
+    }
+    pub fn show_operation(
+        &self,
+        owner: AuthenticatedHuman,
+        id: &str,
+    ) -> Result<super::policy::OperationMetadata, ProvisioningError> {
+        self.check_owner(owner)
+            .map_err(|_error| ProvisioningError::Unauthorized)?;
+        if !super::valid_operation_id(id) {
+            return Err(ProvisioningError::InvalidInput);
+        }
+        let authority = self
+            .gate
+            .lock()
+            .map_err(|_error| ProvisioningError::Unavailable)?;
+        bounded(
+            authority
+                .provider
+                .operation(id)?
+                .ok_or(ProvisioningError::NotFound)?,
+        )
+    }
+
+    #[allow(clippy::too_many_lines)] // Keep provisioning and its temporary backend verifier under one authority scope.
+    fn provision_operation(
+        &self,
+        draft: OperationPolicyDraft,
+        create_only: bool,
+    ) -> Result<String, ProvisioningError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        self.admit(&mut authority)?;
+        let probe = authority.backend.probe_compatibility();
+        self.admit(&mut authority)?;
+        probe?;
+        if let Some(effect) = &draft.create {
+            authority.backend.create_eligible(effect)?;
+            self.admit(&mut authority)?;
+        }
+        let deadline = authority.deadline.ok_or(SessionError::Locked)?;
+        let epoch = authority.session_epoch;
+        if epoch != self.revocation_epoch.load(Ordering::Acquire) {
+            return Err(ProvisioningError::Locked);
+        }
+        struct Verifier<'a> {
+            backend: std::cell::RefCell<&'a mut dyn SecretBackend>,
+            clock: &'a dyn SessionClock,
+            deadline: Duration,
+            closing: &'a AtomicBool,
+            epoch: u64,
+            revocation_epoch: &'a AtomicU64,
+        }
+        impl LoginEligibilityVerifier for Verifier<'_> {
+            fn is_scoped_login_eligible(
+                &self,
+                id: &str,
+                fields: &[super::policy::LoginField],
+                marker: &str,
+                namespace: &crate::secret_storage::Destination,
+            ) -> Result<bool, LoginEligibilityError> {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                let result = self
+                    .backend
+                    .borrow_mut()
+                    .eligible(&CredentialBinding {
+                        namespace: Some(namespace),
+                        immutable_item_id: id,
+                        fields,
+                        marker,
+                    })
+                    .map_err(|_error| LoginEligibilityError);
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                result
+            }
+            fn is_ssh_eligible(&self, id: &str) -> Result<bool, LoginEligibilityError> {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                let result = self
+                    .backend
+                    .borrow_mut()
+                    .ssh_eligible(id)
+                    .map_err(|_error| LoginEligibilityError);
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                result
+            }
+            fn is_login_eligible(
+                &self,
+                id: &str,
+                fields: &[super::policy::LoginField],
+                marker: &str,
+            ) -> Result<bool, LoginEligibilityError> {
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                let result = self
+                    .backend
+                    .borrow_mut()
+                    .eligible(&CredentialBinding {
+                        namespace: None,
+                        immutable_item_id: id,
+                        fields,
+                        marker,
+                    })
+                    .map_err(|_error| LoginEligibilityError);
+                if self.closing.load(Ordering::Acquire)
+                    || self.clock.now() >= self.deadline
+                    || self.revocation_epoch.load(Ordering::Acquire) != self.epoch
+                {
+                    return Err(LoginEligibilityError);
+                }
+                result
+            }
+        }
+        let Authority {
+            provider, backend, ..
+        } = &mut *authority;
+        let result = provider
+            .provision_operation(
+                draft,
+                &Verifier {
+                    backend: std::cell::RefCell::new(backend.as_mut()),
+                    clock: self.clock.as_ref(),
+                    deadline,
+                    closing: &self.closing,
+                    epoch,
+                    revocation_epoch: &self.revocation_epoch,
+                },
+                create_only,
+                || {
+                    !self.closing.load(Ordering::Acquire)
+                        && self.clock.now() < deadline
+                        && self.revocation_epoch.load(Ordering::Acquire) == epoch
+                },
+            )
+            .map_err(Into::into);
+        // Failed/slow eligibility revokes the session before returning to callers.
+        self.provisioning_result(&mut authority, result)
+    }
+    // No public resolver exists until execution can consume values inside this gate.
+    #[allow(dead_code)] // Execution adapter will consume within this private scope in Story 1.7.
+    fn consume_scoped(
+        &self,
+        binding: &CredentialBinding<'_>,
+        consume: impl FnOnce(&[SensitiveString]),
+    ) -> Result<(), SessionError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        self.admit(&mut authority)?;
+        let probe = authority.backend.probe_compatibility();
+        self.admit(&mut authority)?;
+        probe?;
+        let values = authority.backend.resolve(binding);
+        self.admit(&mut authority)?;
+        consume(&values?);
+        Ok(())
+    }
+}
+impl ApprovalAuthenticator for ProviderApplication {
+    fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| SessionError::CleanupFailed)?;
+        if self.closing.load(Ordering::Acquire) {
+            return Err(SessionError::Locked);
+        }
+        if authority.cleanup_failed {
+            return Err(SessionError::CleanupFailed);
+        }
+        Self::revoke(&mut authority)?;
+        let started = self.clock.now();
+        let session_epoch = self.revocation_epoch.load(Ordering::Acquire);
+        let attempt = authority
+            .backend
+            .probe_compatibility()
+            .and_then(|()| authority.backend.unlock(password));
+        match attempt {
+            Ok(lifetime) if !lifetime.is_zero() => {
+                let Some(deadline) = started.checked_add(lifetime.min(MAX_SESSION)) else {
+                    Self::revoke(&mut authority)?;
+                    return Err(SessionError::AuthenticationFailed);
+                };
+                if self.closing.load(Ordering::Acquire) || self.clock.now() >= deadline {
+                    Self::revoke(&mut authority)?;
+                    return Err(SessionError::Locked);
+                }
+                authority.deadline = Some(deadline);
+                authority.session_epoch = session_epoch;
+                Ok(())
+            }
+            result => {
+                Self::revoke(&mut authority)?;
+                Err(result.err().unwrap_or(SessionError::AuthenticationFailed))
+            }
+        }
+    }
+}
+
+impl From<DirectRequestError> for super::protocol::AgentRejection {
+    fn from(error: DirectRequestError) -> Self {
+        match error {
+            DirectRequestError::Unauthorized => Self::Unauthorized,
+            DirectRequestError::Locked => Self::Locked,
+            DirectRequestError::InvalidRequest => Self::InvalidArguments,
+            DirectRequestError::StaleRevision => Self::StaleRevision,
+            _ => Self::Unavailable,
+        }
+    }
+}
+impl From<SessionError> for super::protocol::AgentRejection {
+    fn from(error: SessionError) -> Self {
+        DirectRequestError::from(error).into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::policy::LoginField;
+    use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        mpsc,
+    };
+    struct Clock(Arc<AtomicU64>);
+    impl SessionClock for Clock {
+        fn now(&self) -> Duration {
+            Duration::from_secs(self.0.load(Ordering::SeqCst))
+        }
+    }
+    #[derive(Default)]
+    struct Observed {
+        resolutions: AtomicUsize,
+        unlocks: AtomicUsize,
+        clears: AtomicUsize,
+        incompatible: AtomicBool,
+        cleanup_error: AtomicBool,
+        authority: AtomicBool,
+        expire_probe: AtomicBool,
+        eligibility_time: AtomicU64,
+        resolution_error: AtomicBool,
+    }
+    struct Backend {
+        observed: Arc<Observed>,
+        barrier: Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>,
+        advance: Option<Arc<AtomicU64>>,
+        lifetime: Duration,
+        block_unlock: bool,
+    }
+    impl ProviderSession for Backend {
+        fn probe_compatibility(&mut self) -> Result<(), SessionError> {
+            if self.observed.expire_probe.load(Ordering::SeqCst) {
+                self.advance.as_ref().unwrap().store(900, Ordering::SeqCst);
+            }
+            if self.observed.incompatible.load(Ordering::SeqCst) {
+                Err(SessionError::Incompatible)
+            } else {
+                Ok(())
+            }
+        }
+        fn unlock(&mut self, password: SensitiveString) -> Result<Duration, SessionError> {
+            self.observed.unlocks.fetch_add(1, Ordering::SeqCst);
+            if self.block_unlock {
+                let (entered, resume) = self.barrier.take().unwrap();
+                entered.send(()).unwrap();
+                resume.recv().unwrap();
+            }
+            if password.expose() != "password-sentinel" {
+                return Err(SessionError::AuthenticationFailed);
+            }
+            self.observed.authority.store(true, Ordering::SeqCst);
+            Ok(self.lifetime)
+        }
+        fn clear(&mut self) -> Result<(), SessionError> {
+            self.observed.authority.store(false, Ordering::SeqCst);
+            self.observed.clears.fetch_add(1, Ordering::SeqCst);
+            if self.observed.cleanup_error.load(Ordering::SeqCst) {
+                Err(SessionError::CleanupFailed)
+            } else {
+                Ok(())
+            }
+        }
+    }
+    impl SecretBackend for Backend {
+        fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
+            self.observed.resolutions.fetch_add(1, Ordering::SeqCst);
+            let time = self.observed.eligibility_time.load(Ordering::SeqCst);
+            if time != 0 {
+                self.advance.as_ref().unwrap().store(time, Ordering::SeqCst);
+            }
+            Ok(true)
+        }
+        fn resolve(
+            &mut self,
+            _: &CredentialBinding<'_>,
+        ) -> Result<Vec<SensitiveString>, SessionError> {
+            assert!(self.observed.authority.load(Ordering::SeqCst));
+            self.observed.resolutions.fetch_add(1, Ordering::SeqCst);
+            if let Some((entered, resume)) = self.barrier.take() {
+                entered.send(()).unwrap();
+                resume.recv().unwrap();
+            }
+            if let Some(clock) = &self.advance {
+                clock.store(900, Ordering::SeqCst);
+            }
+            if self.observed.resolution_error.load(Ordering::SeqCst) {
+                return Err(SessionError::BackendUnavailable);
+            }
+            Ok(vec![SensitiveString::new("secret-sentinel".into())])
+        }
+    }
+    fn binding() -> CredentialBinding<'static> {
+        CredentialBinding {
+            namespace: None,
+            immutable_item_id: "11111111-1111-1111-1111-111111111111",
+            fields: &[LoginField::Password],
+            marker: "vw-access=test",
+        }
+    }
+    fn fixture_with(
+        backend: Backend,
+        clock: Arc<AtomicU64>,
+    ) -> (tempfile::TempDir, Arc<ProviderApplication>) {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let provider = Provider::start(dir.path().join("provider")).unwrap();
+        let app =
+            ProviderApplication::new(provider, Box::new(backend), Box::new(Clock(clock))).unwrap();
+        (dir, Arc::new(app))
+    }
+    fn backend(observed: Arc<Observed>) -> Backend {
+        Backend {
+            observed,
+            barrier: None,
+            advance: None,
+            lifetime: Duration::from_secs(3600),
+            block_unlock: false,
+        }
+    }
+    fn unlock(app: &ProviderApplication) {
+        app.authenticate(SensitiveString::new("password-sentinel".into()))
+            .unwrap();
+    }
+    #[test]
+    fn uncertain_cleanup_releases_execution_registry_before_closing_admission() {
+        let (_dir, app) = fixture_with(
+            backend(Arc::new(Observed::default())),
+            Arc::new(AtomicU64::new(0)),
+        );
+        app.cleanup_uncertain.store(true, Ordering::Release);
+        let release = app.release_gate.lock().unwrap();
+        let (observed_tx, observed_rx) = mpsc::channel();
+        let waiting = app.clone();
+        let worker = std::thread::spawn(move || {
+            CLEANUP_WAIT_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || observed_tx.send(()).unwrap()))
+            });
+            waiting.await_cleanup(None)
+        });
+        observed_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        // A canceller takes release_gate then executions. The cleanup path must
+        // never retain executions while waiting for the same release_gate.
+        let registry_available = app.executions.try_lock().is_ok();
+        drop(release);
+        assert_eq!(worker.join().unwrap(), Err(SessionError::CleanupFailed));
+        assert!(
+            registry_available,
+            "cleanup would invert the cancellation lock order"
+        );
+    }
+
+    #[test]
+    fn slow_backend_errors_revoke_before_propagation() {
+        for operation in ["consume_probe", "activate_probe", "resolve"] {
+            let clock = Arc::new(AtomicU64::new(0));
+            let observed = Arc::new(Observed::default());
+            let mut backend = backend(observed.clone());
+            backend.advance = Some(clock.clone());
+            let (_dir, app) = fixture_with(backend, clock);
+            unlock(&app);
+            let before = observed.clears.load(Ordering::SeqCst);
+            if operation == "resolve" {
+                observed.resolution_error.store(true, Ordering::SeqCst);
+            } else {
+                observed.expire_probe.store(true, Ordering::SeqCst);
+                observed.incompatible.store(true, Ordering::SeqCst);
+            }
+            let result = if operation == "activate_probe" {
+                app.activate_operation(super::super::policy::OperationPolicyDraft {
+                    create: None,
+                    ssh: None,
+                    id: "deploy".into(),
+                    description: "Deploy".into(),
+                    image_id: "absent".into(),
+                    targets: vec![],
+                    arguments: vec![],
+                    credentials: vec![],
+                })
+                .map(|_| ())
+            } else {
+                app.consume_scoped(&binding(), |_| panic!("error must not release values"))
+            };
+            assert_eq!(result, Err(SessionError::Locked));
+            // Inspect immediately: status() must not be what performs cleanup.
+            assert!(!observed.authority.load(Ordering::SeqCst));
+            assert_eq!(observed.clears.load(Ordering::SeqCst), before + 1);
+            assert_eq!(
+                observed.resolutions.load(Ordering::SeqCst),
+                usize::from(operation == "resolve")
+            );
+        }
+    }
+
+    #[test]
+    fn closing_between_eligibility_checks_prevents_next_binding_and_final_persistence() {
+        use super::super::policy::{
+            ArgumentSpec, CredentialUse, LoginCredentialDraft, LoginFieldMapping,
+            test_approved_image,
+        };
+        struct ClosingClock {
+            observed: Arc<Observed>,
+            app: Arc<Mutex<std::sync::Weak<ProviderApplication>>>,
+        }
+        impl SessionClock for ClosingClock {
+            fn now(&self) -> Duration {
+                if self.observed.resolutions.load(Ordering::SeqCst) > 0 {
+                    self.app
+                        .lock()
+                        .unwrap()
+                        .upgrade()
+                        .unwrap()
+                        .close_admission();
+                }
+                Duration::ZERO
+            }
+        }
+        for count in [1, 2] {
+            let observed = Arc::new(Observed::default());
+            let weak = Arc::new(Mutex::new(std::sync::Weak::new()));
+            let dir = tempfile::tempdir().unwrap();
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+            let app = Arc::new(
+                ProviderApplication::new(
+                    Provider::start(dir.path().join("provider")).unwrap(),
+                    Box::new(backend(observed.clone())),
+                    Box::new(ClosingClock {
+                        observed: observed.clone(),
+                        app: weak.clone(),
+                    }),
+                )
+                .unwrap(),
+            );
+            *weak.lock().unwrap() = Arc::downgrade(&app);
+            unlock(&app);
+            let path = dir.path().join("provider/provider-state.json");
+            let mut state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            state["approved_images"] =
+                serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
+            std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+            let draft = OperationPolicyDraft {
+                create: None,
+                ssh: None,
+                id: "deploy".into(),
+                description: "Deploy".into(),
+                image_id: "deploy-image".into(),
+                targets: vec!["test".into()],
+                arguments: vec![ArgumentSpec::Target],
+                credentials: (0..count)
+                    .map(|i| LoginCredentialDraft {
+                        namespace: None,
+                        item_id: if i == 0 {
+                            binding().immutable_item_id.into()
+                        } else {
+                            "22222222-2222-2222-2222-222222222222".into()
+                        },
+                        label: format!("Login {i}"),
+                        use_type: CredentialUse::Login,
+                        field_mappings: vec![LoginFieldMapping {
+                            field: LoginField::Password,
+                            environment: format!("PASSWORD_{i}"),
+                        }],
+                    })
+                    .collect(),
+            };
+            assert_eq!(app.activate_operation(draft), Err(SessionError::Locked));
+            assert_eq!(observed.resolutions.load(Ordering::SeqCst), 1);
+            assert!(!observed.authority.load(Ordering::SeqCst));
+            let state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+            assert!(state["operations"].as_array().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn locked_and_incompatible_never_use_items_or_leak_sentinels() {
+        let observed = Arc::new(Observed::default());
+        let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
+        assert_eq!(
+            app.consume_scoped(&binding(), |_| panic!("must not consume")),
+            Err(SessionError::Locked)
+        );
+        observed.incompatible.store(true, Ordering::SeqCst);
+        assert_eq!(
+            app.authenticate(SensitiveString::new("password-sentinel".into())),
+            Err(SessionError::Incompatible)
+        );
+        assert_eq!(observed.unlocks.load(Ordering::SeqCst), 0);
+        assert_eq!(observed.resolutions.load(Ordering::SeqCst), 0);
+        observed.incompatible.store(false, Ordering::SeqCst);
+        unlock(&app);
+        observed.incompatible.store(true, Ordering::SeqCst);
+        assert_eq!(
+            app.consume_scoped(&binding(), |_| panic!("must not consume")),
+            Err(SessionError::Incompatible)
+        );
+        assert_eq!(observed.resolutions.load(Ordering::SeqCst), 0);
+        let persisted =
+            std::fs::read_to_string(dir.path().join("provider/provider-state.json")).unwrap();
+        let exposed = format!(
+            "{persisted} {:?} {:?} {}",
+            app.status(),
+            SensitiveString::new("secret-sentinel".into()),
+            SessionError::AuthenticationFailed
+        );
+        for secret in ["password-sentinel", "session-sentinel", "secret-sentinel"] {
+            assert!(!exposed.contains(secret));
+        }
+    }
+    #[test]
+    fn expiry_exact_boundary_clears_authority_and_token_lifetime_bounds_session() {
+        for (lifetime, limit) in [
+            (Duration::from_secs(30), 30),
+            (Duration::from_secs(3600), 900),
+        ] {
+            let observed = Arc::new(Observed::default());
+            let clock = Arc::new(AtomicU64::new(0));
+            let mut backend = backend(observed.clone());
+            backend.lifetime = lifetime;
+            let (_dir, app) = fixture_with(backend, clock.clone());
+            unlock(&app);
+            // Expected deadlines are independent of the production cap constant.
+            clock.store(limit - 1, Ordering::SeqCst);
+            assert_eq!(app.status(), Ok(SessionStatus::Unlocked));
+            app.consume_scoped(&binding(), |values| {
+                assert_eq!(values[0].expose(), "secret-sentinel")
+            })
+            .unwrap();
+            clock.store(limit, Ordering::SeqCst);
+            assert_eq!(app.status(), Ok(SessionStatus::Locked));
+            assert!(!observed.authority.load(Ordering::SeqCst));
+            assert_eq!(
+                app.consume_scoped(&binding(), |_| panic!("expired")),
+                Err(SessionError::Locked)
+            );
+            assert_eq!(observed.resolutions.load(Ordering::SeqCst), 1);
+        }
+    }
+    #[test]
+    fn unusable_deadlines_clear_newly_created_authority() {
+        for (start, lifetime) in [(0, Duration::ZERO), (u64::MAX, Duration::from_secs(60))] {
+            let observed = Arc::new(Observed::default());
+            let mut backend = backend(observed.clone());
+            backend.lifetime = lifetime;
+            let (_dir, app) = fixture_with(backend, Arc::new(AtomicU64::new(start)));
+            assert_eq!(
+                app.authenticate(SensitiveString::new("password-sentinel".into())),
+                Err(SessionError::AuthenticationFailed)
+            );
+            assert!(!observed.authority.load(Ordering::SeqCst));
+            assert_eq!(app.status(), Ok(SessionStatus::Locked));
+        }
+    }
+    #[test]
+    fn expiry_during_compatibility_probe_prevents_item_resolution() {
+        let clock = Arc::new(AtomicU64::new(0));
+        let observed = Arc::new(Observed::default());
+        let mut backend = backend(observed.clone());
+        backend.advance = Some(clock.clone());
+        let (_dir, app) = fixture_with(backend, clock);
+        unlock(&app);
+        observed.expire_probe.store(true, Ordering::SeqCst);
+        assert_eq!(
+            app.consume_scoped(&binding(), |_| panic!("expired probe")),
+            Err(SessionError::Locked)
+        );
+        assert_eq!(observed.resolutions.load(Ordering::SeqCst), 0);
+        assert!(!observed.authority.load(Ordering::SeqCst));
+    }
+    #[test]
+    fn expires_during_resolution_discards_values() {
+        let clock = Arc::new(AtomicU64::new(0));
+        let observed = Arc::new(Observed::default());
+        let mut backend = backend(observed.clone());
+        backend.advance = Some(clock.clone());
+        let (_dir, app) = fixture_with(backend, clock);
+        unlock(&app);
+        assert_eq!(
+            app.consume_scoped(&binding(), |_| panic!("late value")),
+            Err(SessionError::Locked)
+        );
+        assert!(!observed.authority.load(Ordering::SeqCst));
+    }
+    #[test]
+    fn cleanup_failure_poison_cannot_be_bypassed_by_unlock() {
+        let observed = Arc::new(Observed::default());
+        let (_dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
+        unlock(&app);
+        observed.cleanup_error.store(true, Ordering::SeqCst);
+        assert_eq!(app.lock(), Err(SessionError::CleanupFailed));
+        assert_eq!(app.status(), Ok(SessionStatus::Locked));
+        assert_eq!(
+            app.authenticate(SensitiveString::new("password-sentinel".into())),
+            Err(SessionError::CleanupFailed)
+        );
+        assert_eq!(
+            app.consume_scoped(&binding(), |_| panic!("poisoned")),
+            Err(SessionError::Locked)
+        );
+        observed.cleanup_error.store(false, Ordering::SeqCst);
+        app.lock().unwrap();
+        unlock(&app);
+        assert_eq!(app.status(), Ok(SessionStatus::Unlocked));
+    }
+    #[test]
+    fn lock_serializes_resolution_and_delayed_unlock() {
+        for block_unlock in [false, true] {
+            let observed = Arc::new(Observed::default());
+            let (entered_tx, entered_rx) = mpsc::channel();
+            let (resume_tx, resume_rx) = mpsc::channel();
+            let mut backend = backend(observed.clone());
+            backend.barrier = Some((entered_tx, resume_rx));
+            backend.block_unlock = block_unlock;
+            let (_dir, app) = fixture_with(backend, Arc::new(AtomicU64::new(0)));
+            if !block_unlock {
+                unlock(&app);
+            }
+            let consuming = Arc::new(AtomicBool::new(false));
+            let first = {
+                let app = app.clone();
+                let consuming = consuming.clone();
+                std::thread::spawn(move || {
+                    if block_unlock {
+                        unlock(&app);
+                    } else {
+                        app.consume_scoped(&binding(), |_| {
+                            consuming.store(true, Ordering::SeqCst);
+                        })
+                        .unwrap();
+                    }
+                })
+            };
+            entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            let (locked_tx, locked_rx) = mpsc::channel();
+            let locking = {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    app.lock().unwrap();
+                    locked_tx.send(()).unwrap();
+                })
+            };
+            assert!(locked_rx.recv_timeout(Duration::from_millis(30)).is_err());
+            resume_tx.send(()).unwrap();
+            first.join().unwrap();
+            locking.join().unwrap();
+            assert_eq!(app.status(), Ok(SessionStatus::Locked));
+            assert_eq!(consuming.load(Ordering::SeqCst), !block_unlock);
+            assert!(!observed.authority.load(Ordering::SeqCst));
+            assert_eq!(
+                app.consume_scoped(&binding(), |_| panic!("late result")),
+                Err(SessionError::Locked)
+            );
+        }
+    }
+    #[test]
+    fn lock_restart_and_expiry_invalidate_durable_work() {
+        for action in ["lock", "restart", "expiry"] {
+            let observed = Arc::new(Observed::default());
+            let clock = Arc::new(AtomicU64::new(0));
+            let (dir, app) = fixture_with(backend(observed.clone()), clock.clone());
+            unlock(&app);
+            let path = dir.path().join("provider/provider-state.json");
+            let mut state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            let epoch = state["lifecycle_epoch"].as_u64().unwrap();
+            state["requests"] = serde_json::json!([{"id":"pending", "status":"pending"},{"id":"approved","status":"approved"},{"id":"done","status":"completed"}]);
+            std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+            if action == "restart" {
+                drop(app);
+                let provider = Provider::start(dir.path().join("provider")).unwrap();
+                let app = ProviderApplication::new(
+                    provider,
+                    Box::new(backend(observed.clone())),
+                    Box::new(Clock(clock)),
+                )
+                .unwrap();
+                assert_eq!(app.status(), Ok(SessionStatus::Locked));
+            } else if action == "expiry" {
+                clock.store(900, Ordering::SeqCst);
+                assert_eq!(app.status(), Ok(SessionStatus::Locked));
+                unlock(&app);
+            } else {
+                app.lock().unwrap();
+                unlock(&app);
+            }
+            let state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+            assert!(state["lifecycle_epoch"].as_u64().unwrap() > epoch);
+            assert_eq!(state["requests"][0]["status"], "invalidated");
+            assert_eq!(state["requests"][1]["status"], "invalidated");
+            assert_eq!(state["requests"][2]["status"], "completed");
+        }
+    }
+    #[test]
+    fn persistence_failure_still_clears_backend_and_blocks_renewal() {
+        let observed = Arc::new(Observed::default());
+        let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
+        unlock(&app);
+        std::fs::remove_file(dir.path().join("provider/provider-state.json")).unwrap();
+        assert_eq!(app.lock(), Err(SessionError::CleanupFailed));
+        assert!(!observed.authority.load(Ordering::SeqCst));
+        assert_eq!(
+            app.authenticate(SensitiveString::new("password-sentinel".into())),
+            Err(SessionError::CleanupFailed)
+        );
+    }
+    #[test]
+    fn shutdown_discards_delayed_unlock_and_permanently_closes_admission() {
+        let observed = Arc::new(Observed::default());
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let mut backend = backend(observed.clone());
+        backend.barrier = Some((entered_tx, resume_rx));
+        backend.block_unlock = true;
+        let (_dir, app) = fixture_with(backend, Arc::new(AtomicU64::new(0)));
+        let pending = {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                app.authenticate(SensitiveString::new("password-sentinel".into()))
+            })
+        };
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let shutdown = {
+            let app = app.clone();
+            std::thread::spawn(move || app.shutdown())
+        };
+        let wait_until = std::time::Instant::now() + Duration::from_secs(2);
+        while !app.closing.load(Ordering::Acquire) && std::time::Instant::now() < wait_until {
+            std::thread::yield_now();
+        }
+        let closed = app.closing.load(Ordering::Acquire);
+        resume_tx.send(()).unwrap();
+        let pending_result = pending.join().unwrap();
+        shutdown.join().unwrap().unwrap();
+        assert!(
+            closed,
+            "shutdown did not close admission within the deadline"
+        );
+        assert_eq!(pending_result, Err(SessionError::Locked));
+        assert_eq!(app.status(), Ok(SessionStatus::Locked));
+        assert!(!observed.authority.load(Ordering::SeqCst));
+        assert_eq!(
+            app.authenticate(SensitiveString::new("password-sentinel".into())),
+            Err(SessionError::Locked)
+        );
+        assert_eq!(observed.unlocks.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            app.consume_scoped(&binding(), |_| panic!("shut down")),
+            Err(SessionError::Locked)
+        );
+    }
+
+    #[test]
+    fn expiry_across_bindings_and_before_policy_commit_revokes_without_persistence() {
+        use super::super::policy::{
+            ArgumentSpec, CredentialUse, LoginCredentialDraft, LoginFieldMapping,
+            test_approved_image,
+        };
+        struct StepClock(Arc<AtomicU64>);
+        impl SessionClock for StepClock {
+            fn now(&self) -> Duration {
+                let now = self.0.load(Ordering::SeqCst);
+                Duration::from_secs(if now >= 899 {
+                    self.0.fetch_add(1, Ordering::SeqCst)
+                } else {
+                    now
+                })
+            }
+        }
+        for expire_at in [899, 900] {
+            let dir = tempfile::tempdir().unwrap();
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+            let clock = Arc::new(AtomicU64::new(0));
+            let observed = Arc::new(Observed::default());
+            observed.eligibility_time.store(expire_at, Ordering::SeqCst);
+            let mut backend = backend(observed.clone());
+            backend.advance = Some(clock.clone());
+            let app = ProviderApplication::new(
+                Provider::start(dir.path().join("provider")).unwrap(),
+                Box::new(backend),
+                Box::new(StepClock(clock)),
+            )
+            .unwrap();
+            unlock(&app);
+            let path = dir.path().join("provider/provider-state.json");
+            let mut state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            state["approved_images"] =
+                serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
+            std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+            let credentials = (0..if expire_at == 899 { 1 } else { 2 })
+                .map(|i| LoginCredentialDraft {
+                    namespace: None,
+                    item_id: if i == 0 {
+                        binding().immutable_item_id.into()
+                    } else {
+                        "22222222-2222-2222-2222-222222222222".into()
+                    },
+                    label: format!("Login {i}"),
+                    use_type: CredentialUse::Login,
+                    field_mappings: vec![LoginFieldMapping {
+                        field: LoginField::Password,
+                        environment: format!("DEPLOY_PASSWORD_{i}"),
+                    }],
+                })
+                .collect();
+            let draft = OperationPolicyDraft {
+                create: None,
+                ssh: None,
+                id: "deploy".into(),
+                description: "Deploy".into(),
+                image_id: "deploy-image".into(),
+                targets: vec!["test".into()],
+                arguments: vec![ArgumentSpec::Target],
+                credentials,
+            };
+            assert_eq!(app.activate_operation(draft), Err(SessionError::Locked));
+            assert_eq!(observed.resolutions.load(Ordering::SeqCst), 1);
+            assert!(!observed.authority.load(Ordering::SeqCst));
+            let state: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            assert!(state["operations"].as_array().unwrap().is_empty());
+        }
+    }
+    #[test]
+    fn production_policy_activation_uses_only_owned_unlocked_backend() {
+        use super::super::policy::{
+            ArgumentSpec, CredentialUse, LoginCredentialDraft, LoginFieldMapping,
+            test_approved_image,
+        };
+        let observed = Arc::new(Observed::default());
+        let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
+        let draft = || OperationPolicyDraft {
+            create: None,
+            ssh: None,
+            id: "deploy".into(),
+            description: "Deploy".into(),
+            image_id: "deploy-image".into(),
+            targets: vec!["test".into()],
+            arguments: vec![ArgumentSpec::Target],
+            credentials: vec![LoginCredentialDraft {
+                namespace: None,
+                item_id: binding().immutable_item_id.into(),
+                label: "Login".into(),
+                use_type: CredentialUse::Login,
+                field_mappings: vec![LoginFieldMapping {
+                    field: LoginField::Password,
+                    environment: "DEPLOY_PASSWORD".into(),
+                }],
+            }],
+        };
+        assert_eq!(app.activate_operation(draft()), Err(SessionError::Locked));
+        unlock(&app);
+        assert_eq!(
+            app.activate_operation(draft()),
+            Err(SessionError::InvalidRequest)
+        );
+        assert_eq!(observed.resolutions.load(Ordering::SeqCst), 0);
+        let path = dir.path().join("provider/provider-state.json");
+        let mut state: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        state["approved_images"] =
+            serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
+        std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+        observed.incompatible.store(true, Ordering::SeqCst);
+        assert_eq!(
+            app.activate_operation(draft()),
+            Err(SessionError::Incompatible)
+        );
+        assert_eq!(observed.resolutions.load(Ordering::SeqCst), 0);
+        observed.incompatible.store(false, Ordering::SeqCst);
+        assert_eq!(app.activate_operation(draft()).unwrap().len(), 64);
+        assert_eq!(observed.resolutions.load(Ordering::SeqCst), 1);
+    }
+    #[test]
+    fn contending_submissions_are_rejected_without_queued_creation_or_launch() {
+        use crate::access::direct_request_tests::{fixture, input};
+        let fixture = fixture();
+        struct BlockingLauncher {
+            entered: mpsc::Sender<()>,
+            resume: Mutex<mpsc::Receiver<()>>,
+            calls: AtomicUsize,
+        }
+        impl DirectReviewLauncher for BlockingLauncher {
+            fn launch(&self, _: &str) -> Result<(), DirectRequestError> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                self.entered.send(()).unwrap();
+                self.resume
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(5))
+                    .unwrap();
+                Ok(())
+            }
+        }
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let launcher = Arc::new(BlockingLauncher {
+            entered: entered_tx,
+            resume: Mutex::new(resume_rx),
+            calls: AtomicUsize::new(0),
+        });
+        let first = {
+            let app = fixture.app.clone();
+            let launcher = launcher.clone();
+            std::thread::spawn(move || {
+                app.submit_direct(app.human_owner(), input(), launcher.as_ref())
+            })
+        };
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(9));
+        let (send, receive) = mpsc::channel();
+        let mut contenders = Vec::new();
+        for _ in 0..8 {
+            let (app, launcher, barrier, send) = (
+                fixture.app.clone(),
+                launcher.clone(),
+                barrier.clone(),
+                send.clone(),
+            );
+            contenders.push(std::thread::spawn(move || {
+                barrier.wait();
+                send.send(app.submit_direct(app.human_owner(), input(), launcher.as_ref()))
+                    .unwrap();
+            }));
+        }
+        barrier.wait();
+        let outcomes: Vec<_> = (0..8)
+            .map(|_| receive.recv_timeout(Duration::from_secs(2)))
+            .collect();
+        resume_tx.send(()).unwrap();
+        assert_eq!(first.join().unwrap().unwrap().status, DirectStatus::Pending);
+        for contender in contenders {
+            contender.join().unwrap();
+        }
+        for outcome in outcomes {
+            assert_eq!(outcome.unwrap(), Err(DirectRequestError::Unavailable));
+        }
+        assert_eq!(launcher.calls.load(Ordering::SeqCst), 1);
+        let state: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(fixture.dir.path().join("provider/provider-state.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(state["requests"].as_array().unwrap().len(), 1);
+    }
+    #[test]
+    fn revocation_immediately_after_persistence_returns_terminal_receipt_without_launch() {
+        use crate::access::direct_request_tests::{Launcher, fixture, input};
+        struct PersistedClock {
+            path: std::path::PathBuf,
+            entered: mpsc::Sender<()>,
+            resume: Mutex<mpsc::Receiver<()>>,
+            fired: AtomicBool,
+            expire: bool,
+        }
+        impl SessionClock for PersistedClock {
+            fn now(&self) -> Duration {
+                let persisted = std::fs::read(&self.path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                    .is_some_and(|state| !state["requests"].as_array().unwrap().is_empty());
+                if persisted && !self.fired.swap(true, Ordering::SeqCst) {
+                    self.entered.send(()).unwrap();
+                    self.resume
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .unwrap();
+                }
+                Duration::from_secs(if persisted && self.expire { 910 } else { 10 })
+            }
+        }
+        for expire in [true, false] {
+            let mut fixture = fixture();
+            let (entered_tx, entered_rx) = mpsc::channel();
+            let (resume_tx, resume_rx) = mpsc::channel();
+            Arc::get_mut(&mut fixture.app).unwrap().clock = Box::new(PersistedClock {
+                path: fixture.dir.path().join("provider/provider-state.json"),
+                entered: entered_tx,
+                resume: Mutex::new(resume_rx),
+                fired: AtomicBool::new(false),
+                expire,
+            });
+            let launcher = Arc::new(Launcher::default());
+            let submission = {
+                let (app, launcher) = (fixture.app.clone(), launcher.clone());
+                std::thread::spawn(move || {
+                    app.submit_direct(app.human_owner(), input(), launcher.as_ref())
+                })
+            };
+            entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            if !expire {
+                fixture.app.close_admission();
+            }
+            resume_tx.send(()).unwrap();
+            let receipt = submission.join().unwrap().unwrap();
+            assert_eq!(receipt.status, DirectStatus::Expired);
+            assert_eq!(launcher.calls.load(Ordering::SeqCst), 0);
+            assert_eq!(
+                fixture
+                    .app
+                    .direct_status(fixture.app.human_owner(), &receipt.id),
+                Ok(DirectStatus::Expired)
+            );
+            let state: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(fixture.dir.path().join("provider/provider-state.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(state["requests"][0]["id"], receipt.id);
+            assert_eq!(state["requests"].as_array().unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn execution_post_read_deadlines_precede_the_first_preparation_call() {
+        use crate::access::direct_request_tests::{Launcher, fixture, input};
+        struct Permit;
+        impl ApprovalAuthenticator for Permit {
+            fn authenticate(&self, _: SensitiveString) -> Result<(), SessionError> {
+                Ok(())
+            }
+        }
+        struct AfterReadClock {
+            calls: AtomicUsize,
+            observed: u64,
+        }
+        impl SessionClock for AfterReadClock {
+            fn now(&self) -> Duration {
+                // Initial admission and request expiry see live authority. The
+                // third clock read is after the potentially slow durable read.
+                let call = self.calls.fetch_add(1, Ordering::SeqCst);
+                Duration::from_secs(if call < 2 { 10 } else { self.observed })
+            }
+            fn unix_seconds(&self) -> Result<u64, SessionError> {
+                Ok(1700000000)
+            }
+        }
+        #[derive(Default)]
+        struct ObservePreparation(AtomicUsize);
+        impl ProtectedExecution for ObservePreparation {
+            type Prepared = ();
+            fn prepare(&self, _: ExecutionImage<'_>, _: Vec<String>) -> Result<(), ExecutionError> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        for (session, observed, accepted) in [
+            (false, 309, true),
+            (false, 310, false),
+            (true, 909, true),
+            (true, 910, false),
+        ] {
+            let mut f = fixture();
+            if session {
+                Arc::get_mut(&mut f.app).unwrap().request_lifetime = Duration::from_secs(3600);
+            }
+            let owner = f.app.human_owner();
+            let id = f
+                .app
+                .submit_direct(owner, input(), &Launcher::default())
+                .unwrap()
+                .id;
+            let approval = f
+                .app
+                .prepare_approval(owner, &id)
+                .unwrap()
+                .authenticate(SensitiveString::new("synthetic".into()), &Permit)
+                .unwrap();
+            f.app.commit_approval(approval).unwrap();
+            Arc::get_mut(&mut f.app).unwrap().clock = Box::new(AfterReadClock {
+                calls: AtomicUsize::new(0),
+                observed,
+            });
+            let preparer = ObservePreparation::default();
+            let result = f.app.prepare_execution(owner, &id, &preparer);
+            assert_eq!(
+                result.is_ok(),
+                accepted,
+                "session={session}, observed={observed}"
+            );
+            assert_eq!(preparer.0.load(Ordering::SeqCst), usize::from(accepted));
+        }
+    }
+
+    fn pairing_input(app: &ProviderApplication) -> super::super::agent_binding::AgentPairing {
+        super::super::agent_binding::AgentPairing {
+            label: "pairing-race".into(),
+            public_key: super::super::encode_public_key(
+                &ed25519_dalek::SigningKey::from_bytes(&[101; 32]).verifying_key(),
+            ),
+            uid: if app.human_owner().uid() == 41001 {
+                41002
+            } else {
+                41001
+            },
+            gid: 42001,
+        }
+    }
+    #[test]
+    fn pair_agent_rechecks_closed_admission_after_waiting_for_gate() {
+        use crate::access::direct_request_tests::{fixture, records};
+        let f = fixture();
+        let before = records(&f);
+        let gate = f.app.gate.lock().unwrap();
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let app = f.app.clone();
+        let worker = std::thread::spawn(move || {
+            PAIR_AGENT_GATE_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || entered_tx.send(()).unwrap()))
+            });
+            app.pair_agent(app.human_owner(), pairing_input(&app))
+        });
+        // The pair call has passed its initial check while gate remains held.
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        f.app.close_admission();
+        drop(gate);
+        assert_eq!(worker.join().unwrap(), Err(DirectRequestError::Unavailable));
+        assert_eq!(records(&f), before);
+        assert!(f.app.agent_tokens.lock().unwrap().is_empty());
+    }
+    #[test]
+    fn pair_agent_rechecks_closed_admission_before_token_publication() {
+        use crate::access::direct_request_tests::{fixture, records};
+        use crate::access::provider_store::WRITE_TEST_HOOK;
+        let f = fixture();
+        let (persisted_tx, persisted_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let app = f.app.clone();
+        let worker = std::thread::spawn(move || {
+            WRITE_TEST_HOOK.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move |stage| {
+                    if stage == 1 {
+                        persisted_tx.send(()).unwrap();
+                        resume_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
+                    false
+                }))
+            });
+            let result = app.pair_agent(app.human_owner(), pairing_input(&app));
+            WRITE_TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+            result
+        });
+        persisted_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        f.app.close_admission();
+        resume_tx.send(()).unwrap();
+        assert_eq!(worker.join().unwrap(), Err(DirectRequestError::Unavailable));
+        // A completed durable transaction is retained, but no live authority is
+        // published and the caller never receives successful pairing after close.
+        assert_eq!(records(&f)["pairings"].as_array().unwrap().len(), 1);
+        assert!(f.app.agent_tokens.lock().unwrap().is_empty());
+    }
+    #[test]
+    fn agent_status_refreshes_request_and_session_expiry_at_exact_deadlines() {
+        use crate::access::direct_request_tests::{Launcher, approval, fixture, input, records};
+        for session_expiry in [false, true] {
+            for approved in [false, true] {
+                let mut f = fixture();
+                if session_expiry {
+                    Arc::get_mut(&mut f.app).unwrap().request_lifetime = Duration::from_secs(3600);
+                }
+                let input_pairing = pairing_input(&f.app);
+                let binding = f
+                    .app
+                    .pair_agent(f.app.human_owner(), input_pairing)
+                    .unwrap();
+                let receipt = f
+                    .app
+                    .submit_agent_for_test(
+                        &binding.id,
+                        binding.uid,
+                        &[binding.gid],
+                        input(),
+                        &Launcher::default(),
+                    )
+                    .unwrap();
+                if approved {
+                    f.app.commit_approval(approval(&f, &receipt.id)).unwrap();
+                }
+                let owner = AgentOwner {
+                    binding_id: binding.id,
+                    label: binding.label,
+                    fingerprint: binding.fingerprint,
+                    uid: binding.uid,
+                    gid: binding.gid,
+                };
+                let deadline = if session_expiry { 910 } else { 310 };
+                f.monotonic.store(deadline - 1, Ordering::SeqCst);
+                assert_eq!(
+                    f.app
+                        .agent_status(&owner, owner.uid, &[owner.gid], &receipt.id),
+                    Ok(if approved {
+                        DirectStatus::Approved
+                    } else {
+                        DirectStatus::Pending
+                    })
+                );
+                f.monotonic.store(deadline, Ordering::SeqCst);
+                assert_eq!(
+                    f.app
+                        .agent_status(&owner, owner.uid, &[owner.gid], &receipt.id),
+                    Ok(DirectStatus::Expired)
+                );
+                let expired = records(&f);
+                assert_eq!(
+                    expired["requests"][0]["direct"]["review"]["status"]["status"],
+                    "expired"
+                );
+                assert_eq!(
+                    f.app.gate.lock().unwrap().deadline.is_none(),
+                    session_expiry
+                );
+                assert_eq!(
+                    f.app
+                        .agent_status(&owner, owner.uid, &[owner.gid], &receipt.id),
+                    Ok(DirectStatus::Expired)
+                );
+                assert_eq!(records(&f), expired);
+                assert!(!f.app.admission_closed());
+            }
+        }
+    }
+}

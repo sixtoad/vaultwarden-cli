@@ -1,0 +1,518 @@
+{
+  "files": {
+    "kill-man": {
+      "exists": false,
+      "path": "/usr/share/man/man2/kill.2"
+    },
+    "libproc": {
+      "excerpts": [
+        {
+          "line": 45,
+          "text": ""
+        },
+        {
+          "line": 46,
+          "text": "/*!"
+        },
+        {
+          "line": 47,
+          "text": " *       @define PROC_LISTPIDSPATH_PATH_IS_VOLUME"
+        },
+        {
+          "line": 48,
+          "text": " *       @discussion This flag indicates that all processes that hold open"
+        },
+        {
+          "line": 49,
+          "text": " *               file references on the volume associated with the specified"
+        },
+        {
+          "line": 50,
+          "text": " *               path should be returned."
+        },
+        {
+          "line": 51,
+          "text": " */"
+        },
+        {
+          "line": 52,
+          "text": "#define PROC_LISTPIDSPATH_PATH_IS_VOLUME        1"
+        },
+        {
+          "line": 53,
+          "text": ""
+        },
+        {
+          "line": 54,
+          "text": ""
+        },
+        {
+          "line": 55,
+          "text": "/*!"
+        },
+        {
+          "line": 56,
+          "text": " *       @define PROC_LISTPIDSPATH_EXCLUDE_EVTONLY"
+        },
+        {
+          "line": 57,
+          "text": " *       @discussion This flag indicates that file references that were opened"
+        },
+        {
+          "line": 58,
+          "text": " *               with the O_EVTONLY flag should be excluded from the matching"
+        },
+        {
+          "line": 59,
+          "text": " *               criteria."
+        },
+        {
+          "line": 60,
+          "text": " */"
+        },
+        {
+          "line": 61,
+          "text": "#define PROC_LISTPIDSPATH_EXCLUDE_EVTONLY       2"
+        },
+        {
+          "line": 62,
+          "text": ""
+        },
+        {
+          "line": 63,
+          "text": "__BEGIN_DECLS"
+        },
+        {
+          "line": 64,
+          "text": ""
+        },
+        {
+          "line": 65,
+          "text": ""
+        },
+        {
+          "line": 66,
+          "text": "/*!"
+        },
+        {
+          "line": 67,
+          "text": " *       @function proc_listpidspath"
+        },
+        {
+          "line": 68,
+          "text": " *       @discussion A function which will search through the current"
+        },
+        {
+          "line": 69,
+          "text": " *               processes looking for open file references which match"
+        },
+        {
+          "line": 70,
+          "text": " *               a specified path or volume."
+        },
+        {
+          "line": 71,
+          "text": " *       @param type types of processes to be searched (see proc_listpids)"
+        },
+        {
+          "line": 72,
+          "text": " *       @param typeinfo adjunct information for type"
+        },
+        {
+          "line": 73,
+          "text": " *       @param path file or volume path"
+        },
+        {
+          "line": 74,
+          "text": " *       @param pathflags flags to control which files should be considered"
+        },
+        {
+          "line": 75,
+          "text": " *               during the process search."
+        },
+        {
+          "line": 76,
+          "text": " *       @param buffer a C array of int-sized values to be filled with"
+        },
+        {
+          "line": 83,
+          "text": " *               -1 if an error was encountered;"
+        },
+        {
+          "line": 84,
+          "text": " */"
+        },
+        {
+          "line": 85,
+          "text": "int     proc_listpidspath(uint32_t      type,"
+        },
+        {
+          "line": 86,
+          "text": "    uint32_t      typeinfo,"
+        },
+        {
+          "line": 87,
+          "text": "    const char    *path,"
+        },
+        {
+          "line": 88,
+          "text": "    uint32_t      pathflags,"
+        },
+        {
+          "line": 89,
+          "text": "    void          *buffer,"
+        },
+        {
+          "line": 90,
+          "text": "    int           buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);"
+        },
+        {
+          "line": 91,
+          "text": ""
+        },
+        {
+          "line": 92,
+          "text": "int proc_listpids(uint32_t type, uint32_t typeinfo, void *buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);"
+        },
+        {
+          "line": 93,
+          "text": "int proc_listallpids(void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_1);"
+        },
+        {
+          "line": 94,
+          "text": "int proc_listpgrppids(pid_t pgrpid, void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_1);"
+        },
+        {
+          "line": 95,
+          "text": "int proc_listchildpids(pid_t ppid, void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_1);"
+        },
+        {
+          "line": 96,
+          "text": "int proc_pidinfo(int pid, int flavor, uint64_t arg, void *buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);"
+        },
+        {
+          "line": 97,
+          "text": "int proc_pidfdinfo(int pid, int fd, int flavor, void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);"
+        },
+        {
+          "line": 98,
+          "text": "int proc_pidfileportinfo(int pid, uint32_t fileport, int flavor, void *buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_3);"
+        },
+        {
+          "line": 99,
+          "text": "int proc_name(int pid, void * buffer, uint32_t buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);"
+        },
+        {
+          "line": 100,
+          "text": "int proc_regionfilename(int pid, uint64_t address, void * buffer, uint32_t buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);"
+        }
+      ],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/libproc.h",
+      "sha256": "246d87709fc6b9157ce5cf3c475656ac48e0e1ae8bbdc46cf45acd34294448cd"
+    },
+    "limits-man": {
+      "exists": false,
+      "path": "/usr/share/man/man2/setrlimit.2"
+    },
+    "sandbox-api": {
+      "excerpts": [
+        {
+          "line": 5,
+          "text": ""
+        },
+        {
+          "line": 6,
+          "text": "/*"
+        },
+        {
+          "line": 7,
+          "text": " * This header is deprecated and may be removed in a future release."
+        },
+        {
+          "line": 8,
+          "text": " * Developers who wish to sandbox an app should instead adopt the App Sandbox"
+        },
+        {
+          "line": 9,
+          "text": " * feature described in the App Sandbox Design Guide."
+        },
+        {
+          "line": 10,
+          "text": " */"
+        },
+        {
+          "line": 11,
+          "text": ""
+        },
+        {
+          "line": 12,
+          "text": ""
+        },
+        {
+          "line": 22,
+          "text": ""
+        },
+        {
+          "line": 23,
+          "text": "/*"
+        },
+        {
+          "line": 24,
+          "text": " * @function sandbox_init"
+        },
+        {
+          "line": 25,
+          "text": " * Places the current process in a sandbox with a profile as"
+        },
+        {
+          "line": 26,
+          "text": " * specified.  If the process is already in a sandbox, the new profile"
+        },
+        {
+          "line": 27,
+          "text": " * is ignored and sandbox_init() returns an error."
+        },
+        {
+          "line": 28,
+          "text": " *"
+        },
+        {
+          "line": 29,
+          "text": " * @param profile (input)   The Sandbox profile to be used.  The format"
+        },
+        {
+          "line": 30,
+          "text": " * and meaning of this parameter is modified by the `flags' parameter."
+        },
+        {
+          "line": 31,
+          "text": " *"
+        },
+        {
+          "line": 32,
+          "text": " * @param flags (input)   Must be SANDBOX_NAMED.  All other"
+        },
+        {
+          "line": 33,
+          "text": " * values are reserved."
+        },
+        {
+          "line": 34,
+          "text": " *"
+        },
+        {
+          "line": 35,
+          "text": " * @param errorbuf (output)   In the event of an error, sandbox_init"
+        },
+        {
+          "line": 36,
+          "text": " * will set `*errorbuf' to a pointer to a NUL-terminated string"
+        },
+        {
+          "line": 37,
+          "text": " * describing the error. This string may contain embedded newlines."
+        },
+        {
+          "line": 38,
+          "text": " * This error information is suitable for developers and is not"
+        },
+        {
+          "line": 39,
+          "text": " * intended for end users."
+        },
+        {
+          "line": 40,
+          "text": " *"
+        },
+        {
+          "line": 44,
+          "text": " * @result 0 on success, -1 otherwise."
+        },
+        {
+          "line": 45,
+          "text": " */"
+        },
+        {
+          "line": 46,
+          "text": "API_DEPRECATED(\"No longer supported\", macos(10.5, 10.8), ios(2.0, 6.0), tvos(4.0, 4.0), watchos(1.0, 1.0))"
+        },
+        {
+          "line": 47,
+          "text": "API_UNAVAILABLE(macCatalyst)"
+        },
+        {
+          "line": 48,
+          "text": "OS_WARN_RESULT"
+        },
+        {
+          "line": 49,
+          "text": "int sandbox_init(const char *profile, uint64_t flags, char **errorbuf);"
+        },
+        {
+          "line": 50,
+          "text": ""
+        },
+        {
+          "line": 51,
+          "text": "/*"
+        },
+        {
+          "line": 52,
+          "text": " * @define SANDBOX_NAMED  The `profile' argument specifies a Sandbox"
+        },
+        {
+          "line": 53,
+          "text": " * profile named by one of the kSBXProfile* string constants."
+        },
+        {
+          "line": 54,
+          "text": " */"
+        },
+        {
+          "line": 57,
+          "text": "/*"
+        },
+        {
+          "line": 58,
+          "text": " * @function sandbox_free_error"
+        },
+        {
+          "line": 59,
+          "text": " * Deallocates an error string previously allocated by sandbox_init."
+        },
+        {
+          "line": 60,
+          "text": " *"
+        },
+        {
+          "line": 61,
+          "text": " * @param errorbuf (input)   The buffer to be freed.  Must be a pointer"
+        },
+        {
+          "line": 62,
+          "text": " * previously returned by sandbox_init in the `errorbuf' argument, or NULL."
+        },
+        {
+          "line": 63,
+          "text": " *"
+        },
+        {
+          "line": 64,
+          "text": " * @result void"
+        },
+        {
+          "line": 65,
+          "text": " */"
+        },
+        {
+          "line": 66,
+          "text": "API_DEPRECATED(\"No longer supported\", macos(10.5, 10.8), ios(2.0, 6.0), tvos(4.0, 4.0), watchos(1.0, 1.0))"
+        },
+        {
+          "line": 67,
+          "text": "API_UNAVAILABLE(macCatalyst)"
+        },
+        {
+          "line": 68,
+          "text": "void sandbox_free_error(char *errorbuf);"
+        },
+        {
+          "line": 69,
+          "text": ""
+        },
+        {
+          "line": 70,
+          "text": "__END_DECLS"
+        },
+        {
+          "line": 71,
+          "text": ""
+        }
+      ],
+      "exists": true,
+      "path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/sandbox.h",
+      "sha256": "a2321eb6f1d41fcc7fd8b260d5c3cef985df9e4cf0a6a7c23d91bbfd7c8f26e0"
+    },
+    "sandbox-man": {
+      "excerpts": [
+        {
+          "line": 7,
+          "text": ".Sh NAME"
+        },
+        {
+          "line": 8,
+          "text": ".Nm sandbox-exec"
+        },
+        {
+          "line": 9,
+          "text": ".Nd execute within a sandbox (DEPRECATED)"
+        },
+        {
+          "line": 10,
+          "text": ".Sh SYNOPSIS"
+        },
+        {
+          "line": 11,
+          "text": ".Nm"
+        },
+        {
+          "line": 12,
+          "text": ".Op Fl f Ar profile-file"
+        },
+        {
+          "line": 13,
+          "text": ".Op Fl n Ar profile-name"
+        },
+        {
+          "line": 14,
+          "text": ".Op Fl p Ar profile-string"
+        },
+        {
+          "line": 20,
+          "text": ".Nm"
+        },
+        {
+          "line": 21,
+          "text": "command is"
+        },
+        {
+          "line": 22,
+          "text": ".Sy DEPRECATED ."
+        },
+        {
+          "line": 23,
+          "text": "Developers who wish to sandbox an app should instead adopt the App Sandbox feature described in the App Sandbox Design Guide."
+        },
+        {
+          "line": 24,
+          "text": "The"
+        },
+        {
+          "line": 25,
+          "text": ".Nm"
+        },
+        {
+          "line": 26,
+          "text": "command enters a sandbox using a profile specified by the"
+        },
+        {
+          "line": 27,
+          "text": ".Fl f ,"
+        },
+        {
+          "line": 28,
+          "text": ".Fl n ,"
+        }
+      ],
+      "exists": true,
+      "path": "/usr/share/man/man1/sandbox-exec.1",
+      "sha256": "0d264f72dc6a8e0db5474840f33b512542c469beb109ed146c17055da287336b"
+    }
+  },
+  "mode": "read-only; no process signals, service registration, account or system changes",
+  "observed_utc": "2026-10-27T21:09:09.364293+00:00",
+  "os_build": "26A434",
+  "os_version": "27.0.1",
+  "sdk_path": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk"
+}

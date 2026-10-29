@@ -1,4 +1,4 @@
-//! External observers for real manager cleanup. Opt-in skips are missing evidence.
+//! External observers for delivery, consumer survival and fixture-owned cleanup. Opt-in skips are missing evidence.
 #![cfg(target_os = "linux")]
 use std::{
     path::{Path, PathBuf},
@@ -124,6 +124,14 @@ impl Cleanup {
         }
     }
     fn finish(&mut self) -> Result<(), String> {
+        // The test owner ends its synthetic consumers only after survival assertions.
+        // Production cancellation never creates these markers or stops workloads.
+        for marker in ["tree-ready", "app-tree-ready", "other-tree-ready"] {
+            if self.root.is_dir() {
+                std::fs::write(self.root.join(format!("{marker}.finish")), b"test teardown")
+                    .map_err(|e| e.to_string())?;
+            }
+        }
         // Stop creation before consuming the append-only identity ledger.
         stop_exact(&self.provider)?;
         let entries = std::fs::read_to_string(self.root.join("identities.jsonl"));
@@ -137,7 +145,6 @@ impl Cleanup {
             Err(e) => return Err(e.to_string()),
         };
         for identity in &entries {
-            stop_exact(&identity.name)?;
             let deadline = Instant::now() + Duration::from_secs(10);
             while !empty(&identity.cgroup) {
                 if Instant::now() >= deadline {
@@ -145,6 +152,7 @@ impl Cleanup {
                 }
                 std::thread::sleep(Duration::from_millis(25));
             }
+            stop_exact(&identity.name)?;
         }
         if let Ok(runtime) = std::fs::read_to_string(self.root.join("runtime")) {
             let runtime = Path::new(&runtime);
@@ -274,6 +282,16 @@ fn empty(cgroup: &str) -> bool {
     }
     true
 }
+fn assert_consumer_alive(marker: &Path) {
+    let pid: u32 = std::fs::read_to_string(marker).unwrap().parse().unwrap();
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        .expect("released consumer must survive access cancellation");
+    let state = stat.rsplit_once(") ").unwrap().1.chars().next().unwrap();
+    assert!(
+        !matches!(state, 'Z' | 'X' | 'T' | 't'),
+        "consumer must remain live and unstopped: {state}"
+    );
+}
 fn start(root: &Path, unit: &str, mode: &str) {
     let binary = std::env::var("VW18_TEST_BINARY").expect("script supplies unit harness binary");
     let status = Command::new("timeout")
@@ -317,6 +335,7 @@ fn independent_descendants_provider_crash_and_recovery() {
         "orphan",
         "cancel",
         "crash",
+        "helper-crash",
         "collision",
         "helper-failure",
         "failed-launch-recovery",
@@ -336,9 +355,10 @@ fn independent_descendants_provider_crash_and_recovery() {
         "app-ssh-lock",
         "app-ssh-cancel",
         "ssh-exit",
+        "ssh-clean-exit",
         "ssh-cancel",
         "ssh-crash",
-        "ssh-uncertain",
+        "ssh-detached-recovery",
         "ssh-cleanup-failure",
         "app-deadline",
         "app-persistence",
@@ -351,7 +371,7 @@ fn independent_descendants_provider_crash_and_recovery() {
         "fault-job",
         "fault-exec",
         "fault-monitor",
-        "fault-stop",
+        "fault-observe",
     ] {
         if selected.as_ref().is_some_and(|selected| mode != selected) {
             continue;
@@ -415,18 +435,23 @@ fn independent_descendants_provider_crash_and_recovery() {
             assert_eq!(scoped.len(), 2);
             assert_ne!(scoped[0].name, scoped[1].name);
             assert!(
-                empty(&scoped[0].cgroup),
-                "revoked agent descendants survived acknowledgement"
+                !empty(&scoped[0].cgroup),
+                "revoking future access must preserve the existing consumer"
             );
             assert!(
                 !empty(&scoped[1].cgroup),
                 "other agent was terminated by scoped revocation"
             );
+            assert_consumer_alive(&root.path().join("app-tree-ready"));
+            assert_consumer_alive(&root.path().join("other-tree-ready"));
             assert_eq!(run(&["is-active", &scoped[1].name]).trim(), "active");
             std::fs::write(root.path().join("scoped-observation-complete"), b"observed").unwrap();
             until(root.path(), || root.path().join("finished").exists());
         } else if mode.starts_with("app-")
-            || matches!(mode, "ssh-exit" | "ssh-uncertain" | "ssh-cleanup-failure")
+            || matches!(
+                mode,
+                "ssh-exit" | "ssh-clean-exit" | "ssh-detached-recovery" | "ssh-cleanup-failure"
+            )
             || mode.starts_with("fault-")
             || mode.starts_with("phase-")
             || matches!(
@@ -471,16 +496,21 @@ fn independent_descendants_provider_crash_and_recovery() {
                 let path = PathBuf::from(
                     std::fs::read_to_string(root.path().join("material-path")).unwrap(),
                 );
-                assert!(path.join("identity").exists());
-                assert!(root.path().join("ssh-material-readable").exists());
-                Some(path)
+                assert!(!path.join("identity").exists());
+                assert!(root.path().join("ssh-agent-ready").exists());
+                let socket =
+                    PathBuf::from(std::fs::read_to_string(root.path().join("agent-path")).unwrap());
+                assert!(socket.exists());
+                Some((path, socket))
             } else {
                 None
             };
             if mode == "crash" || mode == "ssh-crash" {
                 run(&["kill", "--signal=SIGKILL", "--kill-whom=main", &unit]);
                 // No callbacks in the killed provider participate in this proof.
-                until(root.path(), || empty(cgroup));
+                std::thread::sleep(Duration::from_millis(300));
+                assert!(!empty(cgroup));
+                assert_consumer_alive(&root.path().join("tree-ready"));
                 assert!(!root.path().join("finished").exists());
                 assert!(
                     lease_path.exists(),
@@ -511,23 +541,30 @@ fn independent_descendants_provider_crash_and_recovery() {
                 std::fs::write(root.path().join("recover"), b"recover").unwrap();
                 run(&["restart", &unit]);
                 until(root.path(), || root.path().join("finished").exists());
-                assert!(!lease_path.exists());
-                if let Some(path) = &ssh_material {
+                assert!(lease_path.exists(), "live lease must survive recovery");
+                assert_consumer_alive(&root.path().join("tree-ready"));
+                if let Some((path, socket)) = &ssh_material {
                     assert!(
-                        !path.exists(),
-                        "restart must reap then remove SSH residuals"
+                        !path.join("identity").exists(),
+                        "restart must not leave a private key on disk"
                     );
+                    assert!(std::os::unix::net::UnixStream::connect(socket).is_err());
                 }
                 assert_eq!(run(&["is-active", &unrelated]).trim(), "active");
                 unrelated_cleanup.finish().unwrap();
             } else {
-                std::fs::write(root.path().join("cancel"), b"cancel").unwrap();
+                if mode == "helper-crash" {
+                    run(&["kill", "--signal=SIGKILL", "--kill-whom=main", request_unit]);
+                } else {
+                    std::fs::write(root.path().join("cancel"), b"cancel").unwrap();
+                }
                 until(root.path(), || root.path().join("finished").exists());
-                assert!(empty(cgroup));
-                if let Some(path) = &ssh_material {
+                assert!(!empty(cgroup));
+                assert_consumer_alive(&root.path().join("tree-ready"));
+                if let Some((_path, socket)) = &ssh_material {
                     assert!(
-                        !path.exists(),
-                        "SSH material must disappear after complete reap"
+                        std::os::unix::net::UnixStream::connect(socket).is_err(),
+                        "cancellation must close the agent while consumers survive"
                     );
                 }
             }
@@ -545,11 +582,41 @@ fn independent_descendants_provider_crash_and_recovery() {
                 "every scenario must record its request identity: {mode}"
             );
         }
+        let preserves_consumers = matches!(
+            mode,
+            "orphan"
+                | "cancel"
+                | "crash"
+                | "helper-crash"
+                | "app-worker-shutdown"
+                | "app-lock"
+                | "app-cancel"
+                | "app-revoke"
+                | "app-agent-revoke"
+                | "app-shutdown"
+                | "app-deadline"
+                | "app-persistence"
+                | "fault-observe"
+        ) || (mode.starts_with("ssh-")
+            && !matches!(mode, "ssh-clean-exit" | "ssh-cleanup-failure"))
+            || mode.starts_with("app-ssh-");
+        if preserves_consumers {
+            let marker = if mode.starts_with("app-") && !mode.starts_with("app-ssh-") {
+                "app-tree-ready"
+            } else {
+                "tree-ready"
+            };
+            assert_consumer_alive(&root.path().join(marker));
+        }
         for identity in created {
-            assert!(
-                empty(&identity.cgroup),
-                "independent reaping failed: {mode}"
-            );
+            if preserves_consumers {
+                assert!(
+                    !empty(&identity.cgroup),
+                    "consumer unexpectedly stopped: {mode}"
+                );
+            } else {
+                until(root.path(), || empty(&identity.cgroup));
+            }
             if mode == "fault-job" {
                 let output = bounded(
                     "systemctl",

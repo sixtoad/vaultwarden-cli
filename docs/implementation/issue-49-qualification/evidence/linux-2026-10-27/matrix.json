@@ -1,0 +1,82 @@
+[
+  {
+    "case": "separate-agent-identities",
+    "outcome": "unavailable",
+    "reason": "authorized-dedicated-provider-and-agent-accounts-required"
+  },
+  {
+    "case": "wrong-uid",
+    "outcome": "unavailable",
+    "reason": "real-cross-account-transport-required"
+  },
+  {
+    "case": "wrong-key",
+    "outcome": "unavailable",
+    "reason": "candidate-enrollment-and-ed25519-verifier-required"
+  },
+  {
+    "case": "socket-substitution",
+    "outcome": "unavailable",
+    "reason": "connection-bound-server-and-client-identity-required"
+  },
+  {
+    "case": "replacement",
+    "outcome": "unavailable",
+    "reason": "no-writer-lifetime-and-exact-executed-image-contract-required"
+  },
+  {
+    "case": "mutation-symlink-hardlink",
+    "outcome": "unavailable",
+    "reason": "protected-stage-and-concurrent-attacker-required"
+  },
+  {
+    "case": "unsafe-dependency-signature",
+    "outcome": "unavailable",
+    "reason": "dependency-closure-and-production-signing-policy-required"
+  },
+  {
+    "case": "agent-inspection",
+    "outcome": "unavailable",
+    "reason": "cross-account-argv-env-memory-files-logs-inspection-required"
+  },
+  {
+    "case": "double-fork-setsid",
+    "outcome": "unavailable",
+    "reason": "supported-containment-contract-required"
+  },
+  {
+    "case": "rapid-fork-exit",
+    "outcome": "unavailable",
+    "reason": "atomic-membership-and-independent-reap-evidence-required"
+  },
+  {
+    "case": "provider-controller-crash",
+    "outcome": "unavailable",
+    "reason": "service-failure-containment-contract-required"
+  },
+  {
+    "case": "expiry-lock-cancel-revoke",
+    "outcome": "unavailable",
+    "reason": "candidate-control-and-continuous-deadline-implementation-required"
+  },
+  {
+    "case": "restart-invalidation",
+    "outcome": "unavailable",
+    "reason": "persistent-ownership-and-fresh-unlock-recovery-required"
+  },
+  {
+    "case": "service-keychain",
+    "outcome": "unavailable",
+    "reason": "authorized-nonlogin-service-keychain-qualification-required"
+  },
+  {
+    "case": "production-signing",
+    "outcome": "unavailable",
+    "reason": "developer-id-hardened-runtime-and-distribution-evidence-required"
+  },
+  {
+    "case": "unsupported-platform-regression",
+    "outcome": "unavailable",
+    "reason": "native-cargo-regression-required"
+  }
+]

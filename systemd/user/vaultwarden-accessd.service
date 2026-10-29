@@ -10,9 +10,9 @@ TimeoutStopSec=30s
 LimitCORE=0
 NoNewPrivileges=yes
 
-# Protected request units are created by the systemd user manager, not
-# by agent clients or this service directly. Each must be manager-owned and
-# bind to this unit with BindsTo=, PartOf= and After= plus KillMode=control-group.
+# Protected delivery helpers run in separate user-manager units. Those units
+# must not depend on this provider's lifetime or terminate consumers on access
+# cancellation. The KillMode above applies only to the provider's own processes.
 
 [Install]
 WantedBy=default.target

@@ -1,4 +1,4 @@
-//! Typed systemd transaction and independent post-stop process observation.
+//! Typed systemd transaction and independent, read-only process observation.
 use crate::access::ports::ExecutionError;
 use dbus::{
     Path as BusPath,
@@ -342,7 +342,7 @@ pub(super) enum Fault {
     Job,
     Exec,
     Monitor,
-    Stop,
+    Observe,
 }
 #[cfg(test)]
 thread_local! { pub(super) static FAULT: std::cell::Cell<Fault> = const { std::cell::Cell::new(Fault::None) }; }
@@ -464,16 +464,9 @@ impl Manager {
             return Err(ExecutionError::CleanupUncertain);
         }
         for relationship in ["BindsTo", "PartOf"] {
-            if self.get::<Vec<String>>(&path, UNIT, relationship)? != vec![config.provider.clone()]
-            {
+            if self.get::<Vec<String>>(&path, UNIT, relationship)? != Vec::<String>::new() {
                 return Err(ExecutionError::CleanupUncertain);
             }
-        }
-        if !self
-            .get::<Vec<String>>(&path, UNIT, "After")?
-            .contains(&config.provider)
-        {
-            return Err(ExecutionError::CleanupUncertain);
         }
         let exec: Vec<ObservedExec> = self.get(&path, SERVICE, "ExecStart")?;
         let helper = config
@@ -492,10 +485,10 @@ impl Manager {
             return Err(ExecutionError::CleanupUncertain);
         }
         for (name, expected) in [
-            ("KillMode", "control-group"),
+            ("KillMode", "none"),
             ("Restart", "no"),
             ("Type", "exec"),
-            ("ExitType", "main"),
+            ("ExitType", "cgroup"),
             ("StandardInput", "null"),
             ("StandardOutput", "null"),
             ("StandardError", "null"),
@@ -511,14 +504,11 @@ impl Manager {
         // An old unit remains owned if manager names change after creation. Only
         // the stable removal contract and name-only shape are ownership evidence.
         if !valid_helper_unset(&self.get::<Vec<String>>(&path, SERVICE, "UnsetEnvironment")?)
-            || !self.get::<bool>(&path, SERVICE, "SendSIGKILL")?
+            || self.get::<bool>(&path, SERVICE, "SendSIGKILL")?
             || self.get::<Vec<String>>(&path, SERVICE, "Environment")? != expected_environment
             || self.get::<u64>(&path, SERVICE, "TimeoutStartUSec")? != 5_000_000
             || self.get::<u64>(&path, SERVICE, "TimeoutStopUSec")? != 2_000_000
-            || matches!(
-                self.get::<u64>(&path, SERVICE, "RuntimeMaxUSec")?,
-                0 | u64::MAX
-            )
+            || self.get::<u64>(&path, SERVICE, "RuntimeMaxUSec")? != u64::MAX
         {
             return Err(ExecutionError::CleanupUncertain);
         }
@@ -642,47 +632,24 @@ impl Manager {
                 .map_err(failure)?;
         }
     }
-    pub fn stop_reap(&self, config: &Config, lease: &Lease) -> Result<(), ExecutionError> {
+    /// Observe resource disuse without changing any service or process lifetime.
+    pub fn unused(&self, config: &Config, lease: &Lease) -> Result<bool, ExecutionError> {
         #[cfg(test)]
-        if FAULT.with(|f| f.get() == Fault::Stop) {
-            return Err(ExecutionError::ManagerUnavailable);
+        if FAULT.with(|f| f.get() == Fault::Observe) {
+            return Err(ExecutionError::CleanupUncertain);
         }
-        if self.owned(config, lease)?.is_some() {
-            self.expect_job(&lease.name)?;
-            let (job,): (BusPath<'static>,) = self
-                .connection
-                .with_proxy(DEST, ROOT, Duration::from_secs(2))
-                .method_call(MANAGER, "StopUnit", (&lease.name, "replace"))
-                .map_err(failure)?;
-            self.wait_job(&job, &lease.name)?;
+        self.owned(config, lease)?;
+        if let Some(path) = self.unit(&lease.name)? {
+            let active: String = self.get(&path, UNIT, "ActiveState")?;
+            if !matches!(active.as_str(), "inactive" | "failed") {
+                return Ok(false);
+            }
         }
-        // Job completion closes containment. Independent /proc scans include zombies,
-        // which neither cgroup.procs nor populated=0 can establish as reaped.
-        let deadline = Instant::now() + WAIT;
-        loop {
-            if let Some(path) = self.unit(&lease.name)? {
-                let active: String = self.get(&path, UNIT, "ActiveState")?;
-                if !matches!(active.as_str(), "inactive" | "failed") {
-                    if Instant::now() >= deadline {
-                        return Err(ExecutionError::CleanupUncertain);
-                    }
-                    std::thread::sleep(Duration::from_millis(20));
-                    continue;
-                }
-            }
-            // Process exit can tear an unrelated proc snapshot. Retry until a
-            // complete scan is available; persistent unreadability stays uncertain.
-            if matches!(
-                proc_empty_until(Path::new("/proc"), &lease.cgroup, deadline),
-                Ok(true)
-            ) {
-                return Ok(());
-            }
-            if Instant::now() >= deadline {
-                return Err(ExecutionError::CleanupUncertain);
-            }
-            std::thread::sleep(Duration::from_millis(20));
-        }
+        proc_empty_until(
+            Path::new("/proc"),
+            &lease.cgroup,
+            Instant::now() + Duration::from_millis(200),
+        )
     }
     pub fn recover(&self, config: &Config) -> Result<(), ExecutionError> {
         // Recovery is called only under ProviderStore's exclusive writer lock.
@@ -708,7 +675,10 @@ impl Manager {
             }
         }
         for lease in leases {
-            self.stop_reap(config, &lease)?;
+            // Legacy or live units are retained. Recovery never stops consumers.
+            if !matches!(self.unused(config, &lease), Ok(true)) {
+                continue;
+            }
             config.forget(&lease)?;
             match std::fs::remove_file(config.socket(&lease.name)) {
                 Ok(()) => {}
@@ -747,20 +717,17 @@ pub(super) fn properties(
     Ok(vec![
         property("Description", "Vaultwarden protected execution".to_owned()),
         property("UnsetEnvironment", unset_environment),
-        property("BindsTo", vec![config.provider.clone()]),
-        property("PartOf", vec![config.provider.clone()]),
-        property("After", vec![config.provider.clone()]),
         property("ExecStart", vec![(helper, args, false)]),
         property("Slice", "app.slice".to_owned()),
         property("Type", "exec".to_owned()),
-        property("ExitType", "main".to_owned()),
-        property("KillMode", "control-group".to_owned()),
+        property("ExitType", "cgroup".to_owned()),
+        property("KillMode", "none".to_owned()),
         property("CollectMode", "inactive-or-failed".to_owned()),
-        property("SendSIGKILL", true),
+        property("SendSIGKILL", false),
         property("Restart", "no".to_owned()),
         property("TimeoutStartUSec", 5_000_000u64),
         property("TimeoutStopUSec", 2_000_000u64),
-        property("RuntimeMaxUSec", micros),
+        property("RuntimeMaxUSec", u64::MAX),
         property("StandardInput", "null".to_owned()),
         property("StandardOutput", "null".to_owned()),
         property("StandardError", "null".to_owned()),
@@ -921,12 +888,11 @@ mod tests {
         assert_eq!(values.signature().to_string(), "a(sv)");
         let values: HashMap<_, _> = values.into_iter().collect();
         for key in ["BindsTo", "PartOf", "After"] {
-            assert_eq!(values[key].0.signature().to_string(), "as");
-            assert_eq!(
-                values[key].0.as_iter().unwrap().next().unwrap().as_str(),
-                Some(config.provider.as_str())
-            );
+            assert!(!values.contains_key(key));
         }
+        assert_eq!(values["RuntimeMaxUSec"].0.as_u64(), Some(u64::MAX));
+        assert_eq!(values["SendSIGKILL"].0.as_u64(), Some(0));
+        assert_eq!(values["ExitType"].0.as_str(), Some("cgroup"));
         assert_eq!(values["ExecStart"].0.signature().to_string(), "a(sasb)");
         assert_eq!(values["SendSIGKILL"].0.signature().to_string(), "b");
         for key in ["RuntimeMaxUSec", "TimeoutStartUSec", "TimeoutStopUSec"] {
@@ -943,7 +909,7 @@ mod tests {
         ] {
             assert!(!values.contains_key(key));
         }
-        assert_eq!(values["KillMode"].0.as_str(), Some("control-group"));
+        assert_eq!(values["KillMode"].0.as_str(), Some("none"));
         assert_eq!(values["CollectMode"].0.signature().to_string(), "s");
         assert_eq!(values["CollectMode"].0.as_str(), Some("inactive-or-failed"));
         assert_eq!(values["Type"].0.as_str(), Some("exec"));

@@ -1,0 +1,48 @@
+{
+  "checked_utc": "2026-10-27T15:37:15.523224+00:00",
+  "fixture_identities": [
+    {
+      "kernel_exit_observed": true,
+      "pid": 65431,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65434,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65437,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65439,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65441,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65512,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65514,
+      "state": "not-present"
+    },
+    {
+      "kernel_exit_observed": true,
+      "pid": 65516,
+      "state": "not-present"
+    }
+  ],
+  "materials_retained": true,
+  "production_containment_proven": false,
+  "unwaited_direct_children": []
+}

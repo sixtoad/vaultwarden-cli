@@ -1,0 +1,11 @@
+{
+  "api_baseline": "13.0",
+  "architecture": "arm64",
+  "certified_versions": [],
+  "kernel_release": "27.0.0",
+  "native_host_authorized": true,
+  "os_build": "26A434",
+  "os_version": "27.0.1",
+  "system": "Darwin",
+  "uid": 501
+}

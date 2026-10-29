@@ -1,0 +1,11 @@
+{
+  "certified_versions": [],
+  "failures": [],
+  "mechanism_selected": null,
+  "observations": 9,
+  "outcome": "blocked",
+  "production_enabled": false,
+  "reason": "production-contracts-and-cross-account-native-evidence-missing",
+  "schema": 1,
+  "source_manifest_complete": true
+}

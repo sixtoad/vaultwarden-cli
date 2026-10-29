@@ -1,0 +1,20 @@
+--- a/src/access/application.rs
++++ b/src/access/application.rs
+@@ -1464,17 +1464,12 @@
+                         observe();
+                     }
+                 });
+-                let write_gate = self
+-                    .release_gate
+-                    .lock()
+-                    .map_err(|_error| DirectRequestError::Unavailable)?;
+                 if !control.live_fast() {
+                     return Err(DirectRequestError::Unavailable);
+                 }
+                 let result = authority
+                     .backend
+                     .create_secret(&effect, &input, &|| control.live_fast());
+-                drop(write_gate);
+                 #[cfg(test)]
+                 PRODUCER_WRITE_FINISHED_HOOK.with(|hook| {
+                     if let Some(observe) = hook.borrow_mut().take() {

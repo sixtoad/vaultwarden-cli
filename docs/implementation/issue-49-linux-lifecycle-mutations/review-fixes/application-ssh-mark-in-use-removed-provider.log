@@ -1,0 +1,8 @@
+thread 'adapters::supervisor::real_tests::provider_harness' (105957) panicked at src/adapters/supervisor/real_tests.rs:1204:22:
+recovery must retain application-handed-off material: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::supervisor::real_tests::provider_harness ... FAILED
+failures:
+failures:
+    adapters::supervisor::real_tests::provider_harness
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 776 filtered out; finished in 0.99s

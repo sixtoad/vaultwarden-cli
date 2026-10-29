@@ -1,0 +1,15 @@
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.31s
+    Blocking waiting for file lock on package cache
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.69s
+   Compiling vaultwarden-cli v0.5.4 (/home/sixtocantolla/.vaultwarden-cli-tests.rOnjAn/vw49-review-mutations-79o2xsct)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.62s
+     Running tests/systemd_supervisor.rs (target/debug/deps/systemd_supervisor-86e7c83b1f689afe)
+
+running 1 test
+real-manager scenario: app-ssh-cancel; provider: vw18-harness-99405-.tmpOuUNCD-app-ssh-cancel.service
+test independent_descendants_provider_crash_and_recovery ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.60s
+

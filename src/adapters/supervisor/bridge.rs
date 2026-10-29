@@ -122,6 +122,7 @@ impl BridgeListener {
         Ok(Some(Bridge {
             socket,
             state: State::Connected,
+            recipient: None,
         }))
     }
 }
@@ -148,8 +149,14 @@ enum State {
 pub(crate) struct Bridge {
     socket: OwnedFd,
     state: State,
+    recipient: Option<(u32, OwnedFd)>,
 }
 impl Bridge {
+    /// Authenticated helper proof for the exact, already-executed consumer.
+    pub(crate) fn take_recipient(&mut self) -> Option<(u32, OwnedFd)> {
+        self.recipient.take()
+    }
+
     pub(crate) fn send(
         &mut self,
         prepared: &PreparedExecutable,
@@ -211,11 +218,23 @@ impl Bridge {
     }
 
     pub(crate) fn receive(&mut self, timeout: Duration) -> Result<Option<Report>, BridgeError> {
-        let Some(packet) = receive_packet(self.socket.as_raw_fd(), timeout)? else {
+        let Some(mut packet) = receive_packet(self.socket.as_raw_fd(), timeout)? else {
             return Ok(None);
         };
         let code = packet.code()?;
-        if !packet.fds.is_empty() || packet.bytes.len() != MAGIC.len() + 1 {
+        if code == EXEC {
+            if self.state != State::Released || packet.fds.len() != 1 || packet.bytes.len() != 10 {
+                return Err(BridgeError);
+            }
+            let pid = u32::from_le_bytes(
+                packet.bytes[6..10]
+                    .try_into()
+                    .map_err(|_error| BridgeError)?,
+            );
+            let pidfd = packet.fds.pop().ok_or(BridgeError)?;
+            validate_recipient(pid, &pidfd)?;
+            self.recipient = Some((pid, pidfd));
+        } else if !packet.fds.is_empty() || packet.bytes.len() != MAGIC.len() + 1 {
             return Err(BridgeError);
         }
         let (report, state) = match (code, self.state) {
@@ -380,6 +399,51 @@ fn poll(fd: RawFd, events: i16, timeout: Duration) -> Result<bool, BridgeError> 
             return Ok(false);
         }
     }
+}
+
+fn child_pidfd(child: libc::pid_t) -> Result<OwnedFd, BridgeError> {
+    if child <= 0 {
+        return Err(BridgeError);
+    }
+    let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, child, 0) };
+    if raw < 0 {
+        return Err(BridgeError);
+    }
+    Ok(unsafe { OwnedFd::from_raw_fd(raw as RawFd) })
+}
+
+fn validate_recipient(pid: u32, pidfd: &OwnedFd) -> Result<(), BridgeError> {
+    if pid == 0 || pid > i32::MAX as u32 {
+        return Err(BridgeError);
+    }
+    let descriptor = pidfd.as_raw_fd();
+    let target =
+        std::fs::read_link(format!("/proc/self/fd/{descriptor}")).map_err(|_error| BridgeError)?;
+    if target != Path::new("anon_inode:[pidfd]") {
+        return Err(BridgeError);
+    }
+    let info = std::fs::read_to_string(format!("/proc/self/fdinfo/{descriptor}"))
+        .map_err(|_error| BridgeError)?;
+    let actual = info
+        .lines()
+        .find_map(|line| line.strip_prefix("Pid:\t"))
+        .ok_or(BridgeError)?
+        .parse::<i32>()
+        .map_err(|_error| BridgeError)?;
+    // A fast consumer may already have been reaped after the helper sent EXEC.
+    // Accept the honest execution report; a dead pidfd cannot authorize key use.
+    if actual != pid as i32 && actual != -1 {
+        return Err(BridgeError);
+    }
+    Ok(())
+}
+
+fn send_exec(fd: RawFd, child: libc::pid_t, pidfd: &OwnedFd) -> Result<(), BridgeError> {
+    let mut bytes = [0u8; 10];
+    bytes[..5].copy_from_slice(MAGIC);
+    bytes[5] = EXEC;
+    bytes[6..].copy_from_slice(&(child as u32).to_le_bytes());
+    send_descriptors(fd, &bytes, &[pidfd.as_raw_fd()])
 }
 
 fn send_code(fd: RawFd, code: u8) -> Result<(), BridgeError> {
@@ -798,6 +862,8 @@ fn helper_session(socket: RawFd) -> Result<(), BridgeError> {
         }
         return Err(BridgeError);
     }
+    // TRACEME works with the inherited non-dumpable state. Do not introduce
+    // a SIGSTOP rendezvous: an exec trap automatically resumes on tracer death.
     let parent = unsafe { libc::getpid() };
     let child = unsafe { libc::fork() };
     if child != 0 {
@@ -813,9 +879,6 @@ fn helper_session(socket: RawFd) -> Result<(), BridgeError> {
         // remains alive in the single-threaded helper until every child is reaped.
         unsafe {
             libc::close(read.as_raw_fd());
-            if !arm_parent_death(parent) {
-                child_fail(write.as_raw_fd());
-            }
             for signal in [libc::SIGTERM, libc::SIGINT, libc::SIGHUP] {
                 libc::signal(signal, libc::SIG_DFL);
             }
@@ -833,9 +896,11 @@ fn helper_session(socket: RawFd) -> Result<(), BridgeError> {
             if producer && libc::dup2(launch.packet.fds[1].as_raw_fd(), 3) < 0 {
                 child_fail(write.as_raw_fd());
             }
-            // A kernel exec event rules out EOF caused by pre-exec SIGKILL.
-            if libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0
-                || libc::kill(libc::getpid(), libc::SIGSTOP) != 0
+            // Never accidentally trace against a new adopter if the helper died
+            // around fork. Once attached, tracer death detaches without killing.
+            if libc::getppid() != parent
+                || libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0
+                || libc::getppid() != parent
             {
                 child_fail(write.as_raw_fd());
             }
@@ -865,14 +930,19 @@ fn report_exec_and_reap(
 ) -> Result<(), BridgeError> {
     // A CLOEXEC error pipe is separate from the helper's successful exec/start job.
     // HUP is expected after successful exec, so observe read directly when poll returns.
-    let confirmed = trace_exec(child) && confirm_exec(read.as_raw_fd());
+    // On detach failure unwind out of the single-threaded helper. Its exit
+    // relinquishes ptrace ownership; waiting here could strand a stopped child.
+    // This is our unreaped direct child: its PID cannot be recycled before the
+    // pidfd is captured. Never use this descriptor to signal the consumer.
+    let pidfd = child_pidfd(child)?;
+    let confirmed = trace_exec(child, read.as_raw_fd())?;
     drop(read);
-    let _ignored = send_code(socket, if confirmed { EXEC } else { FAILED });
+    let _ignored = if confirmed {
+        send_exec(socket, child, &pidfd)
+    } else {
+        send_code(socket, FAILED)
+    };
     reap_all(socket, child, confirmed)
-}
-// Must compare against the actual creating helper, including death before prctl.
-unsafe fn arm_parent_death(parent: libc::pid_t) -> bool {
-    unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == 0 && libc::getppid() == parent }
 }
 unsafe fn child_fail(fd: RawFd) -> ! {
     unsafe {
@@ -880,7 +950,9 @@ unsafe fn child_fail(fd: RawFd) -> ! {
         libc::_exit(127);
     }
 }
-fn trace_exec(child: libc::pid_t) -> bool {
+#[cfg(test)]
+thread_local! { static FAIL_DETACH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) }; }
+fn trace_exec(child: libc::pid_t, error_pipe: RawFd) -> Result<bool, BridgeError> {
     fn wait(child: libc::pid_t) -> Option<i32> {
         loop {
             let mut status = 0;
@@ -892,30 +964,28 @@ fn trace_exec(child: libc::pid_t) -> bool {
             }
         }
     }
-    let Some(stopped) = wait(child) else {
-        return false;
-    };
-    if !libc::WIFSTOPPED(stopped) || libc::WSTOPSIG(stopped) != libc::SIGSTOP {
-        return false;
-    }
-    if unsafe {
-        libc::ptrace(
-            libc::PTRACE_SETOPTIONS,
-            child,
-            0,
-            libc::PTRACE_O_TRACEEXEC | libc::PTRACE_O_EXITKILL,
-        )
-    } != 0
-        || unsafe { libc::ptrace(libc::PTRACE_CONT, child, 0, 0) } != 0
-    {
-        return false;
-    }
     let Some(event) = wait(child) else {
-        return false;
+        return Ok(false);
     };
-    libc::WIFSTOPPED(event)
-        && event >> 16 == libc::PTRACE_EVENT_EXEC
-        && unsafe { libc::ptrace(libc::PTRACE_DETACH, child, 0, 0) } == 0
+    if !libc::WIFSTOPPED(event) {
+        return Ok(false);
+    }
+    // A live tracee stopped at SIGTRAP plus CLOEXEC EOF is positive exec
+    // evidence. Pre-exec SIGKILL has no stopped tracee; a pre-exec SIGTRAP
+    // retains the write descriptor and yields EAGAIN. Check before detaching.
+    let confirmed =
+        libc::WSTOPSIG(event) == libc::SIGTRAP && event >> 16 == 0 && confirm_exec(error_pipe);
+    // Only our confirmed exec trap is synthetic. Preserve an execution owner's
+    // termination or suspension signal observed before exec.
+    let signal = if confirmed { 0 } else { libc::WSTOPSIG(event) };
+    #[cfg(test)]
+    if FAIL_DETACH.with(std::cell::Cell::get) {
+        return Err(BridgeError);
+    }
+    if unsafe { libc::ptrace(libc::PTRACE_DETACH, child, 0, signal) } != 0 {
+        return Err(BridgeError);
+    }
+    Ok(confirmed)
 }
 fn confirm_exec(fd: RawFd) -> bool {
     loop {
@@ -927,17 +997,8 @@ fn confirm_exec(fd: RawFd) -> bool {
         if read > 0 {
             return false;
         }
-        let error = io::Error::last_os_error();
-        if error.kind() != io::ErrorKind::WouldBlock && error.kind() != io::ErrorKind::Interrupted {
+        if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
             return false;
-        }
-        let mut descriptor = libc::pollfd {
-            fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        unsafe {
-            libc::poll(&mut descriptor, 1, 100);
         }
     }
 }
@@ -1204,6 +1265,7 @@ mod tests {
         let mut bridge = Bridge {
             socket: provider,
             state: State::Connected,
+            recipient: None,
         };
         bridge
             .send(
@@ -1381,6 +1443,7 @@ mod tests {
         let mut bridge = Bridge {
             socket: receiver,
             state: State::Transferred,
+            recipient: None,
         };
         send_packet(
             sender.as_raw_fd(),
@@ -1397,6 +1460,7 @@ mod tests {
         let mut bridge = Bridge {
             socket: receiver,
             state: State::Transferred,
+            recipient: None,
         };
         assert!(bridge.release().is_err());
         assert!(bridge.receive(Duration::ZERO).unwrap().is_none());
@@ -1417,11 +1481,17 @@ mod tests {
         assert!(bridge.release().is_err());
         send_code(sender.as_raw_fd(), ZERO).unwrap();
         assert!(bridge.receive(Duration::from_secs(1)).is_err());
-        send_code(sender.as_raw_fd(), EXEC).unwrap();
+        let pid = unsafe { libc::getpid() };
+        let pidfd = child_pidfd(pid).unwrap();
+        send_exec(sender.as_raw_fd(), pid, &pidfd).unwrap();
         assert_eq!(
             bridge.receive(Duration::from_secs(1)).unwrap(),
             Some(Report::ExecConfirmed)
         );
+        let (received_pid, received_fd) = bridge.take_recipient().unwrap();
+        assert_eq!(received_pid, pid as u32);
+        validate_recipient(received_pid, &received_fd).unwrap();
+        assert!(bridge.take_recipient().is_none());
         send_code(sender.as_raw_fd(), ZERO).unwrap();
         assert_eq!(
             bridge.receive(Duration::from_secs(1)).unwrap(),
@@ -1437,84 +1507,148 @@ mod tests {
     }
 
     #[test]
-    fn error_pipe_distinguishes_exec_failure_from_close_on_exec() {
-        let mut fds = [-1; 2];
+    fn exec_report_requires_matching_pidfd_and_exact_payload() {
+        let (sender, receiver) = pair();
+        let mut bridge = Bridge {
+            socket: receiver,
+            state: State::Released,
+            recipient: None,
+        };
+        let pid = unsafe { libc::getpid() };
+        let pidfd = child_pidfd(pid).unwrap();
+        let mut bytes = Vec::from(&MAGIC[..]);
+        bytes.push(EXEC);
+        bytes.extend_from_slice(&(pid as u32).to_le_bytes());
+        for bad in [
+            bytes[..6].to_vec(),
+            bytes[..9].to_vec(),
+            [bytes.as_slice(), &[0]].concat(),
+        ] {
+            send_descriptors(sender.as_raw_fd(), &bad, &[pidfd.as_raw_fd()]).unwrap();
+            assert!(bridge.receive(Duration::from_secs(1)).is_err());
+        }
+        send_descriptors(sender.as_raw_fd(), &bytes, &[]).unwrap();
+        assert!(bridge.receive(Duration::from_secs(1)).is_err());
+        send_descriptors(
+            sender.as_raw_fd(),
+            &bytes,
+            &[pidfd.as_raw_fd(), pidfd.as_raw_fd()],
+        )
+        .unwrap();
+        assert!(bridge.receive(Duration::from_secs(1)).is_err());
+        send_descriptors(sender.as_raw_fd(), &bytes, &[sealed().as_raw_fd()]).unwrap();
+        assert!(bridge.receive(Duration::from_secs(1)).is_err());
+        for mismatch in [0u32, (pid as u32).saturating_add(1), u32::MAX] {
+            bytes[6..].copy_from_slice(&mismatch.to_le_bytes());
+            send_descriptors(sender.as_raw_fd(), &bytes, &[pidfd.as_raw_fd()]).unwrap();
+            assert!(bridge.receive(Duration::from_secs(1)).is_err());
+        }
+        assert!(bridge.take_recipient().is_none());
+        send_exec(sender.as_raw_fd(), pid, &pidfd).unwrap();
         assert_eq!(
-            unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) },
+            bridge.receive(Duration::from_secs(1)).unwrap(),
+            Some(Report::ExecConfirmed)
+        );
+        let (_, fd) = bridge.take_recipient().unwrap();
+        assert_ne!(
+            unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFD) } & libc::FD_CLOEXEC,
             0
         );
-        let reader = unsafe { OwnedFd::from_raw_fd(fds[0]) };
-        let writer = unsafe { OwnedFd::from_raw_fd(fds[1]) };
-        assert_eq!(
-            unsafe { libc::write(writer.as_raw_fd(), [1u8].as_ptr().cast(), 1) },
-            1
-        );
-        assert!(!confirm_exec(reader.as_raw_fd()));
-        drop(writer);
-        assert!(confirm_exec(reader.as_raw_fd()));
+    }
+
+    #[test]
+    fn error_pipe_distinguishes_exec_failure_from_close_on_exec() {
+        // Create the pipe after isolation: other tests fork concurrently and
+        // could otherwise inherit its writer, delaying EOF after our close.
+        let runner = unsafe { libc::fork() };
+        assert!(runner >= 0);
+        if runner == 0 {
+            unsafe {
+                libc::alarm(5);
+                let mut fds = [-1; 2];
+                if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0
+                    || libc::write(fds[1], [1u8].as_ptr().cast(), 1) != 1
+                {
+                    libc::_exit(1);
+                }
+                if confirm_exec(fds[0]) {
+                    libc::_exit(2);
+                }
+                libc::close(fds[1]);
+                libc::_exit(if confirm_exec(fds[0]) { 0 } else { 3 });
+            }
+        }
+        let mut status = 0;
+        assert_eq!(unsafe { libc::waitpid(runner, &mut status, 0) }, runner);
+        assert!(libc::WIFEXITED(status));
+        assert_eq!(libc::WEXITSTATUS(status), 0);
     }
 
     #[test]
     // Tarpaulin uses ptrace for instrumentation; nesting this fixture's
-    // PTRACE_TRACEME/PTRACE_EVENT_EXEC handshake under that tracer changes the
+    // PTRACE_TRACEME/exec-trap handshake under that tracer changes the
     // child-stop semantics it is specifically testing. Run it in the normal
     // process test suite instead of treating coverage instrumentation as the
     // provider's exec-event implementation.
     #[cfg_attr(tarpaulin, ignore)]
     fn pre_exec_sigkill_with_empty_error_pipe_reports_failure_and_confirmed_cleanup() {
-        let (sender, receiver) = pair();
-        // Keep reap_all's waitpid(-1) away from the multithreaded test runner's
-        // other children. The isolated branch uses only syscalls and stack data.
-        let runner = unsafe { libc::fork() };
-        assert!(runner >= 0);
-        if runner == 0 {
-            unsafe {
-                libc::close(receiver.as_raw_fd());
-                libc::_exit(pre_exec_sigkill_case(sender.as_raw_fd()));
+        for signal in [libc::SIGKILL, libc::SIGTRAP] {
+            let (sender, receiver) = pair();
+            // Keep reap_all's waitpid(-1) away from the multithreaded test runner's
+            // other children. The isolated branch uses only syscalls and stack data.
+            let runner = unsafe { libc::fork() };
+            assert!(runner >= 0);
+            if runner == 0 {
+                unsafe {
+                    libc::close(receiver.as_raw_fd());
+                    libc::_exit(pre_exec_signal_case(sender.as_raw_fd(), signal));
+                }
             }
+            drop(sender);
+            let mut bridge = Bridge {
+                socket: receiver,
+                state: State::Released,
+                recipient: None,
+            };
+            // Collect before asserting so even an incorrect EXEC report cannot skip
+            // reaping the isolated runner. Its alarm bounds a broken trace handshake.
+            let first = bridge.receive(Duration::from_secs(10));
+            let second = bridge.receive(Duration::from_secs(10));
+            let mut status = 0;
+            assert_eq!(unsafe { libc::waitpid(runner, &mut status, 0) }, runner);
+            assert!(libc::WIFEXITED(status), "runner status: {status}");
+            assert_eq!(libc::WEXITSTATUS(status), 0, "fixture/cleanup failed");
+            // EXEC/ExecConfirmed is the provider's only start-authorizing report.
+            assert_eq!(
+                [first, second],
+                [Ok(Some(Report::Failed)), Ok(Some(Report::Reaped))],
+                "pre-exec death must not authorize the provider's started notification"
+            );
+            let mut byte = 0u8;
+            assert_eq!(
+                unsafe {
+                    libc::recv(
+                        bridge.socket.as_raw_fd(),
+                        (&mut byte as *mut u8).cast(),
+                        1,
+                        libc::MSG_DONTWAIT,
+                    )
+                },
+                0,
+                "the closed helper sent exactly Failed and Reaped"
+            );
         }
-        drop(sender);
-        let mut bridge = Bridge {
-            socket: receiver,
-            state: State::Released,
-        };
-        // Collect before asserting so even an incorrect EXEC report cannot skip
-        // reaping the isolated runner. Its alarm bounds a broken trace handshake.
-        let first = bridge.receive(Duration::from_secs(10));
-        let second = bridge.receive(Duration::from_secs(10));
-        let mut status = 0;
-        assert_eq!(unsafe { libc::waitpid(runner, &mut status, 0) }, runner);
-        assert!(libc::WIFEXITED(status), "runner status: {status}");
-        assert_eq!(libc::WEXITSTATUS(status), 0, "fixture/cleanup failed");
-        // EXEC/ExecConfirmed is the provider's only start-authorizing report.
-        assert_eq!(
-            [first, second],
-            [Ok(Some(Report::Failed)), Ok(Some(Report::Reaped))],
-            "pre-exec death must not authorize the provider's started notification"
-        );
-        let mut byte = 0u8;
-        assert_eq!(
-            unsafe {
-                libc::recv(
-                    bridge.socket.as_raw_fd(),
-                    (&mut byte as *mut u8).cast(),
-                    1,
-                    libc::MSG_DONTWAIT,
-                )
-            },
-            0,
-            "the closed helper sent exactly Failed and Reaped"
-        );
     }
-
-    unsafe fn pre_exec_sigkill_case(socket: RawFd) -> i32 {
+    unsafe fn pre_exec_signal_case(socket: RawFd, signal: i32) -> i32 {
         unsafe {
+            if initialize_helper().is_err() {
+                return 99;
+            }
             libc::alarm(5);
             let mut fds = [-1; 2];
             if libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
                 return 1;
             }
-            let parent = libc::getpid();
             let child = libc::fork();
             if child < 0 {
                 return 2;
@@ -1523,17 +1657,14 @@ mod tests {
                 libc::close(socket);
                 libc::close(fds[0]);
                 libc::alarm(4);
-                if !arm_parent_death(parent)
-                    || libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0
-                    || libc::kill(libc::getpid(), libc::SIGSTOP) != 0
-                {
-                    child_fail(fds[1]);
+                // Death yields EOF without a live stopped tracee; an injected
+                // trap has a live tracee but retains the CLOEXEC writer. Neither
+                // can be mistaken for successful exec.
+                if signal == libc::SIGTRAP && libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0 {
+                    libc::_exit(8);
                 }
-                // The SIGSTOP rendezvous requires trace_exec to resume us.
-                // SIGKILL then closes the error pipe without writing an error
-                // byte or producing a PTRACE_EVENT_EXEC; no timing race exists.
-                libc::kill(libc::getpid(), libc::SIGKILL);
-                child_fail(fds[1]);
+                libc::kill(libc::getpid(), signal);
+                libc::_exit(0);
             }
             libc::close(fds[1]);
             let reader = OwnedFd::from_raw_fd(fds[0]);
@@ -1561,32 +1692,30 @@ mod tests {
     }
 
     #[test]
-    fn parent_death_before_and_after_prctl_uses_actual_helper_identity() {
-        // Isolate subreaper state from the multithreaded test runner. All fork
-        // branches below use only syscalls and fixed stack data; alarms bound them.
-        for before in [true, false] {
+    fn hardened_observer_death_during_exec_never_stops_or_kills_consumer() {
+        for during_exec in [false, true] {
             let runner = unsafe { libc::fork() };
             assert!(runner >= 0);
             if runner == 0 {
                 unsafe {
-                    libc::_exit(parent_death_case(before));
+                    libc::_exit(observer_death_case(during_exec));
                 }
             }
             let mut status = 0;
             assert_eq!(unsafe { libc::waitpid(runner, &mut status, 0) }, runner);
             assert!(libc::WIFEXITED(status));
-            assert_eq!(libc::WEXITSTATUS(status), 0, "before={before}");
+            assert_eq!(libc::WEXITSTATUS(status), 0, "during_exec={during_exec}");
         }
     }
-    unsafe fn parent_death_case(before: bool) -> i32 {
+    unsafe fn observer_death_case(during_exec: bool) -> i32 {
         unsafe {
             libc::alarm(5);
-            if libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1) != 0 {
+            if initialize_helper().is_err() {
                 return 1;
             }
             let mut ready = [-1; 2];
-            let mut release = [-1; 2];
-            if libc::pipe(ready.as_mut_ptr()) != 0 || libc::pipe(release.as_mut_ptr()) != 0 {
+            let mut gate = [-1; 2];
+            if libc::pipe(ready.as_mut_ptr()) != 0 || libc::pipe(gate.as_mut_ptr()) != 0 {
                 return 2;
             }
             let helper = libc::fork();
@@ -1594,39 +1723,49 @@ mod tests {
                 return 3;
             }
             if helper == 0 {
-                libc::alarm(4);
-                let helper_pid = libc::getpid();
                 let child = libc::fork();
                 if child < 0 {
                     libc::_exit(4);
                 }
                 if child == 0 {
-                    libc::alarm(3);
-                    if !before && !arm_parent_death(helper_pid) {
+                    if libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0 {
+                        libc::_exit(7);
+                    }
+                    if !during_exec {
+                        let pid = libc::getpid();
+                        libc::write(
+                            ready[1],
+                            (&pid as *const libc::pid_t).cast(),
+                            mem::size_of::<libc::pid_t>(),
+                        );
+                    }
+                    let mut byte = 0u8;
+                    if libc::read(gate[0], (&mut byte as *mut u8).cast(), 1) != 1 {
                         libc::_exit(5);
                     }
-                    let child_pid = libc::getpid();
-                    if libc::write(
-                        ready[1],
-                        (&child_pid as *const libc::pid_t).cast(),
-                        std::mem::size_of::<libc::pid_t>(),
-                    ) != std::mem::size_of::<libc::pid_t>() as isize
+                    libc::execl(
+                        c"/bin/true".as_ptr(),
+                        c"true".as_ptr(),
+                        std::ptr::null::<libc::c_char>(),
+                    );
+                    libc::_exit(6);
+                }
+                if during_exec {
+                    libc::write(gate[1], [1u8].as_ptr().cast(), 1);
+                    let mut status = 0;
+                    if libc::waitpid(child, &mut status, 0) != child
+                        || !libc::WIFSTOPPED(status)
+                        || libc::WSTOPSIG(status) != libc::SIGTRAP
                     {
-                        libc::_exit(6);
-                    }
-                    if before {
-                        let mut byte = 0u8;
-                        if libc::read(release[0], (&mut byte as *mut u8).cast(), 1) != 1 {
-                            libc::_exit(7);
-                        }
-                        libc::_exit(if arm_parent_death(helper_pid) { 8 } else { 42 });
-                    }
-                    loop {
-                        libc::pause();
+                        libc::_exit(8);
                     }
                 }
-                if before {
-                    libc::_exit(0);
+                if during_exec {
+                    libc::write(
+                        ready[1],
+                        (&child as *const libc::pid_t).cast(),
+                        mem::size_of::<libc::pid_t>(),
+                    );
                 }
                 loop {
                     libc::pause();
@@ -1636,36 +1775,263 @@ mod tests {
             if libc::read(
                 ready[0],
                 (&mut child as *mut libc::pid_t).cast(),
-                std::mem::size_of::<libc::pid_t>(),
-            ) != std::mem::size_of::<libc::pid_t>() as isize
+                mem::size_of::<libc::pid_t>(),
+            ) != mem::size_of::<libc::pid_t>() as isize
             {
                 return 9;
             }
-            if !before && libc::kill(helper, libc::SIGKILL) != 0 {
+            if libc::kill(helper, libc::SIGKILL) != 0 {
                 return 10;
             }
             let mut status = 0;
             if libc::waitpid(helper, &mut status, 0) != helper {
                 return 11;
             }
-            if before && libc::write(release[1], [1u8].as_ptr().cast(), 1) != 1 {
-                return 12;
+            if !during_exec {
+                libc::write(gate[1], [1u8].as_ptr().cast(), 1);
             }
             if libc::waitpid(child, &mut status, 0) != child {
+                return 12;
+            }
+            if !libc::WIFEXITED(status) || libc::WEXITSTATUS(status) != 0 {
                 return 13;
             }
-            let expected = if before {
-                libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 42
-            } else {
-                libc::WIFSIGNALED(status) && libc::WTERMSIG(status) == libc::SIGKILL
+            0
+        }
+    }
+    #[test]
+    fn external_pre_exec_termination_and_suspension_are_forwarded() {
+        for signal in [libc::SIGTERM, libc::SIGSTOP] {
+            let runner = unsafe { libc::fork() };
+            assert!(runner >= 0);
+            if runner == 0 {
+                unsafe {
+                    libc::_exit(external_signal_case(signal));
+                }
+            }
+            let mut status = 0;
+            assert_eq!(unsafe { libc::waitpid(runner, &mut status, 0) }, runner);
+            assert!(libc::WIFEXITED(status));
+            assert_eq!(libc::WEXITSTATUS(status), 0, "signal={signal}");
+        }
+    }
+    unsafe fn external_signal_case(signal: i32) -> i32 {
+        unsafe {
+            libc::alarm(10);
+            if initialize_helper().is_err() {
+                return 1;
+            }
+            let mut gate = [-1; 2];
+            let mut ready = [-1; 2];
+            let mut result = [-1; 2];
+            let mut error = [-1; 2];
+            if libc::pipe(gate.as_mut_ptr()) != 0
+                || libc::pipe(ready.as_mut_ptr()) != 0
+                || libc::pipe(result.as_mut_ptr()) != 0
+                || libc::pipe2(error.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0
+            {
+                return 2;
+            }
+            let helper = libc::fork();
+            if helper < 0 {
+                return 3;
+            }
+            if helper == 0 {
+                let child = libc::fork();
+                if child < 0 {
+                    libc::_exit(4);
+                }
+                if child == 0 {
+                    libc::close(error[0]);
+                    libc::signal(libc::SIGTERM, libc::SIG_DFL);
+                    if libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0 {
+                        libc::_exit(5);
+                    }
+                    let pid = libc::getpid();
+                    libc::write(
+                        ready[1],
+                        (&pid as *const libc::pid_t).cast(),
+                        size_of::<libc::pid_t>(),
+                    );
+                    let mut byte = 0u8;
+                    libc::read(gate[0], (&mut byte as *mut u8).cast(), 1);
+                    libc::_exit(42);
+                }
+                libc::close(error[1]);
+                if trace_exec(child, error[0]) != Ok(false) {
+                    libc::_exit(6);
+                }
+                let mut status = 0;
+                if libc::waitpid(child, &mut status, libc::WUNTRACED) != child {
+                    libc::_exit(7);
+                }
+                libc::write(result[1], (&status as *const i32).cast(), size_of::<i32>());
+                if libc::WIFSTOPPED(status) {
+                    if libc::waitpid(child, &mut status, 0) != child {
+                        libc::_exit(8);
+                    }
+                    libc::write(result[1], (&status as *const i32).cast(), size_of::<i32>());
+                }
+                libc::_exit(0);
+            }
+            libc::close(error[0]);
+            libc::close(error[1]);
+            let mut child = 0 as libc::pid_t;
+            if libc::read(
+                ready[0],
+                (&mut child as *mut libc::pid_t).cast(),
+                size_of::<libc::pid_t>(),
+            ) != size_of::<libc::pid_t>() as isize
+            {
+                return 9;
+            }
+            if libc::kill(child, signal) != 0 {
+                return 10;
+            }
+            let mut pollfd = libc::pollfd {
+                fd: result[0],
+                events: libc::POLLIN,
+                revents: 0,
             };
-            if !expected {
+            let observed = libc::poll(&mut pollfd, 1, 2000) == 1;
+            // Independent fixture owner resumes its suspended workload, including
+            // on assertion failure; the delivery helper never resumes it for us.
+            if !observed || signal == libc::SIGSTOP {
+                libc::kill(child, libc::SIGCONT);
+                libc::write(gate[1], [1u8].as_ptr().cast(), 1);
+            }
+            let mut status = 0;
+            if libc::read(
+                result[0],
+                (&mut status as *mut i32).cast(),
+                size_of::<i32>(),
+            ) != size_of::<i32>() as isize
+            {
+                return 11;
+            }
+            let expected = if signal == libc::SIGTERM {
+                libc::WIFSIGNALED(status) && libc::WTERMSIG(status) == signal
+            } else {
+                libc::WIFSTOPPED(status) && libc::WSTOPSIG(status) == signal
+            };
+            if observed
+                && signal == libc::SIGSTOP
+                && (libc::read(
+                    result[0],
+                    (&mut status as *mut i32).cast(),
+                    size_of::<i32>(),
+                ) != size_of::<i32>() as isize
+                    || !libc::WIFEXITED(status)
+                    || libc::WEXITSTATUS(status) != 42)
+            {
+                return 12;
+            }
+            if libc::waitpid(helper, &mut status, 0) != helper
+                || !libc::WIFEXITED(status)
+                || libc::WEXITSTATUS(status) != 0
+            {
+                return 13;
+            }
+            if !observed || !expected {
                 return 14;
             }
-            if libc::waitpid(-1, &mut status, libc::WNOHANG) != -1
-                || *libc::__errno_location() != libc::ECHILD
+            0
+        }
+    }
+
+    #[test]
+    fn failed_detach_exits_observer_and_releases_live_exec_trap() {
+        let runner = unsafe { libc::fork() };
+        assert!(runner >= 0);
+        if runner == 0 {
+            unsafe {
+                libc::_exit(failed_detach_case());
+            }
+        }
+        let mut status = 0;
+        assert_eq!(unsafe { libc::waitpid(runner, &mut status, 0) }, runner);
+        assert!(libc::WIFEXITED(status));
+        assert_eq!(libc::WEXITSTATUS(status), 0);
+    }
+    unsafe fn failed_detach_case() -> i32 {
+        unsafe {
+            libc::alarm(10);
+            if initialize_helper().is_err() {
+                return 1;
+            }
+            let mut ready = [-1; 2];
+            if libc::pipe(ready.as_mut_ptr()) != 0 {
+                return 2;
+            }
+            let helper = libc::fork();
+            if helper < 0 {
+                return 3;
+            }
+            if helper == 0 {
+                let mut error = [-1; 2];
+                if libc::pipe2(error.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) != 0 {
+                    libc::_exit(4);
+                }
+                let child = libc::fork();
+                if child < 0 {
+                    libc::_exit(5);
+                }
+                if child == 0 {
+                    libc::close(error[0]);
+                    if libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) != 0 {
+                        libc::_exit(6);
+                    }
+                    libc::execl(
+                        c"/bin/true".as_ptr(),
+                        c"true".as_ptr(),
+                        std::ptr::null::<libc::c_char>(),
+                    );
+                    libc::_exit(7);
+                }
+                libc::close(error[1]);
+                libc::write(
+                    ready[1],
+                    (&child as *const libc::pid_t).cast(),
+                    size_of::<libc::pid_t>(),
+                );
+                FAIL_DETACH.with(|fail| fail.set(true));
+                let error =
+                    report_exec_and_reap(-1, child, OwnedFd::from_raw_fd(error[0])).is_err();
+                libc::_exit(if error { 42 } else { 8 });
+            }
+            let mut child = 0 as libc::pid_t;
+            if libc::read(
+                ready[0],
+                (&mut child as *mut libc::pid_t).cast(),
+                size_of::<libc::pid_t>(),
+            ) != size_of::<libc::pid_t>() as isize
             {
-                return 15;
+                return 9;
+            }
+            let mut status = 0;
+            let mut exited = false;
+            for _ in 0..200 {
+                if libc::waitpid(helper, &mut status, libc::WNOHANG) == helper {
+                    exited = true;
+                    break;
+                }
+                libc::usleep(10_000);
+            }
+            let expected = exited && libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 42;
+            if !exited {
+                // Failure cleanup affects only our synthetic observer. The
+                // consumer must still resume and exit naturally below.
+                libc::kill(helper, libc::SIGKILL);
+                libc::waitpid(helper, &mut status, 0);
+            }
+            if libc::waitpid(child, &mut status, 0) != child
+                || !libc::WIFEXITED(status)
+                || libc::WEXITSTATUS(status) != 0
+            {
+                return 10;
+            }
+            if !expected {
+                return 11;
             }
             0
         }
