@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../platform/provider.dart';
 import '../src/rust/api/provider.dart' as core;
+import '../src/rust/api/management.dart' as manage;
 import 'pilot_bundle.dart';
 
 /// Rust owns admission, review and reply validation. Dart schedules only reads;
@@ -12,6 +14,21 @@ class ProviderController extends ChangeNotifier {
   ProviderController(this.platform) : state = core.providerSnapshot();
   final ProviderPlatform platform;
   core.ProviderSnapshot state;
+  manage.ManagementSnapshot management = manage.managementSnapshot();
+  bool devicesVisible = false;
+  static ProviderConfiguration? _managementOwner;
+  String _managementSettlement = '';
+  String _managementBinding = '';
+  bool get managementPending =>
+      management.recovery.isNotEmpty || _managementSettlement.isNotEmpty;
+  bool get canManage =>
+      eligible &&
+      _ready &&
+      platform.available &&
+      configuration.configured &&
+      !busy &&
+      recoveryId.isEmpty;
+
   ProviderConfiguration configuration = const ProviderConfiguration(
     configured: false,
   );
@@ -26,11 +43,17 @@ class ProviderController extends ChangeNotifier {
   void Function()? _unsubscribe;
   VoidCallback? clearPasswords;
   bool get eligible => !_disposed && !suspended && _routeCurrent;
-  bool get busy => state.busy || settingUp || _reconciling || _operation;
+  bool get busy =>
+      state.busy || management.busy || settingUp || _reconciling || _operation;
   String get recoveryId =>
       _settlementId.isNotEmpty ? _settlementId : state.uncertainId;
   bool get canSetup =>
-      platform.available && eligible && _ready && !busy && recoveryId.isEmpty;
+      platform.available &&
+      eligible &&
+      _ready &&
+      !busy &&
+      recoveryId.isEmpty &&
+      !managementPending;
   bool get canSetupPilot =>
       disposablePilotEnabled &&
       platform is PilotProviderPlatform &&
@@ -52,8 +75,13 @@ class ProviderController extends ChangeNotifier {
     _unsubscribe = platform.onInvalidation(suspend);
     _expiry = Timer.periodic(const Duration(milliseconds: 250), (_) {
       final previous = state.reviewId;
+      final managementWasPrepared = management.canRevoke;
       state = core.providerSnapshot();
-      if (previous != state.reviewId) clearPasswords?.call();
+      management = manage.managementSnapshot();
+      if (previous != state.reviewId ||
+          (managementWasPrepared && !management.canRevoke)) {
+        clearPasswords?.call();
+      }
       _publish();
     });
     await refresh();
@@ -74,6 +102,38 @@ class ProviderController extends ChangeNotifier {
       final loaded = await platform.configuration();
       if (_disposed || context != _context) return;
       final same = _loaded && _sameProvider(loaded);
+      final expectedManagement = management.recovery.isNotEmpty
+          ? management.recovery
+          : _managementBinding;
+      final managementSame =
+          same ||
+          (_managementOwner != null &&
+              loaded.configured == _managementOwner!.configured &&
+              loaded.endpoint == _managementOwner!.endpoint &&
+              loaded.pin == _managementOwner!.pin &&
+              loaded.fingerprint == _managementOwner!.fingerprint);
+      if (managementPending &&
+          (!managementSame ||
+              (loaded.managementRecovery.isNotEmpty &&
+                  !_sameAction(
+                    expectedManagement,
+                    loaded.managementRecovery,
+                  )))) {
+        throw StateError('Original management recovery required');
+      }
+      if ((!same && !managementPending) ||
+          (loaded.managementRecovery.isNotEmpty && !managementPending)) {
+        management = manage.managementConfigure(
+          recovery: loaded.managementRecovery,
+        );
+      }
+      if (same &&
+          loaded.managementRecovery.isEmpty &&
+          _managementSettlement.isNotEmpty &&
+          management.recovery.isEmpty) {
+        _managementSettlement = '';
+        _managementBinding = '';
+      }
       if (recoveryId.isNotEmpty &&
           (!same ||
               (loaded.uncertainId.isNotEmpty &&
@@ -95,6 +155,7 @@ class ProviderController extends ChangeNotifier {
       } else if (loaded.uncertainId.isNotEmpty && recoveryId.isEmpty) {
         state = core.providerConfigure(uncertainId: loaded.uncertainId);
       }
+      _managementOwner = loaded;
       configuration = loaded;
       _loaded = true;
       _ready = true;
@@ -109,10 +170,23 @@ class ProviderController extends ChangeNotifier {
     }
   }
 
+  bool _sameAction(String a, String b) {
+    try {
+      final x = jsonDecode(a) as Map<String, dynamic>,
+          y = jsonDecode(b) as Map<String, dynamic>;
+      return x['action_id'] == y['action_id'] &&
+          x['target']['kind'] == y['target']['kind'] &&
+          x['target']['id'] == y['target']['id'];
+    } catch (_) {
+      return false;
+    }
+  }
+
   void invalidate() {
     _context++;
     clearPasswords?.call();
     state = core.providerInvalidate();
+    management = manage.managementInvalidate();
     _publish();
   }
 
@@ -223,6 +297,7 @@ class ProviderController extends ChangeNotifier {
         !platform.available ||
         !configuration.configured ||
         busy ||
+        managementPending ||
         (recoveryId.isNotEmpty &&
             (command != core.ProviderCommand.status || id != recoveryId))) {
       return false;
@@ -297,7 +372,7 @@ class ProviderController extends ChangeNotifier {
     return accepted && _settlementId.isEmpty;
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({bool automatic = false}) async {
     _poll?.cancel();
     if (!eligible || busy) {
       _schedule();
@@ -305,6 +380,25 @@ class ProviderController extends ChangeNotifier {
     }
     if (!_ready) await _reconcile();
     if (!eligible || busy || !_ready || !configuration.configured) {
+      _schedule();
+      return;
+    }
+    if (_managementSettlement.isNotEmpty) {
+      await _settleManagement();
+      _schedule();
+      return;
+    }
+    if (management.recovery.isNotEmpty) {
+      await performManagement(manage.ManagementCommand.status);
+      _schedule();
+      return;
+    }
+    if (devicesVisible) {
+      if (automatic || management.detail != null) {
+        _schedule();
+        return;
+      }
+      await performManagement(manage.ManagementCommand.list);
       _schedule();
       return;
     }
@@ -340,13 +434,28 @@ class ProviderController extends ChangeNotifier {
   void _schedule() {
     _poll?.cancel();
     if (eligible && platform.available) {
-      _poll = Timer(Duration(seconds: _backoff), refresh);
+      _poll = Timer(
+        Duration(seconds: _backoff),
+        () => refresh(automatic: true),
+      );
     }
   }
 
   Future<void> review(String id) async {
     invalidate();
-    await perform(core.ProviderCommand.review, id: id);
+    final accepted = await perform(core.ProviderCommand.review, id: id);
+    final context = _context;
+    if (accepted && eligible && state.reviewId == id) {
+      await performManagement(manage.ManagementCommand.origin, id: id);
+      if (context == _context &&
+          state.reviewId == id &&
+          (management.outcome == manage.ManagementOutcome.invalid ||
+              management.outcome == manage.ManagementOutcome.rejected)) {
+        state = core.providerInvalidate();
+        diagnostic = 'Invalid origin response. Obtain a fresh complete review.';
+        _publish();
+      }
+    }
   }
 
   Future<void> decide(bool approve, String password) async {
@@ -363,6 +472,107 @@ class ProviderController extends ChangeNotifier {
     await refresh();
   }
 
+  Future<void> _settleManagement() async {
+    if (_managementSettlement.isEmpty || _operation) return;
+    _operation = true;
+    try {
+      await platform.settle(_managementSettlement);
+      _managementSettlement = '';
+      _managementBinding = '';
+    } catch (_) {
+      _ready = false;
+      diagnostic = 'Administrative result received, but recovery storage could not be cleared. Refresh to retry settlement only.';
+    } finally {
+      _operation = false;
+      _publish();
+    }
+  }
+
+  Future<bool> performManagement(
+    manage.ManagementCommand command, {
+    manage.IdentityKind kind = manage.IdentityKind.approvalClient,
+    String id = '',
+    String password = '',
+  }) async {
+    if (!canManage ||
+        _managementSettlement.isNotEmpty ||
+        (managementPending && command != manage.ManagementCommand.status)) {
+      return false;
+    }
+    core.ProviderWork work;
+    try {
+      work = manage.managementBegin(
+        command: command,
+        kind: kind,
+        id: id,
+        password: password,
+      );
+    } catch (_) {
+      clearPasswords?.call();
+      _publish();
+      return false;
+    }
+    if (command != manage.ManagementCommand.origin) {
+      state = core.providerInvalidate();
+      clearPasswords?.call();
+    }
+    _operation = true;
+    management = manage.managementSnapshot();
+    final pending = management.recovery;
+    _publish();
+    Uint8List response;
+    try {
+      response = await platform.send(work.body);
+    } catch (_) {
+      response = Uint8List(0);
+    } finally {
+      work.body.fillRange(0, work.body.length, 0);
+    }
+    management = manage.managementFinish(token: work.token, response: response);
+    final accepted = management.outcome == manage.ManagementOutcome.accepted;
+    if (pending.isNotEmpty &&
+        management.recovery.isEmpty &&
+        (accepted ||
+            management.outcome == manage.ManagementOutcome.rejected ||
+            management.outcome == manage.ManagementOutcome.unsupported)) {
+      _managementSettlement =
+          (jsonDecode(pending) as Map<String, dynamic>)['action_id'] as String;
+      _managementBinding = pending;
+    }
+    _operation = false;
+    if (_managementSettlement.isNotEmpty) await _settleManagement();
+    _publish();
+    return accepted;
+  }
+
+  Future<void> selectIdentity(
+    manage.ManagedIdentity identity, {
+    bool prepare = false,
+  }) async {
+    invalidate();
+    await performManagement(
+      prepare
+          ? manage.ManagementCommand.prepare
+          : manage.ManagementCommand.detail,
+      kind: identity.kind,
+      id: identity.id,
+    );
+  }
+
+  Future<void> revokeIdentity(String password) async {
+    final target = management.detail;
+    if (target == null || !management.canRevoke) {
+      clearPasswords?.call();
+      return;
+    }
+    await performManagement(
+      manage.ManagementCommand.revoke,
+      kind: target.kind,
+      id: target.id,
+      password: password,
+    );
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -373,6 +583,7 @@ class ProviderController extends ChangeNotifier {
     _expiry?.cancel();
     _unsubscribe?.call();
     core.providerInvalidate();
+    manage.managementInvalidate();
     super.dispose();
   }
 }

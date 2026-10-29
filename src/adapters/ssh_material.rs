@@ -308,7 +308,12 @@ fn socket_leaf(request: &str) -> Result<String, ExecutionError> {
 }
 /// Reclaim only a fully recorded request whose exact socket is no longer listening.
 /// Unknown/replaced objects or ambiguous connection errors preserve the entire request.
-fn recover_agent(parent: &File, leaf: &str, runtime: &Path) -> Result<(), ExecutionError> {
+fn recover_agent(
+    parent: &File,
+    leaf: &str,
+    runtime: &Path,
+    require_stopped: bool,
+) -> Result<(), ExecutionError> {
     use std::os::unix::fs::FileTypeExt;
     if !request_name(leaf) {
         return Err(ExecutionError::CleanupUncertain);
@@ -400,7 +405,11 @@ fn recover_agent(parent: &File, leaf: &str, runtime: &Path) -> Result<(), Execut
             };
             let error = std::io::Error::last_os_error().raw_os_error();
             if result == 0 || matches!(error, Some(libc::EINPROGRESS | libc::EAGAIN)) {
-                return Ok(());
+                return if require_stopped {
+                    Err(ExecutionError::CleanupUncertain)
+                } else {
+                    Ok(())
+                };
             }
             if error != Some(libc::ECONNREFUSED) {
                 return Err(ExecutionError::CleanupUncertain);
@@ -428,12 +437,20 @@ fn recover_agent(parent: &File, leaf: &str, runtime: &Path) -> Result<(), Execut
 pub fn recover(root: &Path) -> Result<(), ExecutionError> {
     recover_with_runtime(root, &runtime_path())
 }
+/// Owner reconciliation must prove the old signing endpoint is closed; ordinary
+/// startup preserves live endpoints instead of affecting another consumer.
+pub(crate) fn recover_stopped(root: &Path) -> Result<(), ExecutionError> {
+    recover_mode(root, &runtime_path(), true)
+}
 fn recover_with_runtime(root: &Path, runtime: &Path) -> Result<(), ExecutionError> {
+    recover_mode(root, runtime, false)
+}
+fn recover_mode(root: &Path, runtime: &Path, require_stopped: bool) -> Result<(), ExecutionError> {
     let root = directory(root, true)?;
     let agents = ensure_directory(&root, "agents")?;
     let mut uncertain = false;
     for leaf in entries(&agents)? {
-        if recover_agent(&agents, &leaf, runtime).is_err() {
+        if recover_agent(&agents, &leaf, runtime, require_stopped).is_err() {
             uncertain = true;
         }
     }
@@ -1193,6 +1210,25 @@ else:
             let (mut next, _, _) = prepare(&material_root, &ssh).unwrap();
             next.finalize(CleanupEvidence::NotStarted).unwrap();
         }
+    }
+    #[test]
+    fn management_stopped_recovery_requires_closed_signing_socket_without_stopping_consumers() {
+        let (root, ssh, key) = setup();
+        let material_root = root.path().join("ssh");
+        let (mut material, _, _) = prepare(&material_root, &ssh).unwrap();
+        material.install_key(SensitiveString::new(key)).unwrap();
+        let request = material_root.join("agents").join(&material.leaf);
+        assert_eq!(
+            super::recover_mode(&material_root, root.path(), true),
+            Err(ExecutionError::CleanupUncertain)
+        );
+        assert!(request.exists());
+        // Normal startup still preserves the live endpoint; strict owner
+        // reconciliation cannot claim cleanup until signing authority closes.
+        recover(&material_root).unwrap();
+        material.agent.borrow_mut().close();
+        super::recover_mode(&material_root, root.path(), true).unwrap();
+        assert!(!request.exists());
     }
     #[test]
     fn recovery_reclaims_stale_resources_preserves_live_and_replaced_objects() {

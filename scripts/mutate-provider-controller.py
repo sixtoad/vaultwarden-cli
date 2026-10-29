@@ -15,7 +15,7 @@ evidence = Path(sys.argv[1]).resolve()
 evidence.mkdir(parents=True, exist_ok=True)
 mutations = {
     "saved-id": ("uncertainId: loaded.uncertainId", "uncertainId: ''"),
-    "settlement-admission": ("bool get busy => state.busy || settingUp || _reconciling || _operation;", "bool get busy => state.busy || settingUp || _reconciling;"),
+    "settlement-admission": ("bool get busy =>\n      state.busy || management.busy || settingUp || _reconciling || _operation;", "bool get busy =>\n      state.busy || management.busy || settingUp || _reconciling;"),
     "settlement-reload": ("} catch (_) {\n        _ready = false;", "} catch (_) {\n        _ready = true;"),
     "settlement-already-cleared": ("if (same &&\n          loaded.configured &&", "if (false &&\n          loaded.configured &&"),
     "route-eligibility": (" && _routeCurrent", ""),

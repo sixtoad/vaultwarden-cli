@@ -1,44 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../design/components.dart';
-import '../platform/provider.dart';
 import '../src/rust/api/provider.dart' as core;
-
-class ProviderDevices extends StatelessWidget {
-  const ProviderDevices({super.key, required this.configuration});
-  final ProviderConfiguration configuration;
-  @override
-  Widget build(BuildContext context) => AccessPanel(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const AccessHeading(
-          'Devices & agents',
-          'Known local connection and client identity',
-        ),
-        if (configuration.configured) ...[
-          FactRow('Provider endpoint', configuration.endpoint),
-          FactRow('Pinned server leaf SHA-256', configuration.pin),
-          FactRow(
-            'Client certificate SHA-256',
-            configuration.fingerprint,
-            key: const Key('provider-fingerprint'),
-          ),
-        ] else
-          const Text(
-            'No provider connection is configured. Advanced setup is in Settings.',
-          ),
-        const Text(
-          'This client requests password approval from the Linux provider. Linux owns secret custody and protected execution.',
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Device enrollment, device lists and revocation are not available in this version. Advanced certificate setup is available in Settings.',
-        ),
-      ],
-    ),
-  );
-}
 
 class ProviderActivity extends StatelessWidget {
   const ProviderActivity({
@@ -47,11 +10,12 @@ class ProviderActivity extends StatelessWidget {
     required this.connected,
     required this.configured,
     required this.recoveryPending,
+    this.managementPending = false,
     required this.onRefresh,
     required this.onReopen,
   });
   final core.ProviderSnapshot state;
-  final bool connected, configured, recoveryPending;
+  final bool connected, configured, recoveryPending, managementPending;
   final VoidCallback? onRefresh;
   final ValueChanged<String>? onReopen;
 
@@ -88,6 +52,9 @@ class ProviderActivity extends StatelessWidget {
   }
 
   String get status {
+    if (managementPending) {
+      return 'Activity is paused while the original administrative action is unresolved. Open Devices & agents to reconcile that exact action; revocation will not be resent.';
+    }
     if (!configured) {
       return 'Disconnected. Configure a provider in Settings to load Activity.';
     }
@@ -117,6 +84,7 @@ class ProviderActivity extends StatelessWidget {
         connected &&
         !state.locked &&
         !recoveryPending &&
+        !managementPending &&
         state.historyState == core.ProviderHistoryState.available;
     return AccessPanel(
       child: Column(

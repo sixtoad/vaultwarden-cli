@@ -52,12 +52,15 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   provisioned CA/PKCS#12 (`companion/macos/Runner/ProviderAdapter.swift:47`). No
   nearby invitation, matching-code, QR or dual-human-authorization protocol exists
   in these surfaces. Advanced setup cannot satisfy guided enrollment acceptance.
-- [ ] **Trusted-device management:** the remote companion command schema has no
-  device listing/revocation API. Show only known local configuration initially.
-  Revocation requirements must distinguish approver certificates from requester-agent
-  identities and prevent future unauthorized access. Consumer execution remains with
-  its execution owner: lock or access removal must not terminate consumer programs
-  or claim to recall delivered secrets. See [the governing boundary](../secret-access-boundary.md).
+- [x] **Trusted-device management (implementation):** provider-backed inventory/detail, explicit
+  owner-granted remote administration, permanent revocation and action-bound
+  reconciliation are implemented in the device-management slice. Linux/native
+  runtime and packaging evidence are tracked in the
+  [verification record](issue-50-device-agent-management-verification.md) and
+  [draft PR #57](https://github.com/sixtoad/vaultwarden-cli/pull/57). See the
+  [identity management contract](issue-50-device-agent-management.md). Enrollment
+  remains separate. PR #55 requires future-access denial and provider-owned
+  cleanup without terminating consumer programs.
 - [x] **Remote activity:** authenticated companion history now uses the canonical
   durable store (50 default, 200 maximum), with a closed display-only projection.
   Activity fetches up to 50 events, preserves canonical ordering and unknown legacy
@@ -79,8 +82,8 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
 
 | Destination | First slice | Completion dependency |
 |---|---|---|
-| Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and missing originating-device metadata |
-| Devices & agents | Configured client fingerprint and provider connection, explicit roles/limits | Trusted identities API and genuine mutual enrollment/revocation |
+| Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and signed-admission origin (legacy origin explicitly unavailable) |
+| Devices & agents | Provider-backed identities, granted roles/trust, exact-target permanent revocation and status-only recovery (management slice) | Genuine mutual enrollment remains separate; runtime evidence is recorded in PR #57 |
 | Activity | Bounded durable redacted history; exact-ID fresh review; explicit unavailable/locked/recovery states | Matching-platform and hardware evidence as recorded below |
 | Settings | Existing advanced setup, theme, actual capabilities, separate synthetic diagnostics | Version inspection, bundled CLI repair, native notification settings |
 

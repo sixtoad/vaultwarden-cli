@@ -22,6 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 use zeroize::{Zeroize, Zeroizing};
+mod management;
 const MAX_BODY: usize = 16384;
 const MAX_TICKETS: usize = 256;
 const TICKET_LIFETIME: Duration = Duration::from_secs(60);
@@ -29,6 +30,36 @@ const TICKET_LIFETIME: Duration = Duration::from_secs(60);
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
+    IdentityList {
+        version: u8,
+        limit: u32,
+        after: Option<String>,
+    },
+    IdentityDetail {
+        version: u8,
+        target: management::Target,
+    },
+    IdentityPrepare {
+        version: u8,
+        target: management::Target,
+    },
+    IdentityRevoke {
+        version: u8,
+        target: management::Target,
+        action_id: String,
+        ticket: String,
+        #[serde(deserialize_with = "password")]
+        password: SensitiveString,
+    },
+    IdentityStatus {
+        version: u8,
+        target: management::Target,
+        action_id: String,
+    },
+    RequestOrigin {
+        version: u8,
+        request_id: String,
+    },
     Session {
         version: u8,
     },
@@ -81,7 +112,16 @@ fn history_limit<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Option<u32>,
 }
 impl Command {
     fn valid(&self) -> bool {
+        if let Some(valid) = management::valid(self) {
+            return valid;
+        }
         let (version, id) = match self {
+            Self::IdentityList { .. }
+            | Self::IdentityDetail { .. }
+            | Self::IdentityPrepare { .. }
+            | Self::IdentityRevoke { .. }
+            | Self::IdentityStatus { .. }
+            | Self::RequestOrigin { .. } => return false,
             Self::Session { version } | Self::List { version } => (*version, None),
             Self::History { version, limit } => {
                 if crate::access::history::limit(*limit).is_err() {
@@ -202,6 +242,12 @@ impl FixtureTraffic {
     }
     fn record(&self, command: &Command) {
         let name = match command {
+            Command::IdentityList { .. } => "identity_list",
+            Command::IdentityDetail { .. } => "identity_detail",
+            Command::IdentityPrepare { .. } => "identity_prepare",
+            Command::IdentityRevoke { .. } => "identity_revoke",
+            Command::IdentityStatus { .. } => "identity_status",
+            Command::RequestOrigin { .. } => "request_origin",
             Command::Session { .. } => "session",
             Command::List { .. } => "list",
             Command::History { .. } => "history",
@@ -241,12 +287,37 @@ pub struct Companion {
     identity_store: PathBuf,
     state: Mutex<State>,
     authentication: Mutex<()>,
+    management: Mutex<management::State>,
+    identity_commit: Mutex<()>,
+    provider_fingerprint: String,
     approval_authenticator: Option<Arc<dyn ApprovalAuthenticator + Send + Sync>>,
     execution_dispatcher: Option<Arc<dyn ExecutionDispatcher>>,
     #[cfg(test)]
     fixture_traffic: Option<Arc<FixtureTraffic>>,
 }
 impl Companion {
+    /// Refuse delivery after an unresolved durable administrative action. Call
+    /// before any transport starts, even if the companion endpoint is disabled.
+    pub fn enforce_management_recovery(root: &Path, app: &ProviderApplication) {
+        management::enforce_recovery_fence(root, app);
+    }
+
+    /// Offline trusted-console recovery with exact typed target and action.
+    pub fn reconcile_management_action(
+        root: &Path,
+        action_id: &str,
+        kind: &str,
+        id: &str,
+        actor: Option<&str>,
+    ) -> Result<serde_json::Value, SessionError> {
+        management::reconcile_stopped(root, action_id, kind, id, actor, || {
+            crate::adapters::supervisor::SystemdProcessSupervisor::recover_stopped(root, || {
+                crate::adapters::session::clear_persisted_session()
+                    .map_err(|_error| crate::access::ports::ExecutionError::CleanupUncertain)
+            })
+            .map_err(|_error| ())
+        })
+    }
     pub fn bind(
         address: SocketAddr,
         certificate: &Path,
@@ -278,6 +349,9 @@ impl Companion {
             identity_store: identity_store.into(),
             state: Mutex::new(State::default()),
             authentication: Mutex::new(()),
+            management: Mutex::new(management::State::default()),
+            identity_commit: Mutex::new(()),
+            provider_fingerprint: identity::certificate_fingerprint(certificate)?,
             approval_authenticator: None,
             execution_dispatcher: None,
             #[cfg(test)]
@@ -299,6 +373,9 @@ impl Companion {
         Arc::new(PollLauncher)
     }
     fn authorized(&self, device: &str) -> bool {
+        if self.management.lock().map_or(true, |s| s.failed) {
+            return false;
+        }
         identity::enrolled(&self.identity_store)
             .is_ok_and(|entries| entries.iter().any(|entry| entry.fingerprint == device))
     }
@@ -311,7 +388,7 @@ impl Companion {
         }
     }
     fn dispatch(&self, device: &str, command: Command, app: &ProviderApplication) -> Response {
-        if !self.authorized(device) {
+        if !self.authorized(device) && !management::receipt_authorized(self, device, &command) {
             return Response::error(Error::Unauthorized);
         }
         if !command.valid() {
@@ -321,7 +398,16 @@ impl Companion {
         if let Some(traffic) = &self.fixture_traffic {
             traffic.record(&command);
         }
+        if management::valid(&command).is_some() {
+            return management::dispatch(self, device, command, app);
+        }
         match command {
+            Command::IdentityList { .. }
+            | Command::IdentityDetail { .. }
+            | Command::IdentityPrepare { .. }
+            | Command::IdentityRevoke { .. }
+            | Command::IdentityStatus { .. }
+            | Command::RequestOrigin { .. } => Response::error(Error::Invalid),
             Command::Session { .. } => Self::session(app),
             Command::List { .. } => match app.companion_pending() {
                 Ok(requests) => Response::ok(serde_json::json!({"version":1,"requests":requests})),
@@ -382,6 +468,12 @@ impl Companion {
                 )
             }
             Command::Unlock { password, .. } => {
+                let Ok(_commit) = self.identity_commit.lock() else {
+                    return Response::error(Error::Unavailable);
+                };
+                if !self.authorized(device) {
+                    return Response::error(Error::Unauthorized);
+                }
                 let Ok(_authentication) = self.authentication.try_lock() else {
                     return Response::error(Error::RateLimited);
                 };
@@ -416,6 +508,9 @@ impl Companion {
                 };
                 let status = match decision {
                     Decision::Deny => {
+                        let Ok(_commit) = self.identity_commit.lock() else {
+                            return Response::error(Error::Unavailable);
+                        };
                         if !self.authorized(device) {
                             return Response::error(Error::Unauthorized);
                         }
@@ -439,6 +534,9 @@ impl Companion {
                         let Ok(proof) = prepared.authenticate(password, authenticator.as_ref())
                         else {
                             return Response::error(Error::Authentication);
+                        };
+                        let Ok(_commit) = self.identity_commit.lock() else {
+                            return Response::error(Error::Unavailable);
                         };
                         if !self.authorized(device) || app.companion_now() >= ticket.deadline {
                             return Response::error(Error::Stale);
@@ -493,9 +591,9 @@ impl Companion {
         let device = identity::fingerprint(leaf);
         #[cfg(test)]
         let mut approval = false;
-        let response = if !self.authorized(&device) {
-            Response::error(Error::Unauthorized)
-        } else {
+        // Parse only after mTLS; dispatch permits a revoked leaf solely its
+        // exact historical administrative receipt, never inventory/work.
+        let response = {
             match read_command(&mut stream) {
                 Ok(command) if !stop.load(Ordering::Acquire) => {
                     #[cfg(test)]
@@ -791,6 +889,9 @@ mod tests {
     }
     struct Dispatch(AtomicUsize);
     impl ExecutionDispatcher for Dispatch {
+        fn available(&self) -> bool {
+            true
+        }
         fn dispatch(&self, _: &str) -> Result<(), SessionError> {
             self.0.fetch_add(1, Ordering::SeqCst);
             Ok(())
@@ -1413,6 +1514,7 @@ mod tests {
             Ok(DirectStatus::Pending)
         );
     }
+    include!("companion/management_tests.rs");
 }
 
 #[cfg(test)]

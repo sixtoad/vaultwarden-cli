@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api.dart';
+import 'api/management.dart';
 import 'api/provider.dart';
 
 import 'dart:async';
@@ -68,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1223364608;
+  int get rustContentHash => -991242753;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -89,6 +90,30 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Snapshot crateApiInvalidate({required Invalidation reason});
+
+  Future<InventoryState> crateApiManagementInventoryStateDefault();
+
+  ProviderWork crateApiManagementManagementBegin({
+    required ManagementCommand command,
+    required IdentityKind kind,
+    required String id,
+    required String password,
+  });
+
+  ManagementSnapshot crateApiManagementManagementConfigure({
+    required String recovery,
+  });
+
+  ManagementSnapshot crateApiManagementManagementFinish({
+    required int token,
+    required List<int> response,
+  });
+
+  ManagementSnapshot crateApiManagementManagementInvalidate();
+
+  Future<ManagementOutcome> crateApiManagementManagementOutcomeDefault();
+
+  ManagementSnapshot crateApiManagementManagementSnapshot();
 
   ProviderWork crateApiProviderProviderBegin({
     required ProviderCommand command,
@@ -207,6 +232,199 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "invalidate", argNames: ["reason"]);
 
   @override
+  Future<InventoryState> crateApiManagementInventoryStateDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_inventory_state,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiManagementInventoryStateDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementInventoryStateDefaultConstMeta =>
+      const TaskConstMeta(debugName: "inventory_state_default", argNames: []);
+
+  @override
+  ProviderWork crateApiManagementManagementBegin({
+    required ManagementCommand command,
+    required IdentityKind kind,
+    required String id,
+    required String password,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_management_command(command, serializer);
+          sse_encode_identity_kind(kind, serializer);
+          sse_encode_String(id, serializer);
+          sse_encode_String(password, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiManagementManagementBeginConstMeta,
+        argValues: [command, kind, id, password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementManagementBeginConstMeta =>
+      const TaskConstMeta(
+        debugName: "management_begin",
+        argNames: ["command", "kind", "id", "password"],
+      );
+
+  @override
+  ManagementSnapshot crateApiManagementManagementConfigure({
+    required String recovery,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(recovery, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_management_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiManagementManagementConfigureConstMeta,
+        argValues: [recovery],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementManagementConfigureConstMeta =>
+      const TaskConstMeta(
+        debugName: "management_configure",
+        argNames: ["recovery"],
+      );
+
+  @override
+  ManagementSnapshot crateApiManagementManagementFinish({
+    required int token,
+    required List<int> response,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(token, serializer);
+          sse_encode_list_prim_u_8_loose(response, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_management_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiManagementManagementFinishConstMeta,
+        argValues: [token, response],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementManagementFinishConstMeta =>
+      const TaskConstMeta(
+        debugName: "management_finish",
+        argNames: ["token", "response"],
+      );
+
+  @override
+  ManagementSnapshot crateApiManagementManagementInvalidate() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_management_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiManagementManagementInvalidateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementManagementInvalidateConstMeta =>
+      const TaskConstMeta(debugName: "management_invalidate", argNames: []);
+
+  @override
+  Future<ManagementOutcome> crateApiManagementManagementOutcomeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_management_outcome,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiManagementManagementOutcomeDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementManagementOutcomeDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "management_outcome_default",
+        argNames: [],
+      );
+
+  @override
+  ManagementSnapshot crateApiManagementManagementSnapshot() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_management_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiManagementManagementSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiManagementManagementSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "management_snapshot", argNames: []);
+
+  @override
   ProviderWork crateApiProviderProviderBegin({
     required ProviderCommand command,
     required String requestId,
@@ -219,7 +437,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_provider_command(command, serializer);
           sse_encode_String(requestId, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -247,7 +465,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(uncertainId, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -277,7 +495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -305,7 +523,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 14,
             port: port_,
           );
         },
@@ -332,7 +550,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -357,7 +575,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 16,
             port: port_,
           );
         },
@@ -381,7 +599,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -407,7 +625,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 18,
             port: port_,
           );
         },
@@ -435,7 +653,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -457,7 +675,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -489,6 +707,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Completion dco_decode_box_autoadd_completion(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_completion(raw);
+  }
+
+  @protected
+  ManagedIdentity dco_decode_box_autoadd_managed_identity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_managed_identity(raw);
   }
 
   @protected
@@ -536,15 +760,51 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  IdentityKind dco_decode_identity_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return IdentityKind.values[raw as int];
+  }
+
+  @protected
+  IdentityRole dco_decode_identity_role(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return IdentityRole.values[raw as int];
+  }
+
+  @protected
+  IdentityTrust dco_decode_identity_trust(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return IdentityTrust.values[raw as int];
+  }
+
+  @protected
   Invalidation dco_decode_invalidation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Invalidation.values[raw as int];
   }
 
   @protected
+  InventoryState dco_decode_inventory_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return InventoryState.values[raw as int];
+  }
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  List<IdentityRole> dco_decode_list_identity_role(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_identity_role).toList();
+  }
+
+  @protected
+  List<ManagedIdentity> dco_decode_list_managed_identity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_managed_identity).toList();
   }
 
   @protected
@@ -580,9 +840,72 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ManagedIdentity dco_decode_managed_identity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return ManagedIdentity(
+      kind: dco_decode_identity_kind(arr[0]),
+      id: dco_decode_String(arr[1]),
+      label: dco_decode_String(arr[2]),
+      fingerprint: dco_decode_String(arr[3]),
+      roles: dco_decode_list_identity_role(arr[4]),
+      trust: dco_decode_identity_trust(arr[5]),
+      thisClient: dco_decode_bool(arr[6]),
+    );
+  }
+
+  @protected
+  ManagementCommand dco_decode_management_command(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ManagementCommand.values[raw as int];
+  }
+
+  @protected
+  ManagementOutcome dco_decode_management_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ManagementOutcome.values[raw as int];
+  }
+
+  @protected
+  ManagementSnapshot dco_decode_management_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 18)
+      throw Exception('unexpected arr length: expect 18 but see ${arr.length}');
+    return ManagementSnapshot(
+      state: dco_decode_inventory_state(arr[0]),
+      outcome: dco_decode_management_outcome(arr[1]),
+      busy: dco_decode_bool(arr[2]),
+      identities: dco_decode_list_managed_identity(arr[3]),
+      detail: dco_decode_opt_box_autoadd_managed_identity(arr[4]),
+      canRevoke: dco_decode_bool(arr[5]),
+      hasNext: dco_decode_bool(arr[6]),
+      providerFingerprint: dco_decode_String(arr[7]),
+      executionConfigured: dco_decode_bool(arr[8]),
+      executionAvailable: dco_decode_bool(arr[9]),
+      recovery: dco_decode_String(arr[10]),
+      actionId: dco_decode_String(arr[11]),
+      actionTarget: dco_decode_String(arr[12]),
+      revocation: dco_decode_String(arr[13]),
+      cleanup: dco_decode_String(arr[14]),
+      message: dco_decode_String(arr[15]),
+      originId: dco_decode_String(arr[16]),
+      originText: dco_decode_String(arr[17]),
+    );
+  }
+
+  @protected
   Operation dco_decode_operation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Operation.values[raw as int];
+  }
+
+  @protected
+  ManagedIdentity? dco_decode_opt_box_autoadd_managed_identity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_managed_identity(raw);
   }
 
   @protected
@@ -802,6 +1125,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ManagedIdentity sse_decode_box_autoadd_managed_identity(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_managed_identity(deserializer));
+  }
+
+  @protected
   ProviderReview sse_decode_box_autoadd_provider_review(
     SseDeserializer deserializer,
   ) {
@@ -844,10 +1175,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  IdentityKind sse_decode_identity_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return IdentityKind.values[inner];
+  }
+
+  @protected
+  IdentityRole sse_decode_identity_role(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return IdentityRole.values[inner];
+  }
+
+  @protected
+  IdentityTrust sse_decode_identity_trust(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return IdentityTrust.values[inner];
+  }
+
+  @protected
   Invalidation sse_decode_invalidation(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return Invalidation.values[inner];
+  }
+
+  @protected
+  InventoryState sse_decode_inventory_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return InventoryState.values[inner];
   }
 
   @protected
@@ -858,6 +1217,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <String>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<IdentityRole> sse_decode_list_identity_role(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <IdentityRole>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_identity_role(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ManagedIdentity> sse_decode_list_managed_identity(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ManagedIdentity>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_managed_identity(deserializer));
     }
     return ans_;
   }
@@ -905,10 +1292,107 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ManagedIdentity sse_decode_managed_identity(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_identity_kind(deserializer);
+    var var_id = sse_decode_String(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_fingerprint = sse_decode_String(deserializer);
+    var var_roles = sse_decode_list_identity_role(deserializer);
+    var var_trust = sse_decode_identity_trust(deserializer);
+    var var_thisClient = sse_decode_bool(deserializer);
+    return ManagedIdentity(
+      kind: var_kind,
+      id: var_id,
+      label: var_label,
+      fingerprint: var_fingerprint,
+      roles: var_roles,
+      trust: var_trust,
+      thisClient: var_thisClient,
+    );
+  }
+
+  @protected
+  ManagementCommand sse_decode_management_command(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ManagementCommand.values[inner];
+  }
+
+  @protected
+  ManagementOutcome sse_decode_management_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ManagementOutcome.values[inner];
+  }
+
+  @protected
+  ManagementSnapshot sse_decode_management_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_state = sse_decode_inventory_state(deserializer);
+    var var_outcome = sse_decode_management_outcome(deserializer);
+    var var_busy = sse_decode_bool(deserializer);
+    var var_identities = sse_decode_list_managed_identity(deserializer);
+    var var_detail = sse_decode_opt_box_autoadd_managed_identity(deserializer);
+    var var_canRevoke = sse_decode_bool(deserializer);
+    var var_hasNext = sse_decode_bool(deserializer);
+    var var_providerFingerprint = sse_decode_String(deserializer);
+    var var_executionConfigured = sse_decode_bool(deserializer);
+    var var_executionAvailable = sse_decode_bool(deserializer);
+    var var_recovery = sse_decode_String(deserializer);
+    var var_actionId = sse_decode_String(deserializer);
+    var var_actionTarget = sse_decode_String(deserializer);
+    var var_revocation = sse_decode_String(deserializer);
+    var var_cleanup = sse_decode_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_originId = sse_decode_String(deserializer);
+    var var_originText = sse_decode_String(deserializer);
+    return ManagementSnapshot(
+      state: var_state,
+      outcome: var_outcome,
+      busy: var_busy,
+      identities: var_identities,
+      detail: var_detail,
+      canRevoke: var_canRevoke,
+      hasNext: var_hasNext,
+      providerFingerprint: var_providerFingerprint,
+      executionConfigured: var_executionConfigured,
+      executionAvailable: var_executionAvailable,
+      recovery: var_recovery,
+      actionId: var_actionId,
+      actionTarget: var_actionTarget,
+      revocation: var_revocation,
+      cleanup: var_cleanup,
+      message: var_message,
+      originId: var_originId,
+      originText: var_originText,
+    );
+  }
+
+  @protected
   Operation sse_decode_operation(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return Operation.values[inner];
+  }
+
+  @protected
+  ManagedIdentity? sse_decode_opt_box_autoadd_managed_identity(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_managed_identity(deserializer));
+    } else {
+      return null;
+    }
   }
 
   @protected
@@ -1187,6 +1671,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_managed_identity(
+    ManagedIdentity self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_managed_identity(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_provider_review(
     ProviderReview self,
     SseSerializer serializer,
@@ -1224,7 +1717,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_identity_kind(IdentityKind self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_identity_role(IdentityRole self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_identity_trust(IdentityTrust self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_invalidation(Invalidation self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_inventory_state(
+    InventoryState self,
+    SseSerializer serializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
   }
@@ -1235,6 +1755,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_identity_role(
+    List<IdentityRole> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_identity_role(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_managed_identity(
+    List<ManagedIdentity> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_managed_identity(item, serializer);
     }
   }
 
@@ -1285,9 +1829,81 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_managed_identity(
+    ManagedIdentity self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_identity_kind(self.kind, serializer);
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_String(self.fingerprint, serializer);
+    sse_encode_list_identity_role(self.roles, serializer);
+    sse_encode_identity_trust(self.trust, serializer);
+    sse_encode_bool(self.thisClient, serializer);
+  }
+
+  @protected
+  void sse_encode_management_command(
+    ManagementCommand self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_management_outcome(
+    ManagementOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_management_snapshot(
+    ManagementSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_inventory_state(self.state, serializer);
+    sse_encode_management_outcome(self.outcome, serializer);
+    sse_encode_bool(self.busy, serializer);
+    sse_encode_list_managed_identity(self.identities, serializer);
+    sse_encode_opt_box_autoadd_managed_identity(self.detail, serializer);
+    sse_encode_bool(self.canRevoke, serializer);
+    sse_encode_bool(self.hasNext, serializer);
+    sse_encode_String(self.providerFingerprint, serializer);
+    sse_encode_bool(self.executionConfigured, serializer);
+    sse_encode_bool(self.executionAvailable, serializer);
+    sse_encode_String(self.recovery, serializer);
+    sse_encode_String(self.actionId, serializer);
+    sse_encode_String(self.actionTarget, serializer);
+    sse_encode_String(self.revocation, serializer);
+    sse_encode_String(self.cleanup, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_String(self.originId, serializer);
+    sse_encode_String(self.originText, serializer);
+  }
+
+  @protected
   void sse_encode_operation(Operation self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_managed_identity(
+    ManagedIdentity? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_managed_identity(self, serializer);
+    }
   }
 
   @protected

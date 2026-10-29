@@ -11,9 +11,10 @@ class ProviderConfiguration {
     this.pin = '',
     this.fingerprint = '',
     this.uncertainId = '',
+    this.managementRecovery = '',
   });
   final bool configured;
-  final String endpoint, pin, fingerprint, uncertainId;
+  final String endpoint, pin, fingerprint, uncertainId, managementRecovery;
 }
 
 abstract interface class ProviderPlatform {
@@ -63,7 +64,8 @@ class NativeProviderPlatform
       return const ProviderConfiguration(configured: false);
     }
     if (value is! Map ||
-        value.length != 5 ||
+        (value.length != 5 && value.length != 6) ||
+        (value.length == 6 && value['managementRecovery'] is! String) ||
         value['configured'] != true ||
         ![
           'endpoint',
@@ -77,6 +79,10 @@ class NativeProviderPlatform
     final pin = value['pin'] as String;
     final fingerprint = value['fingerprint'] as String;
     final id = value['uncertainId'] as String;
+    final management = value['managementRecovery'] as String? ?? '';
+    if (management.length > 512 || (management.isNotEmpty && id.isNotEmpty)) {
+      throw const FormatException('Invalid administrative recovery');
+    }
     if (endpoint.length > 2048 ||
         !RegExp(r'^[a-f0-9]{64}$').hasMatch(pin) ||
         !RegExp(r'^[a-f0-9]{64}$').hasMatch(fingerprint) ||
@@ -89,6 +95,7 @@ class NativeProviderPlatform
       pin: pin,
       fingerprint: fingerprint,
       uncertainId: id,
+      managementRecovery: management,
     );
   }
 
