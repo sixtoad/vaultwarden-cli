@@ -109,7 +109,7 @@ Approval transcript, in order:
 | --- | --- | --- |
 | 1 | domain | `dev.vaultwarden.provider.approval.v2` |
 | 2 | action | `approve` (deny is never signed) |
-| 3 | provider identity | SHA-256 of the provider TLS leaf certificate DER (the companion's pin) |
+| 3 | provider identity | SHA-256 of the provider TLS leaf certificate DER (the companion's pin); rotating the provider certificate changes it |
 | 4 | approval client | SHA-256 of the client mTLS leaf DER (the registry fingerprint) |
 | 5 | key id | 32 raw bytes |
 | 6 | request id | UTF-8 (43-character base64url) |
@@ -119,15 +119,17 @@ Approval transcript, in order:
 | 10 | request expiry | u64, Unix seconds |
 | 11 | provider generation | u64 |
 | 12 | ticket | 32 raw bytes |
-| 13 | ticket deadline | u64, Unix milliseconds |
+| 13 | ticket deadline | u64, Unix milliseconds, provider wall clock |
 | 14 | review digest | SHA-256 of the canonical review JSON |
 
 Review digest: SHA-256 over the `review` object exactly as received in the
 Review response, canonicalized as JSON with object members sorted bytewise by
 key (every key is ASCII), no insignificant whitespace, strings escaped as
-`serde_json` does (`\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t`, other control
-characters as lowercase `\u00xx`, all other characters as literal UTF-8) and
-integers in shortest decimal form. This equals RFC 8785 for this schema (no
+`serde_json` does: only `"` (`\"`), `\` (`\\`) and U+0000 to U+001F are
+escaped (`\b`, `\f`, `\n`, `\r`, `\t`, the rest as lowercase `\u00xx`);
+every other character, including DEL (U+007F), the C1 controls (U+0080 to
+U+009F), `/` and non-ASCII, is written as literal UTF-8; integers in shortest
+decimal form. This equals RFC 8785 for this schema (no
 floats; a float fails closed). Hash the received JSON value, not a
 re-serialization of a typed struct that may drop or reorder members.
 
@@ -147,9 +149,19 @@ vector with the inputs, canonical review JSON, transcripts and signatures is in
   `B` is present with a ticket:
   `{"version":2,"domain","action","provider_identity","approval_client","key_id":hex|null,"biometric_allowed":bool,"request_id","record_digest","policy_digest","arguments_digest","expires_at_unix_seconds","generation","ticket","ticket_deadline_unix_ms","review_digest"}`.
   `biometric_allowed` is false when this device has no key or the policy sets
-  `require_password`. `B` is null when the binding is unavailable; password
-  approval still works then. The companion should recompute `review_digest`
-  and refuse to sign on mismatch.
+  `require_password`. It reports eligibility only, never lock state, exactly as
+  the password path does: the provider lock is signalled by `session`
+  (`state:"locked"`); locking ends every pending request (a later review is
+  terminal, with no ticket and no binding), and any decision on a ticket
+  issued before the lock, password or proof, is `stale`. `B` is null when the
+  binding is unavailable, including when the provider wall clock cannot be
+  read (the ticket then never accepts a proof); password approval still works
+  then. The companion should recompute `review_digest` and refuse to sign on
+  mismatch.
+* `ticket_deadline_unix_ms` is the provider's wall clock and is a signed
+  transcript value only. The companion must not enforce it against its own
+  clock (clocks may be skewed); the provider enforces the ticket's 60 second
+  lifetime on its monotonic clock and answers `stale` when it has passed.
 * `{"version":2,"command":"decision",...,"decision":"approve","proof":{"key_id":"hex","signature":"b64url"}}`
   or the same with `"password"`. Approve takes exactly one of `password` or
   `proof`; both or neither is `invalid_request`. Deny takes neither. Version 1
@@ -174,12 +186,21 @@ An administrator may also revoke (never enroll) another device's key.
   => `{"version":2,"operation","target","action_id","ticket","generation","valid_for_seconds":55,"provider_identity","biometric_key_id":hex|null}`.
   Tickets are single use, purpose-bound (an `identity_prepare` ticket never
   authorizes key management and vice versa), and bound to actor, target, action,
-  generation and lock epoch.
+  generation and lock epoch. Key-management tickets live apart from the
+  administrators' `identity_prepare` tickets, so no device can exhaust the
+  table an administrator needs to revoke it, and each device holds at most one
+  outstanding ticket per operation: a new `biometric_prepare` for the same
+  operation replaces (invalidates) the device's previous one.
 * `{"version":2,"command":"biometric_enroll","action_id","ticket","password","public_key","enroll_signature"}`
   (own device only) => `{"version":2,"operation":"enroll","target","action_id","biometric_key_id"}`.
   Requires a fresh password and a valid enrollment proof by the new key.
-  Re-enrollment atomically replaces the key and retires the old key id forever;
-  a retired or another device's key is `invalid_request`.
+  Re-enrollment atomically replaces the key and retires the old key id;
+  a retired or another device's key is `invalid_request`. The retired list
+  holds 256 ids; when it is full every new enrollment is `unavailable` (no id
+  is forgotten to make room), while a revocation is never refused for it and
+  forgets the oldest id instead. Forgetting is safe: enrollment stays refused
+  while the list is full, and any enrollment needs the device certificate, a
+  fresh password and proof of possession, which a fresh key needs anyway.
 * `{"version":2,"command":"biometric_revoke","target","action_id","ticket","password"}`
   => `{"version":2,"operation":"revoke","target","action_id","revoked_key_id":hex|null}`.
   Disables Touch ID and retires the key; the device stays enrolled and keeps
@@ -189,8 +210,26 @@ An administrator may also revoke (never enroll) another device's key.
   rows are unchanged because the companion parses them as closed objects.
 
 Device revocation (online `identity_revoke` and offline `companion revoke`)
-removes the device's key and retires its id in the same registry write. The
-registry (`companion-identities.json`) is now version 3 with `biometric` and
-`retired_biometric_keys`; version 1 and 2 files load with no keys and are
-rewritten as version 3 on the next change. An older provider binary refuses a
-version 3 registry (fail closed).
+removes the device's key and retires its id in the same registry write. Key
+enrollment and key revocation append `biometric_enrolled` / `biometric_revoked`
+audit records (`fingerprint` = the device acted on, `actor` = the acting
+device, `key_id`) in the same write; the newest 64 are kept. Older audit
+records (no `key_id`) stay readable. The registry is never written above its
+64 KiB read limit: an enrollment that would exceed it is `unavailable`, and a
+revocation first forgets the oldest Touch ID audit records, then the oldest
+retired ids.
+
+Registry versions and rollback: `companion-identities.json` is written as the
+lowest version that represents its content. Without any Touch ID key, retired
+key id or Touch ID audit record it is version 2, byte-compatible with the
+previous release (empty Touch ID members are omitted), so offline `companion
+enroll`, administrator grants and device revocations never lock out an older
+binary. Once Touch ID has been used it is version 3 (with `biometric` and
+`retired_biometric_keys`), and an older provider binary refuses it (fail
+closed); it stays version 3 after the last key is revoked, because the retired
+ids must not be lost. Version 1 and 2 files load with no keys. Provider history:
+the approved event carries an `approval` member only after a biometric
+approval; history written before any biometric approval is unchanged. An older binary
+rejects an event carrying it (its event parser refuses unknown members), so
+after the first biometric approval a rollback fails closed on reading that
+history, exactly as it does on a version 3 registry.

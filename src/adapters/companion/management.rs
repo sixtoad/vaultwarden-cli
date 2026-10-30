@@ -116,7 +116,14 @@ struct Ticket {
 }
 #[derive(Default)]
 pub(super) struct State {
+    /// Administrator-only `identity_prepare` tickets (capped by MAX_TICKETS).
     tickets: Vec<Ticket>,
+    /// Touch ID key-management tickets, kept apart so that a non-admin device
+    /// can never exhaust the administrators' table (and so block the online
+    /// revocation of itself). At most one outstanding ticket per (actor,
+    /// operation): a new prepare replaces the actor's previous one, so the
+    /// table is bounded by the enrolled devices (2 x MAX_IDENTITIES).
+    biometric_tickets: Vec<Ticket>,
     pub failed: bool,
     #[cfg(test)]
     pub(super) before_mutation: Option<Box<dyn FnOnce() + Send>>,
@@ -685,10 +692,12 @@ fn biometric(
                 return Err(Error::Stale);
             }
             let now = app.companion_now();
-            state.tickets.retain(|t| t.deadline > now);
-            if state.tickets.len() >= MAX_TICKETS {
-                return Err(Error::RateLimited);
-            }
+            // Expired tickets go, and so does this actor's previous ticket for
+            // the same operation: one outstanding ticket per (actor, purpose).
+            state.biometric_tickets.retain(|t| {
+                t.deadline > now
+                    && !(t.actor == actor && t.purpose == Purpose::Biometric(operation))
+            });
             let action_id = crate::access::RequestId::new_random()
                 .map_err(|_error| Error::Unavailable)?
                 .as_str()
@@ -702,7 +711,7 @@ fn biometric(
             let key_id = identity::biometric_key(&service.identity_store, &target.id)
                 .map_err(|_error| Error::Unavailable)?
                 .map(|key| key.key_id);
-            state.tickets.push(Ticket {
+            state.biometric_tickets.push(Ticket {
                 token: ticket.clone(),
                 purpose: Purpose::Biometric(operation),
                 action_id: action_id.clone(),
@@ -837,7 +846,7 @@ fn biometric(
             if !permitted(BiometricOperation::Revoke, &target) {
                 return Err(Error::Stale);
             }
-            let revoked = identity::revoke_biometric_online(root, &target.id)
+            let revoked = identity::revoke_biometric_online(root, &target.id, actor)
                 .map_err(|_error| Error::Unavailable)?;
             Ok(Response::ok(serde_json::json!({
                 "version": 2,
@@ -850,12 +859,13 @@ fn biometric(
         _ => Err(Error::Invalid),
     }
 }
+/// Consume a Touch ID key-management ticket (never an identity ticket).
 fn take_ticket(
     service: &Companion,
     actor: &str,
     purpose: Purpose,
-    action_id: &str,
-    target: &Target,
+    expected_action: &str,
+    expected_target: &Target,
     token: &str,
 ) -> Result<Ticket, Error> {
     let mut state = service
@@ -863,17 +873,17 @@ fn take_ticket(
         .lock()
         .map_err(|_error| Error::Unavailable)?;
     let position = state
-        .tickets
+        .biometric_tickets
         .iter()
         .position(|t| {
             t.actor == actor
                 && t.purpose == purpose
-                && t.action_id == action_id
-                && t.target == *target
+                && t.action_id == expected_action
+                && t.target == *expected_target
                 && t.token == token
         })
         .ok_or(Error::Stale)?;
-    Ok(state.tickets.swap_remove(position))
+    Ok(state.biometric_tickets.swap_remove(position))
 }
 /// Under `identity_commit`: the actor and target are still enabled and the
 /// management authority (generation, lock epoch) is unchanged.

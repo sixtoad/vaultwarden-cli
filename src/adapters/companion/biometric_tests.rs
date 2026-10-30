@@ -498,7 +498,8 @@ fn biometric_device_revocation_removes_key_in_same_write() {
     let raw: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&s.service.identity_store).unwrap()).unwrap();
     assert_eq!(raw["version"], 3);
-    assert_eq!(raw["biometric"], serde_json::json!([]));
+    // An empty key list is omitted (rollback-compatible shape).
+    assert!(raw.get("biometric").is_none());
     assert_eq!(raw["retired_biometric_keys"], serde_json::json!([key_id]));
     assert!(
         identity::biometric_key(&s.service.identity_store, &me())
@@ -932,7 +933,7 @@ struct RevokeDuringVerify(PathBuf);
 impl BiometricApprovalVerifier for RevokeDuringVerify {
     fn verify(&self, key: &[u8], message: &[u8], signature: &[u8]) -> Result<(), SessionError> {
         // Key revocation lands after verification but before the commit gate.
-        identity::revoke_biometric_online(&self.0, &me()).unwrap();
+        identity::revoke_biometric_online(&self.0, &me(), &me()).unwrap();
         crate::adapters::approval_verifier::RingBiometricVerifier.verify(key, message, signature)
     }
 }
@@ -957,4 +958,417 @@ fn biometric_key_revoked_after_verification_is_stale_at_commit() {
     assert_eq!(response.status, 409, "{}", response.body);
     assert_eq!(s.status(&id), DirectStatus::Pending);
     assert_eq!(s.dispatch.0.load(Ordering::SeqCst), 0);
+}
+
+fn identity_target(id: &str) -> management::Target {
+    management::Target {
+        kind: management::Kind::ApprovalClient,
+        id: id.into(),
+    }
+}
+#[test]
+fn biometric_prepare_flood_cannot_starve_admin_identity_revocation() {
+    // A stolen, non-admin device floods key-management prepares; the
+    // administrator can still revoke it online.
+    let s = setup(true);
+    for _ in 0..300 {
+        s.prepare(&other(), management::BiometricOperation::Enroll, &other());
+        s.prepare(&other(), management::BiometricOperation::Revoke, &other());
+    }
+    let prepared = s.send(
+        &me(),
+        Command::IdentityPrepare {
+            version: 2,
+            target: identity_target(&other()),
+        },
+    );
+    assert_eq!(prepared.status, 200, "{}", prepared.body);
+    let prepared = body(&prepared);
+    let response = s.send(
+        &me(),
+        Command::IdentityRevoke {
+            version: 2,
+            target: identity_target(&other()),
+            action_id: prepared["action_id"].as_str().unwrap().into(),
+            ticket: prepared["ticket"].as_str().unwrap().into(),
+            password: SensitiveString::new(PASSWORD.into()),
+        },
+    );
+    assert_eq!(response.status, 200, "{}", response.body);
+    assert_eq!(body(&response)["revocation"], "recorded");
+    assert!(
+        !identity::enrolled(&s.service.identity_store)
+            .unwrap()
+            .iter()
+            .any(|entry| entry.fingerprint == other())
+    );
+}
+#[test]
+fn biometric_prepare_replaces_the_actors_previous_ticket_for_that_operation() {
+    let s = setup(false);
+    let key = software_key();
+    let public_key = key.public_key().as_ref().to_vec();
+    let signed = |prepared: &serde_json::Value| {
+        let transcript = v2::enroll_transcript(
+            prepared["provider_identity"].as_str().unwrap(),
+            &me(),
+            &public_key,
+            prepared["ticket"].as_str().unwrap(),
+            prepared["action_id"].as_str().unwrap(),
+        )
+        .unwrap();
+        enroll_command(prepared, &public_key, &sign(&key, &transcript), PASSWORD)
+    };
+    let first = body(&s.prepare(&me(), management::BiometricOperation::Enroll, &me()));
+    // A revoke prepare does not displace the enroll ticket...
+    let revoke = body(&s.prepare(&me(), management::BiometricOperation::Revoke, &me()));
+    // ...another device's enroll prepare does not either...
+    assert_eq!(
+        s.prepare(&other(), management::BiometricOperation::Enroll, &other())
+            .status,
+        200
+    );
+    // ...but a second enroll prepare by this device replaces the first.
+    let second = body(&s.prepare(&me(), management::BiometricOperation::Enroll, &me()));
+    assert_eq!(s.send(&me(), signed(&first)).status, 409);
+    assert_eq!(s.password.0.load(Ordering::SeqCst), 0);
+    assert_eq!(s.send(&me(), signed(&second)).status, 200);
+    let response = s.send(
+        &me(),
+        Command::BiometricRevoke {
+            version: 2,
+            target: identity_target(&me()),
+            action_id: revoke["action_id"].as_str().unwrap().into(),
+            ticket: revoke["ticket"].as_str().unwrap().into(),
+            password: SensitiveString::new(PASSWORD.into()),
+        },
+    );
+    assert_eq!(response.status, 200, "{}", response.body);
+}
+#[test]
+fn biometric_ticket_is_bound_to_action_target_and_operation() {
+    let s = setup(true);
+    let key = software_key();
+    let public_key = key.public_key().as_ref().to_vec();
+    let enroll_with = |prepared: &serde_json::Value, action_id: &str| {
+        let transcript = v2::enroll_transcript(
+            prepared["provider_identity"].as_str().unwrap(),
+            &me(),
+            &public_key,
+            prepared["ticket"].as_str().unwrap(),
+            action_id,
+        )
+        .unwrap();
+        let mut command = enroll_command(prepared, &public_key, &sign(&key, &transcript), PASSWORD);
+        if let Command::BiometricEnroll { action_id: a, .. } = &mut command {
+            action_id.clone_into(a);
+        }
+        s.send(&me(), command)
+    };
+    // Another action id, honestly signed, is not the prepared action.
+    let prepared = body(&s.prepare(&me(), management::BiometricOperation::Enroll, &me()));
+    let foreign_action = URL_SAFE_NO_PAD.encode([7u8; 32]);
+    assert_eq!(enroll_with(&prepared, &foreign_action).status, 409);
+    // A revoke ticket never enrolls.
+    let revoke = body(&s.prepare(&me(), management::BiometricOperation::Revoke, &me()));
+    assert_eq!(
+        enroll_with(&revoke, revoke["action_id"].as_str().unwrap()).status,
+        409
+    );
+    assert!(
+        identity::biometric_key(&s.service.identity_store, &me())
+            .unwrap()
+            .is_none()
+    );
+    // An admin's revoke ticket for its own device never revokes another's key.
+    let foreign = software_key();
+    assert_eq!(s.enroll_as(&other(), &foreign, PASSWORD).status, 200);
+    let revoke = body(&s.prepare(&me(), management::BiometricOperation::Revoke, &me()));
+    let response = s.send(
+        &me(),
+        Command::BiometricRevoke {
+            version: 2,
+            target: identity_target(&other()),
+            action_id: revoke["action_id"].as_str().unwrap().into(),
+            ticket: revoke["ticket"].as_str().unwrap().into(),
+            password: SensitiveString::new(PASSWORD.into()),
+        },
+    );
+    assert_eq!(response.status, 409, "{}", response.body);
+    assert!(
+        identity::biometric_key(&s.service.identity_store, &other())
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(s.password.0.load(Ordering::SeqCst), 1);
+}
+fn registry_json(s: &Svc) -> serde_json::Value {
+    serde_json::from_slice(&std::fs::read(&s.service.identity_store).unwrap()).unwrap()
+}
+fn write_registry(s: &Svc, value: &serde_json::Value) {
+    std::fs::write(&s.service.identity_store, value.to_string()).unwrap();
+}
+fn revoke_key(s: &Svc, device: &str, target: &str) -> Response {
+    let prepared = s.prepare(device, management::BiometricOperation::Revoke, target);
+    assert_eq!(prepared.status, 200, "{}", prepared.body);
+    let prepared = body(&prepared);
+    s.send(
+        device,
+        Command::BiometricRevoke {
+            version: 2,
+            target: identity_target(target),
+            action_id: prepared["action_id"].as_str().unwrap().into(),
+            ticket: prepared["ticket"].as_str().unwrap().into(),
+            password: SensitiveString::new(PASSWORD.into()),
+        },
+    )
+}
+fn retired_ids(count: usize) -> Vec<serde_json::Value> {
+    (0..count).map(|i| format!("{i:064x}").into()).collect()
+}
+#[test]
+fn biometric_full_retired_list_never_blocks_revocation_but_refuses_enrollment() {
+    let s = setup(true);
+    let key = software_key();
+    let key_id = s.enroll(&key);
+    let mut raw = registry_json(&s);
+    raw["retired_biometric_keys"] = retired_ids(256).into();
+    write_registry(&s, &raw);
+    let response = revoke_key(&s, &me(), &me());
+    assert_eq!(response.status, 200, "{}", response.body);
+    let retired = registry_json(&s)["retired_biometric_keys"].clone();
+    assert_eq!(retired.as_array().unwrap().len(), 256);
+    assert_eq!(retired[0], format!("{:064x}", 1));
+    assert_eq!(retired[255], key_id.as_str());
+    // Full: a new key is refused (never by forgetting a retired id)...
+    s.cool();
+    assert_eq!(s.enroll_as(&me(), &software_key(), PASSWORD).status, 503);
+    // ...and the forgotten oldest id cannot come back while the list is full.
+    assert_eq!(registry_json(&s)["retired_biometric_keys"], retired);
+    // Device revocation of a device with a key is never blocked either.
+    let mut raw = registry_json(&s);
+    let foreign = software_key();
+    raw["retired_biometric_keys"]
+        .as_array_mut()
+        .unwrap()
+        .remove(0);
+    write_registry(&s, &raw);
+    assert_eq!(s.enroll_as(&other(), &foreign, PASSWORD).status, 200);
+    identity::revoke_online(&s.env.root(), &other(), &me()).unwrap();
+    let raw = registry_json(&s);
+    assert_eq!(raw["retired_biometric_keys"].as_array().unwrap().len(), 256);
+    assert_eq!(
+        raw["retired_biometric_keys"][255],
+        v2::key_id(foreign.public_key().as_ref()).as_str()
+    );
+}
+#[test]
+fn biometric_revocation_forgets_oldest_state_to_stay_under_the_read_limit() {
+    let s = setup(true);
+    let mut raw = registry_json(&s);
+    // 62 more enabled devices with maximal (escaped) labels, a key on every
+    // device but `other`, and Touch ID audit history.
+    let label = "\"".repeat(128);
+    let mut identities = raw["identities"].as_array().unwrap().clone();
+    for i in 0..62 {
+        identities
+            .push(serde_json::json!({"fingerprint": format!("{:064x}", 1000 + i), "label": label}));
+    }
+    let mut biometric = Vec::new();
+    for identity in identities.iter().filter(|i| i["fingerprint"] != other()) {
+        let key = software_key();
+        let public_key = key.public_key().as_ref();
+        biometric.push(serde_json::json!({"fingerprint": identity["fingerprint"], "key_id": v2::key_id(public_key), "public_key": URL_SAFE_NO_PAD.encode(public_key), "enrolled_generation": 1}));
+    }
+    let audit: Vec<_> = (0..64)
+        .map(|i| serde_json::json!({"fingerprint": me(), "actor": me(), "action": "biometric_enrolled", "key_id": format!("{:064x}", 5000 + i)}))
+        .collect();
+    raw["version"] = 3.into();
+    raw["identities"] = identities.into();
+    raw["biometric"] = biometric.into();
+    raw["audit"] = audit.into();
+    raw["retired_biometric_keys"] = serde_json::json!([]);
+    // Retired ids until the file is within one id of the 64 KiB read limit.
+    let mut count = 0;
+    while {
+        raw["retired_biometric_keys"] = retired_ids(count + 1).into();
+        raw.to_string().len() <= 65536
+    } {
+        count += 1;
+    }
+    raw["retired_biometric_keys"] = retired_ids(count).into();
+    assert!(count < 256, "{count}");
+    write_registry(&s, &raw);
+    assert_eq!(
+        identity::enrolled(&s.service.identity_store).unwrap().len(),
+        64
+    );
+    // Revoking the keyless device adds an audit record past the limit; it
+    // still succeeds by forgetting the oldest Touch ID audit entry.
+    identity::revoke_online(&s.env.root(), &other(), &me()).unwrap();
+    let after = std::fs::read(&s.service.identity_store).unwrap();
+    assert!(after.len() <= 65536);
+    let after: serde_json::Value = serde_json::from_slice(&after).unwrap();
+    let audit = after["audit"].as_array().unwrap();
+    assert_eq!(audit.last().unwrap()["action"], "revoked");
+    assert!(audit.len() < 65);
+    assert_eq!(
+        after["retired_biometric_keys"].as_array().unwrap().len(),
+        count
+    );
+    assert!(identity::enrolled(&s.service.identity_store).is_ok());
+}
+#[test]
+fn biometric_enroll_and_revoke_are_audited_and_old_records_stay_readable() {
+    let s = setup(true);
+    let mut raw = registry_json(&s);
+    // A record written by the previous release (no key_id).
+    raw["audit"] = serde_json::json!([{"fingerprint": me(), "actor": "local_owner", "action": "granted_administrator"}]);
+    write_registry(&s, &raw);
+    let key = software_key();
+    let key_id = s.enroll(&key);
+    let foreign = software_key();
+    assert_eq!(s.enroll_as(&other(), &foreign, PASSWORD).status, 200);
+    let foreign_id = v2::key_id(foreign.public_key().as_ref());
+    assert_eq!(revoke_key(&s, &me(), &other()).status, 200);
+    s.cool();
+    assert_eq!(revoke_key(&s, &me(), &me()).status, 200);
+    assert_eq!(
+        registry_json(&s)["audit"],
+        serde_json::json!([
+            {"fingerprint": me(), "actor": "local_owner", "action": "granted_administrator"},
+            {"fingerprint": me(), "actor": me(), "action": "biometric_enrolled", "key_id": key_id},
+            {"fingerprint": other(), "actor": other(), "action": "biometric_enrolled", "key_id": foreign_id},
+            {"fingerprint": other(), "actor": me(), "action": "biometric_revoked", "key_id": foreign_id},
+            {"fingerprint": me(), "actor": me(), "action": "biometric_revoked", "key_id": key_id},
+        ])
+    );
+    // A Touch ID record without its key id, or in a version 2 file, is refused.
+    let mut raw = registry_json(&s);
+    raw["audit"][1].as_object_mut().unwrap().remove("key_id");
+    write_registry(&s, &raw);
+    assert!(identity::enrolled(&s.service.identity_store).is_err());
+    let mut raw = registry_json(&s);
+    raw["audit"][1]["key_id"] = key_id.as_str().into();
+    raw["audit"][0]["key_id"] = key_id.as_str().into();
+    write_registry(&s, &raw);
+    assert!(identity::enrolled(&s.service.identity_store).is_err());
+    let mut raw = registry_json(&s);
+    raw["audit"][0].as_object_mut().unwrap().remove("key_id");
+    raw["version"] = 2.into();
+    raw.as_object_mut()
+        .unwrap()
+        .remove("retired_biometric_keys");
+    write_registry(&s, &raw);
+    assert!(identity::enrolled(&s.service.identity_store).is_err());
+}
+#[test]
+fn biometric_registry_without_touch_id_state_is_written_as_version_2() {
+    // An older binary (version 2, closed fields) can still read a registry
+    // that never used Touch ID, whatever writes it.
+    let s = setup(true);
+    identity::revoke_online(&s.env.root(), &other(), &me()).unwrap();
+    let raw = registry_json(&s);
+    assert_eq!(raw["version"], 2);
+    let mut keys: Vec<_> = raw.as_object().unwrap().keys().cloned().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        [
+            "administrators",
+            "audit",
+            "identities",
+            "revoked",
+            "version"
+        ]
+    );
+    // Touch ID state makes it version 3, and it stays so after a revocation
+    // (the retired id must survive a downgrade-reading binary refusing it).
+    let key = software_key();
+    s.enroll(&key);
+    assert_eq!(registry_json(&s)["version"], 3);
+    s.cool();
+    assert_eq!(revoke_key(&s, &me(), &me()).status, 200);
+    assert_eq!(registry_json(&s)["version"], 3);
+}
+#[test]
+fn biometric_review_without_provider_wall_clock_keeps_password_approval() {
+    let s = setup(false);
+    let key = software_key();
+    let key_id = s.enroll(&key);
+    let id = s.request();
+    s.service.state.lock().unwrap().wall_clock_unavailable = true;
+    let review = s.review(&id);
+    assert_eq!(review["approval_binding"], serde_json::Value::Null);
+    assert!(review["ticket"].is_string());
+    // The ticket has no signing deadline: a proof is refused.
+    let junk = vec![0x30u8; 70];
+    assert_eq!(
+        s.send(&me(), proof(&id, &ticket(&review), &key_id, &junk))
+            .status,
+        422
+    );
+    let review = s.review(&id);
+    assert_eq!(
+        s.send(&me(), password_decision(&id, &ticket(&review)))
+            .status,
+        200
+    );
+}
+#[test]
+fn biometric_lock_after_review_makes_decisions_stale_like_passwords() {
+    // Documented: `biometric_allowed` is key/policy eligibility only. Lock is
+    // signalled as for passwords: `session` reports it, a lock ends pending
+    // requests (a fresh review is terminal, no ticket, no binding), and a
+    // decision on a ticket from before the lock is `stale`.
+    let s = setup(false);
+    let key = software_key();
+    let key_id = s.enroll(&key);
+    let id = s.request();
+    let review = s.review(&id);
+    assert_eq!(review["approval_binding"]["biometric_allowed"], true);
+    let signature = sign(&key, &companion_transcript(&review, &key_id));
+    let other_id = s.request();
+    let before = s.review(&other_id);
+    s.env.app().lock().unwrap();
+    let session = body(&s.send(&me(), Command::Session { version: 1 }));
+    assert_eq!(session["state"], "locked");
+    assert_eq!(
+        s.send(&me(), proof(&id, &ticket(&review), &key_id, &signature))
+            .status,
+        409
+    );
+    assert_eq!(
+        s.send(&me(), password_decision(&other_id, &ticket(&before)))
+            .status,
+        409
+    );
+    let after = s.review(&id);
+    assert_eq!(after["ticket"], serde_json::Value::Null);
+    assert_eq!(after["approval_binding"], serde_json::Value::Null);
+    assert_eq!(s.dispatch.0.load(Ordering::SeqCst), 0);
+}
+#[test]
+fn biometric_key_survives_a_companion_restart() {
+    let mut s = setup(false);
+    let key = software_key();
+    let key_id = s.enroll(&key);
+    // A new service over the same files (the registry is reloaded from disk),
+    // with the production verifier.
+    s.service = Companion::bind(
+        "127.0.0.1:0".parse().unwrap(),
+        &s.env.root().join("server.pem"),
+        &s.env.root().join("server-key.pem"),
+        &s.env.root().join("client-ca.pem"),
+        &s.service.identity_store,
+    )
+    .unwrap()
+    .with_approval_authenticator(s.password.clone())
+    .with_execution_dispatcher(s.dispatch.clone());
+    let id = s.request();
+    let review = s.review(&id);
+    assert_eq!(review["approval_binding"]["key_id"], key_id.as_str());
+    let response = approve(&s, &key, &key_id, &id);
+    assert_eq!(response.status, 200, "{}", response.body);
+    assert_eq!(s.dispatch.0.load(Ordering::SeqCst), 1);
 }

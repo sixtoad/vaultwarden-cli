@@ -33,6 +33,9 @@ MUTATIONS = {
     "biometric-current-key-recheck": ("src/adapters/companion.rs", [("&& identity::biometric_key(&self.identity_store, device)", "&& false && identity::biometric_key(&self.identity_store, device)")]),
     "biometric-retired-key": ("src/adapters/companion_identity.rs", [("|| registry.retired_biometric_keys.contains(&key_id)", "|| false")]),
     "biometric-ticket-purpose": ("src/adapters/companion/management.rs", [("&& t.purpose == purpose", "&& true")]),
+    "biometric-ticket-exact-action": ("src/adapters/companion/management.rs", [("&& t.action_id == expected_action", "&& true")]),
+    "biometric-ticket-exact-target": ("src/adapters/companion/management.rs", [("&& t.target == *expected_target", "&& true")]),
+    "biometric-ticket-one-per-actor": ("src/adapters/companion/management.rs", [("&& !(t.actor == actor && t.purpose == Purpose::Biometric(operation))", "")]),
     "biometric-own-device-enroll": ("src/adapters/companion/management.rs", [("&& (target.id == actor", "&& (true")]),
 }
 BIOMETRIC = [name for name in MUTATIONS if name.startswith("biometric-")]

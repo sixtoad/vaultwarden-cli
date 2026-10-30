@@ -17,10 +17,22 @@ use zeroize::Zeroizing;
 
 pub const STORE_FILE: &str = "companion-identities.json";
 const MAX_IDENTITIES: usize = 64;
-/// Retired biometric key ids are permanent; the bound fails closed (refuses
-/// further enrollment) rather than forgetting a retired key.
-const MAX_RETIRED_KEYS: usize = 1024;
-/// Registry format written by this provider. v1/v2 files load with no keys.
+/// Retired biometric key ids. When the list is full, NEW enrollments (first
+/// enrollment and re-enrollment) are refused, so no key id is ever forgotten
+/// to make room for an enrollment. A revocation is never refused for the
+/// bound: it forgets the OLDEST retired id instead. Forgetting cannot reopen
+/// that key while the list stays full (enrollment is refused), and every
+/// enrollment needs the device certificate, a fresh password and proof of
+/// possession anyway, so a forgotten id grants nothing a fresh key would not.
+/// 256 ids (about 17 KiB) keep the registry well under its 64 KiB read limit.
+const MAX_RETIRED_KEYS: usize = 256;
+/// Touch ID key-management audit entries kept (oldest dropped first).
+const MAX_BIOMETRIC_AUDIT: usize = 64;
+/// The registry reader refuses larger files; never write one.
+const MAX_REGISTRY_BYTES: usize = 65536;
+/// Highest registry format this provider reads. Writers emit the lowest
+/// version that represents the content: version 2 (byte-compatible with the
+/// previous release) unless Touch ID state or audit exists, then version 3.
 const REGISTRY_VERSION: u8 = 3;
 const STOPPED_PROVIDER_ATTEMPTS: u32 = 50;
 const STOPPED_PROVIDER_RETRY: std::time::Duration = std::time::Duration::from_millis(10);
@@ -42,11 +54,12 @@ struct Registry {
     #[serde(default)]
     audit: Vec<IdentityAudit>,
     /// v3: at most one production approval key per enabled approval client.
-    #[serde(default)]
+    /// Omitted when empty so a version 2 write stays readable by an older binary.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     biometric: Vec<BiometricEnrollment>,
     /// v3: key ids replaced by re-enrollment, revoked, or removed with their
     /// device. Never accepted again for approval or enrollment.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     retired_biometric_keys: Vec<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -71,15 +84,28 @@ impl BiometricEnrollment {
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct IdentityAudit {
+    /// The approval client acted on.
     fingerprint: String,
+    /// `local_owner` or the acting approval client's fingerprint.
     actor: String,
     action: IdentityAction,
+    /// v3, Touch ID actions only: the key enrolled or revoked. Absent in
+    /// older records, which stay readable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    key_id: Option<String>,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum IdentityAction {
     GrantedAdministrator,
     Revoked,
+    BiometricEnrolled,
+    BiometricRevoked,
+}
+impl IdentityAction {
+    fn biometric(self) -> bool {
+        matches!(self, Self::BiometricEnrolled | Self::BiometricRevoked)
+    }
 }
 
 fn unavailable<T>(_: T) -> SessionError {
@@ -206,10 +232,23 @@ fn registry(path: &Path) -> Result<Registry, SessionError> {
         || registry.administrators.iter().any(|fp| {
             !admins.insert(fp) || !registry.identities.iter().any(|i| &i.fingerprint == fp)
         })
-        || registry.audit.len() > MAX_IDENTITIES * 2
+        || registry
+            .audit
+            .iter()
+            .filter(|e| !e.action.biometric())
+            .count()
+            > MAX_IDENTITIES * 2
+        || registry
+            .audit
+            .iter()
+            .filter(|e| e.action.biometric())
+            .count()
+            > MAX_BIOMETRIC_AUDIT
         || registry.audit.iter().any(|e| {
             !valid_fingerprint(&e.fingerprint)
                 || (e.actor != "local_owner" && !valid_fingerprint(&e.actor))
+                || e.action.biometric() != e.key_id.is_some()
+                || e.key_id.as_ref().is_some_and(|id| !valid_fingerprint(id))
         })
         || !valid_biometric(&registry)
     {
@@ -219,7 +258,9 @@ fn registry(path: &Path) -> Result<Registry, SessionError> {
 }
 fn valid_biometric(registry: &Registry) -> bool {
     if registry.version < 3 {
-        return registry.biometric.is_empty() && registry.retired_biometric_keys.is_empty();
+        return registry.biometric.is_empty()
+            && registry.retired_biometric_keys.is_empty()
+            && !registry.audit.iter().any(|e| e.action.biometric());
     }
     let mut devices = std::collections::HashSet::new();
     let mut keys = std::collections::HashSet::new();
@@ -288,32 +329,47 @@ pub(crate) fn enroll_biometric_online(
     {
         return Err(SessionError::InvalidRequest);
     }
-    retire_biometric(&mut registry, fingerprint);
-    if registry.retired_biometric_keys.len() > MAX_RETIRED_KEYS {
+    // Full: refuse every new enrollment rather than forget a retired id.
+    if registry.retired_biometric_keys.len() >= MAX_RETIRED_KEYS {
         return Err(SessionError::BackendUnavailable);
     }
+    retire_biometric(&mut registry, fingerprint);
     registry.biometric.push(BiometricEnrollment {
         fingerprint: fingerprint.into(),
         key_id: key_id.clone(),
         public_key: base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key),
         enrolled_generation: generation,
     });
+    biometric_audit(
+        &mut registry,
+        fingerprint,
+        fingerprint,
+        IdentityAction::BiometricEnrolled,
+        &key_id,
+    );
     persist_registry(root, registry)?;
     Ok(key_id)
 }
 /// Caller holds the companion identity commit gate. Disables Touch ID for the
 /// device (the device stays enrolled); the key id is retired permanently.
+/// `actor` is the device itself or an administrator.
 pub(crate) fn revoke_biometric_online(
     root: &Path,
     fingerprint: &str,
+    actor: &str,
 ) -> Result<Option<String>, SessionError> {
     let mut registry = registry(&root.join(STORE_FILE))?;
     let retired = retire_biometric(&mut registry, fingerprint);
-    if retired.is_some() {
-        if registry.retired_biometric_keys.len() > MAX_RETIRED_KEYS {
-            return Err(SessionError::BackendUnavailable);
-        }
-        persist_registry(root, registry)?;
+    if let Some(key_id) = &retired {
+        forget_oldest_retired(&mut registry);
+        biometric_audit(
+            &mut registry,
+            fingerprint,
+            actor,
+            IdentityAction::BiometricRevoked,
+            key_id,
+        );
+        persist_revocation(root, registry)?;
     }
     Ok(retired)
 }
@@ -325,6 +381,38 @@ fn retire_biometric(registry: &mut Registry, fingerprint: &str) -> Option<String
     let old = registry.biometric.swap_remove(position);
     registry.retired_biometric_keys.push(old.key_id.clone());
     Some(old.key_id)
+}
+/// A full retired list never blocks a revocation (see MAX_RETIRED_KEYS).
+fn forget_oldest_retired(registry: &mut Registry) {
+    let excess = registry
+        .retired_biometric_keys
+        .len()
+        .saturating_sub(MAX_RETIRED_KEYS);
+    registry.retired_biometric_keys.drain(..excess);
+}
+fn biometric_audit(
+    registry: &mut Registry,
+    fingerprint: &str,
+    actor: &str,
+    action: IdentityAction,
+    key_id: &str,
+) {
+    registry.audit.push(IdentityAudit {
+        fingerprint: fingerprint.into(),
+        actor: actor.into(),
+        action,
+        key_id: Some(key_id.into()),
+    });
+    if registry
+        .audit
+        .iter()
+        .filter(|e| e.action.biometric())
+        .count()
+        > MAX_BIOMETRIC_AUDIT
+        && let Some(oldest) = registry.audit.iter().position(|e| e.action.biometric())
+    {
+        registry.audit.remove(oldest);
+    }
 }
 pub(crate) fn enrolled(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
     Ok(registry(path)?.identities)
@@ -379,6 +467,7 @@ pub fn grant_administrator(root: &Path, fingerprint: &str) -> Result<(), Session
             fingerprint: fingerprint.into(),
             actor: "local_owner".into(),
             action: IdentityAction::GrantedAdministrator,
+            key_id: None,
         });
         persist_registry(root, registry)?;
     }
@@ -407,19 +496,16 @@ pub(crate) fn revoke_online(
     registry.revoked.push(entry);
     registry.administrators.retain(|fp| fp != fingerprint);
     // Device revocation removes its approval key in the same atomic write.
-    // A full retired list never blocks revocation: the oldest retired id is
-    // dropped instead (it can no longer match any enrolled device key).
-    if retire_biometric(&mut registry, fingerprint).is_some()
-        && registry.retired_biometric_keys.len() > MAX_RETIRED_KEYS
-    {
-        registry.retired_biometric_keys.remove(0);
-    }
+    // A full retired list never blocks revocation (see MAX_RETIRED_KEYS).
+    retire_biometric(&mut registry, fingerprint);
+    forget_oldest_retired(&mut registry);
     registry.audit.push(IdentityAudit {
         fingerprint: fingerprint.into(),
         actor: actor.into(),
         action: IdentityAction::Revoked,
+        key_id: None,
     });
-    persist_registry(root, registry)
+    persist_revocation(root, registry)
 }
 fn valid_label(label: &str) -> bool {
     !label.is_empty() && label.len() <= 128 && !label.chars().any(char::is_control)
@@ -467,9 +553,37 @@ fn persist(root: &Path, identities: Vec<EnrolledCompanion>) -> Result<(), Sessio
         },
     )
 }
+/// A revocation is never refused for size: if the file would exceed the read
+/// limit, the oldest Touch ID audit entries and then the oldest retired key
+/// ids are forgotten first (see MAX_RETIRED_KEYS for why that is safe).
+fn persist_revocation(root: &Path, mut registry: Registry) -> Result<(), SessionError> {
+    while serialize(&mut registry)?.len() > MAX_REGISTRY_BYTES {
+        if let Some(oldest) = registry.audit.iter().position(|e| e.action.biometric()) {
+            registry.audit.remove(oldest);
+        } else if !registry.retired_biometric_keys.is_empty() {
+            registry.retired_biometric_keys.remove(0);
+        } else {
+            break;
+        }
+    }
+    persist_registry(root, registry)
+}
+fn serialize(registry: &mut Registry) -> Result<Vec<u8>, SessionError> {
+    registry.version = if registry.biometric.is_empty()
+        && registry.retired_biometric_keys.is_empty()
+        && !registry.audit.iter().any(|e| e.action.biometric())
+    {
+        2
+    } else {
+        3
+    };
+    serde_json::to_vec(registry).map_err(unavailable)
+}
 fn persist_registry(root: &Path, mut registry: Registry) -> Result<(), SessionError> {
-    registry.version = REGISTRY_VERSION;
-    let bytes = serde_json::to_vec(&registry).map_err(unavailable)?;
+    let bytes = serialize(&mut registry)?;
+    if bytes.len() > MAX_REGISTRY_BYTES {
+        return Err(SessionError::BackendUnavailable);
+    }
     let mut nonce = [0; 16];
     getrandom::fill(&mut nonce).map_err(unavailable)?;
     let temporary = root.join(format!(".companion-{}.new", fingerprint(&nonce)));

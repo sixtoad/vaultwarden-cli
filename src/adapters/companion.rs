@@ -248,6 +248,9 @@ struct Ticket {
 struct State {
     tickets: Vec<Ticket>,
     attempts: HashMap<String, VecDeque<Duration>>,
+    /// Test-only: the provider wall clock fails for v2 reviews.
+    #[cfg(test)]
+    wall_clock_unavailable: bool,
 }
 impl State {
     fn attempt(&mut self, device: &str, now: Duration) -> bool {
@@ -531,15 +534,20 @@ impl Companion {
                 let mut token = None;
                 let mut deadline_unix_ms = None;
                 if review.status == DirectStatus::Pending && version == 2 {
-                    let Some(ms) = app
-                        .companion_unix_seconds()
-                        .ok()
+                    let seconds = app.companion_unix_seconds().ok();
+                    #[cfg(test)]
+                    let seconds = seconds.filter(|_| {
+                        !self
+                            .state
+                            .lock()
+                            .is_ok_and(|state| state.wall_clock_unavailable)
+                    });
+                    // Without a wall clock there is no signing deadline: the
+                    // ticket never accepts a proof and the binding is null,
+                    // but password approval stays available.
+                    deadline_unix_ms = seconds
                         .and_then(|seconds| seconds.checked_mul(1000))
-                        .and_then(|ms| ms.checked_add(TICKET_LIFETIME.as_millis() as u64))
-                    else {
-                        return Response::error(Error::Unavailable);
-                    };
-                    deadline_unix_ms = Some(ms);
+                        .and_then(|ms| ms.checked_add(TICKET_LIFETIME.as_millis() as u64));
                 }
                 if review.status == DirectStatus::Pending {
                     let Ok(mut state) = self.state.lock() else {
