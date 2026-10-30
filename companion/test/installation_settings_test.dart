@@ -6,14 +6,20 @@ import 'package:flutter/services.dart';
 import 'package:companion_slice/design/access_theme.dart';
 import 'package:companion_slice/platform/installation.dart';
 import 'package:companion_slice/provider/installation_settings.dart';
+import 'package:companion_slice/provider/support_views.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeInstallation implements InstallationPlatform {
-  FakeInstallation({this.desktop = true, this.state = 'compatible'});
+  FakeInstallation({
+    this.desktop = true,
+    this.state = 'compatible',
+    this.protected = false,
+  });
   @override
   final bool desktop;
   final String state;
+  final bool protected;
   int inspections = 0, enables = 0;
   @override
   bool get usesDirectoryPicker => false;
@@ -34,9 +40,9 @@ class FakeInstallation implements InstallationPlatform {
       },
       'resolved': <String, String>{},
       'roles': {
-        'protected_requesting': false,
+        'protected_requesting': protected,
         'desktop_approval': false,
-        'protected_provider': false,
+        'protected_provider': protected,
         'vault_cli': true,
       },
     });
@@ -186,6 +192,56 @@ void main() {
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'protected roles describe the bundled provider without claiming installation',
+    (tester) async {
+      await show(tester, FakeInstallation(protected: true));
+      expect(
+        find.textContaining(
+          'The bundled provider (Linux, or macOS on Apple Silicon) requires separate reviewed installation',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('does not install or start a service'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Protected requesting and provider execution'),
+        findsNothing,
+      );
+    },
+  );
+  testWidgets(
+    'native capabilities state macOS arm64 packaging limits truthfully',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: ProviderCapabilities()),
+          ),
+        ),
+      );
+      expect(
+        find.textContaining(
+          'macOS on Apple Silicon (arm64): the desktop bundle includes vw-access and the native vaultwarden-accessd provider.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('nothing installs them yet'), findsOneWidget);
+      expect(find.textContaining('Development signing only.'), findsOneWidget);
+      expect(
+        find.textContaining('Intel Macs and Rosetta are unsupported.'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(
+          'Guided enrollment and notifications are not available.',
+        ),
+        findsOneWidget,
+      );
     },
   );
   for (final state in ['missing', 'damaged', 'incompatible']) {

@@ -102,7 +102,11 @@ Review these templates before any installed action:
 - [`com.cantolla.vaultwarden-accessd.plist.in`](../../packaging/macos/native/com.cantolla.vaultwarden-accessd.plist.in)
 - [`native-identities.json.in`](../../packaging/macos/native/native-identities.json.in)
 
-Neither template is installable until placeholders are resolved. UUIDs are
+Neither template is installable until placeholders are resolved;
+`scripts/macos-provider-plan.py` resolves both from validated explicit inputs
+into a caller-chosen directory and installs nothing (see
+[desktop installation](../desktop-installation.md#macos-provider-installer-plan-review-material-installs-nothing)).
+UUIDs are
 lowercase hexadecimal without separators; UID/GID placeholders must become JSON
 integers. Obtain the actual account GeneratedUID values and confirm they agree
 with native membership lookup. Do not reuse an existing unrelated account or

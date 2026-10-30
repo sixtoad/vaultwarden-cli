@@ -100,13 +100,13 @@ class _InstallationSettingsState extends State<InstallationSettings> {
           const SizedBox(height: 12),
           Text(
             current.roles['protected_requesting'] == true
-                ? 'vw-access can request approved work from a configured Linux provider. The bundled provider/helpers require separate authorized configuration; installation does not start a service.'
+                ? 'vw-access can request approved work from a configured provider. The bundled provider (Linux, or macOS on Apple Silicon) requires separate reviewed installation and authorized configuration; enabling commands does not install or start a service.'
                 : 'Protected requesting and provider execution with vw-access are unavailable on this platform. The bundled vaultwarden-cli is a vault client, not a protected approval client.',
           ),
           const SizedBox(height: 12),
           Text(
             current.roles['desktop_approval'] == true
-                ? 'Desktop approval: macOS can approve through the existing pinned-TLS Linux-provider connection. Native macOS provider execution is tracked in #49.'
+                ? 'Desktop approval: macOS can approve through the existing pinned-TLS Linux-provider connection. Approving the native macOS provider from this app is tracked in #49.'
                 : 'Desktop approval transport is not implemented on this platform.',
           ),
           const SizedBox(height: 12),

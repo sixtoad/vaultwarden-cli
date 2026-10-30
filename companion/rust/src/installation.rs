@@ -192,18 +192,32 @@ fn command_path(name: &str) -> String {
         binary_name(name)
     )
 }
+/// Linux, and native macOS on Apple Silicon only: the macOS provider rejects
+/// Intel/Rosetta at runtime, so an x86_64 macOS bundle never advertises it.
+fn protected_bundle() -> bool {
+    platform() == "linux" || (platform() == "macos" && std::env::consts::ARCH == "aarch64")
+}
 fn expected_commands() -> Vec<String> {
     let mut commands = vec!["vaultwarden-cli".to_owned()];
-    if platform() == "linux" {
+    if protected_bundle() {
         commands.push("vw-access".to_owned());
     }
     commands
 }
+/// Bundled provider binaries that are not user commands. The native macOS
+/// provider does not use Linux's systemd helper `vaultwarden-access-exec`.
+fn expected_provider_components() -> Vec<&'static str> {
+    match (platform(), protected_bundle()) {
+        ("linux", _) => vec!["vaultwarden-accessd", "vaultwarden-access-exec"],
+        ("macos", true) => vec!["vaultwarden-accessd"],
+        _ => Vec::new(),
+    }
+}
 fn expected_roles() -> BTreeMap<String, bool> {
     BTreeMap::from([
-        ("protected_requesting".into(), platform() == "linux"),
+        ("protected_requesting".into(), protected_bundle()),
         ("desktop_approval".into(), platform() == "macos"),
-        ("protected_provider".into(), platform() == "linux"),
+        ("protected_provider".into(), protected_bundle()),
         ("vault_cli".into(), true),
     ])
 }
@@ -288,12 +302,7 @@ fn validate_contract(root: &Path, running_app: bool) -> Result<(Manifest, String
     }
     let mut required = manifest.commands.values().cloned().collect::<Vec<_>>();
     required.push(command_path("companion-command"));
-    if platform() == "linux" {
-        required.extend([
-            command_path("vaultwarden-accessd"),
-            command_path("vaultwarden-access-exec"),
-        ]);
-    }
+    required.extend(expected_provider_components().into_iter().map(command_path));
     required.push(
         match platform() {
             "macos" => "Contents/Frameworks/libcompanion_core.dylib",
@@ -933,11 +942,12 @@ mod tests {
                     "lib/libflutter_linux_gtk.so".into(),
                     "lib/libapp.so".into(),
                     "data/icudtl.dat".into(),
-                    command_path("vw-access"),
-                    command_path("vaultwarden-accessd"),
-                    command_path("vaultwarden-access-exec"),
                 ],
             });
+            if protected_bundle() {
+                paths.push(command_path("vw-access"));
+            }
+            paths.extend(expected_provider_components().into_iter().map(command_path));
             let mut payloads = Vec::new();
             for relative in paths {
                 let path = root.join(&relative);
@@ -1001,6 +1011,45 @@ mod tests {
                 .insert("desktop_approval".into(), platform() != "macos");
         });
         assert!(validate(&f.root).is_err());
+    }
+    #[test]
+    fn protected_commands_follow_platform_and_architecture() {
+        let protected =
+            cfg!(target_os = "linux") || cfg!(all(target_os = "macos", target_arch = "aarch64"));
+        assert_eq!(protected_bundle(), protected);
+        assert_eq!(
+            expected_commands().contains(&"vw-access".to_owned()),
+            protected
+        );
+        assert_eq!(expected_roles()["protected_requesting"], protected);
+        assert_eq!(expected_roles()["protected_provider"], protected);
+        assert_eq!(
+            expected_provider_components().contains(&"vaultwarden-accessd"),
+            protected
+        );
+        assert_eq!(
+            expected_provider_components().contains(&"vaultwarden-access-exec"),
+            cfg!(target_os = "linux")
+        );
+        let f = Fixture::new();
+        assert!(validate(&f.root).is_ok());
+        for role in ["protected_requesting", "protected_provider"] {
+            let g = Fixture::new();
+            g.change(|m| {
+                m.roles.insert(role.into(), !protected);
+            });
+            assert!(validate(&g.root).is_err(), "{role}");
+        }
+        if protected {
+            let h = Fixture::new();
+            let accessd = command_path("vaultwarden-accessd");
+            h.change(|m| m.payloads.retain(|p| p.path != accessd));
+            fs::remove_file(h.root.join(&accessd)).unwrap();
+            assert_eq!(
+                validate(&h.root).unwrap_err(),
+                "Missing required bundle component record"
+            );
+        }
     }
     #[test]
     fn incompatible_app_is_distinct_but_old_launcher_accepts_new_compatible_bundle() {
