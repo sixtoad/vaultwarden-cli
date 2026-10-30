@@ -18,7 +18,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import plistlib
 import re
 import sys
@@ -253,9 +253,12 @@ def prepare_output(output):
     """The output directory is new or empty, and never a system location."""
     absolute = Path(os.path.abspath(output))
     resolved = absolute.resolve()
-    for candidate in {absolute, resolved}:
+    # Also compare the path as given in POSIX form: on a Windows host
+    # '/Library' resolves to a drive path that no macOS root would match.
+    candidates = [PurePosixPath(p.as_posix()) for p in (Path(output), absolute, resolved)]
+    for candidate in candidates:
         for root in FORBIDDEN_OUTPUT_ROOTS:
-            require(not (candidate == Path(root) or candidate.is_relative_to(root)), f'refusing to write into system location {candidate}')
+            require(not candidate.is_relative_to(root), f'refusing to write into system location {candidate}')
     if absolute.is_symlink():
         raise PlanError('output directory must not be a symbolic link')
     if absolute.exists():
