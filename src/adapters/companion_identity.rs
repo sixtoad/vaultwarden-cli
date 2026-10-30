@@ -1,5 +1,5 @@
 //! Offline, provider-owned companion enrollment. This is separate from agent pairings.
-use crate::access::ports::SessionError;
+use crate::access::{approval_v2, ports::SessionError};
 use rustls::pki_types::{CertificateDer, UnixTime, pem::PemObject};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -17,6 +17,11 @@ use zeroize::Zeroizing;
 
 pub const STORE_FILE: &str = "companion-identities.json";
 const MAX_IDENTITIES: usize = 64;
+/// Retired biometric key ids are permanent; the bound fails closed (refuses
+/// further enrollment) rather than forgetting a retired key.
+const MAX_RETIRED_KEYS: usize = 1024;
+/// Registry format written by this provider. v1/v2 files load with no keys.
+const REGISTRY_VERSION: u8 = 3;
 const STOPPED_PROVIDER_ATTEMPTS: u32 = 50;
 const STOPPED_PROVIDER_RETRY: std::time::Duration = std::time::Duration::from_millis(10);
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,6 +41,32 @@ struct Registry {
     administrators: Vec<String>,
     #[serde(default)]
     audit: Vec<IdentityAudit>,
+    /// v3: at most one production approval key per enabled approval client.
+    #[serde(default)]
+    biometric: Vec<BiometricEnrollment>,
+    /// v3: key ids replaced by re-enrollment, revoked, or removed with their
+    /// device. Never accepted again for approval or enrollment.
+    #[serde(default)]
+    retired_biometric_keys: Vec<String>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BiometricEnrollment {
+    fingerprint: String,
+    key_id: String,
+    /// Unpadded base64url of the 65-byte uncompressed SEC1 P-256 point.
+    public_key: String,
+    enrolled_generation: u64,
+}
+impl BiometricEnrollment {
+    fn decoded(&self) -> Option<Vec<u8>> {
+        use base64::Engine;
+        let key = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&self.public_key)
+            .ok()?;
+        (approval_v2::valid_public_key(&key) && approval_v2::key_id(&key) == self.key_id)
+            .then_some(key)
+    }
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -157,7 +188,7 @@ fn registry(path: &Path) -> Result<Registry, SessionError> {
     let registry: Registry = serde_json::from_slice(&bytes).map_err(unavailable)?;
     let mut seen = std::collections::HashSet::new();
     let mut admins = std::collections::HashSet::new();
-    if !matches!(registry.version, 1 | 2)
+    if !matches!(registry.version, 1..=REGISTRY_VERSION)
         || (registry.version == 1
             && (!registry.revoked.is_empty()
                 || !registry.administrators.is_empty()
@@ -180,10 +211,120 @@ fn registry(path: &Path) -> Result<Registry, SessionError> {
             !valid_fingerprint(&e.fingerprint)
                 || (e.actor != "local_owner" && !valid_fingerprint(&e.actor))
         })
+        || !valid_biometric(&registry)
     {
         return Err(SessionError::BackendUnavailable);
     }
     Ok(registry)
+}
+fn valid_biometric(registry: &Registry) -> bool {
+    if registry.version < 3 {
+        return registry.biometric.is_empty() && registry.retired_biometric_keys.is_empty();
+    }
+    let mut devices = std::collections::HashSet::new();
+    let mut keys = std::collections::HashSet::new();
+    registry.retired_biometric_keys.len() <= MAX_RETIRED_KEYS
+        && registry
+            .retired_biometric_keys
+            .iter()
+            .all(|id| valid_fingerprint(id) && keys.insert(id.as_str()))
+        && registry.biometric.iter().all(|entry| {
+            devices.insert(entry.fingerprint.as_str())
+                && keys.insert(entry.key_id.as_str())
+                && registry
+                    .identities
+                    .iter()
+                    .any(|identity| identity.fingerprint == entry.fingerprint)
+                && entry.decoded().is_some()
+        })
+}
+/// The current production approval key of an ENABLED approval client.
+pub(crate) fn biometric_key(
+    path: &Path,
+    fingerprint: &str,
+) -> Result<Option<approval_v2::EnrolledKey>, SessionError> {
+    let registry = registry(path)?;
+    if !registry
+        .identities
+        .iter()
+        .any(|identity| identity.fingerprint == fingerprint)
+    {
+        return Ok(None);
+    }
+    Ok(registry
+        .biometric
+        .iter()
+        .find(|entry| entry.fingerprint == fingerprint)
+        .and_then(|entry| {
+            Some(approval_v2::EnrolledKey {
+                key_id: entry.key_id.clone(),
+                public_key: entry.decoded()?,
+            })
+        }))
+}
+/// Caller holds the companion identity commit gate. Atomically replaces the
+/// device's key; the previous key id is retired permanently in the same write.
+pub(crate) fn enroll_biometric_online(
+    root: &Path,
+    fingerprint: &str,
+    public_key: &[u8],
+    generation: u64,
+) -> Result<String, SessionError> {
+    use base64::Engine;
+    if !approval_v2::valid_public_key(public_key) {
+        return Err(SessionError::InvalidRequest);
+    }
+    let key_id = approval_v2::key_id(public_key);
+    let mut registry = registry(&root.join(STORE_FILE))?;
+    if !registry
+        .identities
+        .iter()
+        .any(|identity| identity.fingerprint == fingerprint)
+        || registry.retired_biometric_keys.contains(&key_id)
+        || registry
+            .biometric
+            .iter()
+            .any(|entry| entry.key_id == key_id)
+    {
+        return Err(SessionError::InvalidRequest);
+    }
+    retire_biometric(&mut registry, fingerprint);
+    if registry.retired_biometric_keys.len() > MAX_RETIRED_KEYS {
+        return Err(SessionError::BackendUnavailable);
+    }
+    registry.biometric.push(BiometricEnrollment {
+        fingerprint: fingerprint.into(),
+        key_id: key_id.clone(),
+        public_key: base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key),
+        enrolled_generation: generation,
+    });
+    persist_registry(root, registry)?;
+    Ok(key_id)
+}
+/// Caller holds the companion identity commit gate. Disables Touch ID for the
+/// device (the device stays enrolled); the key id is retired permanently.
+pub(crate) fn revoke_biometric_online(
+    root: &Path,
+    fingerprint: &str,
+) -> Result<Option<String>, SessionError> {
+    let mut registry = registry(&root.join(STORE_FILE))?;
+    let retired = retire_biometric(&mut registry, fingerprint);
+    if retired.is_some() {
+        if registry.retired_biometric_keys.len() > MAX_RETIRED_KEYS {
+            return Err(SessionError::BackendUnavailable);
+        }
+        persist_registry(root, registry)?;
+    }
+    Ok(retired)
+}
+fn retire_biometric(registry: &mut Registry, fingerprint: &str) -> Option<String> {
+    let position = registry
+        .biometric
+        .iter()
+        .position(|entry| entry.fingerprint == fingerprint)?;
+    let old = registry.biometric.swap_remove(position);
+    registry.retired_biometric_keys.push(old.key_id.clone());
+    Some(old.key_id)
 }
 pub(crate) fn enrolled(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
     Ok(registry(path)?.identities)
@@ -207,6 +348,16 @@ pub(crate) fn management_records(
             .map(|entry| (entry, true, false)),
     );
     Ok(result)
+}
+/// Current key id per enabled approval client.
+pub(crate) fn biometric_key_ids(
+    path: &Path,
+) -> Result<std::collections::HashMap<String, String>, SessionError> {
+    Ok(registry(path)?
+        .biometric
+        .into_iter()
+        .map(|entry| (entry.fingerprint, entry.key_id))
+        .collect())
 }
 pub(crate) fn administrator(path: &Path, fingerprint: &str) -> bool {
     registry(path).is_ok_and(|r| r.administrators.iter().any(|fp| fp == fingerprint))
@@ -255,6 +406,14 @@ pub(crate) fn revoke_online(
     let entry = registry.identities.remove(position);
     registry.revoked.push(entry);
     registry.administrators.retain(|fp| fp != fingerprint);
+    // Device revocation removes its approval key in the same atomic write.
+    // A full retired list never blocks revocation: the oldest retired id is
+    // dropped instead (it can no longer match any enrolled device key).
+    if retire_biometric(&mut registry, fingerprint).is_some()
+        && registry.retired_biometric_keys.len() > MAX_RETIRED_KEYS
+    {
+        registry.retired_biometric_keys.remove(0);
+    }
     registry.audit.push(IdentityAudit {
         fingerprint: fingerprint.into(),
         actor: actor.into(),
@@ -282,11 +441,13 @@ fn read_or_initial(root: &Path) -> Result<Registry, SessionError> {
     let path = root.join(STORE_FILE);
     match std::fs::symlink_metadata(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Registry {
-            version: 2,
+            version: REGISTRY_VERSION,
             identities: Vec::new(),
             revoked: Vec::new(),
             administrators: Vec::new(),
             audit: Vec::new(),
+            biometric: Vec::new(),
+            retired_biometric_keys: Vec::new(),
         }),
         _ => registry(&path),
     }
@@ -296,16 +457,18 @@ fn persist(root: &Path, identities: Vec<EnrolledCompanion>) -> Result<(), Sessio
     persist_registry(
         root,
         Registry {
-            version: 2,
+            version: REGISTRY_VERSION,
             identities,
             revoked: Vec::new(),
             administrators: Vec::new(),
             audit: Vec::new(),
+            biometric: Vec::new(),
+            retired_biometric_keys: Vec::new(),
         },
     )
 }
 fn persist_registry(root: &Path, mut registry: Registry) -> Result<(), SessionError> {
-    registry.version = 2;
+    registry.version = REGISTRY_VERSION;
     let bytes = serde_json::to_vec(&registry).map_err(unavailable)?;
     let mut nonce = [0; 16];
     getrandom::fill(&mut nonce).map_err(unavailable)?;

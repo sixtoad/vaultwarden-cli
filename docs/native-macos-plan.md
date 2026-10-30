@@ -90,6 +90,18 @@ in-process-only product is required solely because the CLI lacks containment.
 
 Reuse Flutter's typed review and durable status recovery. Add a distinct production biometric contract bound to provider identity, request, policy revision, decision, freshness and one-time consumption. Enroll/revoke that signing identity through the authenticated human path. Keep synthetic and production key namespaces and transcript domains separate. Touch ID cancellation or unavailability never silently approves or automatically submits a password. Offer explicit password approval, independent of provider unlock. Test biometric enrollment changes, replay, stale reviews, device revocation and app relaunch. An M1 Mac mini without suitable Touch ID hardware must still work with password approval; hardware-specific biometric evidence remains separate from simulated tests and issue 41's key-continuity work.
 
+Status (2026-10-30): PR A implements the provider side: the v2 approval and
+enrollment transcripts, online own-device enrollment (fresh password, management
+ticket, proof of possession) and key revocation, the `ring` verifier behind the
+`BiometricApprovalVerifier` port, retired key ids, cascade on device revocation,
+the `require_password` policy field, history attribution and a golden vector
+(`tests/fixtures/approval-v2-golden.json`). The wire contract is in
+[companion-protocol.md](companion-protocol.md#production-touch-id-approval-v2-issue-49);
+owner decisions are recorded in
+[issue-49-native-provider.md](implementation/issue-49-native-provider.md#production-touch-id-approval-owner-decisions-2026-10-30).
+Companion bridge (PR B), Secure Enclave signer (PR C) and UI (PR D) are pending;
+no hardware biometric evidence exists yet.
+
 One installation must deliver the Flutter app, `vw-access`, provider, execution components and required service definitions with a common version manifest. The existing archive/Swift DMG cannot serve as proof. A signed installation plan must disclose account creation, file destinations and service registration. Use stable signing identities for release; obtain Developer ID/notarization capability before claiming normal distribution support. Never disable Gatekeeper or SIP to install.
 
 Upgrade sequence: verify the new payload before activation, close admission, coordinate resource release with the execution owner or defer activation, preserve configuration/Keychain, migrate only supported state schemas, atomically switch a complete version and restart locked. Retain the old resources or defer activation when their safe lifetime cannot be established. Failed verification leaves the current version intact. Rollback must not reactivate consumed approvals or incompatible state. Do not replace unrelated binaries, accounts or settings.

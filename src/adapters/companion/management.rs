@@ -13,6 +13,19 @@ pub(super) enum Kind {
     ApprovalClient,
     RequesterAgent,
 }
+/// Production Touch ID key management on an approval client (v2 contract).
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum BiometricOperation {
+    Enroll,
+    Revoke,
+}
+/// A management ticket authorizes exactly one kind of mutation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Purpose {
+    IdentityRevoke,
+    Biometric(BiometricOperation),
+}
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Target {
@@ -93,6 +106,7 @@ struct Journal {
 }
 struct Ticket {
     token: String,
+    purpose: Purpose,
     action_id: String,
     actor: String,
     target: Target,
@@ -116,17 +130,52 @@ fn cursor_valid(value: &str) -> bool {
 }
 pub(super) fn valid(command: &Command) -> Option<bool> {
     Some(match command {
+        // Version 3 list/detail rows add `biometric_key_id`; v2 is unchanged.
         Command::IdentityList {
             version,
             limit,
             after,
         } => {
-            *version == 2
+            matches!(version, 2 | 3)
                 && (1..=MAX_PAGE).contains(limit)
                 && after.as_ref().is_none_or(|s| cursor_valid(s))
         }
-        Command::IdentityDetail { version, target }
-        | Command::IdentityPrepare { version, target } => *version == 2 && target.valid(),
+        Command::IdentityDetail { version, target } => matches!(version, 2 | 3) && target.valid(),
+        Command::IdentityPrepare { version, target } => *version == 2 && target.valid(),
+        Command::BiometricPrepare {
+            version, target, ..
+        } => *version == 2 && target.kind == Kind::ApprovalClient && target.valid(),
+        Command::BiometricEnroll {
+            version,
+            action_id,
+            ticket,
+            password,
+            public_key,
+            enroll_signature,
+        } => {
+            *version == 2
+                && valid_request_id(action_id)
+                && identity::valid_fingerprint(ticket)
+                && valid_password(password)
+                && decode_binary(public_key)
+                    .is_some_and(|key| crate::access::approval_v2::valid_public_key(&key))
+                && decode_binary(enroll_signature)
+                    .is_some_and(|sig| crate::access::approval_v2::valid_signature_len(&sig))
+        }
+        Command::BiometricRevoke {
+            version,
+            target,
+            action_id,
+            ticket,
+            password,
+        } => {
+            *version == 2
+                && target.kind == Kind::ApprovalClient
+                && target.valid()
+                && valid_request_id(action_id)
+                && identity::valid_fingerprint(ticket)
+                && valid_password(password)
+        }
         Command::IdentityRevoke {
             version,
             target,
@@ -309,6 +358,14 @@ pub(super) fn dispatch(
                 })),
             };
         }
+        if matches!(
+            &command,
+            Command::BiometricPrepare { .. }
+                | Command::BiometricEnroll { .. }
+                | Command::BiometricRevoke { .. }
+        ) {
+            return biometric(service, actor, command, app, root);
+        }
         if !identity::administrator(&service.identity_store, actor) {
             return Err(Error::Unauthorized);
         }
@@ -316,7 +373,11 @@ pub(super) fn dispatch(
             .management_authority()
             .map_err(|_error| Error::Unavailable)?;
         match command {
-            Command::IdentityList { limit, after, .. } => {
+            Command::IdentityList {
+                version,
+                limit,
+                after,
+            } => {
                 let mut rows = inventory(service, actor, app)?;
                 rows.retain(|row| {
                     after
@@ -336,17 +397,21 @@ pub(super) fn dispatch(
                         .execution_dispatcher
                         .as_ref()
                         .is_some_and(|dispatcher| dispatcher.available());
+                let rows = rows_for(service, version, rows)?;
                 Ok(Response::ok(
-                    serde_json::json!({"version":2,"identities":rows,"next_cursor":next,"generation":generation,"provider":{"fingerprint":service.provider_fingerprint,"execution_configured":configured,"execution_available":available}}),
+                    serde_json::json!({"version":version,"identities":rows,"next_cursor":next,"generation":generation,"provider":{"fingerprint":service.provider_fingerprint,"execution_configured":configured,"execution_available":available}}),
                 ))
             }
-            Command::IdentityDetail { target, .. } => {
+            Command::IdentityDetail { version, target } => {
                 let row = inventory(service, actor, app)?
                     .into_iter()
                     .find(|row| row.target() == target)
                     .ok_or(Error::Unavailable)?;
+                let row = rows_for(service, version, vec![row])?
+                    .pop()
+                    .ok_or(Error::Unavailable)?;
                 Ok(Response::ok(
-                    serde_json::json!({"version":2,"identity":row,"generation":generation}),
+                    serde_json::json!({"version":version,"identity":row,"generation":generation}),
                 ))
             }
             Command::IdentityPrepare { target, .. } => {
@@ -378,6 +443,7 @@ pub(super) fn dispatch(
                     .ok_or(Error::Unavailable)?;
                 state.tickets.push(Ticket {
                     token: ticket.clone(),
+                    purpose: Purpose::IdentityRevoke,
                     action_id: action_id.clone(),
                     actor: actor.into(),
                     target,
@@ -405,6 +471,7 @@ pub(super) fn dispatch(
                     .iter()
                     .position(|t| {
                         t.actor == actor
+                            && t.purpose == Purpose::IdentityRevoke
                             && t.action_id == action_id
                             && t.target == target
                             && t.token == ticket
@@ -548,6 +615,288 @@ pub(super) fn dispatch(
         }
     })();
     result.unwrap_or_else(Response::error)
+}
+
+/// v3 rows: the v2 row plus the approval client's current `biometric_key_id`.
+fn rows_for(
+    service: &Companion,
+    version: u8,
+    rows: Vec<Identity>,
+) -> Result<Vec<serde_json::Value>, Error> {
+    let keys = if version == 3 {
+        identity::biometric_key_ids(&service.identity_store).map_err(|_error| Error::Unavailable)?
+    } else {
+        std::collections::HashMap::new()
+    };
+    rows.into_iter()
+        .map(|row| {
+            let key = (row.kind == Kind::ApprovalClient)
+                .then(|| keys.get(&row.id).cloned())
+                .flatten();
+            let mut value = serde_json::to_value(&row).map_err(|_error| Error::Unavailable)?;
+            if version == 3 {
+                value
+                    .as_object_mut()
+                    .ok_or(Error::Unavailable)?
+                    .insert("biometric_key_id".into(), serde_json::json!(key));
+            }
+            Ok(value)
+        })
+        .collect()
+}
+
+/// Own-device Touch ID key enrollment and revocation. Never needs an
+/// administrator for the caller's own device; an administrator may revoke
+/// (never enroll) another enabled device's key. Every mutation consumes a
+/// purpose-bound ticket and a fresh password, and enrollment additionally
+/// proves possession of the new key over the enroll transcript.
+fn biometric(
+    service: &Companion,
+    actor: &str,
+    command: Command,
+    app: &ProviderApplication,
+    root: &Path,
+) -> Result<Response, Error> {
+    let (generation, epoch) = app
+        .management_authority()
+        .map_err(|_error| Error::Unavailable)?;
+    let permitted = |operation: BiometricOperation, target: &Target| {
+        target.kind == Kind::ApprovalClient
+            && (target.id == actor
+                || (operation == BiometricOperation::Revoke
+                    && identity::administrator(&service.identity_store, actor)))
+    };
+    match command {
+        Command::BiometricPrepare {
+            operation, target, ..
+        } => {
+            if !permitted(operation, &target) {
+                return Err(Error::Unauthorized);
+            }
+            let mut state = service
+                .management
+                .lock()
+                .map_err(|_error| Error::Unavailable)?;
+            if !identity::enrolled(&service.identity_store)
+                .map_err(|_error| Error::Unavailable)?
+                .iter()
+                .any(|entry| entry.fingerprint == target.id)
+            {
+                return Err(Error::Stale);
+            }
+            let now = app.companion_now();
+            state.tickets.retain(|t| t.deadline > now);
+            if state.tickets.len() >= MAX_TICKETS {
+                return Err(Error::RateLimited);
+            }
+            let action_id = crate::access::RequestId::new_random()
+                .map_err(|_error| Error::Unavailable)?
+                .as_str()
+                .to_owned();
+            let mut nonce = [0; 32];
+            getrandom::fill(&mut nonce).map_err(|_error| Error::Unavailable)?;
+            let ticket = identity::fingerprint(&nonce);
+            let deadline = now
+                .checked_add(Duration::from_secs(55))
+                .ok_or(Error::Unavailable)?;
+            let key_id = identity::biometric_key(&service.identity_store, &target.id)
+                .map_err(|_error| Error::Unavailable)?
+                .map(|key| key.key_id);
+            state.tickets.push(Ticket {
+                token: ticket.clone(),
+                purpose: Purpose::Biometric(operation),
+                action_id: action_id.clone(),
+                actor: actor.into(),
+                target: target.clone(),
+                generation,
+                epoch,
+                deadline,
+            });
+            Ok(Response::ok(serde_json::json!({
+                "version": 2,
+                "operation": operation,
+                "target": target,
+                "action_id": action_id,
+                "ticket": ticket,
+                "generation": generation,
+                "valid_for_seconds": 55,
+                "provider_identity": service.provider_fingerprint,
+                "biometric_key_id": key_id,
+            })))
+        }
+        Command::BiometricEnroll {
+            action_id,
+            ticket,
+            password,
+            public_key,
+            enroll_signature,
+            ..
+        } => {
+            let target = Target {
+                kind: Kind::ApprovalClient,
+                id: actor.into(),
+            };
+            let ticket = take_ticket(
+                service,
+                actor,
+                Purpose::Biometric(BiometricOperation::Enroll),
+                &action_id,
+                &target,
+                &ticket,
+            )?;
+            if ticket.generation != generation || app.companion_now() >= ticket.deadline {
+                return Err(Error::Stale);
+            }
+            let _authentication = service
+                .authentication
+                .try_lock()
+                .map_err(|_error| Error::RateLimited)?;
+            if !service.attempt(actor, app.companion_now()) {
+                return Err(Error::RateLimited);
+            }
+            let (Some(key), Some(signature)) =
+                (decode_binary(&public_key), decode_binary(&enroll_signature))
+            else {
+                return Err(Error::Invalid);
+            };
+            let transcript = crate::access::approval_v2::enroll_transcript(
+                &service.provider_fingerprint,
+                actor,
+                &key,
+                &ticket.token,
+                &action_id,
+            )
+            .ok_or(Error::Invalid)?;
+            service
+                .biometric_verifier
+                .verify(&key, &transcript, &signature)
+                .map_err(|_error| Error::Authentication)?;
+            service
+                .approval_authenticator
+                .as_ref()
+                .ok_or(Error::Unavailable)?
+                .authenticate(password)
+                .map_err(|_error| Error::Authentication)?;
+            let _commit = service
+                .identity_commit
+                .lock()
+                .map_err(|_error| Error::Unavailable)?;
+            recheck(service, actor, &ticket, app)?;
+            let key_id = identity::enroll_biometric_online(root, actor, &key, ticket.generation)
+                .map_err(|error| match error {
+                    SessionError::InvalidRequest => Error::Invalid,
+                    _ => Error::Unavailable,
+                })?;
+            Ok(Response::ok(serde_json::json!({
+                "version": 2,
+                "operation": BiometricOperation::Enroll,
+                "target": target,
+                "action_id": action_id,
+                "biometric_key_id": key_id,
+            })))
+        }
+        Command::BiometricRevoke {
+            target,
+            action_id,
+            ticket,
+            password,
+            ..
+        } => {
+            if !permitted(BiometricOperation::Revoke, &target) {
+                return Err(Error::Unauthorized);
+            }
+            let ticket = take_ticket(
+                service,
+                actor,
+                Purpose::Biometric(BiometricOperation::Revoke),
+                &action_id,
+                &target,
+                &ticket,
+            )?;
+            if ticket.generation != generation || app.companion_now() >= ticket.deadline {
+                return Err(Error::Stale);
+            }
+            let _authentication = service
+                .authentication
+                .try_lock()
+                .map_err(|_error| Error::RateLimited)?;
+            if !service.attempt(actor, app.companion_now()) {
+                return Err(Error::RateLimited);
+            }
+            service
+                .approval_authenticator
+                .as_ref()
+                .ok_or(Error::Unavailable)?
+                .authenticate(password)
+                .map_err(|_error| Error::Authentication)?;
+            let _commit = service
+                .identity_commit
+                .lock()
+                .map_err(|_error| Error::Unavailable)?;
+            recheck(service, actor, &ticket, app)?;
+            if !permitted(BiometricOperation::Revoke, &target) {
+                return Err(Error::Stale);
+            }
+            let revoked = identity::revoke_biometric_online(root, &target.id)
+                .map_err(|_error| Error::Unavailable)?;
+            Ok(Response::ok(serde_json::json!({
+                "version": 2,
+                "operation": BiometricOperation::Revoke,
+                "target": target,
+                "action_id": action_id,
+                "revoked_key_id": revoked,
+            })))
+        }
+        _ => Err(Error::Invalid),
+    }
+}
+fn take_ticket(
+    service: &Companion,
+    actor: &str,
+    purpose: Purpose,
+    action_id: &str,
+    target: &Target,
+    token: &str,
+) -> Result<Ticket, Error> {
+    let mut state = service
+        .management
+        .lock()
+        .map_err(|_error| Error::Unavailable)?;
+    let position = state
+        .tickets
+        .iter()
+        .position(|t| {
+            t.actor == actor
+                && t.purpose == purpose
+                && t.action_id == action_id
+                && t.target == *target
+                && t.token == token
+        })
+        .ok_or(Error::Stale)?;
+    Ok(state.tickets.swap_remove(position))
+}
+/// Under `identity_commit`: the actor and target are still enabled and the
+/// management authority (generation, lock epoch) is unchanged.
+fn recheck(
+    service: &Companion,
+    actor: &str,
+    ticket: &Ticket,
+    app: &ProviderApplication,
+) -> Result<(), Error> {
+    if !service.authorized(actor)
+        || app.companion_now() >= ticket.deadline
+        || app
+            .management_authority()
+            .map_err(|_error| Error::Unavailable)?
+            != (ticket.generation, ticket.epoch)
+        || !identity::enrolled(&service.identity_store)
+            .map_err(|_error| Error::Unavailable)?
+            .iter()
+            .any(|entry| entry.fingerprint == ticket.target.id)
+    {
+        return Err(Error::Stale);
+    }
+    Ok(())
 }
 
 /// Called before ANY transport/worker starts. An interrupted administrative

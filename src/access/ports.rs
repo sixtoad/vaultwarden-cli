@@ -432,6 +432,16 @@ pub trait SecretBackend: ProviderSession {
 pub trait ApprovalAuthenticator {
     fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError>;
 }
+/// Verifies an ECDSA P-256 / SHA-256 ASN.1 DER signature by a 65-byte
+/// uncompressed SEC1 public key. Core builds the message; adapters own crypto.
+pub trait BiometricApprovalVerifier {
+    fn verify(
+        &self,
+        public_key: &[u8],
+        message: &[u8],
+        signature: &[u8],
+    ) -> Result<(), SessionError>;
+}
 /// Elapsed monotonic time, unrelated to wall-clock adjustments.
 pub trait SessionClock: Send + Sync {
     fn now(&self) -> std::time::Duration;

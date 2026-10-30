@@ -408,6 +408,7 @@ fn isolated_human_submission_https_child() {
         .collect();
     let state_path = root.join("provider-state.json");
     let policy = OperationPolicyDraft {
+        require_password: false,
         create: None,
         ssh: None,
         id: "deploy".into(),

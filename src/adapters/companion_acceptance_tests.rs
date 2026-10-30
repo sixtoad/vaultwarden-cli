@@ -203,6 +203,7 @@ fn companion_acceptance_fixture() {
             .unwrap();
         let revision = app
             .activate_operation(OperationPolicyDraft {
+                require_password: false,
                 create: None,
                 ssh: None,
                 id: "synthetic-deploy".into(),

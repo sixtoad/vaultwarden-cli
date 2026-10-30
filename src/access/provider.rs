@@ -1219,6 +1219,7 @@ impl Provider {
         &mut self,
         binding: &super::direct_request::ApprovalBinding,
         approve: bool,
+        method: Option<super::history::ApprovalMethod>,
         now: u64,
         still_authorized: impl Fn() -> bool,
     ) -> Result<super::direct_request::DirectStatus, super::direct_request::DirectRequestError>
@@ -1246,7 +1247,18 @@ impl Provider {
         } else {
             (DirectStatus::Denied, DecisionOutcome::Denied)
         };
+        if method.is_some() && !approve {
+            return Err(DirectRequestError::InvalidRequest);
+        }
         request.transition(next.clone(), outcome, now)?;
+        if let Some(method) = method {
+            let event = request
+                .direct
+                .as_mut()
+                .and_then(|direct| direct.audit.last_mut())
+                .ok_or(DirectRequestError::Unavailable)?;
+            event.approval = Some(method);
+        }
         self.store.write_state_guarded(&state, still_authorized)?;
         self.state = state;
         Ok(next)
@@ -1454,6 +1466,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            require_password: false,
             create: None,
             ssh: None,
             id: "deploy-homelab".into(),
