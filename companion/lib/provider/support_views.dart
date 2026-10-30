@@ -156,6 +156,10 @@ class ProviderCapabilities extends StatelessWidget {
       ),
       SizedBox(height: 8),
       Text(
+        'macOS on Apple Silicon (arm64): the desktop bundle includes vw-access and the native vaultwarden-accessd provider. Installing the provider into /Library and its launchd service is a reviewed manual step; a plan generator produces the files, but nothing installs them yet. Development signing only. Intel Macs and Rosetta are unsupported.',
+      ),
+      SizedBox(height: 8),
+      Text(
         'Windows and Linux: desktop shell builds; provider transport and identity integration are unavailable.',
       ),
       SizedBox(height: 8),

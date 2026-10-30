@@ -26,6 +26,7 @@ flutter test
 flutter test --dart-define=COMPANION_DISPOSABLE_PILOT=true test/pilot_setup_test.dart
 python3 "$repo/scripts/test-desktop-companion-artifact.py"
 python3 "$repo/scripts/test-desktop-bundle.py"
+python3 "$repo/scripts/test-macos-provider-plan.py"
 python3 "$repo/scripts/test-provider-packaged-diagnostics.py"
 
 case "$(uname -s)" in

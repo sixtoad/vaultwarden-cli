@@ -56,15 +56,34 @@ def checkpoint(repo, evidence, name):
     return state
 
 
+def host_architecture():
+    """Host command architecture in Rust's spelling (aarch64/x86_64)."""
+    machine = host_platform.machine()
+    return {'arm64': 'aarch64', 'AMD64': 'x86_64'}.get(machine, machine)
+
+
+def protected_commands(platform, architecture):
+    """Protected request/provider binaries the bundle ships, by platform.
+
+    Linux ships the systemd helper `vaultwarden-access-exec`. The native macOS
+    provider does not use it (the helper exits 1 off Linux), and the provider
+    rejects Intel/Rosetta at runtime, so only an arm64 macOS bundle carries the
+    protected commands. Windows has none.
+    """
+    if platform == 'linux':
+        return ['vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']
+    if platform == 'macos' and architecture == 'aarch64':
+        return ['vw-access', 'vaultwarden-accessd']
+    return []
+
+
 def build_commands(repo, platform):
     environment = dict(os.environ)
     if platform == 'windows':
         # Copied launchers and command EXEs must not depend on a developer's
         # globally installed VC redistributable or DLL search PATH.
         environment['RUSTFLAGS'] = environment.get('RUSTFLAGS', '') + ' -C target-feature=+crt-static'
-    commands = ['vaultwarden-cli']
-    if platform == 'linux':
-        commands += ['vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']
+    commands = ['vaultwarden-cli', *protected_commands(platform, host_architecture())]
     subprocess.run(['cargo', 'build', '--release', '--locked', *sum((['--bin', name] for name in commands), [])], cwd=repo, env=environment, check=True)
     subprocess.run(['cargo', 'build', '--release', '--locked', '--manifest-path', str(repo / 'companion/rust/Cargo.toml'), '--bin', 'companion-command', '--target-dir', str(repo / 'companion/rust/target/command-launcher')], cwd=repo, env=environment, check=True)
     return commands
@@ -102,7 +121,9 @@ def populate(repo, root, platform, source):
     suffix = '.exe' if platform == 'windows' else ''
     command_dir = root / ('Contents/Helpers' if platform == 'macos' else 'commands')
     command_dir.mkdir(parents=True, exist_ok=True)
-    commands = ['vaultwarden-cli'] + (['vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec'] if platform == 'linux' else [])
+    architecture = host_architecture()
+    protected = protected_commands(platform, architecture)
+    commands = ['vaultwarden-cli', *protected]
     cargo_target = Path(os.environ.get('CARGO_TARGET_DIR', str(repo / 'target')))
     for command in commands:
         shutil.copy2(cargo_target / 'release' / (command + suffix), command_dir / (command + suffix))
@@ -136,14 +157,14 @@ def populate(repo, root, platform, source):
             payloads.append({'path': path, 'sha256': '' if platform == 'macos' and path == app else artifact.digest(item), 'executable': bool(item.stat().st_mode & 0o111) if os.name != 'nt' else path.endswith('.exe')})
     manifest = {
         'schema': 1, 'command_abi': 1, 'platform': platform,
-        'architecture': {'arm64': 'aarch64', 'AMD64': 'x86_64'}.get(host_platform.machine(), host_platform.machine()),
+        'architecture': architecture,
         'app_version': next(line.removeprefix('version: ').strip() for line in (repo / 'companion/pubspec.yaml').read_text().splitlines() if line.startswith('version: ')),
         'core_version': tomllib.loads((repo / 'companion/rust/Cargo.toml').read_text())['package']['version'],
         'cli_version': tomllib.loads((repo / 'Cargo.toml').read_text())['package']['version'],
         'source_revision': source['revision'], 'source_inputs_sha256': source['inputs_sha256'],
         'entrypoint': 'lib/main.dart',
-        'commands': {name: (command_dir / (name + suffix)).relative_to(root).as_posix() for name in ['vaultwarden-cli'] + (['vw-access'] if platform == 'linux' else [])},
-        'roles': {'protected_requesting': platform == 'linux', 'desktop_approval': platform == 'macos', 'protected_provider': platform == 'linux', 'vault_cli': True},
+        'commands': {name: (command_dir / (name + suffix)).relative_to(root).as_posix() for name in ['vaultwarden-cli'] + (['vw-access'] if protected else [])},
+        'roles': {'protected_requesting': bool(protected), 'desktop_approval': platform == 'macos', 'protected_provider': bool(protected), 'vault_cli': True},
         'payloads': payloads, 'links': links,
     }
     destination = root / ('Contents/Resources/bundle.json' if platform == 'macos' else 'bundle.json')

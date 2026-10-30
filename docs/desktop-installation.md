@@ -14,7 +14,8 @@ Do not bypass Gatekeeper, remove quarantine or modify an installed application.
 | Platform | Bundled tools | Request / approve / execute capability |
 | --- | --- | --- |
 | Linux | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, `vaultwarden-access-exec`, command launcher | `vw-access` requests protected work; provider/helper implement approved Linux delivery. Flutter provider transport/approval is unavailable. |
-| macOS | `vaultwarden-cli`, command launcher | Vault CLI works. Flutter approves through the existing pinned-TLS Linux-provider connection. Protected `vw-access` requesting and native provider execution are unavailable; #49 owns that port. |
+| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. Installing the provider into `/Library/VaultwardenAccess` and its launchd service is a reviewed manual step: `scripts/macos-provider-plan.py` resolves the templates into files, and nothing installs them yet (see below). Development signing only. Flutter approves through the existing pinned-TLS Linux-provider connection; approving the native provider from the app is tracked in #49. Guided enrollment and notifications are not available (#59, #61). |
+| macOS, Intel (x86_64) | `vaultwarden-cli`, command launcher | Vault CLI works. Flutter approves through the existing pinned-TLS Linux-provider connection. The native provider rejects Intel and Rosetta, so an Intel bundle neither ships nor advertises `vw-access`/`vaultwarden-accessd`. |
 | Windows | `vaultwarden-cli.exe`, command launcher | Vault CLI works. Protected requesting/provider execution and Flutter approval transport are unavailable. |
 
 The manifest records the actual app, core and CLI versions separately: currently
@@ -22,7 +23,9 @@ The manifest records the actual app, core and CLI versions separately: currently
 Bundle schema 1, launcher ABI 1, the expected runtime platform/architecture and
 running app/core versions are checked. Old ABI-1 command launchers can select
 new compatible app/core versions. A bundle records its host command architecture;
-the normal macOS app is built for the same host architecture as its commands. The core may retain universal library slices, but the application is explicitly single-architecture. An Intel archive on Apple Silicon requires an already available Rosetta environment; the package never installs Rosetta or claims a native ARM command.
+the normal macOS app is built for the same host architecture as its commands. The core may retain universal library slices, but the application is explicitly single-architecture. An Intel archive on Apple Silicon requires an already available Rosetta environment for the vault CLI; the package never installs Rosetta or claims a native ARM command, and macOS protected commands are only in arm64 bundles. The `vaultwarden-access-exec` helper is Linux's systemd helper and is not shipped on macOS: the native provider does not use it.
+
+The CI and release desktop matrices currently build the macOS bundle on an Intel runner, so published macOS archives do not yet contain the protected commands. Build on an Apple Silicon host with `scripts/build-desktop-bundle.sh` to obtain an arm64 bundle. A command folder enabled from an earlier macOS arm64 bundle (which listed only `vaultwarden-cli`) is reported as an incompatible command setup by the new bundle: enable commands in a new empty user folder, as for any command-set change.
 
 `bundle.json` (macOS: `Contents/Resources/bundle.json`) binds every regular
 payload, required runtime libraries, command paths, supported roles and internal
@@ -125,3 +128,33 @@ trust store, installed app or service is touched.
 tracked diffs, all tracked/untracked input paths, file/link kinds, modes and hashes. Packaging refuses
 if any source input changes during build, recording `source-changed-paths.json`.
 The historic PR #52 Windows artifact did not retain changed paths. Instrumented Windows CI run **40867575316**, job **123426118530**, on this slice's first commit reproduced the report and refused packaging. Exactly seven Flutter-generated registrant/CMake files changed from checkout CRLF bytes to generator LF bytes. Each before hash equals the committed LF bytes converted to CRLF; each after hash equals the exact committed LF bytes. Those seven LF hashes also match PR #52 commit `93431e6460f5a73c1d0f2e8d8fd087bade4e2f54`, so the reproduction uses the exact historical inputs rather than inferring a cause from the old boolean alone. Git's normalized diff was empty despite seven modified status entries. The narrow `.gitattributes` rules fix checkout normalization for those exact seven files only. A regression checks `core.autocrlf=true` checkout and regeneration without source drift. Final matching Windows CI must still show clean provenance; no flag is forced false and no files are discarded or ignored.
+
+## macOS provider installer plan (review material, installs nothing)
+
+`scripts/macos-provider-plan.py` resolves
+`packaging/macos/native/com.cantolla.vaultwarden-accessd.plist.in` and
+`native-identities.json.in` from explicit inputs into a new or empty output
+directory you choose:
+
+```bash
+python3 scripts/macos-provider-plan.py --output ~/vw-provider-plan \
+  --version 0.5.4 --provider-account _vwaccess --provider-group _vwaccess \
+  --provider-uid 491 --provider-uuid <32 lowercase hex> \
+  --operator-uid 501 --operator-uuid <32 lowercase hex> \
+  --human-gid 492 --agent-gid 493 [--bundle /path/to/companion_slice.app]
+```
+
+Every input is validated (decimal non-zero IDs, distinct provider/operator UIDs
+and UUIDs, distinct human/agent GIDs, lowercase 32-hex GeneratedUIDs without
+dashes, short account/group names, `MAJOR.MINOR.PATCH[-pre]` version), and any
+`@PLACEHOLDER@` left after resolution is an error. The resolved plist keeps
+`AbandonProcessGroup`, zero core limits and `/dev/null` standard streams, and
+runs `/Library/VaultwardenAccess/versions/<version>/vaultwarden-accessd`, the
+bundle's `Contents/Helpers/vaultwarden-accessd` at the bundle's `cli_version`;
+`--bundle` checks that version and records the payload hashes. `plan.json` lists
+each file's destination, owner and mode from
+[the native provider installation surface](implementation/issue-49-native-provider.md#concrete-installation-approval-surface).
+The generator runs no command and writes only into the output directory; it
+refuses system locations and never overwrites. Copying the files into place,
+creating accounts and loading the service remain separately reviewed manual
+steps.

@@ -157,5 +157,91 @@ class BundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'damaged'):
                 bundle.verify(root, manifest)
 
+    def synthetic_populate(self, temporary, platform, machine):
+        """populate() over synthetic files; macOS signing/lipo calls are faked."""
+        suffix = '.exe' if platform == 'windows' else ''
+        repo = Path(temporary) / 'source'; repo.mkdir()
+        (repo / 'companion/rust/target/command-launcher/release').mkdir(parents=True)
+        (repo / 'target/release').mkdir(parents=True)
+        (repo / 'Cargo.toml').write_text('[package]\nversion="7.2.1"\n')
+        (repo / 'companion/rust/Cargo.toml').write_text('[package]\nversion="0.1.0"\n')
+        (repo / 'companion/pubspec.yaml').write_text('version: 0.1.0+1\n')
+        # Every protected binary exists in the cargo target: the bundle must
+        # choose what to ship, not inherit whatever happens to be built.
+        for name in ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']:
+            p = repo / 'target/release' / (name + suffix); p.write_bytes(b'synthetic ' + name.encode()); p.chmod(0o755)
+        p = repo / 'companion/rust/target/command-launcher/release' / ('companion-command' + suffix); p.write_bytes(b'launcher'); p.chmod(0o755)
+        root = Path(temporary) / 'bundle'; root.mkdir()
+        runtime = {'macos': ['Contents/MacOS/companion_slice', 'Contents/Frameworks/libcompanion_core.dylib'],
+                   'windows': ['companion_slice.exe', 'companion_core.dll'],
+                   'linux': ['companion_slice', 'lib/libcompanion_core.so']}[platform]
+        for name in runtime:
+            p = root / name; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b'runtime'); p.chmod(0o755)
+        lipo = {'arm64': 'arm64', 'x86_64': 'x86_64'}[machine] if platform == 'macos' else None
+        def run(argv, *args, **kwargs):
+            return subprocess.CompletedProcess(argv, 0, '', 'Signature=adhoc\n')
+        source = {'revision': 'a' * 40, 'inputs_sha256': 'b' * 64}
+        with patch.dict(os.environ, {}, clear=True), patch.object(bundle.host_platform, 'machine', return_value=machine), \
+                patch.object(bundle.subprocess, 'run', side_effect=run) as fake_run, \
+                patch.object(bundle.subprocess, 'check_output', return_value=f'{lipo}\n'), \
+                patch.object(bundle, 'verify_macos_entitlements'):
+            manifest = bundle.populate(repo, root, platform, source)
+        return root, manifest, fake_run
+
+    def test_macos_arm64_bundles_and_advertises_native_protected_commands(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest, run = self.synthetic_populate(temporary, 'macos', 'arm64')
+            helpers = root / 'Contents/Helpers'
+            self.assertEqual(sorted(p.name for p in helpers.iterdir()), ['companion-command', 'vaultwarden-accessd', 'vaultwarden-cli', 'vw-access'])
+            # The native provider does not use the Linux systemd helper.
+            self.assertFalse((helpers / 'vaultwarden-access-exec').exists())
+            self.assertEqual(manifest['architecture'], 'aarch64')
+            self.assertEqual(manifest['commands'], {'vaultwarden-cli': 'Contents/Helpers/vaultwarden-cli', 'vw-access': 'Contents/Helpers/vw-access'})
+            self.assertEqual(manifest['roles'], {'protected_requesting': True, 'desktop_approval': True, 'protected_provider': True, 'vault_cli': True})
+            payloads = {entry['path']: entry for entry in manifest['payloads']}
+            for name in ['vw-access', 'vaultwarden-accessd']:
+                entry = payloads['Contents/Helpers/' + name]
+                # A Windows host records executability by `.exe` suffix, not mode bits.
+                if os.name != 'nt':
+                    self.assertTrue(entry['executable'])
+                self.assertEqual(entry['sha256'], bundle.artifact.digest(helpers / name))
+            signed = [call.args[0][-1] for call in run.call_args_list if call.args[0][:4] == ['/usr/bin/codesign', '--force', '--sign', '-'] and len(call.args[0]) == 5]
+            self.assertEqual(sorted(Path(p).name for p in signed), ['companion-command', 'vaultwarden-accessd', 'vaultwarden-cli', 'vw-access'])
+            (helpers / 'vaultwarden-accessd').write_bytes(b'replaced')
+            with self.assertRaisesRegex(ValueError, 'damaged'):
+                bundle.verify(root, manifest)
+
+    def test_macos_intel_bundle_never_advertises_protected_commands(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest, _ = self.synthetic_populate(temporary, 'macos', 'x86_64')
+            self.assertEqual(sorted(p.name for p in (root / 'Contents/Helpers').iterdir()), ['companion-command', 'vaultwarden-cli'])
+            self.assertEqual(manifest['architecture'], 'x86_64')
+            self.assertEqual(set(manifest['commands']), {'vaultwarden-cli'})
+            self.assertEqual(manifest['roles'], {'protected_requesting': False, 'desktop_approval': True, 'protected_provider': False, 'vault_cli': True})
+
+    def test_linux_and_windows_protected_commands_are_unchanged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest, _ = self.synthetic_populate(temporary, 'linux', 'x86_64')
+            self.assertEqual(sorted(p.name for p in (root / 'commands').iterdir()), ['companion-command', 'vaultwarden-access-exec', 'vaultwarden-accessd', 'vaultwarden-cli', 'vw-access'])
+            self.assertEqual(set(manifest['commands']), {'vaultwarden-cli', 'vw-access'})
+            self.assertTrue(manifest['roles']['protected_requesting'] and manifest['roles']['protected_provider'])
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest, _ = self.synthetic_populate(temporary, 'windows', 'AMD64')
+            self.assertEqual(sorted(p.name for p in (root / 'commands').iterdir()), ['companion-command.exe', 'vaultwarden-cli.exe'])
+            self.assertEqual(manifest['commands'], {'vaultwarden-cli': 'commands/vaultwarden-cli.exe'})
+            self.assertEqual(manifest['architecture'], 'x86_64')
+            self.assertEqual(manifest['roles'], {'protected_requesting': False, 'desktop_approval': False, 'protected_provider': False, 'vault_cli': True})
+
+    def test_command_build_selects_protected_binaries_by_platform_and_architecture(self):
+        cases = [('linux', 'x86_64', ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']),
+                 ('macos', 'arm64', ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd']),
+                 ('macos', 'x86_64', ['vaultwarden-cli']),
+                 ('windows', 'AMD64', ['vaultwarden-cli'])]
+        for platform, machine, expected in cases:
+            with tempfile.TemporaryDirectory() as temporary, patch.object(bundle.subprocess, 'run') as run, patch.object(bundle.host_platform, 'machine', return_value=machine):
+                self.assertEqual(bundle.build_commands(Path(temporary), platform), expected)
+                argv = run.call_args_list[0].args[0]
+                self.assertEqual([argv[i + 1] for i, item in enumerate(argv) if item == '--bin'], expected)
+
 if __name__ == '__main__':
     unittest.main()
