@@ -62,6 +62,35 @@ impl SecretBackend for Backend {
         self.0.fetch_add(1, Ordering::SeqCst);
         Ok(vec![SensitiveString::new("native-synthetic-value".into())])
     }
+    fn create_eligible(&mut self, _: &CreateEffect) -> Result<(), SessionError> {
+        Ok(())
+    }
+    fn create_secret(
+        &mut self,
+        _: &CreateEffect,
+        input: &crate::secret_storage::SecretImport,
+        live: &dyn Fn() -> bool,
+    ) -> Result<String, crate::secret_storage::WriteStatus> {
+        assert!(live());
+        NATIVE_CREATED.with(|created| {
+            created
+                .borrow_mut()
+                .push(input.password.clone().unwrap_or_default());
+        });
+        Ok("33333333-3333-3333-3333-333333333333".into())
+    }
+    fn verify_secret(
+        &mut self,
+        _: &CreateEffect,
+        _: &str,
+        _: &crate::secret_storage::SecretImport,
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+}
+thread_local! {
+    /// Passwords received by the synthetic create backend on this test thread.
+    static NATIVE_CREATED: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 struct Auth;
 impl ApprovalAuthenticator for Auth {
@@ -657,7 +686,7 @@ fn native_spawn_delivers_resolved_mapping_without_parent_environment_or_descript
             // application resolves its normal mapping. Production image admission is unchanged.
             prepared.path = self.0.clone();
             prepared.argv = arguments(vec!["synthetic-environment-observer".into()]).unwrap();
-            let mut launch = Spawn::new(&prepared, &environment).unwrap();
+            let mut launch = Spawn::new(&mut prepared, &environment).unwrap();
             let mut pid = 0;
             control
                 .release(&mut || {
@@ -802,4 +831,327 @@ fn native_stopped_provider_proof_observes_other_provider_processes() {
     assert!(matches!(refused, Err(ExecutionError::ManagerUnavailable)));
     assert!(!cleared);
     assert!(!platform::other_process_named(uid, name).unwrap());
+}
+
+/// Disposable producer image; modes are selected by argv[1]. Every mode ignores SIGPIPE
+/// and exits zero unless stated, so frame validation alone decides acceptance.
+const PRODUCER_SOURCE: &[u8] = br#"
+#include <signal.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+static void put(const void *data, size_t len) {
+    const char *p = data;
+    while (len) { ssize_t n = write(3, p, len); if (n <= 0) return; p += n; len -= (size_t)n; }
+}
+static void header(uint32_t n) {
+    unsigned char h[4] = { n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >> 24) & 0xff };
+    put(h, 4);
+}
+/* Writes the header then {"password":"<fill>"} of exactly total JSON bytes. */
+static void password(uint32_t total, char fill) {
+    size_t k = total - 15;
+    char *json = malloc(total);
+    memcpy(json, "{\"password\":\"", 13);
+    memset(json + 13, fill, k);
+    memcpy(json + 13 + k, "\"}", 2);
+    header(total);
+    put(json, total);
+    free(json);
+}
+int main(int argc, char **argv) {
+    signal(SIGPIPE, SIG_IGN);
+    const char *m = argc > 1 ? argv[1] : "";
+    if (!strcmp(m, "small")) { const char *j = "{\"password\":\"native-producer-sentinel\"}"; header((uint32_t)strlen(j)); put(j, strlen(j)); }
+    else if (!strcmp(m, "descriptors")) {
+        /* fd 3 is the write-only pipe end; the read end and every other descriptor are closed. */
+        struct stat st;
+        int flags = fcntl(3, F_GETFL);
+        if (flags < 0 || (flags & O_ACCMODE) != O_WRONLY || fstat(3, &st) || !S_ISFIFO(st.st_mode)) return 1;
+        for (int fd = 4; fd < getdtablesize(); ++fd) { errno = 0; if (fcntl(fd, F_GETFD) != -1 || errno != EBADF) return 1; }
+        const char *j = "{\"password\":\"native-producer-sentinel\"}"; header((uint32_t)strlen(j)); put(j, strlen(j));
+    }
+    else if (!strcmp(m, "maximum")) password(65536, 'm');
+    else if (!strcmp(m, "overflow")) { password(65536, 'o'); char extra[70000]; memset(extra, 'x', sizeof extra); put(extra, sizeof extra); }
+    else if (!strcmp(m, "short")) { header(100); put("{\"password\":\"x\"", 15); }
+    else if (!strcmp(m, "zero")) header(0);
+    else if (!strcmp(m, "oversized")) { header(65537); put("{}", 2); }
+    else if (!strcmp(m, "trailing")) { password(40, 't'); put(" ", 1); }
+    else if (!strcmp(m, "malformed")) { header(8); put("not json", 8); }
+    else if (!strcmp(m, "nonzero")) { const char *j = "{\"password\":\"native-producer-sentinel\"}"; header((uint32_t)strlen(j)); put(j, strlen(j)); return 1; }
+    else if (!strcmp(m, "detached")) {
+        pid_t child = fork();
+        if (child < 0) return 1;
+        if (child == 0) { sleep(3); put("late-bytes", 10); _exit(0); }
+        const char *j = "{\"password\":\"native-producer-sentinel\"}"; header((uint32_t)strlen(j)); put(j, strlen(j));
+    }
+    else return 2;
+    return 0;
+}
+"#;
+fn producer_image() -> &'static Path {
+    static IMAGE: std::sync::OnceLock<(tempfile::TempDir, PathBuf)> = std::sync::OnceLock::new();
+    &IMAGE
+        .get_or_init(|| {
+            let dir = tempfile::tempdir().unwrap();
+            let source = dir.path().join("producer.c");
+            let binary = dir.path().join("producer");
+            std::fs::write(&source, PRODUCER_SOURCE).unwrap();
+            assert!(
+                std::process::Command::new("/usr/bin/clang")
+                    .arg(&source)
+                    .arg("-o")
+                    .arg(&binary)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            (dir, binary)
+        })
+        .1
+}
+fn prepared_ssh() -> PreparedExecutable {
+    let reg = image_registration();
+    NativeExecutablePreparer
+        .prepare(
+            ExecutionImage {
+                root: Path::new(&reg.execution_root),
+                path: Path::new(&reg.path),
+                sha256: &reg.sha256,
+                profile: reg.profile,
+            },
+            vec!["ssh".into()],
+        )
+        .unwrap()
+}
+/// Spawns the disposable producer through the production `Spawn` with a test-only
+/// image substitution after admission, then reaps it. Returns whether it exited zero.
+fn spawn_and_reap(mut prepared: PreparedExecutable, mode: &str) -> bool {
+    prepared.path = producer_image().into();
+    prepared.argv = arguments(vec!["synthetic-producer".into(), mode.into()]).unwrap();
+    let environment = ChildEnvironment::from_mappings([]).unwrap();
+    let mut launch = Spawn::new(&mut prepared, &environment).unwrap();
+    let pid = launch.start().unwrap();
+    drop(launch);
+    let mut status = 0;
+    assert_eq!(unsafe { libc::waitpid(pid, &mut status, 0) }, pid);
+    libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0
+}
+fn produce(mode: &str) -> Result<crate::secret_storage::SecretImport, ExecutionError> {
+    let mut prepared = prepared_ssh();
+    let mut output = NativeExecutablePreparer
+        .prepare_producer(&mut prepared)
+        .unwrap();
+    assert!(spawn_and_reap(prepared, mode), "{mode}");
+    output.read(CleanupEvidence::Reaped)
+}
+
+#[test]
+fn native_producer_frame_round_trips_through_fd_three() {
+    let input = produce("small").unwrap();
+    assert_eq!(input.password.as_deref(), Some("native-producer-sentinel"));
+    assert_eq!(input.selectors(), ["password"]);
+    let input = produce("descriptors").unwrap();
+    assert_eq!(input.password.as_deref(), Some("native-producer-sentinel"));
+}
+
+#[test]
+fn native_producer_maximum_frame_exceeds_pipe_buffer_and_succeeds() {
+    let input = produce("maximum").unwrap();
+    let password = input.password.as_deref().unwrap();
+    assert_eq!(password.len(), crate::secret_storage::MAX_IMPORT_BYTES - 15);
+    assert!(password.bytes().all(|b| b == b'm'));
+}
+
+#[test]
+fn native_producer_rejects_overflow_and_malformed_frames() {
+    for mode in [
+        "overflow",
+        "short",
+        "zero",
+        "oversized",
+        "trailing",
+        "malformed",
+    ] {
+        assert_eq!(
+            produce(mode).err(),
+            Some(ExecutionError::ExecutionFailed),
+            "{mode}"
+        );
+    }
+}
+
+#[test]
+fn native_producer_output_requires_confirmed_reaping() {
+    for evidence in [
+        CleanupEvidence::NotStarted,
+        CleanupEvidence::Detached,
+        CleanupEvidence::Uncertain,
+    ] {
+        let mut prepared = prepared_ssh();
+        let mut output = NativeExecutablePreparer
+            .prepare_producer(&mut prepared)
+            .unwrap();
+        assert!(spawn_and_reap(prepared, "small"));
+        assert_eq!(
+            output.read(evidence).err(),
+            Some(ExecutionError::CleanupUncertain),
+            "{evidence:?}"
+        );
+        // One-shot: a refused read consumed the channel.
+        assert!(output.read(CleanupEvidence::Reaped).is_err());
+    }
+}
+
+#[test]
+fn native_producer_abandoned_launch_accepts_nothing() {
+    let mut prepared = prepared_ssh();
+    let mut output = NativeExecutablePreparer
+        .prepare_producer(&mut prepared)
+        .unwrap();
+    assert!(
+        NativeExecutablePreparer
+            .prepare_producer(&mut prepared)
+            .is_err(),
+        "one channel per prepared execution"
+    );
+    drop(prepared);
+    let started = std::time::Instant::now();
+    assert_eq!(
+        output.read(CleanupEvidence::Reaped).err(),
+        Some(ExecutionError::ExecutionFailed)
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+}
+
+#[test]
+fn native_producer_detached_descendant_neither_hangs_nor_appends() {
+    let mut prepared = prepared_ssh();
+    let mut output = NativeExecutablePreparer
+        .prepare_producer(&mut prepared)
+        .unwrap();
+    assert!(spawn_and_reap(prepared, "detached"));
+    // The descendant still holds fd 3 and writes only after three seconds.
+    let started = std::time::Instant::now();
+    let input = output.read(CleanupEvidence::Reaped).unwrap();
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert_eq!(input.password.as_deref(), Some("native-producer-sentinel"));
+}
+
+/// Application wiring: native create reaches the adapter's producer channel, and only a
+/// zero exit with confirmed reaping posts. The fixture never signals the producer.
+#[test]
+fn native_create_reaches_producer_and_posts_only_after_successful_reaped_exit() {
+    struct ProducerSpawn(&'static str);
+    impl ProcessSupervisor<NativeExecutablePreparer> for ProducerSpawn {
+        fn available(&self) -> bool {
+            true
+        }
+        fn supervise(
+            &self,
+            _: PreparedExecutable,
+            _: ChildEnvironment,
+        ) -> Result<ExecutionOutcome, ExecutionError> {
+            Err(ExecutionError::Unavailable)
+        }
+        fn supervise_controlled(
+            &self,
+            mut prepared: PreparedExecutable,
+            environment: ChildEnvironment,
+            control: &dyn ExecutionControl,
+        ) -> Supervision {
+            assert!(prepared.producer.is_some(), "create prepares fd 3");
+            prepared.path = producer_image().into();
+            prepared.argv = arguments(vec!["synthetic-producer".into(), self.0.into()]).unwrap();
+            let mut launch = Spawn::new(&mut prepared, &environment).unwrap();
+            let mut pid = 0;
+            control
+                .release(&mut || {
+                    pid = launch.start()?;
+                    Ok(())
+                })
+                .unwrap();
+            drop(launch);
+            control.started().unwrap();
+            let mut status = 0;
+            assert_eq!(unsafe { libc::waitpid(pid, &mut status, 0) }, pid);
+            assert!(libc::WIFEXITED(status));
+            Supervision {
+                outcome: Ok(if libc::WEXITSTATUS(status) == 0 {
+                    ExecutionOutcome::ExitedZero
+                } else {
+                    ExecutionOutcome::ExitedNonZero
+                }),
+                cleanup: CleanupEvidence::Reaped,
+                helper_reaped: false,
+            }
+        }
+    }
+    for (mode, posts) in [("small", true), ("nonzero", false), ("malformed", false)] {
+        NATIVE_CREATED.with(|created| created.borrow_mut().clear());
+        let f = Fixture::new();
+        f.app()
+            .create_operation(
+                f.app().human_owner(),
+                OperationPolicyDraft {
+                    id: "native-create".into(),
+                    description: "Native synthetic create".into(),
+                    image_id: "native-ssh".into(),
+                    targets: vec![],
+                    arguments: vec![],
+                    credentials: vec![],
+                    ssh: None,
+                    create: Some(CreateEffect {
+                        server: "https://vault.example".into(),
+                        destination: crate::secret_storage::Destination {
+                            account_id: "11111111-1111-1111-1111-111111111111".into(),
+                            folder: "homelab/production".into(),
+                            folder_id: "22222222-2222-2222-2222-222222222222".into(),
+                            reference: "homelab/production/github/token".into(),
+                        },
+                        fields: vec!["password".into()],
+                        eligibility_marker: "deploy".into(),
+                    }),
+                },
+            )
+            .unwrap();
+        let id = f
+            .app()
+            .submit_direct(
+                f.app().human_owner(),
+                DirectSubmission {
+                    operation: "native-create".into(),
+                    revision: None,
+                    values: vec![],
+                },
+                &Launcher,
+            )
+            .unwrap()
+            .id;
+        f.approve(&id);
+        let result = f.app().run_execution(
+            f.app().human_owner(),
+            &id,
+            &NativeExecutablePreparer,
+            &ProducerSpawn(mode),
+        );
+        let created = NATIVE_CREATED.with(|created| created.borrow().clone());
+        if posts {
+            assert!(
+                matches!(result, Ok(DirectStatus::Completed { exit_code: 0 })),
+                "{mode}: {result:?}"
+            );
+            assert_eq!(created, ["native-producer-sentinel"], "{mode}");
+        } else {
+            assert!(created.is_empty(), "{mode}: {result:?}");
+        }
+        assert_eq!(f.resolved.load(Ordering::SeqCst), 0, "{mode}");
+        let state =
+            std::fs::read_to_string(f.root.path().join("provider/provider-state.json")).unwrap();
+        assert!(!state.contains("native-producer-sentinel"), "{mode}");
+    }
 }

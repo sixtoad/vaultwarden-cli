@@ -109,11 +109,18 @@ are not part of the closed policy schema. Normal signed agent submission and
 fresh human approval are still required for every execution. Reviews on loopback
 and native macOS show the create effect, namespace, schema and marker.
 
-The producer receives **fd 3**, a provider-owned bounded memory file. Write a
-four-byte unsigned little-endian JSON byte length at offset zero, followed by the
-same JSON import format. The file has fixed capacity 65540 bytes and cannot grow
-or shrink. The provider reads only after successful exit and confirmed reaping,
-then seals writes and validates the frame/schema. Stdout/stderr remain discarded.
+The producer receives **fd 3**. Write a four-byte unsigned little-endian JSON byte
+length at offset zero, followed by the same JSON import format, sequentially
+(`write(header); write(json)` works on every platform). On Linux fd 3 is a
+provider-owned bounded memory file with fixed capacity 65540 bytes that cannot grow
+or shrink; the provider reads only after successful exit and confirmed reaping,
+then seals writes and validates the frame/schema. On native Apple Silicon macOS fd
+3 is the write end of an anonymous pipe: it is **not seekable**, so never seek or
+`pwrite`; write the frame once from the start. The provider drains it concurrently
+into at most 65540 bytes of memory (any further byte rejects the output), stops
+reading once the producer is confirmed reaped (bytes written later, for example by
+a descendant, are ignored) and accepts only an exact frame with no trailing bytes.
+Native producer support is source-tested; installed qualification is outstanding. Stdout/stderr remain discarded.
 No API token, vault key, provider socket or read credential is given to the
 producer. Never place values in arguments, logs or stdout/stderr. Producer failure,
 timeout, cancellation, lock, malformed output or lost approval prevents mutation.

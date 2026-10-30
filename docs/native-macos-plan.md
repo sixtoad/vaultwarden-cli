@@ -13,9 +13,11 @@ composition, reviewed Mach-O preparation, explicit operator/provider identities,
 Unix authentication, sleep-aware authority and memory-only SSH signing. See the
 [implementation and installation packet](implementation/issue-49-native-provider.md)
 for the selected contract, tests, service templates and remaining qualification.
-Source tests do not establish an installed deployment. Native producer output is
-still unavailable; distinct-account/service-Keychain/launchd lifecycle and release
-signing require the concrete separately approved setup described there.
+Source tests do not establish an installed deployment. Native producer output
+(create-secret) now uses a bounded provider-drained pipe as fd 3 and is covered by
+source tests only; distinct-account/service-Keychain/launchd lifecycle, installed
+producer qualification and release signing require the concrete separately
+approved setup described there.
 
 The earlier stages and observations below are preserved as design history; their
 statements about the source being Linux-only describe the baseline, not the new
