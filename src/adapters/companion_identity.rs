@@ -17,13 +17,13 @@ use zeroize::Zeroizing;
 
 pub const STORE_FILE: &str = "companion-identities.json";
 const MAX_IDENTITIES: usize = 64;
-/// Retired biometric key ids. When the list is full, NEW enrollments (first
-/// enrollment and re-enrollment) are refused, so no key id is ever forgotten
-/// to make room for an enrollment. A revocation is never refused for the
-/// bound: it forgets the OLDEST retired id instead. Forgetting cannot reopen
-/// that key while the list stays full (enrollment is refused), and every
-/// enrollment needs the device certificate, a fresh password and proof of
-/// possession anyway, so a forgotten id grants nothing a fresh key would not.
+/// Retired biometric key ids, a bounded LRU: when the list is full, any write
+/// that retires another id (re-enrollment, key or device revocation) forgets
+/// the OLDEST retired id instead of being refused, so Touch ID housekeeping
+/// never blocks a registry write. Accepted residual risk: a long-forgotten
+/// retired key could be enrolled again, which still needs the device's mTLS
+/// certificate, a fresh password and a proof of possession by that key over a
+/// provider-issued ticket, exactly what enrolling a fresh key needs.
 /// 256 ids (about 17 KiB) keep the registry well under its 64 KiB read limit.
 const MAX_RETIRED_KEYS: usize = 256;
 /// Touch ID key-management audit entries kept (oldest dropped first).
@@ -329,10 +329,7 @@ pub(crate) fn enroll_biometric_online(
     {
         return Err(SessionError::InvalidRequest);
     }
-    // Full: refuse every new enrollment rather than forget a retired id.
-    if registry.retired_biometric_keys.len() >= MAX_RETIRED_KEYS {
-        return Err(SessionError::BackendUnavailable);
-    }
+    // A full retired list forgets its oldest id (see MAX_RETIRED_KEYS).
     retire_biometric(&mut registry, fingerprint);
     registry.biometric.push(BiometricEnrollment {
         fingerprint: fingerprint.into(),
@@ -361,7 +358,6 @@ pub(crate) fn revoke_biometric_online(
     let mut registry = registry(&root.join(STORE_FILE))?;
     let retired = retire_biometric(&mut registry, fingerprint);
     if let Some(key_id) = &retired {
-        forget_oldest_retired(&mut registry);
         biometric_audit(
             &mut registry,
             fingerprint,
@@ -369,7 +365,7 @@ pub(crate) fn revoke_biometric_online(
             IdentityAction::BiometricRevoked,
             key_id,
         );
-        persist_revocation(root, registry)?;
+        persist_registry(root, registry)?;
     }
     Ok(retired)
 }
@@ -382,7 +378,7 @@ fn retire_biometric(registry: &mut Registry, fingerprint: &str) -> Option<String
     registry.retired_biometric_keys.push(old.key_id.clone());
     Some(old.key_id)
 }
-/// A full retired list never blocks a revocation (see MAX_RETIRED_KEYS).
+/// A full retired list never blocks a write (see MAX_RETIRED_KEYS).
 fn forget_oldest_retired(registry: &mut Registry) {
     let excess = registry
         .retired_biometric_keys
@@ -498,14 +494,13 @@ pub(crate) fn revoke_online(
     // Device revocation removes its approval key in the same atomic write.
     // A full retired list never blocks revocation (see MAX_RETIRED_KEYS).
     retire_biometric(&mut registry, fingerprint);
-    forget_oldest_retired(&mut registry);
     registry.audit.push(IdentityAudit {
         fingerprint: fingerprint.into(),
         actor: actor.into(),
         action: IdentityAction::Revoked,
         key_id: None,
     });
-    persist_revocation(root, registry)
+    persist_registry(root, registry)
 }
 fn valid_label(label: &str) -> bool {
     !label.is_empty() && label.len() <= 128 && !label.chars().any(char::is_control)
@@ -553,20 +548,28 @@ fn persist(root: &Path, identities: Vec<EnrolledCompanion>) -> Result<(), Sessio
         },
     )
 }
-/// A revocation is never refused for size: if the file would exceed the read
-/// limit, the oldest Touch ID audit entries and then the oldest retired key
-/// ids are forgotten first (see MAX_RETIRED_KEYS for why that is safe).
-fn persist_revocation(root: &Path, mut registry: Registry) -> Result<(), SessionError> {
-    while serialize(&mut registry)?.len() > MAX_REGISTRY_BYTES {
+/// Touch ID housekeeping never blocks a registry write. Every write first
+/// bounds the retired list, then, while the file would exceed the read limit,
+/// forgets the oldest Touch ID audit entries and then the oldest retired key
+/// ids (see MAX_RETIRED_KEYS for why that is safe). Identities, revocations,
+/// administrators, other audit and enrolled keys are never trimmed; their
+/// worst case (64 devices with maximal escaped labels, all administrators
+/// with keys, 128 audit records) is about 58 KiB, so a revocation always fits.
+fn trim_touch_id_housekeeping(registry: &mut Registry) -> Result<Vec<u8>, SessionError> {
+    forget_oldest_retired(registry);
+    loop {
+        let bytes = serialize(registry)?;
+        if bytes.len() <= MAX_REGISTRY_BYTES {
+            return Ok(bytes);
+        }
         if let Some(oldest) = registry.audit.iter().position(|e| e.action.biometric()) {
             registry.audit.remove(oldest);
         } else if !registry.retired_biometric_keys.is_empty() {
             registry.retired_biometric_keys.remove(0);
         } else {
-            break;
+            return Ok(bytes);
         }
     }
-    persist_registry(root, registry)
 }
 fn serialize(registry: &mut Registry) -> Result<Vec<u8>, SessionError> {
     registry.version = if registry.biometric.is_empty()
@@ -580,7 +583,7 @@ fn serialize(registry: &mut Registry) -> Result<Vec<u8>, SessionError> {
     serde_json::to_vec(registry).map_err(unavailable)
 }
 fn persist_registry(root: &Path, mut registry: Registry) -> Result<(), SessionError> {
-    let bytes = serialize(&mut registry)?;
+    let bytes = trim_touch_id_housekeeping(&mut registry)?;
     if bytes.len() > MAX_REGISTRY_BYTES {
         return Err(SessionError::BackendUnavailable);
     }

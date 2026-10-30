@@ -196,11 +196,16 @@ An administrator may also revoke (never enroll) another device's key.
   Requires a fresh password and a valid enrollment proof by the new key.
   Re-enrollment atomically replaces the key and retires the old key id;
   a retired or another device's key is `invalid_request`. The retired list
-  holds 256 ids; when it is full every new enrollment is `unavailable` (no id
-  is forgotten to make room), while a revocation is never refused for it and
-  forgets the oldest id instead. Forgetting is safe: enrollment stays refused
-  while the list is full, and any enrollment needs the device certificate, a
-  fresh password and proof of possession, which a fresh key needs anyway.
+  is a bounded LRU of 256 ids: when it is full, any write that retires
+  another id (re-enrollment, key or device revocation) forgets the oldest id
+  instead of being refused. Touch ID housekeeping (retired ids and Touch ID
+  audit records) never blocks any registry write: before the 64 KiB size
+  check every write forgets the oldest Touch ID audit records, then the
+  oldest retired ids. Identities, revocations, administrators, other audit
+  records and enrolled keys are never trimmed. Accepted residual risk: a
+  long-forgotten retired key could be enrolled again, which still needs the
+  device's mTLS certificate, a fresh password and a proof of possession by
+  that key over a provider-issued ticket, as any fresh key does.
 * `{"version":2,"command":"biometric_revoke","target","action_id","ticket","password"}`
   => `{"version":2,"operation":"revoke","target","action_id","revoked_key_id":hex|null}`.
   Disables Touch ID and retires the key; the device stays enrolled and keeps

@@ -1127,7 +1127,7 @@ fn retired_ids(count: usize) -> Vec<serde_json::Value> {
     (0..count).map(|i| format!("{i:064x}").into()).collect()
 }
 #[test]
-fn biometric_full_retired_list_never_blocks_revocation_but_refuses_enrollment() {
+fn biometric_full_retired_list_forgets_oldest_id_instead_of_refusing() {
     let s = setup(true);
     let key = software_key();
     let key_id = s.enroll(&key);
@@ -1140,27 +1140,179 @@ fn biometric_full_retired_list_never_blocks_revocation_but_refuses_enrollment() 
     assert_eq!(retired.as_array().unwrap().len(), 256);
     assert_eq!(retired[0], format!("{:064x}", 1));
     assert_eq!(retired[255], key_id.as_str());
-    // Full: a new key is refused (never by forgetting a retired id)...
+    // Full: a new enrollment is never refused for the bound...
     s.cool();
-    assert_eq!(s.enroll_as(&me(), &software_key(), PASSWORD).status, 503);
-    // ...and the forgotten oldest id cannot come back while the list is full.
+    let second = s.enroll(&software_key());
     assert_eq!(registry_json(&s)["retired_biometric_keys"], retired);
+    // ...and a re-enrollment forgets the oldest retired id (bounded LRU).
+    s.cool();
+    s.enroll(&software_key());
+    let after = registry_json(&s)["retired_biometric_keys"].clone();
+    assert_eq!(after.as_array().unwrap().len(), 256);
+    assert_eq!(after[0], format!("{:064x}", 2));
+    assert_eq!(after[254], key_id.as_str());
+    assert_eq!(after[255], second.as_str());
     // Device revocation of a device with a key is never blocked either.
-    let mut raw = registry_json(&s);
     let foreign = software_key();
-    raw["retired_biometric_keys"]
-        .as_array_mut()
-        .unwrap()
-        .remove(0);
-    write_registry(&s, &raw);
     assert_eq!(s.enroll_as(&other(), &foreign, PASSWORD).status, 200);
     identity::revoke_online(&s.env.root(), &other(), &me()).unwrap();
     let raw = registry_json(&s);
     assert_eq!(raw["retired_biometric_keys"].as_array().unwrap().len(), 256);
+    assert_eq!(raw["retired_biometric_keys"][0], format!("{:064x}", 3));
     assert_eq!(
         raw["retired_biometric_keys"][255],
         v2::key_id(foreign.public_key().as_ref()).as_str()
     );
+}
+/// A private provider root with no running provider, for offline commands.
+fn offline_root() -> tempfile::TempDir {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    write_private(root.path(), ".provider-state.lock", b"");
+    root
+}
+fn granted_records(raw: &serde_json::Value) -> Vec<serde_json::Value> {
+    raw["audit"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["action"] == "granted_administrator")
+        .cloned()
+        .collect()
+}
+/// `identities` enabled devices (maximal escaped labels), a key on this
+/// device, Touch ID housekeeping at its caps (256 retired ids, 64 Touch ID
+/// audit records), padded with other audit to within 2 bytes of 64 KiB.
+fn registry_at_touch_id_caps(identities: usize) -> serde_json::Value {
+    let mut devices = vec![serde_json::json!({"fingerprint": me(), "label": "Synthetic Mac"})];
+    for i in 1..identities {
+        devices.push(serde_json::json!({"fingerprint": format!("{:064x}", 1000 + i), "label": "\"".repeat(128)}));
+    }
+    devices.last_mut().unwrap()["label"] = "x".into();
+    let key = software_key();
+    let public_key = key.public_key().as_ref();
+    let mut raw = serde_json::json!({
+        "version": 3,
+        "identities": devices,
+        "administrators": [],
+        "biometric": [{"fingerprint": me(), "key_id": v2::key_id(public_key), "public_key": URL_SAFE_NO_PAD.encode(public_key), "enrolled_generation": 1}],
+        "retired_biometric_keys": retired_ids(256),
+        "audit": (0..64)
+            .map(|i| serde_json::json!({"fingerprint": me(), "actor": me(), "action": "biometric_enrolled", "key_id": format!("{:064x}", 5000 + i)}))
+            .collect::<Vec<_>>(),
+    });
+    let fits = |raw: &serde_json::Value| raw.to_string().len() <= 65536;
+    for i in 0..128 {
+        let audit = raw["audit"].as_array_mut().unwrap();
+        audit.push(serde_json::json!({"fingerprint": format!("{:064x}", 9000 + i), "actor": "local_owner", "action": "granted_administrator"}));
+        if !fits(&raw) {
+            raw["audit"].as_array_mut().unwrap().pop();
+            break;
+        }
+    }
+    // Other audit is OLDER than Touch ID audit, so oldest-first trimming of
+    // any record would drop it; only Touch ID records may go.
+    let audit = raw["audit"].as_array_mut().unwrap();
+    audit.rotate_left(64);
+    assert_eq!(audit[0]["action"], "granted_administrator");
+    // Lengthen the last label until the file cannot grow by another byte.
+    let last = identities - 1;
+    for grow in ["\"", "x"] {
+        loop {
+            let mut label = raw["identities"][last]["label"]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            if label.len() >= 128 {
+                break;
+            }
+            label.push_str(grow);
+            let before = raw["identities"][last]["label"].clone();
+            raw["identities"][last]["label"] = label.into();
+            if !fits(&raw) {
+                raw["identities"][last]["label"] = before;
+                break;
+            }
+        }
+    }
+    assert!(
+        raw.to_string().len() > 65536 - 2,
+        "{}",
+        raw.to_string().len()
+    );
+    raw
+}
+fn assert_only_touch_id_housekeeping_trimmed(
+    store: &Path,
+    before: &serde_json::Value,
+    identities: usize,
+) {
+    let bytes = std::fs::read(store).unwrap();
+    assert!(bytes.len() <= 65536, "{}", bytes.len());
+    let after: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(identity::enrolled(store).unwrap().len(), identities);
+    // Identities and non-Touch-ID audit are never trimmed...
+    for device in before["identities"].as_array().unwrap() {
+        assert!(after["identities"].as_array().unwrap().contains(device));
+    }
+    let kept = granted_records(&after);
+    assert!(kept.starts_with(&granted_records(before)));
+    // ...nor the enrolled key; the oldest Touch ID audit records went first.
+    assert_eq!(after["biometric"], before["biometric"]);
+    let touch_id = after["audit"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["action"] == "biometric_enrolled")
+        .collect::<Vec<_>>();
+    assert!(touch_id.len() < 64);
+    assert_eq!(touch_id.last().unwrap()["key_id"], format!("{:064x}", 5063));
+    assert_eq!(
+        after["retired_biometric_keys"],
+        before["retired_biometric_keys"]
+    );
+}
+#[test]
+fn biometric_housekeeping_at_caps_never_blocks_offline_enrollment() {
+    let root = offline_root();
+    let raw = registry_at_touch_id_caps(62);
+    let store = write_private(
+        root.path(),
+        identity::STORE_FILE,
+        raw.to_string().as_bytes(),
+    );
+    let certificate = write_private(
+        root.path(),
+        "other.pem",
+        include_bytes!("../../../tests/companion-tls/other.pem"),
+    );
+    let ca = write_private(root.path(), "client-ca.pem", CLIENT_CA);
+    let added = identity::enroll(root.path(), &certificate, &ca, "Other Mac").unwrap();
+    assert_only_touch_id_housekeeping_trimmed(&store, &raw, 63);
+    assert!(
+        identity::list(root.path())
+            .unwrap()
+            .iter()
+            .any(|i| i.fingerprint == added)
+    );
+}
+#[test]
+fn biometric_housekeeping_at_caps_never_blocks_administrator_grant() {
+    let root = offline_root();
+    let raw = registry_at_touch_id_caps(62);
+    let store = write_private(
+        root.path(),
+        identity::STORE_FILE,
+        raw.to_string().as_bytes(),
+    );
+    identity::grant_administrator(root.path(), &me()).unwrap();
+    assert_only_touch_id_housekeeping_trimmed(&store, &raw, 62);
+    assert!(identity::administrator(&store, &me()));
+    let granted = granted_records(&registry_json_at(&store));
+    assert_eq!(granted.last().unwrap()["fingerprint"], me().as_str());
+}
+fn registry_json_at(store: &Path) -> serde_json::Value {
+    serde_json::from_slice(&std::fs::read(store).unwrap()).unwrap()
 }
 #[test]
 fn biometric_revocation_forgets_oldest_state_to_stay_under_the_read_limit() {
