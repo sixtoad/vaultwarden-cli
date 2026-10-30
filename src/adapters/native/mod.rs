@@ -1,6 +1,7 @@
 //! Native Apple Silicon execution. Authorization remains in the portable application.
 pub(crate) mod identity;
 mod image;
+mod producer;
 mod reaper;
 #[cfg(test)]
 pub(crate) use image::test_requirement;
@@ -17,7 +18,10 @@ use crate::access::{
 use std::{
     ffi::CString,
     fs::File,
-    os::{fd::AsRawFd, unix::fs::MetadataExt},
+    os::{
+        fd::{AsRawFd, OwnedFd},
+        unix::fs::MetadataExt,
+    },
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -32,6 +36,9 @@ pub(crate) struct PreparedExecutable {
     argv: Vec<CString>,
     cwd: Option<File>,
     agent: Option<std::rc::Rc<std::cell::RefCell<super::ssh_agent::Agent>>>,
+    /// Write end of the private producer pipe; becomes the child's fd 3 and is
+    /// closed in the provider as soon as the spawn attempt ends.
+    producer: Option<OwnedFd>,
     reaping: reaper::Reservation,
 }
 impl ImageVerifier for NativeExecutablePreparer {
@@ -64,6 +71,7 @@ impl ProtectedExecution for NativeExecutablePreparer {
             argv: arguments(argv)?,
             cwd: None,
             agent: None,
+            producer: None,
             reaping,
         })
     }
@@ -81,8 +89,19 @@ impl ProtectedExecution for NativeExecutablePreparer {
         prepared.agent = Some(material.agent.clone());
         Ok(Box::new(material))
     }
-    // Producer protocols need a bounded anonymous native channel; unsupported modes deny
-    // before secret resolution through the port's default, without disabling login or SSH.
+    /// Bounded anonymous pipe: fd 3 in the child, drained by a provider reader. It is
+    /// read only after confirmed reaping; see `producer` for the frame rules.
+    fn prepare_producer(
+        &self,
+        prepared: &mut PreparedExecutable,
+    ) -> Result<Box<dyn crate::access::ports::ProducerOutput>, ExecutionError> {
+        if prepared.producer.is_some() {
+            return Err(ExecutionError::InvalidArguments);
+        }
+        let (write, output) = producer::open()?;
+        prepared.producer = Some(write);
+        Ok(Box::new(output))
+    }
 }
 fn arguments(args: Vec<String>) -> Result<Vec<CString>, ExecutionError> {
     if args.is_empty()
@@ -225,7 +244,7 @@ impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor {
     }
     fn supervise_controlled(
         &self,
-        prepared: PreparedExecutable,
+        mut prepared: PreparedExecutable,
         environment: ChildEnvironment,
         control: &dyn ExecutionControl,
     ) -> Supervision {
@@ -247,7 +266,8 @@ impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor {
             if image::signature(&prepared.path)? != prepared.requirement {
                 return Err(ExecutionError::InvalidImage);
             }
-            let mut launch = Spawn::new(&prepared, &environment)?;
+            // Spawn takes the producer write end; dropping it closes the provider copy.
+            let mut launch = Spawn::new(&mut prepared, &environment)?;
             control.release(&mut || {
                 pid = launch.start()?;
                 Ok(())
@@ -319,13 +339,16 @@ struct Spawn {
     path: CString,
     argv: Vec<*mut libc::c_char>,
     environment: Vec<*mut libc::c_char>,
+    /// Provider copy of the producer write end, closed when the launch is dropped.
+    producer: Option<OwnedFd>,
 }
 impl Spawn {
     fn new(
-        prepared: &PreparedExecutable,
+        prepared: &mut PreparedExecutable,
         environment: &ChildEnvironment,
     ) -> Result<Self, ExecutionError> {
         use std::os::unix::ffi::OsStrExt;
+        let producer = prepared.producer.take();
         let mut attributes = std::ptr::null_mut();
         let mut actions = std::ptr::null_mut();
         if unsafe { libc::posix_spawnattr_init(&mut attributes) } != 0 {
@@ -353,6 +376,7 @@ impl Spawn {
                 .map(|s| s.as_ptr().cast_mut().cast())
                 .chain([std::ptr::null_mut()])
                 .collect(),
+            producer,
         };
         let mut arch = 0x0100000c;
         let mut count = 0;
@@ -391,6 +415,14 @@ impl Spawn {
             {
                 return Err(ExecutionError::Unavailable);
             }
+        }
+        // POSIX_SPAWN_CLOEXEC_DEFAULT inherits only descriptors named by file actions.
+        if let Some(write) = &launch.producer
+            && unsafe {
+                libc::posix_spawn_file_actions_adddup2(&mut launch.actions, write.as_raw_fd(), 3)
+            } != 0
+        {
+            return Err(ExecutionError::Unavailable);
         }
         if let Some(cwd) = &prepared.cwd
             && unsafe {

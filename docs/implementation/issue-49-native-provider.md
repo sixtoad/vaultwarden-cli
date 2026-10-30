@@ -80,11 +80,30 @@ the shared application using actual native images. Portable signature/session/
 request tests run on both platforms. Windows and Intel/Rosetta rejection remain
 separate from successful native delivery evidence.
 
+Native producer/create-secret output (`src/adapters/native/producer.rs`) gives
+the producer an anonymous pipe as fd 3 (a `posix_spawn` dup2 file action under
+`POSIX_SPAWN_CLOEXEC_DEFAULT`; the provider closes its write end when the launch
+ends). macOS has no memfd sealing and POSIX shared memory is mmap-only, and an
+unlinked file would put plaintext on disk, so a pipe was chosen. A provider reader
+thread drains it concurrently into at most 65540 bytes of zeroizing memory; any
+further byte invalidates the output (never truncated and accepted). After confirmed
+reaping the reader takes what is already buffered without blocking, then stops and
+closes the read end, so a detached descendant holding fd 3 cannot stall the provider
+and its later writes are ignored. Exactly a 1..=65536 length prefix plus that many
+JSON bytes is accepted. Source tests drive a real spawned producer through the
+production spawn path (round trip, a frame larger than the pipe buffer, overflow,
+short/zero/oversized/trailing/malformed frames, unreaped evidence, an abandoned
+launch, a detached descendant) and the application create path (only a zero exit
+with confirmed reaping posts). Linux keeps its sealed memfd unchanged.
+
 Still unavailable or unqualified:
 
-- Native producer/create-secret output uses the port's default denial before
-  secret resolution. Login-environment delivery and SSH do not depend on this
-  separate output protocol. Native producer parity is not claimed.
+- Native create-secret has source-level parity only: installed qualification
+  (distinct accounts, launchd service, a reviewed root-owned producer image) is
+  outstanding, as for the other native paths below. `pipe()` plus
+  `F_DUPFD_CLOEXEC` (macOS has no `pipe2`) leaves a brief window in which a
+  concurrent non-`posix_spawn` child of the provider could inherit the original
+  descriptors.
 - Installed distinct-account end-to-end request/companion approval/Keychain
   rehearsal, launchd stop/reboot/upgrade survival and service-account credential
   ACLs have not been established by same-user synthetic fixtures.
