@@ -201,7 +201,9 @@ class BundleTests(unittest.TestCase):
             payloads = {entry['path']: entry for entry in manifest['payloads']}
             for name in ['vw-access', 'vaultwarden-accessd']:
                 entry = payloads['Contents/Helpers/' + name]
-                self.assertTrue(entry['executable'])
+                # A Windows host records executability by `.exe` suffix, not mode bits.
+                if os.name != 'nt':
+                    self.assertTrue(entry['executable'])
                 self.assertEqual(entry['sha256'], bundle.artifact.digest(helpers / name))
             signed = [call.args[0][-1] for call in run.call_args_list if call.args[0][:4] == ['/usr/bin/codesign', '--force', '--sign', '-'] and len(call.args[0]) == 5]
             self.assertEqual(sorted(Path(p).name for p in signed), ['companion-command', 'vaultwarden-accessd', 'vaultwarden-cli', 'vw-access'])
