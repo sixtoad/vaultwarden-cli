@@ -1,0 +1,83 @@
+{
+  "_contract": {
+    "description": "Synthetic golden vector for production Touch ID approval v2 (issue 49 PR A). Software P-256 key; no private key is committed. Verify, never re-sign: ECDSA signatures are randomized.",
+    "framing": "Each transcript field is a 4-byte big-endian length followed by the field bytes, in the listed order.",
+    "approval_fields": [
+      "domain 'dev.vaultwarden.provider.approval.v2' (ASCII)",
+      "action 'approve' (ASCII)",
+      "provider_identity: 32 raw bytes of SHA-256(provider TLS leaf certificate DER), the companion's pin",
+      "approval_client: 32 raw bytes of SHA-256(client mTLS leaf certificate DER)",
+      "key_id: 32 raw bytes of SHA-256(65-byte uncompressed SEC1 public key)",
+      "request_id: UTF-8 (43-char base64url)",
+      "record_digest: 32 raw bytes",
+      "policy_digest: 32 raw bytes",
+      "arguments_digest: 32 raw bytes",
+      "expires_at_unix_seconds: u64 big-endian",
+      "generation: u64 big-endian",
+      "ticket: 32 raw bytes (the 64-hex ticket decoded)",
+      "ticket_deadline_unix_ms: u64 big-endian",
+      "review_digest: 32 raw bytes of SHA-256(canonical JSON of the review object)"
+    ],
+    "enroll_fields": [
+      "domain 'dev.vaultwarden.provider.approval-enroll.v2' (ASCII)",
+      "provider_identity: 32 raw bytes",
+      "approval_client: 32 raw bytes",
+      "public_key: 65 raw bytes",
+      "management ticket: 32 raw bytes",
+      "action_id: UTF-8"
+    ],
+    "review_digest": "SHA-256 over the review JSON object with members sorted by key (bytewise), no whitespace, serde_json string escaping (\\\" \\\\ \\b \\f \\n \\r \\t, other controls \\u00xx lowercase, non-ASCII literal UTF-8), integers in shortest decimal form.",
+    "signature": "ECDSA P-256 SHA-256, ASN.1 DER, unpadded base64url, at most 72 bytes.",
+    "public_key": "unpadded base64url of the 65-byte uncompressed SEC1 point (0x04 || X || Y).",
+    "hex": "All SHA-256 identifiers on the wire are 64 lowercase hex characters."
+  },
+  "approval": {
+    "approval_client": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+    "arguments_digest": "2252ed2cc39dcdd7d5217fa3fd082819d34fe8d196afc6a0c03a4fa2046e4c0a",
+    "expires_at_unix_seconds": 1700000300,
+    "generation": 7,
+    "key_id": "63df271eadf864c4456e1d72b4e14bf4034abc501fa9e1c77bfe5e3af97de039",
+    "policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "provider_identity": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+    "record_digest": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+    "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+    "review": {
+      "arguments": [
+        "staging",
+        "safe"
+      ],
+      "arguments_digest": "2252ed2cc39dcdd7d5217fa3fd082819d34fe8d196afc6a0c03a4fa2046e4c0a",
+      "credentials": [
+        {
+          "label": "Deployment <login>",
+          "use_type": "login"
+        }
+      ],
+      "effect": "Deploy \"staging\" <img> café",
+      "executable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expires_at_unix_seconds": 1700000300,
+      "id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+      "one_time": "Approval authorizes one protected execution. Lock or cancellation stops its descendants.",
+      "operation": "deploy",
+      "policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requester": "local human terminal",
+      "status": {
+        "status": "pending"
+      },
+      "target": "staging"
+    },
+    "review_digest": "5413ad24daebf26364c3fe126f8f2cada3bbd44a868f3ffb3c58cf59936b2a7b",
+    "signature": "MEUCIQDjBqMpUUrFy3Nk04Q_FdenBgYfrOFegh6j0eefSjOeaAIgHquVyZKH8ISVHnf-_hkgLPGRHGLZWe6NtGbvo-qvn60",
+    "ticket": "4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c",
+    "ticket_deadline_unix_ms": 1700000060000,
+    "transcript_hex": "000000246465762e7661756c7477617264656e2e70726f76696465722e617070726f76616c2e763200000007617070726f7665000000201f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f000000202e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e0000002063df271eadf864c4456e1d72b4e14bf4034abc501fa9e1c77bfe5e3af97de0390000002b42776348427763484277634842776348427763484277634842776348427763484277634842776348427763000000203d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d00000020bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000202252ed2cc39dcdd7d5217fa3fd082819d34fe8d196afc6a0c03a4fa2046e4c0a00000008000000006553f22c000000080000000000000007000000204c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c000000080000018bcfe65260000000205413ad24daebf26364c3fe126f8f2cada3bbd44a868f3ffb3c58cf59936b2a7b",
+    "review_canonical_json": "{\"arguments\":[\"staging\",\"safe\"],\"arguments_digest\":\"2252ed2cc39dcdd7d5217fa3fd082819d34fe8d196afc6a0c03a4fa2046e4c0a\",\"credentials\":[{\"label\":\"Deployment <login>\",\"use_type\":\"login\"}],\"effect\":\"Deploy \\\"staging\\\" <img> café\",\"executable_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"expires_at_unix_seconds\":1700000300,\"id\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\",\"one_time\":\"Approval authorizes one protected execution. Lock or cancellation stops its descendants.\",\"operation\":\"deploy\",\"policy_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"requester\":\"local human terminal\",\"status\":{\"status\":\"pending\"},\"target\":\"staging\"}"
+  },
+  "enroll": {
+    "action_id": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk",
+    "signature": "MEUCICzqb0vh00LhK9DM7AkdZMjy35i_UB6ViTy8WipmKOkMAiEA6kpTHukTW3Bzj1Lw04tMLn1Ri9BWWT9Cg_uii_1xASI",
+    "ticket": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b",
+    "transcript_hex": "0000002b6465762e7661756c7477617264656e2e70726f76696465722e617070726f76616c2d656e726f6c6c2e7632000000201f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f000000202e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e0000004104220743778892d1ad65ba7e3a05b4fd8795403795f60411dada4c061eb1d27b942acb0e9b6c3931e4903a78926943b1e825b486cf97230ee31af04136c237874b000000205b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b0000002b43516b4a43516b4a43516b4a43516b4a43516b4a43516b4a43516b4a43516b4a43516b4a43516b4a43516b"
+  },
+  "public_key": "BCIHQ3eIktGtZbp-OgW0_YeVQDeV9gQR2tpMBh6x0nuUKssOm2w5MeSQOniSaUOx6CW0hs-XIw7jGvBBNsI3h0s"
+}

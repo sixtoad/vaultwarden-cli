@@ -516,7 +516,7 @@ impl ExecutionWorker {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 #[cfg(test)]
 pub(crate) fn native_ssh_requirement() -> Result<String, ExecutionError> {

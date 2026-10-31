@@ -112,6 +112,7 @@ fn storage_acceptance_fixture() {
             let mut create = effect.clone();
             create.destination.reference = format!("storage-acceptance/{scenario}");
             app.activate_operation(OperationPolicyDraft {
+                require_password: false,
                 id: format!("storage-{scenario}"),
                 description: format!("Synthetic storage acceptance {scenario}"),
                 image_id: "storage-producer".into(),
@@ -213,6 +214,7 @@ fn storage_acceptance_fixture() {
                     let mut namespace = effect.destination.clone();
                     namespace.reference = "storage-acceptance/create".into();
                     let draft = OperationPolicyDraft {
+                        require_password: false,
                         id: "storage-consume".into(),
                         description:
                             "Consume exactly the separately selected synthetic stored item".into(),

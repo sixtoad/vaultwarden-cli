@@ -34,6 +34,15 @@ pub enum HistoryOutcome {
     LegacyUnknown,
     Reconciled,
 }
+/// How an approval was authenticated. Recorded only on biometric approvals:
+/// an `Approved` event without it was authenticated by a fresh password (every
+/// legacy and password approval), so existing records and projections stay
+/// byte-identical. Never carries a signature, password or public key.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ApprovalMethod {
+    Biometric { key_id: String },
+}
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "HistoryEventWire")]
 pub struct HistoryEvent {
@@ -56,6 +65,8 @@ pub struct HistoryEvent {
     pub outcome: HistoryOutcome,
     /// None only for migrated events whose precise lifecycle phase was not stored.
     pub status: Option<DirectStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<ApprovalMethod>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +89,8 @@ struct HistoryEventWire {
     ordinal: u32,
     outcome: HistoryOutcome,
     status: Option<DirectStatus>,
+    #[serde(default)]
+    approval: Option<ApprovalMethod>,
 }
 impl TryFrom<HistoryEventWire> for HistoryEvent {
     type Error = &'static str;
@@ -98,6 +111,7 @@ impl TryFrom<HistoryEventWire> for HistoryEvent {
             ordinal: w.ordinal,
             outcome: w.outcome,
             status: w.status,
+            approval: w.approval,
         };
         if event.valid() {
             Ok(event)
@@ -139,6 +153,7 @@ impl HistoryEvent {
             ordinal,
             outcome,
             status,
+            approval: None,
         }
     }
     pub(crate) fn valid(&self) -> bool {
@@ -159,6 +174,11 @@ impl HistoryEvent {
             && self.credentials.iter().all(|c| text(&c.label))
             && (self.at_unix_seconds.is_some() || self.outcome == HistoryOutcome::LegacyUnknown)
             && self.ssh.as_ref().is_none_or(|ssh| ssh.valid())
+            && self.approval.as_ref().is_none_or(|method| match method {
+                ApprovalMethod::Biometric { key_id } => {
+                    self.outcome == HistoryOutcome::Approved && super::valid_sha256(key_id)
+                }
+            })
             && self.consistent_outcome()
     }
     fn consistent_outcome(&self) -> bool {
@@ -241,6 +261,7 @@ impl HistoryEvent {
         // Earlier snapshots precede the POST; only the terminal snapshot must
         // carry the latest durable certainty. Historical events never change.
         expected.write_receipt.clone_from(&self.write_receipt);
+        expected.approval.clone_from(&self.approval);
         if self.write_receipt.as_ref().is_some_and(|receipt| {
             record.write_receipt.as_ref().is_none_or(|latest| {
                 receipt.attempt_id != latest.attempt_id
