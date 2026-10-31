@@ -54,7 +54,7 @@ pub(crate) fn hex32(value: &str) -> Option<[u8; 32]> {
         return None;
     }
     let mut out = [0u8; 32];
-    for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         let digit = |b: u8| match b {
             b'0'..=b'9' => Some(b - b'0'),
             b'a'..=b'f' => Some(b - b'a' + 10),
@@ -110,10 +110,8 @@ fn canonical(value: &serde_json::Value, out: &mut String) -> Option<()> {
         Value::Number(n) => {
             if let Some(v) = n.as_u64() {
                 out.push_str(&v.to_string());
-            } else if let Some(v) = n.as_i64() {
-                out.push_str(&v.to_string());
             } else {
-                return None;
+                out.push_str(&n.as_i64()?.to_string());
             }
         }
         Value::String(s) => out.push_str(&serde_json::to_string(s).ok()?),
