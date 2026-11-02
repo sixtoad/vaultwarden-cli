@@ -51,7 +51,12 @@ pub struct ProviderSession {
     support: BiometricSupport,
     prepared: Option<u64>,
     biometric: Biometric,
+    /// The request whose Touch ID result is still open; `None` once definite.
     proof_id: Option<String>,
+    /// The provider identity that refused a version 2 review. Survives
+    /// `configure` and re-pinning: that provider keeps version 1 reviews for
+    /// the life of this process (an app restart retries version 2).
+    unsupported_provider: Option<String>,
 }
 impl ProviderSession {
     pub fn configure(&mut self, uncertain_id: &str) -> Result<(), &'static str> {
@@ -214,6 +219,7 @@ impl ProviderSession {
                 self.invalidate();
                 self.unresolved = Some(request_id.clone());
                 self.proof_id = None;
+                self.biometric = Biometric::None;
                 self.status_id = request_id.clone();
                 self.status_text = "Decision in flight; it may have committed.".into();
             }
@@ -266,7 +272,12 @@ impl ProviderSession {
         let pin = Pin::new(provider_identity, approval_client).ok_or(Refusal::NotPinned)?;
         if self.pin.as_ref() != Some(&pin) {
             self.invalidate();
-            self.support = BiometricSupport::Requested;
+            self.support =
+                if self.unsupported_provider.as_deref() == Some(pin.provider_identity.as_str()) {
+                    BiometricSupport::Unsupported
+                } else {
+                    BiometricSupport::Requested
+                };
         }
         self.pin = Some(pin);
         Ok(())
@@ -300,6 +311,10 @@ impl ProviderSession {
         };
         let transcript = v2::approval_transcript(&received, self.pin.as_ref())?;
         Ok((reviewed.response.review.id.clone(), transcript))
+    }
+    /// The pinned identities, which the Touch ID key session must match.
+    pub fn pinned(&self) -> Option<&Pin> {
+        self.pin.as_ref()
     }
     pub fn biometric_state(&self) -> ProviderBiometricState {
         let binding = self
@@ -414,6 +429,10 @@ impl ProviderSession {
                         ErrorCode::InvalidRequest | ErrorCode::Unauthorized => Biometric::Rejected,
                         ErrorCode::Unavailable => Biometric::OutcomeUnknown,
                     };
+                    if self.biometric != Biometric::OutcomeUnknown {
+                        // Definite: a later status poll never rewrites it.
+                        self.proof_id = None;
+                    }
                 }
                 self.invalidate();
                 self.authority = None;
@@ -431,6 +450,8 @@ impl ProviderSession {
                 {
                     // An older provider: keep version 1 reviews and passwords.
                     self.support = BiometricSupport::Unsupported;
+                    self.unsupported_provider =
+                        self.pin.as_ref().map(|p| p.provider_identity.clone());
                     self.message = "Provider does not offer Touch ID approval. Refresh and review the request again to approve with a password.".into();
                     return;
                 }
@@ -536,6 +557,9 @@ impl ProviderSession {
                     return Err("review");
                 }
                 self.message = reply.review.status.summary();
+                // A new review starts with no Touch ID result on display.
+                self.biometric = Biometric::None;
+                self.proof_id = None;
                 self.reviewed = Some(Reviewed {
                     response: reply,
                     started: flight.started,
@@ -555,6 +579,9 @@ impl ProviderSession {
                         Status::Pending {} => Biometric::OutcomeUnknown,
                         _ => Biometric::Rejected,
                     };
+                    if self.biometric != Biometric::OutcomeUnknown {
+                        self.proof_id = None;
+                    }
                 }
                 self.status_id = flight.id.clone();
                 self.status_progress = match reply.status {

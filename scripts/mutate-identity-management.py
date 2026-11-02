@@ -13,7 +13,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATIONS = {
-    "explicit-administrator": ("src/adapters/companion/management.rs", [("if !identity::administrator(&service.identity_store, actor) {", "if false {")]),
+    "explicit-administrator": ("src/adapters/companion/management.rs", [("if !own_detail && !identity::administrator(&service.identity_store, actor) {", "if false {")]),
     "exact-target": ("src/adapters/companion/management.rs", [("&& t.target == target", "&& true")]),
     "exact-action": ("src/adapters/companion/management.rs", [("&& t.action_id == action_id", "&& true")]),
     "authority-generation": ("src/access/application.rs", [(".is_none_or(|a| a.generation != generation)", ".is_none_or(|_| false)")]),
@@ -40,6 +40,9 @@ MUTATIONS = {
     "biometric-ticket-exact-target": ("src/adapters/companion/management.rs", [("&& t.target == *expected_target", "&& true")]),
     "biometric-ticket-one-per-actor": ("src/adapters/companion/management.rs", [("&& !(t.actor == actor && t.purpose == Purpose::Biometric(operation))", "")]),
     "biometric-own-device-enroll": ("src/adapters/companion/management.rs", [("&& (target.id == actor", "&& (true")]),
+    # PR B: a non-administrator reads only its OWN version 3 detail row.
+    "biometric-own-detail-only-self": ("src/adapters/companion/management.rs", [("if target.kind == Kind::ApprovalClient && target.id == actor);", "if target.kind == Kind::ApprovalClient);")]),
+    "biometric-own-detail-only-v3": ("src/adapters/companion/management.rs", [("Command::IdentityDetail { version: 3, target }", "Command::IdentityDetail { target, .. }")]),
 }
 BIOMETRIC = [name for name in MUTATIONS if name.startswith("biometric-")]
 

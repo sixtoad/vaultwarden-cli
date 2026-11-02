@@ -9,7 +9,7 @@
 //! `provider_finish`; key-management work goes through `biometric_key_finish`.
 use super::provider::ProviderWork;
 use crate::provider::{biometric::BiometricKeySession, session::ProviderSession};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 /// Why the companion refuses to produce or send a Touch ID proof. Every value
 /// is a local refusal: nothing was sent to the provider.
@@ -157,7 +157,7 @@ pub struct BiometricEnrollRequest {
     pub transcript: Vec<u8>,
 }
 
-fn keys() -> &'static Mutex<BiometricKeySession> {
+pub(crate) fn keys() -> &'static Mutex<BiometricKeySession> {
     static SESSION: OnceLock<Mutex<BiometricKeySession>> = OnceLock::new();
     SESSION.get_or_init(|| Mutex::new(BiometricKeySession::default()))
 }
@@ -167,10 +167,21 @@ fn provider<T>(f: impl FnOnce(&mut ProviderSession) -> T) -> Result<T, Biometric
         .map_err(|_| BiometricRefusal::NotConfigured)?;
     Ok(f(&mut state))
 }
+/// The key session, locked, after the pin rule: its pin must equal the
+/// provider session's current pin (read first; the two locks are never held
+/// together). A mismatch resets the key session and refuses `NotPinned`.
+fn pinned_keys() -> Result<MutexGuard<'static, BiometricKeySession>, BiometricRefusal> {
+    let current = provider(|s| s.pinned().cloned())?;
+    let mut s = keys().lock().map_err(|_| BiometricRefusal::NotConfigured)?;
+    s.require_pin(current.as_ref())?;
+    Ok(s)
+}
 
 /// Pin the provider leaf SHA-256 and this device's client leaf SHA-256 (both
 /// 64 lowercase hex). Call after every `provider_configure`; configuration
-/// clears the pin. Pinning retires any current review so the next one is v2.
+/// clears this pin and resets the key session (`biometric_key_configure`).
+/// Pinning new values retires any current review so the next one is v2,
+/// unless this provider already refused v2 (then v1 for the process lifetime).
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_biometric_pin(
     provider_identity: String,
@@ -202,26 +213,31 @@ pub fn provider_biometric_begin(
     provider(|s| s.begin_biometric(handle, &key_id, &signature))?
 }
 
+/// Pin the key session with the SAME values just given to
+/// `provider_biometric_pin` (refused `NotPinned` otherwise). Every key call
+/// re-checks that rule; `provider_configure` resets the key session.
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_configure(
     provider_identity: String,
     approval_client: String,
 ) -> Result<BiometricKeySnapshot, BiometricRefusal> {
+    let current = provider(|s| s.pinned().cloned())?;
     let mut s = keys().lock().map_err(|_| BiometricRefusal::NotConfigured)?;
     s.configure(&provider_identity, &approval_client)?;
+    s.require_pin(current.as_ref())?;
     Ok(s.snapshot())
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_snapshot() -> Result<BiometricKeySnapshot, BiometricRefusal> {
+    let current = provider(|s| s.pinned().cloned())?;
     let mut s = keys().lock().map_err(|_| BiometricRefusal::NotConfigured)?;
+    // A stale pin resets the session so the snapshot shows it unconfigured.
+    let _pinned = s.require_pin(current.as_ref());
     Ok(s.snapshot())
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_begin(command: BiometricKeyCommand) -> Result<ProviderWork, BiometricRefusal> {
-    keys()
-        .lock()
-        .map_err(|_| BiometricRefusal::NotConfigured)?
-        .begin(command)
+    pinned_keys()?.begin(command)
 }
 /// The enrollment proof-of-possession transcript for `public_key` (65-byte
 /// uncompressed SEC1) under the current `PrepareEnroll` ticket.
@@ -229,10 +245,7 @@ pub fn biometric_key_begin(command: BiometricKeyCommand) -> Result<ProviderWork,
 pub fn biometric_key_enroll_transcript(
     public_key: Vec<u8>,
 ) -> Result<BiometricEnrollRequest, BiometricRefusal> {
-    keys()
-        .lock()
-        .map_err(|_| BiometricRefusal::NotConfigured)?
-        .enroll_transcript(&public_key)
+    pinned_keys()?.enroll_transcript(&public_key)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_begin_enroll(
@@ -240,17 +253,11 @@ pub fn biometric_key_begin_enroll(
     public_key: Vec<u8>,
     signature: Vec<u8>,
 ) -> Result<ProviderWork, BiometricRefusal> {
-    keys()
-        .lock()
-        .map_err(|_| BiometricRefusal::NotConfigured)?
-        .begin_enroll(password, &public_key, &signature)
+    pinned_keys()?.begin_enroll(password, &public_key, &signature)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_begin_revoke(password: String) -> Result<ProviderWork, BiometricRefusal> {
-    keys()
-        .lock()
-        .map_err(|_| BiometricRefusal::NotConfigured)?
-        .begin_revoke(password)
+    pinned_keys()?.begin_revoke(password)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_finish(

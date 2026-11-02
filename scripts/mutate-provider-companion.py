@@ -56,6 +56,13 @@ mutations = {
     "v2-proof-key": ("session.rs", [("if key_id != signing.key_id {", "if false {")]),
     "v2-enroll-provider-pin": ("biometric.rs", [("|| r.provider_identity != pin.provider_identity", "|| false")]),
     "v2-enroll-local-proof": ("biometric.rs", [("if !v2::verify(public_key, &transcript, signature) {", "if false {")]),
+    # PR B patch round: sticky fallback, result lifetime, pin rule, ticket kept.
+    "v2-sticky-fallback": ("session.rs", [("if self.unsupported_provider.as_deref() == Some(pin.provider_identity.as_str()) {", "if false {")]),
+    "v2-review-clears-result": ("session.rs", [("// A new review starts with no Touch ID result on display.\n                self.biometric = Biometric::None;", "")]),
+    "v2-definite-error-final": ("session.rs", [("// Definite: a later status poll never rewrites it.\n                        self.proof_id = None;", "")]),
+    "v2-definite-status-final": ("session.rs", [("Biometric::Rejected,\n                    };\n                    if self.biometric != Biometric::OutcomeUnknown {", "Biometric::Rejected,\n                    };\n                    if false {")]),
+    "v2-key-pin-rule": ("biometric.rs", [("if self.pin.is_some() && self.pin.as_ref() == current {", "if self.pin.is_some() {")]),
+    "v2-key-ticket-kept-on-oversize": ("biometric.rs", [("        let mut bytes = bytes?;\n", "        self.ticket = None;\n        let mut bytes = bytes?;\n")]),
 }
 if args.only:
     mutations = {name: mutations[name] for name in args.only}

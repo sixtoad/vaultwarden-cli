@@ -701,6 +701,8 @@ fn key_exchange(s: &mut BiometricKeySession, command: KeyCommand, reply: Value) 
     s.finish(work.token, &serde_json::to_vec(&reply).unwrap());
     serde_json::from_slice(&work.body).unwrap()
 }
+/// The provider's `identity_detail` v3 answer to a non-administrator reading
+/// its OWN row (the only target this session sends): roles `["approve"]`.
 fn row(key_id: Value) -> Value {
     json!({"version":3,"identity":{"kind":"approval_client","id":CLIENT,"label":"This Mac","fingerprint":CLIENT,
         "roles":["approve"],"trust":"enabled","this_client":true,"biometric_key_id":key_id},"generation":4})
@@ -742,11 +744,24 @@ fn identity_detail_v3_reports_this_devices_current_key_id() {
         key_exchange(&mut s, KeyCommand::Read, bad);
         assert_eq!(s.snapshot().outcome, KeyOutcome::Invalid);
     }
+    // A row for another device is never accepted, whatever the provider sends.
     let mut other = row(Value::Null);
     other["identity"]["id"] = "f".repeat(64).into();
     other["identity"]["fingerprint"] = "f".repeat(64).into();
     key_exchange(&mut s, KeyCommand::Read, other);
     assert_eq!(s.snapshot().outcome, KeyOutcome::Invalid);
+    // What the provider answers a non-administrator for any other target: a
+    // refusal, not an older provider.
+    key_exchange(&mut s, KeyCommand::Read, row(json!("a".repeat(64))));
+    key_exchange(
+        &mut s,
+        KeyCommand::Read,
+        json!({"version":1,"error":"unauthorized"}),
+    );
+    assert_eq!(
+        (s.snapshot().state, s.snapshot().outcome),
+        (KeyState::Enrolled, KeyOutcome::Rejected)
+    );
     key_exchange(
         &mut s,
         KeyCommand::Read,
@@ -918,4 +933,164 @@ fn revocation_sends_the_closed_command_and_maps_password_rejection() {
         json!({"version":1,"error":"invalid_request"}),
     );
     assert_eq!(s.snapshot().state, KeyState::Unsupported);
+}
+
+// ---- patch round: pin rule, sticky fallback, result lifetime, sizes ------
+
+#[test]
+fn key_session_operates_only_under_the_provider_sessions_pin() {
+    let action = "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk";
+    let current = Pin::new(PROVIDER, CLIENT).unwrap();
+    let mut s = keys();
+    assert_eq!(s.require_pin(Some(&current)), Ok(()));
+    key_exchange(
+        &mut s,
+        KeyCommand::PrepareEnroll,
+        prepared("enroll", TICKET, action),
+    );
+    let request = s.enroll_transcript(&pk_of(&key())).unwrap();
+    let switched = Pin::new(&"4c".repeat(32), CLIENT).unwrap();
+    assert_eq!(s.require_pin(Some(&switched)), Err(Refusal::NotPinned));
+    assert_eq!(s.require_pin(None), Err(Refusal::NotPinned));
+    assert!(!s.snapshot().configured && !s.snapshot().can_enroll);
+    s.configure(PROVIDER, CLIENT).unwrap();
+    assert_eq!(
+        s.begin_enroll(
+            "fresh".into(),
+            &pk_of(&key()),
+            &sign(&key(), &request.transcript)
+        )
+        .err()
+        .unwrap(),
+        Refusal::NoPreparedOperation
+    );
+    // A provider reconfiguration resets the session the same way.
+    key_exchange(
+        &mut s,
+        KeyCommand::PrepareRevoke,
+        prepared("revoke", TICKET, action),
+    );
+    assert!(s.snapshot().can_revoke);
+    s.reset();
+    assert!(!s.snapshot().configured && !s.snapshot().can_revoke);
+    assert_eq!(
+        s.begin_revoke("fresh".into()).err().unwrap(),
+        Refusal::NotPinned
+    );
+}
+
+#[test]
+fn password_fallback_sticks_to_the_provider_across_reconfiguration_and_repinning() {
+    let mut session = connected(true);
+    exchange(
+        &mut session,
+        Command::Review,
+        ID,
+        br#"{"version":1,"error":"invalid_request"}"#,
+    );
+    let unsupported = |s: &ProviderSession| s.biometric_state().support;
+    assert_eq!(unsupported(&session), BiometricSupport::Unsupported);
+    session.pin(PROVIDER, CLIENT).unwrap();
+    assert_eq!(unsupported(&session), BiometricSupport::Unsupported);
+    session.configure("").unwrap();
+    session.pin(PROVIDER, CLIENT).unwrap();
+    assert_eq!(unsupported(&session), BiometricSupport::Unsupported);
+    exchange(
+        &mut session,
+        Command::Session,
+        "",
+        br#"{"version":1,"state":"unlocked","generation":1}"#,
+    );
+    let body = exchange(
+        &mut session,
+        Command::Review,
+        ID,
+        &serde_json::to_vec(&review_v1()).unwrap(),
+    );
+    assert_eq!(body["version"], 1, "no second failed v2 review");
+    assert!(session.snapshot().can_decide);
+    // Another provider is asked for version 2 again.
+    session.pin(&"4c".repeat(32), CLIENT).unwrap();
+    assert_eq!(unsupported(&session), BiometricSupport::Requested);
+}
+
+#[test]
+fn a_new_review_never_shows_the_previous_touch_id_result() {
+    let (mut session, token, _) = proof_sent();
+    session.finish(token, br#"{"version":2,"status":{"status":"approved"}}"#);
+    assert_eq!(session.biometric_state().result, Biometric::Approved);
+    exchange(
+        &mut session,
+        Command::Review,
+        ID,
+        &serde_json::to_vec(&review_v2()).unwrap(),
+    );
+    assert_eq!(session.biometric_state().result, Biometric::None);
+    // A password decision on it also starts from no Touch ID result.
+    send(&mut session, Command::Deny, "", "");
+    assert_eq!(session.biometric_state().result, Biometric::None);
+}
+
+#[test]
+fn a_definite_touch_id_result_is_never_rewritten_by_a_later_status_poll() {
+    for (reply, result) in [
+        (&br#"{"version":1,"error":"stale"}"#[..], Biometric::Stale),
+        (
+            br#"{"version":2,"status":{"status":"approved"}}"#,
+            Biometric::Approved,
+        ),
+        (
+            br#"{"version":2,"status":{"status":"denied"}}"#,
+            Biometric::Rejected,
+        ),
+    ] {
+        let (mut session, token, _) = proof_sent();
+        session.finish(token, reply);
+        assert_eq!(session.biometric_state().result, result);
+        for status in [
+            &br#"{"version":1,"status":{"status":"pending"}}"#[..],
+            br#"{"version":1,"status":{"status":"running"}}"#,
+        ] {
+            exchange(&mut session, Command::Status, ID, status);
+            assert_eq!(session.biometric_state().result, result);
+        }
+    }
+}
+
+#[test]
+fn an_oversize_key_mutation_is_refused_locally_and_keeps_its_ticket() {
+    let action = "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk";
+    // Valid length (4096 bytes) but each byte escapes to six in JSON.
+    let oversize = "\u{1}".repeat(4096);
+    let mut s = keys();
+    key_exchange(
+        &mut s,
+        KeyCommand::PrepareEnroll,
+        prepared("enroll", TICKET, action),
+    );
+    let request = s.enroll_transcript(&pk_of(&key())).unwrap();
+    let signature = sign(&key(), &request.transcript);
+    assert_eq!(
+        s.begin_enroll(oversize.clone(), &pk_of(&key()), &signature)
+            .err()
+            .unwrap(),
+        Refusal::RequestTooLarge
+    );
+    assert!(s.snapshot().can_enroll, "nothing sent, ticket kept");
+    assert!(s
+        .begin_enroll("fresh".into(), &pk_of(&key()), &signature)
+        .is_ok());
+
+    let mut s = keys();
+    key_exchange(
+        &mut s,
+        KeyCommand::PrepareRevoke,
+        prepared("revoke", TICKET, action),
+    );
+    assert_eq!(
+        s.begin_revoke(oversize).err().unwrap(),
+        Refusal::RequestTooLarge
+    );
+    assert!(s.snapshot().can_revoke, "nothing sent, ticket kept");
+    assert!(s.begin_revoke("fresh".into()).is_ok());
 }

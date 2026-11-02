@@ -213,6 +213,12 @@ An administrator may also revoke (never enroll) another device's key.
 * `identity_list` / `identity_detail` with `version:3` add
   `biometric_key_id` (hex or null) to every row (null for agents). Version 2
   rows are unchanged because the companion parses them as closed objects.
+  `identity_list` and every other `identity_detail` stay administrator-only,
+  with one exception: any enabled approval client may read its OWN row with
+  `{"version":3,"command":"identity_detail","target":{"kind":"approval_client","id":<its own fp>}}`
+  (read-only; this is how a device learns its current key id). A
+  non-administrator asking for another target, or for its own row with
+  `version:2`, gets `unauthorized`.
 
 Device revocation (online `identity_revoke` and offline `companion revoke`)
 removes the device's key and retires its id in the same registry write. Key

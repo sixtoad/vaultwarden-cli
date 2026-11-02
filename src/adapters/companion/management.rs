@@ -373,7 +373,11 @@ pub(super) fn dispatch(
         ) {
             return biometric(service, actor, command, app, root);
         }
-        if !identity::administrator(&service.identity_store, actor) {
+        // A device reads its own version 3 row (its Touch ID key id) without
+        // administrator rights; every other read and mutation stays admin-only.
+        let own_detail = matches!(&command, Command::IdentityDetail { version: 3, target }
+            if target.kind == Kind::ApprovalClient && target.id == actor);
+        if !own_detail && !identity::administrator(&service.identity_store, actor) {
             return Err(Error::Unauthorized);
         }
         let (generation, epoch) = app

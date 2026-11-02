@@ -136,9 +136,17 @@ pub fn provider_snapshot() -> ProviderSnapshot {
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_configure(uncertain_id: String) -> Result<ProviderSnapshot, String> {
-    let mut state = session().lock().map_err(|_| "Provider core unavailable.")?;
-    state.configure(&uncertain_id)?;
-    Ok(state.snapshot())
+    let snapshot = {
+        let mut state = session().lock().map_err(|_| "Provider core unavailable.")?;
+        state.configure(&uncertain_id)?;
+        state.snapshot()
+    };
+    // The provider pin is gone: so are the key session's pin and tickets.
+    super::biometric::keys()
+        .lock()
+        .map_err(|_| "Provider core unavailable.")?
+        .reset();
+    Ok(snapshot)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_invalidate() -> ProviderSnapshot {

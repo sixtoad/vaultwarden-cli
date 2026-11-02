@@ -181,10 +181,29 @@ refuses (typed `BiometricRefusal`) on any digest, identity, request,
 generation, ticket or policy mismatch; it never checks the provider's ticket
 deadline against the local clock. `provider_biometric_begin` sends Decision v2
 with `proof` and is finished by `provider_finish`, with the same single-shot
-and status-only recovery as a password approval. `biometric_key_*` reads the
-device's `biometric_key_id` (`identity_detail` version 3) and runs
-`biometric_prepare`/`biometric_enroll`/`biometric_revoke`; enrollment proofs
-are verified locally before sending. The synthetic v1 lifecycle is unchanged.
+and status-only recovery as a password approval. `BiometricSigningRequest.handle`
+is a Rust `u64` (a `BigInt` in the generated Dart): pass it back unchanged.
+The fallback to version 1 is sticky per provider identity for the life of the
+process: reconfiguring and re-pinning the same provider does not retry
+version 2 (an app restart does); a different provider is asked again. The
+Touch ID result (`ProviderBiometricState.result`) is cleared when a new review
+is accepted or a password decision is sent, and once definite it is never
+rewritten by a later status poll.
+
+Key management uses a second session. After `provider_biometric_pin`, call
+`biometric_key_configure` with the SAME two values. **Pin rule:** every key
+call (`biometric_key_begin`, `_enroll_transcript`, `_begin_enroll`,
+`_begin_revoke`, `_snapshot`) first compares the key session's pin with the
+provider session's current pin; if they differ (or the provider is unpinned)
+the key session is reset (pin, tickets, prepared key and read state dropped)
+and the call refuses `NotPinned`. `provider_configure` also resets it, so a
+ticket prepared for one provider can never be submitted to another. The key
+session reads this device's `biometric_key_id` with `identity_detail`
+version 3 for its own device, which the provider allows without administrator
+rights, and runs `biometric_prepare`/`biometric_enroll`/`biometric_revoke`;
+enrollment proofs are verified locally before sending, and a body over the
+16 KiB request limit is refused locally without consuming the ticket. Finish
+key work with `biometric_key_finish`. The synthetic v1 lifecycle is unchanged.
 
 ## Preserved synthetic contract and lifecycle
 

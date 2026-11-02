@@ -142,6 +142,28 @@ impl BiometricKeySession {
         self.ticket = None;
         self.enroll_key = None;
     }
+    /// Forget the pin and every ticket, prepared key and read state: the
+    /// provider was reconfigured. A request in flight finishes as stale
+    /// (reads) or outcome unknown (mutations); nothing is resent.
+    pub fn reset(&mut self) {
+        self.invalidate();
+        self.pin = None;
+        self.state = KeyState::Unknown;
+        self.key_id.clear();
+        self.outcome = Outcome::None;
+        self.message = "Provider changed. Pin it again before managing Touch ID.".into();
+    }
+    /// The pin rule: this session operates only while its pin equals the
+    /// provider session's pin (`current`). A mismatch resets it.
+    pub fn require_pin(&mut self, current: Option<&Pin>) -> Result<(), Refusal> {
+        if self.pin.is_some() && self.pin.as_ref() == current {
+            return Ok(());
+        }
+        if self.pin.is_some() {
+            self.reset();
+        }
+        Err(Refusal::NotPinned)
+    }
     fn own(&self) -> Result<Target, Refusal> {
         let pin = self.pin.as_ref().ok_or(Refusal::NotPinned)?;
         Ok(Target {
@@ -254,22 +276,17 @@ impl BiometricKeySession {
         if !v2::verify(public_key, &transcript, signature) {
             return Err(Refusal::InvalidSignature);
         }
-        let ticket = self.ticket.take().expect("checked ticket").prepared;
         let mut body = serde_json::json!({
             "version": 2,
             "command": "biometric_enroll",
-            "action_id": ticket.action_id,
-            "ticket": ticket.ticket,
+            "action_id": prepared.action_id,
+            "ticket": prepared.ticket,
             "password": password.as_str(),
             "public_key": v2::base64url(public_key),
             "enroll_signature": v2::base64url(signature),
         });
-        self.send_mutation(
-            Sent::Enroll,
-            ticket.action_id,
-            public_key.to_vec(),
-            &mut body,
-        )
+        let action_id = prepared.action_id.clone();
+        self.send_mutation(Sent::Enroll, action_id, public_key.to_vec(), &mut body)
     }
     pub fn begin_revoke(&mut self, password: String) -> Result<ProviderWork, Refusal> {
         let password = Zeroizing::new(password);
@@ -280,17 +297,20 @@ impl BiometricKeySession {
         if password.is_empty() || password.len() > 4096 {
             return Err(Refusal::InvalidPassword);
         }
-        let ticket = self.ticket.take().expect("checked ticket").prepared;
+        let prepared = &self.ticket.as_ref().expect("checked ticket").prepared;
         let mut body = serde_json::json!({
             "version": 2,
             "command": "biometric_revoke",
             "target": target,
-            "action_id": ticket.action_id,
-            "ticket": ticket.ticket,
+            "action_id": prepared.action_id,
+            "ticket": prepared.ticket,
             "password": password.as_str(),
         });
-        self.send_mutation(Sent::Revoke, ticket.action_id, Vec::new(), &mut body)
+        let action_id = prepared.action_id.clone();
+        self.send_mutation(Sent::Revoke, action_id, Vec::new(), &mut body)
     }
+    /// Consumes the ticket only once the body is known to be sendable: a local
+    /// refusal (an oversize body) keeps the ticket for a corrected retry.
     fn send_mutation(
         &mut self,
         sent: Sent,
@@ -304,8 +324,13 @@ impl BiometricKeySession {
                 v.zeroize();
             }
         }
+        let mut bytes = bytes?;
+        if bytes.len() > REQUEST_LIMIT {
+            bytes.zeroize();
+            return Err(Refusal::RequestTooLarge);
+        }
         self.invalidate();
-        self.launch(sent, action_id, public_key, bytes?)
+        self.launch(sent, action_id, public_key, bytes)
     }
     fn launch(
         &mut self,
