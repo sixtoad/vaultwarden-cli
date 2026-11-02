@@ -1,4 +1,9 @@
+use super::approval_v2::{self as v2, ApprovalBinding, Pin, ReceivedReview};
 use super::protocol::*;
+use crate::api::biometric::{
+    BiometricDecisionResult as Biometric, BiometricRefusal as Refusal, BiometricSigningRequest,
+    BiometricSupport, ProviderBiometricState,
+};
 use crate::api::provider::{
     ProviderCommand as Command, ProviderHistoryEvent, ProviderHistoryState, ProviderOutcome,
     ProviderSnapshot, ProviderStatusProgress, ProviderWork,
@@ -9,6 +14,8 @@ use zeroize::Zeroizing;
 struct Reviewed {
     response: ReviewResponse,
     started: Instant,
+    /// Version 2 only: the `review` member as received and the binding.
+    signed: Option<(serde_json::Value, Option<ApprovalBinding>)>,
 }
 struct Flight {
     token: u32,
@@ -16,6 +23,9 @@ struct Flight {
     command: Command,
     id: String,
     started: Instant,
+    /// A version 2 review request, or a version 2 Touch ID decision.
+    v2: bool,
+    proof: bool,
 }
 
 /// One foreground session. Reads are generation-scoped; a sent decision survives
@@ -37,6 +47,11 @@ pub struct ProviderSession {
     message: String,
     outcome: ProviderOutcome,
     status_progress: ProviderStatusProgress,
+    pin: Option<Pin>,
+    support: BiometricSupport,
+    prepared: Option<u64>,
+    biometric: Biometric,
+    proof_id: Option<String>,
 }
 impl ProviderSession {
     pub fn configure(&mut self, uncertain_id: &str) -> Result<(), &'static str> {
@@ -49,6 +64,11 @@ impl ProviderSession {
         }
         self.unresolved = (!uncertain_id.is_empty()).then(|| uncertain_id.to_string());
         self.configured = true;
+        // A (re)configured provider must be pinned again before Touch ID.
+        self.pin = None;
+        self.support = BiometricSupport::Unpinned;
+        self.biometric = Biometric::None;
+        self.proof_id = None;
         self.authority = None;
         self.requests.clear();
         self.status_id.clear();
@@ -62,6 +82,7 @@ impl ProviderSession {
     pub fn invalidate(&mut self) {
         self.epoch = self.epoch.checked_add(1).expect("provider epoch exhausted");
         self.reviewed = None;
+        self.prepared = None;
         self.history.clear();
         self.history_state = ProviderHistoryState::Idle;
     }
@@ -154,6 +175,9 @@ impl ProviderSession {
             }
             Command::Review => {
                 self.invalidate();
+                if self.support == BiometricSupport::Requested {
+                    request["version"] = 2.into();
+                }
                 request["command"] = "review".into();
                 request["request_id"] = request_id.clone().into();
             }
@@ -189,6 +213,7 @@ impl ProviderSession {
                 }
                 self.invalidate();
                 self.unresolved = Some(request_id.clone());
+                self.proof_id = None;
                 self.status_id = request_id.clone();
                 self.status_text = "Decision in flight; it may have committed.".into();
             }
@@ -219,11 +244,150 @@ impl ProviderSession {
             command,
             id: request_id,
             started: Instant::now(),
+            v2: request["version"] == 2,
+            proof: false,
         });
         self.message = "Contacting provider…".into();
         self.outcome = ProviderOutcome::None;
         Ok(ProviderWork {
             token: self.serial,
+            body,
+        })
+    }
+    /// Pin the provider leaf and this device's client leaf SHA-256 values.
+    /// Retires the current review so the next one is requested as version 2.
+    pub fn pin(&mut self, provider_identity: &str, approval_client: &str) -> Result<(), Refusal> {
+        if !self.configured {
+            return Err(Refusal::NotConfigured);
+        }
+        if self.flight.is_some() {
+            return Err(Refusal::Busy);
+        }
+        let pin = Pin::new(provider_identity, approval_client).ok_or(Refusal::NotPinned)?;
+        if self.pin.as_ref() != Some(&pin) {
+            self.invalidate();
+            self.support = BiometricSupport::Requested;
+        }
+        self.pin = Some(pin);
+        Ok(())
+    }
+    fn signing_transcript(&self) -> Result<(String, v2::SigningTranscript), Refusal> {
+        if !self.configured {
+            return Err(Refusal::NotConfigured);
+        }
+        if self.flight.is_some() {
+            return Err(Refusal::Busy);
+        }
+        if self.unresolved.is_some() {
+            return Err(Refusal::OutcomeUncertain);
+        }
+        let decidable = self.can_decide();
+        let reviewed = self
+            .reviewed
+            .as_ref()
+            .filter(|_| decidable)
+            .ok_or(Refusal::NoDecidableReview)?;
+        let (raw_review, binding) = reviewed
+            .signed
+            .as_ref()
+            .ok_or(Refusal::BindingUnavailable)?;
+        let received = ReceivedReview {
+            raw_review,
+            review: &reviewed.response.review,
+            ticket: reviewed.response.ticket.as_deref(),
+            generation: reviewed.response.generation,
+            binding: binding.as_ref(),
+        };
+        let transcript = v2::approval_transcript(&received, self.pin.as_ref())?;
+        Ok((reviewed.response.review.id.clone(), transcript))
+    }
+    pub fn biometric_state(&self) -> ProviderBiometricState {
+        let binding = self
+            .reviewed
+            .as_ref()
+            .and_then(|r| r.signed.as_ref())
+            .and_then(|(_, binding)| binding.as_ref());
+        let refusal = self.signing_transcript().err();
+        ProviderBiometricState {
+            support: self.support,
+            binding_available: binding.is_some(),
+            biometric_allowed: binding.is_some_and(|b| b.biometric_allowed),
+            key_id: binding.and_then(|b| b.key_id.clone()).unwrap_or_default(),
+            can_prepare: refusal.is_none(),
+            refusal,
+            result: self.biometric,
+        }
+    }
+    /// The exact transcript to sign for the current review. The review stays
+    /// usable for a password approval if Touch ID is cancelled.
+    pub fn prepare_biometric(&mut self) -> Result<BiometricSigningRequest, Refusal> {
+        let (request_id, signing) = self.signing_transcript()?;
+        self.prepared = Some(self.epoch);
+        Ok(BiometricSigningRequest {
+            handle: self.epoch,
+            request_id,
+            key_id: signing.key_id,
+            transcript: signing.transcript,
+        })
+    }
+    /// Send a Touch ID approval (Decision v2 with `proof`, never `password`).
+    /// Same single-shot and uncertain-outcome rules as a password approval.
+    pub fn begin_biometric(
+        &mut self,
+        handle: u64,
+        key_id: &str,
+        signature: &[u8],
+    ) -> Result<ProviderWork, Refusal> {
+        if self.prepared != Some(handle) || handle != self.epoch {
+            if self.flight.is_some() {
+                return Err(Refusal::Busy);
+            }
+            return Err(Refusal::StaleHandle);
+        }
+        // Every binding check runs again against the review as it is now.
+        let (request_id, signing) = self.signing_transcript()?;
+        if key_id != signing.key_id {
+            return Err(Refusal::KeyMismatch);
+        }
+        if !v2::valid_signature(signature) {
+            return Err(Refusal::InvalidSignature);
+        }
+        let serial = self.serial.checked_add(1).ok_or(Refusal::Busy)?;
+        let review = self.reviewed.take().ok_or(Refusal::NoDecidableReview)?;
+        let request = serde_json::json!({
+            "version": 2,
+            "command": "decision",
+            "request_id": request_id,
+            "ticket": review.response.ticket,
+            "decision": "approve",
+            "proof": {"key_id": signing.key_id, "signature": v2::base64url(signature)},
+        });
+        let body = serde_json::to_vec(&request).map_err(|_| Refusal::RequestTooLarge)?;
+        self.invalidate();
+        if body.len() > REQUEST_LIMIT {
+            // Not sent: no ambiguous commit to recover.
+            self.status_text = "Decision not sent: request exceeded the size limit.".into();
+            return Err(Refusal::RequestTooLarge);
+        }
+        self.unresolved = Some(request_id.clone());
+        self.proof_id = Some(request_id.clone());
+        self.biometric = Biometric::InFlight;
+        self.status_id = request_id.clone();
+        self.status_text = "Decision in flight; it may have committed.".into();
+        self.serial = serial;
+        self.flight = Some(Flight {
+            token: serial,
+            epoch: self.epoch,
+            command: Command::Approve,
+            id: request_id,
+            started: Instant::now(),
+            v2: true,
+            proof: true,
+        });
+        self.message = "Contacting provider…".into();
+        self.outcome = ProviderOutcome::None;
+        Ok(ProviderWork {
+            token: serial,
             body,
         })
     }
@@ -242,6 +406,15 @@ impl ProviderSession {
         }
         if let Ok(error) = decode::<ErrorResponse>(bytes) {
             if error.version == 1 {
+                if flight.proof {
+                    self.biometric = match error.error {
+                        ErrorCode::AuthenticationFailed => Biometric::PasswordRequired,
+                        ErrorCode::RateLimited => Biometric::RateLimited,
+                        ErrorCode::Stale => Biometric::Stale,
+                        ErrorCode::InvalidRequest | ErrorCode::Unauthorized => Biometric::Rejected,
+                        ErrorCode::Unavailable => Biometric::OutcomeUnknown,
+                    };
+                }
                 self.invalidate();
                 self.authority = None;
                 self.requests.clear();
@@ -250,6 +423,15 @@ impl ProviderSession {
                     self.history_state = ProviderHistoryState::Unavailable;
                     self.message =
                         "Activity unavailable from this provider. Refresh to reconnect.".into();
+                    return;
+                }
+                if flight.v2
+                    && flight.command == Command::Review
+                    && error.error == ErrorCode::InvalidRequest
+                {
+                    // An older provider: keep version 1 reviews and passwords.
+                    self.support = BiometricSupport::Unsupported;
+                    self.message = "Provider does not offer Touch ID approval. Refresh and review the request again to approve with a password.".into();
                     return;
                 }
                 if decision && error.error.definite_rejection() {
@@ -268,6 +450,9 @@ impl ProviderSession {
             }
         }
         if self.accept(&flight, bytes).is_err() {
+            if flight.proof {
+                self.biometric = Biometric::OutcomeUnknown;
+            }
             self.invalidate();
             self.authority = None;
             self.requests.clear();
@@ -335,8 +520,13 @@ impl ProviderSession {
                 self.requests = reply.requests;
             }
             Command::Review => {
-                let reply: ReviewResponse = decode(bytes)?;
-                if reply.version != 1
+                let (reply, signed) = if flight.v2 {
+                    let (reply, raw, binding) = v2::decode_review(bytes)?;
+                    (reply, Some((raw, binding)))
+                } else {
+                    (decode::<ReviewResponse>(bytes)?, None)
+                };
+                if reply.version != if flight.v2 { 2 } else { 1 }
                     || !reply.review.valid()
                     || reply.review.id != flight.id
                     || reply.ticket.as_ref().is_some_and(|t| !valid_hex(t))
@@ -349,12 +539,22 @@ impl ProviderSession {
                 self.reviewed = Some(Reviewed {
                     response: reply,
                     started: flight.started,
+                    signed,
                 });
             }
             Command::Approve | Command::Deny | Command::Status => {
                 let reply: StatusResponse = decode(bytes)?;
-                if reply.version != 1 {
+                if reply.version != if flight.proof { 2 } else { 1 } {
                     return Err("version");
+                }
+                if self.proof_id.as_deref() == Some(&flight.id) {
+                    self.biometric = match reply.status {
+                        Status::Approved {} | Status::Running {} | Status::Completed { .. } => {
+                            Biometric::Approved
+                        }
+                        Status::Pending {} => Biometric::OutcomeUnknown,
+                        _ => Biometric::Rejected,
+                    };
                 }
                 self.status_id = flight.id.clone();
                 self.status_progress = match reply.status {
@@ -410,6 +610,7 @@ mod tests {
                 } else {
                     Instant::now()
                 },
+                signed: None,
             });
             assert!(!session.can_decide());
             assert!(session.snapshot().review_text.is_empty());

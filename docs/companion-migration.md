@@ -167,6 +167,25 @@ hash. The app loads the library beside its own executable, not from the current
 working directory. The plain Dart FFI test deliberately loads the development
 library in `rust/target/release`.
 
+## Touch ID approval v2 bridge (issue 49)
+
+`companion/rust/src/api/biometric.rs` is the Rust side of production Touch ID
+approval (`docs/companion-protocol.md`, "Production Touch ID approval v2").
+After every `provider_configure`, call `provider_biometric_pin(<provider leaf
+SHA-256>, <client leaf SHA-256>)`; only a pinned session requests version 2
+reviews. A provider that answers a version 2 review with `invalid_request` is
+treated as older: the session returns to version 1 reviews and password
+approval. `provider_biometric_prepare` returns the exact transcript to sign,
+built from the received review JSON and the provider's `approval_binding`, and
+refuses (typed `BiometricRefusal`) on any digest, identity, request,
+generation, ticket or policy mismatch; it never checks the provider's ticket
+deadline against the local clock. `provider_biometric_begin` sends Decision v2
+with `proof` and is finished by `provider_finish`, with the same single-shot
+and status-only recovery as a password approval. `biometric_key_*` reads the
+device's `biometric_key_id` (`identity_detail` version 3) and runs
+`biometric_prepare`/`biometric_enroll`/`biometric_revoke`; enrollment proofs
+are verified locally before sending. The synthetic v1 lifecycle is unchanged.
+
 ## Preserved synthetic contract and lifecycle
 
 The UI can select only synthetic fixture 1 or 2. Rust supplies their complete

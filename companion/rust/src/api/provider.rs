@@ -123,7 +123,7 @@ pub struct ProviderSnapshot {
     pub status_text: String,
     pub message: String,
 }
-fn session() -> &'static Mutex<ProviderSession> {
+pub(crate) fn session() -> &'static Mutex<ProviderSession> {
     static SESSION: OnceLock<Mutex<ProviderSession>> = OnceLock::new();
     SESSION.get_or_init(|| Mutex::new(ProviderSession::default()))
 }
