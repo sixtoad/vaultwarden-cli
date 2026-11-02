@@ -102,16 +102,45 @@ impl ApprovalAuthenticator for Auth {
         }
     }
 }
+pub(crate) fn operation_draft() -> OperationPolicyDraft {
+    OperationPolicyDraft {
+        require_password: false,
+        id: "native-version".into(),
+        description: "Native synthetic approved launch".into(),
+        image_id: "native-ssh".into(),
+        targets: vec!["-V".into()],
+        arguments: vec![ArgumentSpec::Target],
+        credentials: vec![LoginCredentialDraft {
+            namespace: None,
+            item_id: "11111111-1111-1111-1111-111111111111".into(),
+            label: "Synthetic".into(),
+            use_type: CredentialUse::Login,
+            field_mappings: vec![LoginFieldMapping {
+                field: LoginField::Password,
+                environment: "NATIVE_TEST_VALUE".into(),
+            }],
+        }],
+        ssh: None,
+        create: None,
+    }
+}
+pub(crate) fn submission(operation: &str) -> DirectSubmission {
+    DirectSubmission {
+        operation: operation.into(),
+        revision: None,
+        values: vec!["-V".into()],
+    }
+}
 struct Launcher;
 impl DirectReviewLauncher for Launcher {
     fn launch(&self, _: &str) -> Result<(), DirectRequestError> {
         Ok(())
     }
 }
-struct Fixture {
-    root: tempfile::TempDir,
+pub(crate) struct Fixture {
+    pub(crate) root: tempfile::TempDir,
     app: Option<ProviderApplication>,
-    clock: Arc<AtomicU64>,
+    pub(crate) clock: Arc<AtomicU64>,
     resolved: Arc<AtomicUsize>,
     revision: String,
 }
@@ -122,10 +151,10 @@ impl Drop for Fixture {
     }
 }
 impl Fixture {
-    fn app(&self) -> &ProviderApplication {
+    pub(crate) fn app(&self) -> &ProviderApplication {
         self.app.as_ref().unwrap()
     }
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         use std::os::unix::fs::PermissionsExt;
         let root = tempfile::tempdir().unwrap();
         std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
@@ -158,25 +187,7 @@ impl Fixture {
             &NativeExecutablePreparer,
         )
         .unwrap();
-        let operation = OperationPolicyDraft {
-            id: "native-version".into(),
-            description: "Native synthetic approved launch".into(),
-            image_id: "native-ssh".into(),
-            targets: vec!["-V".into()],
-            arguments: vec![ArgumentSpec::Target],
-            credentials: vec![LoginCredentialDraft {
-                namespace: None,
-                item_id: "11111111-1111-1111-1111-111111111111".into(),
-                label: "Synthetic".into(),
-                use_type: CredentialUse::Login,
-                field_mappings: vec![LoginFieldMapping {
-                    field: LoginField::Password,
-                    environment: "NATIVE_TEST_VALUE".into(),
-                }],
-            }],
-            ssh: None,
-            create: None,
-        };
+        let operation = operation_draft();
         let revision = app
             .create_operation(app.human_owner(), operation)
             .unwrap()
@@ -1098,6 +1109,7 @@ fn native_create_reaches_producer_and_posts_only_after_successful_reaped_exit() 
             .create_operation(
                 f.app().human_owner(),
                 OperationPolicyDraft {
+                    require_password: false,
                     id: "native-create".into(),
                     description: "Native synthetic create".into(),
                     image_id: "native-ssh".into(),

@@ -45,6 +45,11 @@ pub struct OperationPolicyDraft {
     pub ssh: Option<SshOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub create: Option<CreateEffect>,
+    /// Refuse biometric (Touch ID) approval for requests under this policy;
+    /// only a fresh password approves. Absent means false. Bound into the
+    /// policy revision only when true, so existing revisions are unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub require_password: bool,
 }
 
 /// Operator-owned destination and exact producer schema. Updates have no variant.
@@ -379,6 +384,8 @@ pub(crate) struct OperationPolicy {
     ssh: Option<SshOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     create: Option<CreateEffect>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    require_password: bool,
     revision: String,
 }
 
@@ -421,6 +428,7 @@ impl OperationPolicy {
                 credentials: self.credentials.clone(),
                 ssh: self.ssh.clone(),
                 create: self.create.clone(),
+                require_password: self.require_password,
             },
             revision: self.revision.clone(),
         }
@@ -452,12 +460,16 @@ impl OperationPolicy {
             credentials: draft.credentials,
             ssh: draft.ssh,
             create: draft.create,
+            require_password: draft.require_password,
             revision,
         })
     }
 
     pub(crate) fn id(&self) -> &str {
         &self.id
+    }
+    pub(crate) fn require_password(&self) -> bool {
+        self.require_password
     }
     pub(crate) fn revision(&self) -> &str {
         &self.revision
@@ -602,6 +614,7 @@ impl OperationPolicy {
         )?;
         let rebuilt = Self::from_draft(
             OperationPolicyDraft {
+                require_password: self.require_password,
                 id: self.id.clone(),
                 description: self.description.clone(),
                 image_id: self.image.image_id.clone(),
@@ -642,6 +655,8 @@ struct StoredOperationPolicy {
     ssh: Option<SshOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     create: Option<CreateEffect>,
+    #[serde(default)]
+    require_password: bool,
     revision: String,
 }
 
@@ -665,6 +680,7 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
                 credentials: stored.credentials,
                 ssh: stored.ssh,
                 create: stored.create,
+                require_password: stored.require_password,
             },
             &image,
         )?;
@@ -1005,6 +1021,17 @@ fn canonicalize_draft(draft: &mut OperationPolicyDraft) {
 }
 
 fn revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
+    let base = base_revision_for(draft, image);
+    if draft.require_password {
+        hex_digest(
+            &serde_json::to_vec(&(5u8, "require_password", base))
+                .expect("password requirement projection serializes"),
+        )
+    } else {
+        base
+    }
+}
+fn base_revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
     if draft.create.is_some() || draft.credentials.iter().any(|c| c.namespace.is_some()) {
         return hex_digest(
             &serde_json::to_vec(&(4u8, draft, image)).expect("policy projection serializes"),
@@ -1112,6 +1139,7 @@ pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
 #[cfg(all(test, target_os = "linux"))]
 pub(crate) fn test_ssh_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        require_password: false,
         create: None,
         id: "ssh-backup".into(),
         description: "Back up the fixed resource".into(),
@@ -1463,6 +1491,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            require_password: false,
             create: None,
             ssh: None,
             id: "deploy-homelab".into(),
@@ -2211,6 +2240,7 @@ mod create_boundary_tests {
             effect.fields.extend(["password".into(), "notes".into()]);
             assert!(effect.valid());
             let draft = OperationPolicyDraft {
+                require_password: false,
                 id: "create-secret".into(),
                 description: "Create".into(),
                 image_id: "producer".into(),
@@ -2229,5 +2259,52 @@ mod create_boundary_tests {
                 assert!(!effect.valid());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod require_password_tests {
+    use super::*;
+    fn draft(require_password: bool) -> OperationPolicyDraft {
+        OperationPolicyDraft {
+            require_password,
+            id: "deploy".into(),
+            description: "Deploy".into(),
+            image_id: "deploy-image".into(),
+            targets: vec!["staging".into()],
+            arguments: vec![ArgumentSpec::Target],
+            credentials: vec![],
+            ssh: None,
+            create: None,
+        }
+    }
+    #[test]
+    fn biometric_require_password_is_parsed_defaulted_and_bound_into_revision() {
+        let image = ResolvedImage {
+            image_id: "deploy-image".into(),
+            execution_root: "/opt".into(),
+            path: "/opt/deploy".into(),
+            sha256: "a".repeat(64),
+            profile: ExecutionProfile::ReviewedSelfContainedElf64V1,
+        };
+        let plain = draft(false);
+        let strict = draft(true);
+        assert_ne!(revision_for(&plain, &image), revision_for(&strict, &image));
+        assert_eq!(
+            revision_for(&plain, &image),
+            base_revision_for(&plain, &image)
+        );
+        let json = serde_json::to_value(&plain).unwrap();
+        assert!(json.get("require_password").is_none());
+        let mut with_flag = json.clone();
+        with_flag["require_password"] = true.into();
+        assert_eq!(
+            serde_json::from_value::<OperationPolicyDraft>(with_flag).unwrap(),
+            strict
+        );
+        assert_eq!(
+            serde_json::from_value::<OperationPolicyDraft>(json).unwrap(),
+            plain
+        );
     }
 }

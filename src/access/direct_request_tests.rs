@@ -220,6 +220,7 @@ fn fixture_with_lifetime(lifetime: Duration) -> Fixture {
 }
 pub(crate) fn operation_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        require_password: false,
         create: None,
         ssh: None,
         id: "deploy".into(),
@@ -4861,7 +4862,7 @@ fn agent_provider_rechecks_revocation_without_application_tokens() {
         .unwrap();
     let approval = provider.prepare_direct(human, &review.id).unwrap();
     assert_eq!(
-        provider.decide_direct(&approval, true, now, || true),
+        provider.decide_direct(&approval, true, None, now, || true),
         Ok(DirectStatus::Approved)
     );
     let claim = provider

@@ -17,6 +17,7 @@ pub mod agent_binding;
 #[cfg(all(test, target_os = "linux"))]
 mod agent_binding_tests;
 pub mod application;
+pub mod approval_v2;
 pub mod direct_request;
 #[cfg(all(test, target_os = "linux"))]
 pub(crate) mod direct_request_tests;

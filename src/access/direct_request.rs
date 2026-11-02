@@ -426,8 +426,10 @@ pub(crate) struct PreparedApproval {
     pub(crate) binding: ApprovalBinding,
     pub(crate) generation: u64,
     pub(crate) companion_deadline: Option<std::time::Duration>,
+    /// The bound policy revision demands a fresh password (`require_password`).
+    pub(crate) password_required: bool,
 }
-pub(crate) struct AuthenticatedApproval(PreparedApproval);
+pub(crate) struct AuthenticatedApproval(PreparedApproval, Option<super::history::ApprovalMethod>);
 impl PreparedApproval {
     pub(crate) fn authenticate(
         self,
@@ -440,12 +442,44 @@ impl PreparedApproval {
         authenticator
             .authenticate(password)
             .map_err(|_error| DirectRequestError::AuthenticationFailed)?;
-        Ok(AuthenticatedApproval(self))
+        Ok(AuthenticatedApproval(self, None))
+    }
+    /// Production Touch ID approval (contract v2). The transcript is rebuilt
+    /// from this prepared binding and the provider-owned ticket context; the
+    /// companion contributes only the key id and the signature. `enrolled` is
+    /// the device's current key as recorded by the provider.
+    pub(crate) fn authenticate_biometric(
+        self,
+        context: &super::approval_v2::ApprovalContext<'_>,
+        proof: &super::approval_v2::BiometricProof,
+        enrolled: &super::approval_v2::EnrolledKey,
+        verifier: &dyn super::ports::BiometricApprovalVerifier,
+    ) -> Result<AuthenticatedApproval, DirectRequestError> {
+        use super::approval_v2 as v2;
+        if self.password_required
+            || self.companion_deadline.is_none()
+            || proof.key_id != enrolled.key_id
+            || !v2::valid_public_key(&enrolled.public_key)
+            || v2::key_id(&enrolled.public_key) != enrolled.key_id
+            || !v2::valid_signature_len(&proof.signature)
+        {
+            return Err(DirectRequestError::AuthenticationFailed);
+        }
+        let transcript =
+            v2::approval_transcript(context, &self.binding, self.generation, &enrolled.key_id)
+                .ok_or(DirectRequestError::AuthenticationFailed)?;
+        verifier
+            .verify(&enrolled.public_key, &transcript, &proof.signature)
+            .map_err(|_error| DirectRequestError::AuthenticationFailed)?;
+        let method = super::history::ApprovalMethod::Biometric {
+            key_id: enrolled.key_id.clone(),
+        };
+        Ok(AuthenticatedApproval(self, Some(method)))
     }
 }
 impl AuthenticatedApproval {
-    pub(crate) fn into_prepared(self) -> PreparedApproval {
-        self.0
+    pub(crate) fn into_parts(self) -> (PreparedApproval, Option<super::history::ApprovalMethod>) {
+        (self.0, self.1)
     }
 }
 pub(crate) fn arguments_digest(values: &[String]) -> String {

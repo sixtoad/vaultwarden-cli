@@ -4,8 +4,8 @@ use crate::access::{
     application::{ProviderApplication, SessionStatus},
     direct_request::{DirectRequestError, DirectReview, DirectStatus, valid_request_id},
     ports::{
-        ApprovalAuthenticator, DirectReviewLauncher, ExecutionDispatcher, SensitiveString,
-        SessionError,
+        ApprovalAuthenticator, BiometricApprovalVerifier, DirectReviewLauncher,
+        ExecutionDispatcher, SensitiveString, SessionError,
     },
 };
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
@@ -22,6 +22,8 @@ use std::{
     time::{Duration, Instant},
 };
 use zeroize::{Zeroize, Zeroizing};
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod biometric_tests;
 mod management;
 const MAX_BODY: usize = 16384;
 const MAX_TICKETS: usize = 256;
@@ -56,6 +58,30 @@ enum Command {
         target: management::Target,
         action_id: String,
     },
+    BiometricPrepare {
+        version: u8,
+        operation: management::BiometricOperation,
+        target: management::Target,
+    },
+    BiometricEnroll {
+        version: u8,
+        action_id: String,
+        ticket: String,
+        #[serde(deserialize_with = "password")]
+        password: SensitiveString,
+        /// Unpadded base64url, 65-byte uncompressed SEC1 P-256 point.
+        public_key: String,
+        /// Unpadded base64url ASN.1 DER ECDSA signature over the enroll transcript.
+        enroll_signature: String,
+    },
+    BiometricRevoke {
+        version: u8,
+        target: management::Target,
+        action_id: String,
+        ticket: String,
+        #[serde(deserialize_with = "password")]
+        password: SensitiveString,
+    },
     RequestOrigin {
         version: u8,
         request_id: String,
@@ -86,6 +112,9 @@ enum Command {
         decision: Decision,
         #[serde(default, deserialize_with = "optional_password")]
         password: Option<SensitiveString>,
+        /// Version 2 only: production Touch ID proof instead of a password.
+        #[serde(default)]
+        proof: Option<ProofWire>,
     },
     Unlock {
         version: u8,
@@ -98,6 +127,34 @@ enum Command {
 enum Decision {
     Approve,
     Deny,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProofWire {
+    key_id: String,
+    /// Unpadded base64url ASN.1 DER ECDSA P-256 signature (at most 72 bytes).
+    signature: String,
+}
+impl ProofWire {
+    fn decode(&self) -> Option<crate::access::approval_v2::BiometricProof> {
+        let signature = decode_binary(&self.signature)?;
+        (identity::valid_fingerprint(&self.key_id)
+            && crate::access::approval_v2::valid_signature_len(&signature))
+        .then(|| crate::access::approval_v2::BiometricProof {
+            key_id: self.key_id.clone(),
+            signature,
+        })
+    }
+}
+/// Strict unpadded base64url (canonical re-encoding required), bounded input.
+fn decode_binary(value: &str) -> Option<Vec<u8>> {
+    use base64::Engine;
+    if value.is_empty() || value.len() > 256 {
+        return None;
+    }
+    let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let bytes = engine.decode(value).ok()?;
+    (engine.encode(&bytes) == value).then_some(bytes)
 }
 fn password<'de, D: serde::Deserializer<'de>>(de: D) -> Result<SensitiveString, D::Error> {
     String::deserialize(de).map(SensitiveString::new)
@@ -121,6 +178,9 @@ impl Command {
             | Self::IdentityPrepare { .. }
             | Self::IdentityRevoke { .. }
             | Self::IdentityStatus { .. }
+            | Self::BiometricPrepare { .. }
+            | Self::BiometricEnroll { .. }
+            | Self::BiometricRevoke { .. }
             | Self::RequestOrigin { .. } => return false,
             Self::Session { version } | Self::List { version } => (*version, None),
             Self::History { version, limit } => {
@@ -132,8 +192,11 @@ impl Command {
             Self::Review {
                 version,
                 request_id,
+            } => {
+                // v2 adds the additive approval_binding; v1 is byte-identical.
+                return matches!(version, 1 | 2) && valid_request_id(request_id);
             }
-            | Self::Status {
+            Self::Status {
                 version,
                 request_id,
             } => (*version, Some(request_id)),
@@ -149,17 +212,20 @@ impl Command {
                 ticket,
                 decision,
                 password,
+                proof,
             } => {
-                if !identity::valid_fingerprint(ticket)
-                    || !match (decision, password) {
-                        (Decision::Approve, Some(p)) => valid_password(p),
-                        (Decision::Deny, None) => true,
+                // Approve takes exactly one authenticator; v1 has only password.
+                // Deny is never signed and carries neither.
+                return matches!(version, 1 | 2)
+                    && (*version == 2 || proof.is_none())
+                    && identity::valid_fingerprint(ticket)
+                    && valid_request_id(request_id)
+                    && match (decision, password, proof) {
+                        (Decision::Approve, Some(p), None) => valid_password(p),
+                        (Decision::Approve, None, Some(proof)) => proof.decode().is_some(),
+                        (Decision::Deny, None, None) => true,
                         _ => false,
-                    }
-                {
-                    return false;
-                }
-                (*version, Some(request_id))
+                    };
             }
         };
         version == 1 && id.is_none_or(|id| valid_request_id(id))
@@ -174,11 +240,17 @@ struct Ticket {
     review: DirectReview,
     generation: u64,
     deadline: Duration,
+    /// Wall-clock signing deadline sent in a v2 approval_binding (transcript
+    /// field 13). None for v1 reviews: such a ticket never accepts a proof.
+    deadline_unix_ms: Option<u64>,
 }
 #[derive(Default)]
 struct State {
     tickets: Vec<Ticket>,
     attempts: HashMap<String, VecDeque<Duration>>,
+    /// Test-only: the provider wall clock fails for v2 reviews.
+    #[cfg(test)]
+    wall_clock_unavailable: bool,
 }
 impl State {
     fn attempt(&mut self, device: &str, now: Duration) -> bool {
@@ -248,6 +320,9 @@ impl FixtureTraffic {
             Command::IdentityPrepare { .. } => "identity_prepare",
             Command::IdentityRevoke { .. } => "identity_revoke",
             Command::IdentityStatus { .. } => "identity_status",
+            Command::BiometricPrepare { .. } => "biometric_prepare",
+            Command::BiometricEnroll { .. } => "biometric_enroll",
+            Command::BiometricRevoke { .. } => "biometric_revoke",
             Command::RequestOrigin { .. } => "request_origin",
             Command::Session { .. } => "session",
             Command::List { .. } => "list",
@@ -293,6 +368,7 @@ pub struct Companion {
     identity_commit: Mutex<()>,
     provider_fingerprint: String,
     approval_authenticator: Option<Arc<dyn ApprovalAuthenticator + Send + Sync>>,
+    biometric_verifier: Arc<dyn BiometricApprovalVerifier + Send + Sync>,
     execution_dispatcher: Option<Arc<dyn ExecutionDispatcher>>,
     #[cfg(test)]
     fixture_traffic: Option<Arc<FixtureTraffic>>,
@@ -358,6 +434,7 @@ impl Companion {
             identity_commit: Mutex::new(()),
             provider_fingerprint: identity::certificate_fingerprint(certificate)?,
             approval_authenticator: None,
+            biometric_verifier: Arc::new(super::approval_verifier::RingBiometricVerifier),
             execution_dispatcher: None,
             #[cfg(test)]
             fixture_traffic: None,
@@ -368,6 +445,15 @@ impl Companion {
         authenticator: Arc<dyn ApprovalAuthenticator + Send + Sync>,
     ) -> Self {
         self.approval_authenticator = Some(authenticator);
+        self
+    }
+    /// Replace the production `ring` verifier (test seam).
+    #[cfg(test)]
+    fn with_biometric_verifier(
+        mut self,
+        verifier: Arc<dyn BiometricApprovalVerifier + Send + Sync>,
+    ) -> Self {
+        self.biometric_verifier = verifier;
         self
     }
     pub fn with_execution_dispatcher(mut self, dispatcher: Arc<dyn ExecutionDispatcher>) -> Self {
@@ -412,6 +498,9 @@ impl Companion {
             | Command::IdentityPrepare { .. }
             | Command::IdentityRevoke { .. }
             | Command::IdentityStatus { .. }
+            | Command::BiometricPrepare { .. }
+            | Command::BiometricEnroll { .. }
+            | Command::BiometricRevoke { .. }
             | Command::RequestOrigin { .. } => Response::error(Error::Invalid),
             Command::Session { .. } => Self::session(app),
             Command::List { .. } => match app.companion_pending() {
@@ -435,11 +524,31 @@ impl Companion {
                     Err(_) => Response::error(Error::Unavailable),
                 }
             }
-            Command::Review { request_id, .. } => {
+            Command::Review {
+                version,
+                request_id,
+            } => {
                 let Ok((review, generation)) = app.companion_review(&request_id) else {
                     return Response::error(Error::Unavailable);
                 };
                 let mut token = None;
+                let mut deadline_unix_ms = None;
+                if review.status == DirectStatus::Pending && version == 2 {
+                    let seconds = app.companion_unix_seconds().ok();
+                    #[cfg(test)]
+                    let seconds = seconds.filter(|_| {
+                        !self
+                            .state
+                            .lock()
+                            .is_ok_and(|state| state.wall_clock_unavailable)
+                    });
+                    // Without a wall clock there is no signing deadline: the
+                    // ticket never accepts a proof and the binding is null,
+                    // but password approval stays available.
+                    deadline_unix_ms = seconds
+                        .and_then(|seconds| seconds.checked_mul(1000))
+                        .and_then(|ms| ms.checked_add(TICKET_LIFETIME.as_millis() as u64));
+                }
                 if review.status == DirectStatus::Pending {
                     let Ok(mut state) = self.state.lock() else {
                         return Response::error(Error::Unavailable);
@@ -465,11 +574,27 @@ impl Companion {
                         review: review.clone(),
                         generation,
                         deadline,
+                        deadline_unix_ms,
                     });
                     token = Some(ticket);
                 }
+                if version == 1 {
+                    return Response::ok(
+                        serde_json::json!({"version":1,"review":review,"ticket":token,"generation":generation}),
+                    );
+                }
+                let binding = match (&token, deadline_unix_ms) {
+                    (Some(ticket), Some(ms)) => {
+                        match self.approval_binding(device, &review, generation, ticket, ms, app) {
+                            Some(binding) => binding,
+                            // Password approval stays available without it.
+                            None => serde_json::Value::Null,
+                        }
+                    }
+                    _ => serde_json::Value::Null,
+                };
                 Response::ok(
-                    serde_json::json!({"version":1,"review":review,"ticket":token,"generation":generation}),
+                    serde_json::json!({"version":2,"review":review,"ticket":token,"generation":generation,"approval_binding":binding}),
                 )
             }
             Command::Unlock { password, .. } => {
@@ -491,11 +616,12 @@ impl Companion {
                 }
             }
             Command::Decision {
+                version,
                 request_id,
                 ticket,
                 decision,
                 password,
-                ..
+                proof,
             } => {
                 let consumed = self.state.lock().ok().and_then(|mut state| {
                     state.consume(device, &request_id, &ticket, app.companion_now())
@@ -531,14 +657,49 @@ impl Companion {
                         if !self.attempt(device, app.companion_now()) {
                             return Response::error(Error::RateLimited);
                         }
-                        let (Some(authenticator), Some(password)) =
-                            (&self.approval_authenticator, password)
-                        else {
-                            return Response::error(Error::Unavailable);
-                        };
-                        let Ok(proof) = prepared.authenticate(password, authenticator.as_ref())
-                        else {
-                            return Response::error(Error::Authentication);
+                        let (authenticated, key_id) = match (password, proof) {
+                            (Some(password), None) => {
+                                let Some(authenticator) = &self.approval_authenticator else {
+                                    return Response::error(Error::Unavailable);
+                                };
+                                let Ok(authenticated) =
+                                    prepared.authenticate(password, authenticator.as_ref())
+                                else {
+                                    return Response::error(Error::Authentication);
+                                };
+                                (authenticated, None)
+                            }
+                            (None, Some(proof)) => {
+                                let Some(proof) = proof.decode() else {
+                                    return Response::error(Error::Invalid);
+                                };
+                                let Ok(Some(enrolled)) =
+                                    identity::biometric_key(&self.identity_store, device)
+                                else {
+                                    return Response::error(Error::Authentication);
+                                };
+                                let Some(deadline_unix_ms) = ticket.deadline_unix_ms else {
+                                    return Response::error(Error::Authentication);
+                                };
+                                // Every transcript value is provider-owned state.
+                                let context = crate::access::approval_v2::ApprovalContext {
+                                    provider_identity: &self.provider_fingerprint,
+                                    approval_client: device,
+                                    ticket: &ticket.token,
+                                    ticket_deadline_unix_ms: deadline_unix_ms,
+                                    review: &ticket.review,
+                                };
+                                let Ok(authenticated) = prepared.authenticate_biometric(
+                                    &context,
+                                    &proof,
+                                    &enrolled,
+                                    self.biometric_verifier.as_ref(),
+                                ) else {
+                                    return Response::error(Error::Authentication);
+                                };
+                                (authenticated, Some(enrolled.key_id))
+                            }
+                            _ => return Response::error(Error::Invalid),
                         };
                         let Ok(_commit) = self.identity_commit.lock() else {
                             return Response::error(Error::Unavailable);
@@ -546,7 +707,16 @@ impl Companion {
                         if !self.authorized(device) || app.companion_now() >= ticket.deadline {
                             return Response::error(Error::Stale);
                         }
-                        app.commit_approval(proof)
+                        // Re-enrollment or key revocation since verification wins.
+                        if let Some(key_id) = &key_id
+                            && identity::biometric_key(&self.identity_store, device)
+                                .ok()
+                                .flatten()
+                                .is_none_or(|current| current.key_id != *key_id)
+                        {
+                            return Response::error(Error::Stale);
+                        }
+                        app.commit_approval(authenticated)
                     }
                 };
                 match status {
@@ -558,12 +728,48 @@ impl Companion {
                             app.close_admission();
                             return Response::error(Error::Unavailable);
                         }
-                        Response::ok(serde_json::json!({"version":1,"status":status}))
+                        Response::ok(serde_json::json!({"version":version,"status":status}))
                     }
                     Err(_) => Response::error(Error::Stale),
                 }
             }
         }
+    }
+    /// Everything a v2 companion needs to rebuild the approval transcript.
+    /// The provider never reads these values back from the companion.
+    fn approval_binding(
+        &self,
+        device: &str,
+        review: &DirectReview,
+        generation: u64,
+        ticket: &str,
+        deadline_unix_ms: u64,
+        app: &ProviderApplication,
+    ) -> Option<serde_json::Value> {
+        use crate::access::approval_v2 as v2;
+        let (binding, password_required) = app.companion_approval_binding(&review.id).ok()?;
+        let review_digest = v2::hex(&v2::review_digest(review)?);
+        let key_id = identity::biometric_key(&self.identity_store, device)
+            .ok()?
+            .map(|key| key.key_id);
+        Some(serde_json::json!({
+            "version": 2,
+            "domain": std::str::from_utf8(v2::APPROVAL_DOMAIN).ok()?,
+            "action": std::str::from_utf8(v2::APPROVE_ACTION).ok()?,
+            "provider_identity": self.provider_fingerprint,
+            "approval_client": device,
+            "key_id": key_id,
+            "biometric_allowed": key_id.is_some() && !password_required,
+            "request_id": binding.request_id,
+            "record_digest": binding.record_digest,
+            "policy_digest": binding.policy_digest,
+            "arguments_digest": binding.arguments_digest,
+            "expires_at_unix_seconds": binding.expires_at_unix_seconds,
+            "generation": generation,
+            "ticket": ticket,
+            "ticket_deadline_unix_ms": deadline_unix_ms,
+            "review_digest": review_digest,
+        }))
     }
     fn attempt(&self, device: &str, now: Duration) -> bool {
         self.state
@@ -968,6 +1174,7 @@ mod tests {
             ticket: token.into(),
             decision: Decision::Approve,
             password: Some(SensitiveString::new(password.into())),
+            proof: None,
         }
     }
     #[test]
@@ -1176,7 +1383,8 @@ mod tests {
                         request_id: id.clone(),
                         ticket: new,
                         decision: Decision::Deny,
-                        password: None
+                        password: None,
+                        proof: None,
                     },
                     &f.app
                 )
@@ -1423,6 +1631,7 @@ mod tests {
                     review,
                     generation: 1,
                     deadline: Duration::from_secs(70),
+                    deadline_unix_ms: None,
                 });
             }
         }

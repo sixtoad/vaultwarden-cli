@@ -1,4 +1,5 @@
 pub mod agent_wait;
+pub mod approval_verifier;
 pub mod companion;
 pub mod companion_identity;
 pub mod desktop_launch;

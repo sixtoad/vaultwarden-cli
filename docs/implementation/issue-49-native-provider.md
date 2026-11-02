@@ -194,3 +194,57 @@ safe lifetime is established. Preserve audit/state and Keychain by default;
 credential deletion and account removal require their own explicit inventory and
 approval. Retain uncertain resources and report incomplete removal. Reusing an
 account UID must never revive old enrollment.
+
+## Production Touch ID approval: owner decisions (2026-10-30)
+
+PR A (provider verifier and online enrollment) follows four owner decisions.
+The contract is in [companion-protocol.md](../companion-protocol.md#production-touch-id-approval-v2-issue-49).
+
+1. **Online enrollment through the authenticated human path.** A device enrolls
+   its key over mTLS with a fresh password, a purpose-bound management ticket and
+   a proof-of-possession signature over the enroll transcript. Reason: keys are
+   created in the Secure Enclave on the Mac, so an offline console step would
+   need key export or a second trusted channel; the password plus ticket keeps
+   enrollment as strong as password approval itself. Offline device revocation
+   stays as the fallback and removes the key in the same write.
+2. **Touch ID is allowed for every policy; `require_password` is reserved.** The
+   operation policy gains `require_password` (default false, omitted from
+   existing revisions so their digests are unchanged, bound into the revision
+   when true). When true, a biometric proof is refused for that request and only
+   a fresh password approves. Reason: a minimal, tested escape hatch for
+   high-impact operations without designing per-policy authentication now.
+3. **`ring` (`ECDSA_P256_SHA256_ASN1`) is the verifier.** Added as a direct
+   dependency at the version already locked through rustls (0.17.14); no new
+   crate enters the lock file. Reason: audited, already shipped, and rejects
+   off-curve points and malformed DER. Core (`src/access/`) builds transcripts
+   only; `ring` lives in `src/adapters/approval_verifier.rs` behind the
+   `BiometricApprovalVerifier` port.
+4. **One key per (provider, approval client).** The key id is bound into every
+   transcript together with the provider identity and client fingerprint; one
+   key cannot be enrolled on two devices, and re-enrollment or revocation
+   retires the old id permanently. Reason: device revocation must disable
+   exactly that device's biometric authority, and a key copied between providers
+   or devices must not carry authority.
+
+Implementation choices recorded for review:
+
+- Provider identity is SHA-256 of the provider leaf certificate DER, because
+  that is what the companion pins (`PinnedTransport.leafSHA256`), not an SPKI
+  hash. Rotating the provider certificate changes field 3 for new approvals;
+  enrolled keys stay valid (the registry does not store the provider identity)
+  once the companion re-pins.
+- Review and decision gained `version:2` rather than new members on version 1,
+  and identity rows gained `biometric_key_id` only at `version:3`, because the
+  shipped companion parses these responses with `deny_unknown_fields`.
+- History records `approval:{method:"biometric",key_id}` only on biometric
+  approvals; absence means password (all legacy and password approvals), so
+  existing records and goldens are unchanged.
+- Key management writes no recovery journal entry: each enroll/revoke is one
+  atomic registry write with no execution cleanup to reconcile.
+- The ticket deadline in the transcript is provider wall time at review + 60 s
+  in milliseconds; authority still expires on the monotonic ticket deadline.
+
+Verification on the M1 host: `cargo fmt --check`, strict clippy and
+`scripts/test-native-protected-macos.sh` (library tests including the new
+cross-platform `biometric_*` tests with software P-256 keys). The Linux-only
+companion suites and the Linux mutation jobs were not run on this host.

@@ -978,6 +978,7 @@ mod tests {
             ordinal: 0,
             outcome: HistoryOutcome::Submitted,
             status: Some(DirectStatus::Pending),
+            approval: None,
         };
         assert_eq!(
             response_frame(&HumanResponse::History {

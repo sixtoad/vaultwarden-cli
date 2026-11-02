@@ -1228,8 +1228,34 @@ impl ProviderApplication {
             authority.generation,
         ))
     }
+    /// The durable approval binding of a pending request (for the v2
+    /// companion transcript) and whether its policy refuses biometric proof.
+    pub(crate) fn companion_approval_binding(
+        &self,
+        id: &str,
+    ) -> Result<(super::direct_request::ApprovalBinding, bool), DirectRequestError> {
+        let mut authority = self
+            .gate
+            .lock()
+            .map_err(|_error| DirectRequestError::Unavailable)?;
+        match self.admit(&mut authority) {
+            Ok(()) | Err(SessionError::Locked) => {}
+            Err(error) => return Err(error.into()),
+        }
+        let binding = authority.provider.prepare_direct(self.owner, id)?;
+        let password_required = authority
+            .provider
+            .decision_policy(&binding)?
+            .require_password();
+        Ok((binding, password_required))
+    }
     pub(crate) fn companion_now(&self) -> Duration {
         self.clock.now()
+    }
+    /// Provider wall time for the companion's display/signing deadline only;
+    /// authority deadlines remain monotonic.
+    pub(crate) fn companion_unix_seconds(&self) -> Result<u64, DirectRequestError> {
+        Ok(self.clock.unix_seconds()?)
     }
     pub(crate) fn companion_prepare(
         &self,
@@ -1250,17 +1276,23 @@ impl ProviderApplication {
         {
             return Err(DirectRequestError::StaleRevision);
         }
+        let binding = authority.provider.prepare_direct(self.owner, id)?;
+        let password_required = authority
+            .provider
+            .decision_policy(&binding)?
+            .require_password();
         Ok(PreparedApproval {
-            binding: authority.provider.prepare_direct(self.owner, id)?,
+            binding,
             generation,
             companion_deadline: Some(deadline),
+            password_required,
         })
     }
     pub(crate) fn companion_deny(
         &self,
         prepared: PreparedApproval,
     ) -> Result<DirectStatus, DirectRequestError> {
-        self.commit_decision(prepared, false)
+        self.commit_decision(prepared, false, None)
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn management_hold_gate_for_test(&self, action: impl FnOnce()) {
@@ -1309,24 +1341,31 @@ impl ProviderApplication {
         self.admit(&mut authority)?;
         self.expire_requests(&mut authority)?;
         self.request_agent_live(&authority, id)?;
+        let binding = authority.provider.prepare_direct(owner, id)?;
+        let password_required = authority
+            .provider
+            .decision_policy(&binding)?
+            .require_password();
         Ok(PreparedApproval {
-            binding: authority.provider.prepare_direct(owner, id)?,
+            binding,
             generation: authority.generation,
             companion_deadline: None,
+            password_required,
         })
     }
     pub(crate) fn commit_approval(
         &self,
         authenticated: AuthenticatedApproval,
     ) -> Result<DirectStatus, DirectRequestError> {
-        self.commit_decision(authenticated.into_prepared(), true)
+        let (prepared, method) = authenticated.into_parts();
+        self.commit_decision(prepared, true, method)
     }
     pub(crate) fn deny_direct(
         &self,
         owner: AuthenticatedHuman,
         id: &str,
     ) -> Result<DirectStatus, DirectRequestError> {
-        self.commit_decision(self.prepare_approval(owner, id)?, false)
+        self.commit_decision(self.prepare_approval(owner, id)?, false, None)
     }
     /// Claims an approved decision exactly once, then resolves only its policy
     /// selected values into an explicit child environment.  A production caller
@@ -1844,6 +1883,7 @@ impl ProviderApplication {
         &self,
         prepared: PreparedApproval,
         approve: bool,
+        method: Option<super::history::ApprovalMethod>,
     ) -> Result<DirectStatus, DirectRequestError> {
         let mut authority = self
             .gate
@@ -1931,15 +1971,17 @@ impl ProviderApplication {
         if !Self::token_live(&token) {
             return Err(DirectRequestError::Unauthorized);
         }
-        let result = authority.provider.decide_direct(binding, approve, now, || {
-            prepared
-                .companion_deadline
-                .is_none_or(|deadline| self.clock.now() < deadline)
-                && !self.closing.load(Ordering::Acquire)
-                && Self::token_live(&token)
-                && self.clock.now() < deadline
-                && self.clock.now() < session_deadline
-        });
+        let result = authority
+            .provider
+            .decide_direct(binding, approve, method, now, || {
+                prepared
+                    .companion_deadline
+                    .is_none_or(|deadline| self.clock.now() < deadline)
+                    && !self.closing.load(Ordering::Acquire)
+                    && Self::token_live(&token)
+                    && self.clock.now() < deadline
+                    && self.clock.now() < session_deadline
+            });
         drop(decision_release);
         if result == Err(DirectRequestError::Unavailable) {
             // All persistence failures close process authority, including uncertain rename durability.
@@ -2510,6 +2552,7 @@ mod tests {
             }
             let result = if operation == "activate_probe" {
                 app.activate_operation(super::super::policy::OperationPolicyDraft {
+                    require_password: false,
                     create: None,
                     ssh: None,
                     id: "deploy".into(),
@@ -2583,6 +2626,7 @@ mod tests {
                 serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
             std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
             let draft = OperationPolicyDraft {
+                require_password: false,
                 create: None,
                 ssh: None,
                 id: "deploy".into(),
@@ -2950,6 +2994,7 @@ mod tests {
                 })
                 .collect();
             let draft = OperationPolicyDraft {
+                require_password: false,
                 create: None,
                 ssh: None,
                 id: "deploy".into(),
@@ -2976,6 +3021,7 @@ mod tests {
         let observed = Arc::new(Observed::default());
         let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
         let draft = || OperationPolicyDraft {
+            require_password: false,
             create: None,
             ssh: None,
             id: "deploy".into(),
