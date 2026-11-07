@@ -1524,3 +1524,47 @@ fn biometric_key_survives_a_companion_restart() {
     assert_eq!(response.status, 200, "{}", response.body);
     assert_eq!(s.dispatch.0.load(Ordering::SeqCst), 1);
 }
+/// `identity_detail` version 3 is the companion's only way to read its own
+/// enrolled key id, so a non-administrator may read its OWN row (version 3
+/// only). Any other target, version 2, and `identity_list` stay admin-only.
+#[test]
+fn biometric_identity_detail_v3_is_self_service_and_everything_else_stays_admin_only() {
+    let detail = |s: &Svc, version: u8, target: &str| {
+        s.send(
+            &me(),
+            Command::IdentityDetail {
+                version,
+                target: identity_target(target),
+            },
+        )
+    };
+    let s = setup(false);
+    let key = software_key();
+    let key_id = s.enroll(&key);
+    let own = detail(&s, 3, &me());
+    assert_eq!(own.status, 200, "{}", own.body);
+    let own = body(&own);
+    assert_eq!(own["version"], 3);
+    assert_eq!(own["identity"]["id"], me().as_str());
+    assert_eq!(own["identity"]["this_client"], true);
+    assert_eq!(own["identity"]["roles"], serde_json::json!(["approve"]));
+    assert_eq!(own["identity"]["biometric_key_id"], key_id.as_str());
+    assert_eq!(detail(&s, 3, &other()).status, 403);
+    assert_eq!(detail(&s, 2, &me()).status, 403);
+    let list = s.send(
+        &me(),
+        Command::IdentityList {
+            version: 3,
+            limit: 10,
+            after: None,
+        },
+    );
+    assert_eq!(list.status, 403);
+
+    let admin = setup(true);
+    for (version, target) in [(3, me()), (3, other()), (2, me()), (2, other())] {
+        let response = detail(&admin, version, &target);
+        assert_eq!(response.status, 200, "{}", response.body);
+        assert_eq!(body(&response)["identity"]["id"], target.as_str());
+    }
+}

@@ -123,7 +123,7 @@ pub struct ProviderSnapshot {
     pub status_text: String,
     pub message: String,
 }
-fn session() -> &'static Mutex<ProviderSession> {
+pub(crate) fn session() -> &'static Mutex<ProviderSession> {
     static SESSION: OnceLock<Mutex<ProviderSession>> = OnceLock::new();
     SESSION.get_or_init(|| Mutex::new(ProviderSession::default()))
 }
@@ -136,9 +136,17 @@ pub fn provider_snapshot() -> ProviderSnapshot {
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_configure(uncertain_id: String) -> Result<ProviderSnapshot, String> {
-    let mut state = session().lock().map_err(|_| "Provider core unavailable.")?;
-    state.configure(&uncertain_id)?;
-    Ok(state.snapshot())
+    let snapshot = {
+        let mut state = session().lock().map_err(|_| "Provider core unavailable.")?;
+        state.configure(&uncertain_id)?;
+        state.snapshot()
+    };
+    // The provider pin is gone: so are the key session's pin and tickets.
+    super::biometric::keys()
+        .lock()
+        .map_err(|_| "Provider core unavailable.")?
+        .reset();
+    Ok(snapshot)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_invalidate() -> ProviderSnapshot {

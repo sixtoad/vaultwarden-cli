@@ -13,7 +13,7 @@ import sys
 
 root = Path(__file__).resolve().parents[1]
 base = root / "companion/rust/src/provider"
-originals = {name: (base / name).read_bytes() for name in ["protocol.rs", "session.rs"]}
+originals = {name: (base / name).read_bytes() for name in ["protocol.rs", "session.rs", "approval_v2.rs", "biometric.rs"]}
 parser = argparse.ArgumentParser()
 parser.add_argument("evidence", nargs="?", type=Path, default=root / "companion/build/provider-mutations")
 parser.add_argument("--only", nargs="+")
@@ -45,13 +45,31 @@ mutations = {
     "rejected-authority": ("session.rs", [("self.authority = None;\n                self.requests.clear();\n                self.outcome = ProviderOutcome::Rejected;", "self.outcome = ProviderOutcome::Rejected;")]),
     "typed-rejection": ("session.rs", [("self.outcome = ProviderOutcome::Rejected;", "self.outcome = ProviderOutcome::Accepted;")]),
     "committed-terminality": ("session.rs", [("Status::Approved {} | Status::Running {} => ProviderStatusProgress::Committed,", "Status::Approved {} | Status::Running {} => ProviderStatusProgress::Terminal,")]),
+    # Production Touch ID approval v2 (issue 49): never sign an unbound review.
+    "v2-review-digest": ("approval_v2.rs", [("if review != signed_digest {", "if false {")]),
+    "v2-provider-pin": ("approval_v2.rs", [("if binding.provider_identity != pin.provider_identity {", "if false {")]),
+    "v2-biometric-allowed": ("approval_v2.rs", [("if !binding.biometric_allowed {", "if false {")]),
+    "v2-request-binding": ("approval_v2.rs", [("if binding.request_id != received.review.id {", "if false {")]),
+    "v2-generation-binding": ("approval_v2.rs", [("if binding.generation != received.generation {", "if false {")]),
+    "v2-ticket-binding": ("approval_v2.rs", [("if received.ticket != Some(binding.ticket.as_str()) {", "if false {")]),
+    "v2-proof-handle": ("session.rs", [("if self.prepared != Some(handle) || handle != self.epoch {", "if false {")]),
+    "v2-proof-key": ("session.rs", [("if key_id != signing.key_id {", "if false {")]),
+    "v2-enroll-provider-pin": ("biometric.rs", [("|| r.provider_identity != pin.provider_identity", "|| false")]),
+    "v2-enroll-local-proof": ("biometric.rs", [("if !v2::verify(public_key, &transcript, signature) {", "if false {")]),
+    # PR B patch round: sticky fallback, result lifetime, pin rule, ticket kept.
+    "v2-sticky-fallback": ("session.rs", [("if self.unsupported_provider.as_deref() == Some(pin.provider_identity.as_str()) {", "if false {")]),
+    "v2-review-clears-result": ("session.rs", [("// A new review starts with no Touch ID result on display.\n                self.biometric = Biometric::None;", "")]),
+    "v2-definite-error-final": ("session.rs", [("// Definite: a later status poll never rewrites it.\n                        self.proof_id = None;", "")]),
+    "v2-definite-status-final": ("session.rs", [("Biometric::Rejected,\n                    };\n                    if self.biometric != Biometric::OutcomeUnknown {", "Biometric::Rejected,\n                    };\n                    if false {")]),
+    "v2-key-pin-rule": ("biometric.rs", [("if self.pin.is_some() && self.pin.as_ref() == current {", "if self.pin.is_some() {")]),
+    "v2-key-ticket-kept-on-oversize": ("biometric.rs", [("        let mut bytes = bytes?;\n", "        self.ticket = None;\n        let mut bytes = bytes?;\n")]),
 }
 if args.only:
     mutations = {name: mutations[name] for name in args.only}
 
 def run(name):
     with (evidence / f"{name}.log").open("wb") as log:
-        for selection in [["--test", "provider"], ["--lib", "provider::session::tests"]]:
+        for selection in [["--test", "provider"], ["--test", "approval_v2"], ["--lib", "provider::session::tests"]]:
             code = subprocess.run(command + selection, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=180).returncode
             if code != 0:
                 return code

@@ -167,6 +167,44 @@ hash. The app loads the library beside its own executable, not from the current
 working directory. The plain Dart FFI test deliberately loads the development
 library in `rust/target/release`.
 
+## Touch ID approval v2 bridge (issue 49)
+
+`companion/rust/src/api/biometric.rs` is the Rust side of production Touch ID
+approval (`docs/companion-protocol.md`, "Production Touch ID approval v2").
+After every `provider_configure`, call `provider_biometric_pin(<provider leaf
+SHA-256>, <client leaf SHA-256>)`; only a pinned session requests version 2
+reviews. A provider that answers a version 2 review with `invalid_request` is
+treated as older: the session returns to version 1 reviews and password
+approval. `provider_biometric_prepare` returns the exact transcript to sign,
+built from the received review JSON and the provider's `approval_binding`, and
+refuses (typed `BiometricRefusal`) on any digest, identity, request,
+generation, ticket or policy mismatch; it never checks the provider's ticket
+deadline against the local clock. `provider_biometric_begin` sends Decision v2
+with `proof` and is finished by `provider_finish`, with the same single-shot
+and status-only recovery as a password approval. `BiometricSigningRequest.handle`
+is a Rust `u64` (a `BigInt` in the generated Dart): pass it back unchanged.
+The fallback to version 1 is sticky per provider identity for the life of the
+process: reconfiguring and re-pinning the same provider does not retry
+version 2 (an app restart does); a different provider is asked again. The
+Touch ID result (`ProviderBiometricState.result`) is cleared when a new review
+is accepted or a password decision is sent, and once definite it is never
+rewritten by a later status poll.
+
+Key management uses a second session. After `provider_biometric_pin`, call
+`biometric_key_configure` with the SAME two values. **Pin rule:** every key
+call (`biometric_key_begin`, `_enroll_transcript`, `_begin_enroll`,
+`_begin_revoke`, `_snapshot`) first compares the key session's pin with the
+provider session's current pin; if they differ (or the provider is unpinned)
+the key session is reset (pin, tickets, prepared key and read state dropped)
+and the call refuses `NotPinned`. `provider_configure` also resets it, so a
+ticket prepared for one provider can never be submitted to another. The key
+session reads this device's `biometric_key_id` with `identity_detail`
+version 3 for its own device, which the provider allows without administrator
+rights, and runs `biometric_prepare`/`biometric_enroll`/`biometric_revoke`;
+enrollment proofs are verified locally before sending, and a body over the
+16 KiB request limit is refused locally without consuming the ticket. Finish
+key work with `biometric_key_finish`. The synthetic v1 lifecycle is unchanged.
+
 ## Preserved synthetic contract and lifecycle
 
 The UI can select only synthetic fixture 1 or 2. Rust supplies their complete
