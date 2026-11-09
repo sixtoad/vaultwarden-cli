@@ -25,12 +25,13 @@ Credentials (state/backend.json, TLS identity, companion CA and the provider
 secret file store state/secrets/) are never generated, copied or deleted except
 by uninstall --purge: install creates the empty layout and prints the manual
 steps (docs/macos-setup.md). The service is started only when the four state
-files and the stored API client secret are present with the documented owner
-and modes.
+files, the stored API client secret and the enrolled companion registry
+(state/companion-identities.json) are present with the documented owner, modes
+and link count.
 
-Requirements: docs/implementation/issue-49-native-provider.md. Runs with the
-system /usr/bin/python3 (3.9) under sudo, preferably isolated (-I); standard
-library only.
+Requirements: docs/implementation/issue-49-native-provider.md. Run it as
+`sudo /usr/bin/python3 -I <root-owned copy>/scripts/macos-provider-install.py`
+(the system Python 3.9, isolated); standard library only.
 """
 import os
 import sys
@@ -63,6 +64,12 @@ PLAN_PATH = HERE / 'macos-provider-plan.py'
 TEMPLATE_NAMES = ('com.cantolla.vaultwarden-accessd.plist.in', 'native-identities.json.in')
 # Owners allowed for the code that runs as root (and every ancestor directory).
 TRUSTED_CODE_OWNERS = (0,)
+# Lists a path's access control entries (`ls -led`: mode string with a trailing `+`, then
+# one ` N: <entry>` line per ACE). The standard library cannot read ACLs on macOS.
+LS_TOOL = '/bin/ls'
+LS_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', 'LC_ALL': 'C'}
+ACL_ENTRY = re.compile(r'\s*\d+: ')
+MODE_FIELD = re.compile(r'[-bcdlps][-rwxsStT]{9}([@+]{0,2})$')
 
 
 class InstallError(Exception):
@@ -99,6 +106,27 @@ def check_code_trust(paths, owners=None, top='/'):
             require(info.st_uid in owners and not info.st_mode & 0o022,
                     f'{item} can be changed by a non-root account (owner uid {info.st_uid}, mode {mode_text(info.st_mode & 0o7777)}); '
                     'run a root-owned copy of the installer (docs/desktop-installation.md#macos-provider-installation-upgrade-and-removal)')
+            entries = acl_entries(item)
+            require(not entries,
+                    f'{item} carries an access control list ({"; ".join(entries)[:200]}), which can grant write access '
+                    'beyond its mode; run a root-owned copy of the installer without ACLs (chmod -N)')
+
+
+def acl_entries(path):
+    """The access control entries of one path, read with `ls -led`; fails closed (a pseudo-entry) when unreadable."""
+    try:
+        result = subprocess.run([LS_TOOL, '-led', str(path)], capture_output=True, text=True, env=LS_ENV, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        return [f'access control list unreadable: {error}']
+    lines = result.stdout.splitlines()
+    fields = lines[0].split(None, 1) if lines else []
+    flags = MODE_FIELD.match(fields[0]) if fields else None
+    if result.returncode != 0 or flags is None:
+        return [f'access control list unreadable: ls exit {result.returncode} {(result.stderr or result.stdout).strip()[:100]!r}']
+    entries = [line.strip() for line in lines[1:] if ACL_ENTRY.match(line)]
+    if '+' in flags.group(1) and not entries:
+        entries = ['access control list present (+)']
+    return entries
 
 
 def load_plan_module(path=PLAN_PATH, euid=None):
@@ -136,6 +164,9 @@ TOMBSTONES_SCHEMA = 1
 # PR #71: the provider keeps its API client secret in a file store, not the Keychain.
 SECRETS_DIR = f'{INSTALL_ROOT}/state/secrets'
 BOOTSTRAP_SECRET = f'{SECRETS_DIR}/vaultwarden-accessd.bootstrap-client-secret'
+# PR #71 companion_identity::STORE_FILE: `--companion-enroll-cert` writes it; the provider's
+# companion listener (identity::enrolled) refuses to bind without it.
+COMPANION_STORE = f'{INSTALL_ROOT}/state/companion-identities.json'
 MAX_PAYLOAD = plan.MAX_PAYLOAD_BYTES
 MAX_SMALL = 1024 * 1024
 # Absolute system tools. Never resolved through PATH for the real root.
@@ -152,6 +183,7 @@ SYSTEM_TOOLS = {
 FAKE_TOOLS_ENV = 'VW_PROVIDER_INSTALLER_FAKE_TOOLS'
 TOOL_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', 'LC_ALL': 'C'}
 EXIT_REFUSED, EXIT_INCOMPLETE = 2, 3
+DSCL_RECORD_NOT_FOUND = 56  # eDSRecordNotFound; the only dscl failure that means "no such record"
 ADMIN_GROUP = 'admin'
 OPERATOR = 'operator'  # plan.json's placeholder for the operator account in group members
 MIN_ADOPTABLE_GID = 500
@@ -285,8 +317,11 @@ class Installer:
         exits 56 (eDSRecordNotFound).
         """
         result = self.tool('dscl', '.', '-read', f'/{kind}/{name}', attribute, mutating=False, check=False)
-        if result.returncode != 0:
+        if result.returncode == DSCL_RECORD_NOT_FOUND:
             return None
+        # Any other failure (directory service unreachable, a killed tool) is not "absent": fail closed.
+        require(result.returncode == 0,
+                f'dscl . -read /{kind}/{name} {attribute} failed ({result.returncode}): {result.stderr.strip()[:300]}')
         text = result.stdout.strip()
         if not text:
             message = result.stderr.strip()
@@ -1061,7 +1096,30 @@ def credential_status(installer, files):
         else:
             problems.extend(found)
     problems.extend(secret_store_problems(installer, files))
+    problems.extend(companion_store_problems(installer, files))
     return not problems, problems
+
+
+def provider_ids(files):
+    owner = next(entry for entry in files.values() if entry['created_by'] == 'operator')
+    return {'owner': owner['owner'], 'group': owner['group'], 'owner_id': owner['owner_id'], 'group_id': owner['group_id']}
+
+
+def companion_store_problems(installer, files):
+    """Review round 3: the service starts only once a companion is enrolled.
+
+    PR #71 `identity::enrolled()` reads state/companion-identities.json (provider-owned,
+    0600, one link, no ACL) before the companion listener binds; without it the provider
+    exits and launchd would restart it in a loop.
+    """
+    try:
+        found = installer.inspect(dict(provider_ids(files), path=COMPANION_STORE, mode='0600'), 'file')
+    except (OSError, InstallError) as error:
+        return [f'{COMPANION_STORE} unreadable ({error}); run as root']
+    if found is None:
+        return [f'{COMPANION_STORE} is missing (enroll the companion with --companion-enroll-cert while the service is '
+                f'stopped, {DOCS_CREDENTIALS})']
+    return found
 
 
 def secret_store_problems(installer, files):
@@ -1072,8 +1130,7 @@ def secret_store_problems(installer, files):
     provider re-checks it (and refuses ACLs) at every read. Without it the provider fails
     closed and launchd would restart it in a loop.
     """
-    owner = next(entry for entry in files.values() if entry['created_by'] == 'operator')
-    ids = {'owner': owner['owner'], 'group': owner['group'], 'owner_id': owner['owner_id'], 'group_id': owner['group_id']}
+    ids = provider_ids(files)
     for path, kind, mode in [(SECRETS_DIR, 'dir', '0700'), (BOOTSTRAP_SECRET, 'file', '0600')]:
         try:
             found = installer.inspect(dict(ids, path=path, mode=mode), kind)
@@ -1110,7 +1167,8 @@ def next_steps(values, version, operator):
         f'       cd / && sudo -u {account} {vdir}/vaultwarden-accessd --state-root {state} --companion-enroll-cert {state}/companion-client.pem \\',
         f'         --companion-client-ca {state}/companion-ca.pem --companion-label "Mac operator"',
         f'       sudo rm {state}/companion-client.pem',
-        f'  5. {command} start   (or re-run install): it starts once the state files and the secret verify.',
+        f'  5. {command} start   (or re-run install): it starts only once the state files, the secret and the enrolled',
+        f'     companion ({COMPANION_STORE}, written by step 4) verify; never before step 4.',
         f'  Administration: {vdir}/vw-access history --limit 5 (operator {operator}, group {values["human_group"]}; '
         f'the human socket {INSTALL_ROOT}/run/human is the default state root).',
         f'  Agents: an account with primary GID {values["agent_gid"]} creates its key with {vdir}/vw-access setup agent-key '
@@ -1269,12 +1327,12 @@ def finish_switch(installer, receipt):
         installer.save_receipt(receipt)
 
 
-def record_switch(installer, receipt, target, by):
+def record_switch(installer, receipt, target, by, source=None):
     """Recorded before the plist changes, so a re-run after a crash recognizes the target plist."""
     pending = receipt.get('switching')
     if pending is not None and pending['to'] == target:
         return  # an interrupted switch to the same target: keep its original record
-    receipt['switching'] = {'from': receipt['active_version'], 'to': target, 'by': by}
+    receipt['switching'] = {'from': source or receipt['active_version'], 'to': target, 'by': by}
     installer.save_receipt(receipt)
 
 
@@ -1321,6 +1379,7 @@ def command_rollback(installer, args):
     active = receipt['active_version']
     pending = receipt.get('switching')
     resuming = pending is not None and pending.get('by') == 'rollback' and args.to_version in (None, pending['to'])
+    interrupted = None
     if resuming:
         # A re-run of an interrupted rollback converges on its target; it never flips back.
         target = pending['to']
@@ -1332,9 +1391,17 @@ def command_rollback(installer, args):
             installer.out(f'Already rolled back to {active} (from {last.get("from")}); pass --to-version to switch again')
             start_if_ready(installer, layout_files(receipt_values(receipt, active)), active)
             return 0
-        target = args.to_version or receipt.get('previous_version')
+        interrupted = pending if pending is not None and pending.get('by') == 'upgrade' else None
+        if interrupted is not None:
+            # An upgrade interrupted between the plist write and the receipt save leaves the receipt
+            # naming the old version active while the plist may name the new one: roll back to the
+            # version that upgrade left, never to an older previous_version.
+            target = args.to_version or interrupted['from']
+            installer.out(f'An upgrade {interrupted["from"]} -> {interrupted["to"]} was interrupted; rolling back to {target}')
+        else:
+            target = args.to_version or receipt.get('previous_version')
         require(target, 'no previous version recorded; pass --to-version')
-        require(target != active, f'version {target} is already active')
+        require(target != active or interrupted is not None, f'version {target} is already active')
     require(target in receipt['versions'], f'version {target} was not installed by this installer')
     problems = verify_version(installer, target, receipt['versions'][target])
     require(not problems, f'version {target} failed verification; the current version stays active: ' + '; '.join(problems))
@@ -1345,8 +1412,9 @@ def command_rollback(installer, args):
             f'consumed approvals are never reactivated. Pass --confirm-state-compatible once {target} is confirmed compatible')
     require_acknowledged(installer, args)
     files = layout_files(receipt_values(receipt, target))
-    installer.out(f'Rolling back native provider {pending["from"] if resuming else active} -> {target}')
-    record_switch(installer, receipt, target, 'rollback')
+    source = pending['from'] if resuming else interrupted['to'] if interrupted is not None else active
+    installer.out(f'Rolling back native provider {source} -> {target}')
+    record_switch(installer, receipt, target, 'rollback', source=None if resuming else source)
     switch(installer, receipt, target, plist_bytes, files)
     return 0
 

@@ -306,7 +306,7 @@ def plan_document(values, outputs):
     return {
         'schema': PLAN_SCHEMA,
         'installs': False,
-        'note': 'Review material only. Nothing has been installed. Development signing only; Apple Silicon (arm64) only; Intel and Rosetta are unsupported. Credentials (created_by operator) are never generated or copied by the installer.',
+        'note': 'Review material only. Nothing has been installed. Signature policy chosen at install time: --team-id TEAMID requires an Apple-issued Developer ID signature of that team, --allow-development-signature accepts ad-hoc development builds only; Apple Silicon (arm64) only; Intel and Rosetta are unsupported. Credentials (created_by operator) are never generated or copied by the installer.',
         'version': version,
         'label': LABEL,
         'inputs': {k: values[k] for k in sorted(values)},

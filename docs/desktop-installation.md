@@ -134,10 +134,12 @@ The historic PR #52 Windows artifact did not retain changed paths. Instrumented 
 `scripts/macos-provider-plan.py` resolves
 `packaging/macos/native/com.cantolla.vaultwarden-accessd.plist.in` and
 `native-identities.json.in` from explicit inputs into a new or empty output
-directory you choose:
+directory you choose. Run it, like the installer, with the isolated system Python
+from the root-owned copy of the reviewed commit (made as shown in the next
+section; it needs no root itself):
 
 ```bash
-python3 scripts/macos-provider-plan.py --output ~/vw-provider-plan \
+/usr/bin/python3 -I /usr/local/libexec/vw-provider-installer/scripts/macos-provider-plan.py --output ~/vw-provider-plan \
   --version 0.5.4 --provider-account _vwaccess --provider-group _vwaccess \
   --provider-uid 491 --provider-uuid <GeneratedUID> \
   --operator-uid 501 --operator-uuid <GeneratedUID> \
@@ -189,10 +191,12 @@ cannot be pinned that way, so mutating commands refuse unless the installer
 script, `macos-provider-plan.py`, the templates and every ancestor directory are
 root-owned and not group- or other-writable; this check runs for every run as
 root (a dry run and `status` included) and before the plan module is executed.
-Run the script itself first (`python3 -I` keeps the environment and the current
-directory out of the import path; the script also drops its own directory and
-the current directory from it before importing anything). Run a root-owned copy
-of the reviewed commit:
+Every code file and ancestor directory must also carry no access control list
+(checked with `/bin/ls -led`; remove one with `chmod -N`). Always run
+`/usr/bin/python3 -I` on the root-owned copy, never `python3` on a checkout
+(`-I` keeps the environment and the current directory out of the import path;
+the script also drops its own directory and the current directory from it
+before importing anything). Make the root-owned copy of the reviewed commit:
 
 ```bash
 sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/vw-provider-installer
@@ -247,20 +251,26 @@ mutation it records, so a re-run after an interruption at any step converges.
 The installer never generates or copies credentials (only `uninstall --purge`
 deletes them). Until `state/backend.json`, `provider-cert.pem`,
 `provider-key.pem` and `companion-ca.pem` exist (provider-owned, `0600`, one
-link) and the provider has stored its API client secret in its file store
+link), the provider has stored its API client secret in its file store
 (`state/secrets/`, provider-owned `0700`, with
-`vaultwarden-accessd.bootstrap-client-secret` provider-owned `0600`, one link),
-the service stays disabled (`launchctl disable`) and the installer prints the
-manual steps (see the next section and [macos-setup.md](macos-setup.md)).
-Re-run the same `install` command (or `start`) afterwards: it changes nothing
-else and starts the service (`launchctl enable`, `bootstrap`), then waits for
-launchd to report `state = running` and otherwise reports the last exit code.
+`vaultwarden-accessd.bootstrap-client-secret` provider-owned `0600`, one link)
+and a companion is enrolled (`state/companion-identities.json`, written by the
+provider's `--companion-enroll-cert`, provider-owned `0600`, one link; without it
+the provider refuses to bind its companion listener and launchd would restart it
+in a loop), the service stays disabled (`launchctl disable`) and the installer
+prints the manual steps (see the next section and [macos-setup.md](macos-setup.md)).
+The order is: install the state files, store the secret, enroll the companion
+with the service stopped, and only then run `start` (or re-run the same
+`install` command): it changes nothing else and starts the service (`launchctl
+enable`, `bootstrap`), then waits for launchd to report `state = running` and
+otherwise reports the last exit code.
 The provider runs as the provider account, never root, and always starts locked.
 `stop --acknowledge-active-work` closes admission and boots the service out;
 `start` verifies the active version and credentials and starts it. `status`
 shows the launchd state, PID and last exit code, the accounts and memberships,
-the sockets in `run/human` and `run/agent`, the credential files and the secret
-store, and any pending switch. A receipt or tombstone file that is not the
+the sockets in `run/human` and `run/agent`, the credential files, the secret
+store and the companion registry (naming each missing or wrong one), and any
+pending switch. A receipt or tombstone file that is not the
 documented structure is refused with a clean error naming the file.
 
 **Upgrade.** Generate and review a plan for the new version with the same
@@ -298,7 +308,10 @@ pending resumes it towards its recorded target, even when the receipt already
 names that target active; it never flips back to the version it left. Once a
 rollback completed, re-running it is a no-op that only makes sure the service
 runs; pass `--to-version V` to switch again. A failed upgrade's pending switch
-does not capture `rollback`: it switches back to the previous version as usual.
+does not capture `rollback`: without `--to-version` it switches back to the
+version that upgrade left (the marker's `from`), even when the upgrade was
+interrupted after the plist write but before the receipt named the new version
+active, never to an older `previous_version`.
 
 **Uninstall.** `uninstall --acknowledge-active-work` closes admission, boots the
 service out, then removes only installer-owned, unchanged files: the
@@ -316,7 +329,7 @@ root-owned `/Library/VaultwardenAccess/account-tombstones.json`, which stays
 after removal: a later install refuses a removed GeneratedUID, so a recreated
 account can never revive old enrollment. The operator account is never touched.
 
-`python3 scripts/test-macos-provider-install.py` exercises all of this under a
+`/usr/bin/python3 -I scripts/test-macos-provider-install.py` exercises all of this under a
 temporary root prefix with fake `dscl`, `dseditgroup`, `dsmemberutil`,
 `launchctl`, `chown`, `stat`, `codesign` and `lipo`, including a crash after
 every single step of install, upgrade, rollback and full removal; no test uses sudo,
@@ -351,10 +364,14 @@ one link:
   `vaultwarden-accessd.bootstrap-client-secret` with that owner and mode before it
   starts the service: without the secret the provider fails closed and launchd
   would restart it in a loop.
+- The companion registry `state/companion-identities.json`: written by the
+  provider's `--companion-enroll-cert` (below), provider-owned `0600`, one link.
+  The installer requires it before it starts the service, for the same reason.
 
-Enroll the companion client certificate with the service stopped; the client
-PEM must be provider-owned `0600` with one link, so copy it in rather than
-pointing at your own file:
+After storing the secret, enroll the companion client certificate with the
+service stopped (after a fresh install it has never started; `stop` is then
+harmless), and only then start it. The client PEM must be provider-owned `0600`
+with one link, so copy it in rather than pointing at your own file:
 
 ```bash
 sudo /usr/bin/python3 -I $I stop --acknowledge-active-work

@@ -291,7 +291,7 @@ class Host:
         birth = info.st_birthtime if hasattr(info, 'st_birthtime') else info.st_ctime_ns
         self.update(lambda s, k=f'{info.st_ino}:{birth}': s['owners'].__setitem__(k, [491, 491]))
 
-    def provision_credentials(self, secret=True):
+    def provision_credentials(self, secret=True, companion=True):
         for name in plan.STATE_FILES:
             path = self.path(f'{ROOT}/state/{name}')
             path.write_bytes(b'synthetic credential placeholder\n')
@@ -299,6 +299,16 @@ class Host:
             self.provider_owned(path)
         if secret:
             self.provision_secret()
+        if companion:
+            self.provision_companion()
+
+    def provision_companion(self, mode=0o600):
+        # PR #71: `--companion-enroll-cert` writes the provider-owned registry state/companion-identities.json.
+        path = self.path(f'{ROOT}/state/companion-identities.json')
+        path.write_text('{"version":2,"identities":[{"fingerprint":"' + 'a' * 64 + '","label":"Mac operator"}]}')
+        path.chmod(mode)
+        self.provider_owned(path)
+        return path
 
     def provision_secret(self, mode=0o600):
         # PR #71: the API client secret is a provider-owned file store under state/secrets/.
@@ -713,7 +723,7 @@ class LifecycleTests(InstallerTestCase):
         self.assertFalse(self.host.path(f'{ROOT}/versions').exists())
         self.assertFalse(self.host.path(f'{ROOT}/native-identities.json').exists())
         self.assertFalse(self.host.path(f'{ROOT}/run').exists())
-        self.assertEqual(sorted(os.listdir(self.host.path(f'{ROOT}/state'))), sorted(plan.STATE_FILES + ('secrets',)))
+        self.assertEqual(sorted(os.listdir(self.host.path(f'{ROOT}/state'))), sorted(plan.STATE_FILES + ('companion-identities.json', 'secrets')))
         state = self.host.state()
         self.assertEqual(state['launchd']['loaded'], False)
         self.assertIn('_vwaccess', state['users']); self.assertIn('_vwhuman', state['groups'])
@@ -1416,6 +1426,133 @@ class ReviewRound2Tests(LifecycleBase):
         self.assertEqual(self.receipt()['active_version'], '0.5.4')
         self.assertOk(self.run_installer(*rollback, '--to-version', '0.6.0'))
         self.assertEqual(self.receipt()['active_version'], '0.6.0')
+
+
+class ReviewRound3Tests(LifecycleBase):
+    """Review round 3 on PR #70."""
+
+    COMPANION = f'{ROOT}/state/companion-identities.json'
+
+    def test_the_service_waits_for_an_enrolled_companion(self):
+        # PR #71 `identity::enrolled()` refuses to bind without state/companion-identities.json
+        # (provider-owned, 0600, one link, no ACL): starting earlier is a launchd restart loop.
+        self.fresh_host()
+        self.assertOk(self.install())
+        self.host.provision_credentials(companion=False)
+        code, out, _ = self.assertOk(self.install())
+        self.assertFalse(self.host.state()['launchd'].get('loaded'))
+        self.assertIn(f'credential: {self.COMPANION} is missing (enroll the companion', out)
+        code, _, err = self.run_installer('start')
+        self.assertEqual(code, 2); self.assertIn(f'{self.COMPANION} is missing', err)
+        # status names the missing gate item (incomplete credentials are an expected state, not a fault: exit 0).
+        code, out, _ = self.assertOk(self.run_installer('status'))
+        self.assertIn('credentials: incomplete', out); self.assertIn(f'  {self.COMPANION} is missing', out)
+        path = self.host.provision_companion(mode=0o644)
+        self.assertIn(f'{self.COMPANION} mode 0644, expected 0600', self.assertOk(self.install())[1])
+        self.assertFalse(self.host.state()['launchd'].get('loaded'))
+        path.chmod(0o600)
+        os.link(path, path.parent / 'second-link')
+        self.assertIn(f'{self.COMPANION} has 2 hard links, expected 1', self.assertOk(self.install())[1])
+        self.assertFalse(self.host.state()['launchd'].get('loaded'))
+        os.unlink(path.parent / 'second-link')
+        self.assertOk(self.run_installer('start'))
+        self.assertTrue(self.host.state()['launchd']['running'])
+        self.assertIn('credentials: present', self.assertOk(self.run_installer('status'))[1])
+
+    def test_documented_order_enrolls_before_the_first_start(self):
+        self.fresh_host()
+        out = self.assertOk(self.install())[1]
+        secret, enroll, start = (out.index('--store-bootstrap-secret'), out.index('--companion-enroll-cert'), out.index(' start '))
+        self.assertLess(secret, enroll); self.assertLess(enroll, start)
+        self.assertIn('companion-identities.json', out[start - 200:start + 200])
+        doc = (HERE.parent / 'docs/desktop-installation.md').read_text()
+        section = doc[doc.index('## macOS provider installation, upgrade and removal'):]
+        gate = section[section.index('The installer never generates or copies credentials'):]
+        gate = gate[:gate.index('\n\n')]
+        self.assertIn('companion-identities.json', gate)
+        self.assertLess(gate.index('secret'), gate.index('companion-identities.json'))
+        self.assertLess(gate.index('enroll'), gate.index('`start`'))
+
+    def test_documented_invocations_use_the_isolated_system_python_on_the_root_owned_copy(self):
+        for name in ('docs/desktop-installation.md', 'docs/implementation/issue-49-native-provider.md'):
+            for line in (HERE.parent / name).read_text().splitlines():
+                for script in ('macos-provider-install.py', 'macos-provider-plan.py'):
+                    if script in line and 'python' in line and 'test-' not in line:
+                        with self.subTest(doc=name, line=line):
+                            self.assertRegex(line, r'/usr/bin/python3 -I (\$I|\$P|/usr/local/libexec/vw-provider-installer/scripts/)')
+        for line in installer.next_steps(installer.receipt_values(self.receipt(), '0.5.4'), '0.5.4', 'sixto').splitlines():
+            if 'python' in line:
+                self.assertIn('/usr/bin/python3 -I', line)
+
+    def fake_ls(self, temporary, output, code=0):
+        tool = Path(temporary) / 'ls'
+        tool.write_text(f'#!/bin/sh\ncat <<\'EOF\'\n{output}EOF\nexit {code}\n')
+        tool.chmod(0o755)
+        return patch.object(installer, 'LS_TOOL', str(tool))
+
+    def test_code_trust_refuses_acl_entries(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            top = Path(os.path.realpath(temporary))
+            script = top / 'macos-provider-install.py'
+            script.write_text('# code\n'); script.chmod(0o644); top.chmod(0o755)
+            owners = (os.getuid(),)
+            installer.check_code_trust([script], owners=owners, top=top)
+            with self.fake_ls(temporary, '-rw-r--r--+ 1 root  wheel  7 Nov  9 12:00 x\n 0: group:everyone allow write\n'):
+                with self.assertRaisesRegex(installer.InstallError, 'access control list'):
+                    installer.check_code_trust([script], owners=owners, top=top)
+            with self.fake_ls(temporary, '-rw-r--r--  1 root  wheel  7 Nov  9 12:00 x\n 0: user:sixto allow write\n'):
+                with self.assertRaisesRegex(installer.InstallError, 'access control list'):
+                    installer.check_code_trust([script], owners=owners, top=top)
+            with self.fake_ls(temporary, '', code=1):
+                with self.assertRaisesRegex(installer.InstallError, 'access control list'):
+                    installer.check_code_trust([script], owners=owners, top=top)
+            with self.fake_ls(temporary, '-rw-r--r--@ 1 root  wheel  7 Nov  9 12:00 x\n'):
+                installer.check_code_trust([script], owners=owners, top=top)
+            if sys.platform == 'darwin':
+                # A real ACL on our own temporary file (no privilege needed).
+                subprocess.run(['/bin/chmod', '+a', 'everyone allow write', str(script)], check=True)
+                with self.assertRaisesRegex(installer.InstallError, 'access control list'):
+                    installer.check_code_trust([script], owners=owners, top=top)
+
+    def test_only_record_not_found_reads_as_absent(self):
+        reader = installer.Installer(self.host.root, True, out=lambda _: None)
+        self.assertIsNone(reader.read_attribute('Groups', 'no-such-group', 'GroupMembership'))
+        for code in (1, 70, 255, -9):
+            failed = subprocess.CompletedProcess([], code, '', 'DS Error: -14009 (eDSCannotAccessSession)\n')
+            with self.subTest(code=code), patch.object(installer.Installer, 'tool', return_value=failed):
+                with self.assertRaisesRegex(installer.InstallError, f'dscl .*failed \\({code}\\)'):
+                    reader.read_attribute('Groups', '_vwhuman', 'GroupMembership')
+                with self.assertRaises(installer.InstallError):
+                    reader.members('_vwhuman')
+
+    def test_rollback_after_a_crash_between_plist_and_receipt_targets_the_switch_source(self):
+        self.assertOk(self.upgrade('--acknowledge-active-work'))
+        bundle3 = self.host.bundle('0.7.0'); plan3 = self.host.plan('0.7.0', bundle3)
+        save = installer.Installer.save_receipt
+
+        def crashing_save(instance, receipt):
+            if receipt.get('active_version') == '0.7.0':
+                raise Crash('after the plist write, before the receipt')
+            return save(instance, receipt)
+        with patch.object(installer.Installer, 'save_receipt', crashing_save), self.assertRaises(Crash):
+            self.run_installer('upgrade', '--plan', str(plan3), '--bundle', str(bundle3), *self.pinned(plan3), '--acknowledge-active-work')
+        receipt = self.receipt()
+        self.assertEqual((receipt['active_version'], receipt['previous_version'], receipt['switching']),
+                         ('0.6.0', '0.5.4', {'from': '0.6.0', 'to': '0.7.0', 'by': 'upgrade'}))
+        self.assertIn(b'0.7.0', self.host.path(f'/Library/LaunchDaemons/{LABEL}.plist').read_bytes())
+        self.assertOk(self.run_installer('rollback', '--acknowledge-active-work', '--confirm-state-compatible'))
+        receipt = self.receipt()
+        self.assertEqual(receipt['active_version'], '0.6.0')
+        self.assertNotIn('switching', receipt)
+        self.assertEqual(receipt['last_switch'], {'from': '0.7.0', 'to': '0.6.0', 'by': 'rollback'})
+        self.assertEqual(self.host.state()['launchd']['program'], f'{ROOT}/versions/0.6.0/vaultwarden-accessd')
+        self.assertIn(b'0.6.0', self.host.path(f'/Library/LaunchDaemons/{LABEL}.plist').read_bytes())
+        self.assertOk(self.run_installer('status'))
+
+    def test_plan_note_names_both_signature_policies(self):
+        note = json.loads((self.plan1 / 'plan.json').read_text())['note']
+        self.assertNotIn('Development signing only', note)
+        self.assertIn('--team-id', note); self.assertIn('--allow-development-signature', note)
 
 
 class RealProcessToolTests(InstallerTestCase):

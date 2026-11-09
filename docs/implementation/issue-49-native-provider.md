@@ -207,8 +207,8 @@ performed.
 
 - **Review binding:** mutating runs require `--expect-plan-sha256` (the digest of
   the reviewed `plan.json`, which carries the plist, identity and binary
-  hashes), a signature policy (`--team-id TEAMID`, checked with the designated
-  requirement `anchor apple generic and certificate leaf[subject.OU] = "TEAMID"`,
+  hashes), a signature policy (`--team-id TEAMID`, checked with the full
+  Developer ID designated requirement ending in `certificate leaf[subject.OU] = "TEAMID"`,
   or `--allow-development-signature` for ad-hoc builds only), and a root-owned
   copy of the installer: the script, the plan module, the templates and every
   ancestor directory must be root-owned and not group/other-writable. Every
@@ -255,10 +255,21 @@ performed.
   GeneratedUID, so a recreated account cannot revive old enrollment. (Review
   round 2: `--confirm-secrets-removed` is gone; it asserted Keychain removal,
   and the provider no longer keeps its secrets in a Keychain.)
-- **Start gate:** the service starts only when the four state files and the
+- **Start gate:** the service starts only when the four state files, the
   stored API client secret (`state/secrets/` `0700`,
   `vaultwarden-accessd.bootstrap-client-secret` `0600`, provider-owned, one link)
-  verify (review round 2, decision R2-8).
+  and the enrolled companion registry `state/companion-identities.json`
+  (provider-owned `0600`, one link; PR #71 `identity::enrolled()` refuses to bind
+  the companion listener without it) verify (review round 2, decision R2-8;
+  review round 3). `status` names each missing item. Order: store the secret,
+  enroll the companion with the service stopped, then `start`.
+- **Code trust (review round 3):** besides owner and mode bits, every code file
+  and ancestor directory must carry no access control list (`/bin/ls -led`).
+- **Directory service (review round 3):** only `dscl` exit 56
+  (eDSRecordNotFound) reads as an absent record; any other failure refuses.
+- **Rollback after an interrupted upgrade (review round 3):** without
+  `--to-version`, `rollback` targets the pending upgrade's `from` version, never
+  an older `previous_version`.
 
 ## Production Touch ID approval: owner decisions (2026-10-30)
 
