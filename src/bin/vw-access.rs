@@ -297,7 +297,7 @@ fn main() -> ExitCode {
     ) {
         return ExitCode::from(run_agent(&args.command));
     }
-    let mut args = match args {
+    let args = match args {
         Args {
             command: Command::Setup { command },
             ..
@@ -315,16 +315,20 @@ fn main() -> ExitCode {
     // macOS: default to the installed human endpoint named by the root-owned
     // native identity record (/Library/VaultwardenAccess/run/human).
     #[cfg(target_os = "macos")]
-    if args.state_root.is_none() {
-        args.state_root = vaultwarden_cli::adapters::human_socket::installed_human_socket_dir();
+    let args = {
+        let mut args = args;
         if args.state_root.is_none() {
-            eprintln!(
-                "vw-access: no installed endpoint found at {}; pass --state-root",
-                vaultwarden_cli::adapters::human_socket::INSTALLED_IDENTITIES_PATH
-            );
-            return ExitCode::from(2);
+            args.state_root = vaultwarden_cli::adapters::human_socket::installed_human_socket_dir();
+            if args.state_root.is_none() {
+                eprintln!(
+                    "vw-access: no installed endpoint found at {}; pass --state-root",
+                    vaultwarden_cli::adapters::human_socket::INSTALLED_IDENTITIES_PATH
+                );
+                return ExitCode::from(2);
+            }
         }
-    }
+        args
+    };
     if args.state_root.is_none() {
         eprintln!("vw-access: invalid command; use --help");
         return ExitCode::from(2);
