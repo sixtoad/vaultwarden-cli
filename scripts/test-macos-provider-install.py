@@ -24,6 +24,14 @@ import unittest
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
+if sys.platform != 'darwin':
+    # The installer is macOS-only and so are these fixtures: it imports fcntl (absent
+    # on Windows) and checks ACLs with BSD `ls -le`; the fake chown/stat key ownership
+    # on (inode, st_birthtime), and Linux has no birthtime, so the st_ctime fallback
+    # changes on every chmod/rename and every owner reads back as the runner's uid.
+    # The suite runs on the macOS job of scripts/test-desktop-companion.sh.
+    print(f'test-macos-provider-install: skipped on {sys.platform}: macOS-only installer and fixtures')
+    sys.exit(0)
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('installer', HERE / 'macos-provider-install.py')
 installer = importlib.util.module_from_spec(spec)
