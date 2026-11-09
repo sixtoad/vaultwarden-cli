@@ -14,7 +14,7 @@ Do not bypass Gatekeeper, remove quarantine or modify an installed application.
 | Platform | Bundled tools | Request / approve / execute capability |
 | --- | --- | --- |
 | Linux | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, `vaultwarden-access-exec`, command launcher | `vw-access` requests protected work; provider/helper implement approved Linux delivery. Flutter provider transport/approval is unavailable. |
-| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. Installing the provider into `/Library/VaultwardenAccess` and its launchd service is a reviewed manual step: `scripts/macos-provider-plan.py` resolves the templates into files, and nothing installs them yet (see below). Development signing only. Flutter approves through the existing pinned-TLS Linux-provider connection; approving the native provider from the app is tracked in #49. Guided enrollment and notifications are not available (#59, #61). |
+| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. An administrator installs the provider into `/Library/VaultwardenAccess` and its launchd service with `sudo /usr/bin/python3 scripts/macos-provider-install.py`, from a plan reviewed with `scripts/macos-provider-plan.py` (see below); the app itself installs nothing. Development signing only. Flutter approves through the existing pinned-TLS Linux-provider connection; approving the native provider from the app is tracked in #49. Guided enrollment and notifications are not available (#59, #61). |
 | macOS, Intel (x86_64) | `vaultwarden-cli`, command launcher | Vault CLI works. Flutter approves through the existing pinned-TLS Linux-provider connection. The native provider rejects Intel and Rosetta, so an Intel bundle neither ships nor advertises `vw-access`/`vaultwarden-accessd`. |
 | Windows | `vaultwarden-cli.exe`, command launcher | Vault CLI works. Protected requesting/provider execution and Flutter approval transport are unavailable. |
 
@@ -141,20 +141,109 @@ python3 scripts/macos-provider-plan.py --output ~/vw-provider-plan \
   --version 0.5.4 --provider-account _vwaccess --provider-group _vwaccess \
   --provider-uid 491 --provider-uuid <32 lowercase hex> \
   --operator-uid 501 --operator-uuid <32 lowercase hex> \
-  --human-gid 492 --agent-gid 493 [--bundle /path/to/companion_slice.app]
+  --human-gid 492 --agent-gid 493 \
+  [--provider-gid 491] [--human-group _vwhuman] [--agent-group _vwagent] \
+  --bundle /path/to/companion_slice.app
 ```
 
 Every input is validated (decimal non-zero IDs, distinct provider/operator UIDs
-and UUIDs, distinct human/agent GIDs, lowercase 32-hex GeneratedUIDs without
-dashes, short account/group names, `MAJOR.MINOR.PATCH[-pre]` version), and any
-`@PLACEHOLDER@` left after resolution is an error. The resolved plist keeps
-`AbandonProcessGroup`, zero core limits and `/dev/null` standard streams, and
-runs `/Library/VaultwardenAccess/versions/<version>/vaultwarden-accessd`, the
+and UUIDs, distinct provider/human/agent GIDs and group names, lowercase 32-hex
+GeneratedUIDs without dashes, short account/group names, `MAJOR.MINOR.PATCH[-pre]`
+version), and any `@PLACEHOLDER@` left after resolution is an error. The provider
+primary GID defaults to the provider UID. Choose a free provider UID/GID pair and
+two free GIDs (`dscl . -list /Users UniqueID`, `dscl . -list /Groups
+PrimaryGroupID`); generate the provider GeneratedUID with `uuidgen | tr -d - | tr
+A-F a-f`, and read the operator's with `dscl . -read /Users/$USER GeneratedUID`.
+The resolved plist keeps `AbandonProcessGroup`, zero core limits and `/dev/null`
+standard streams, and runs
+`/Library/VaultwardenAccess/versions/<version>/vaultwarden-accessd`, the
 bundle's `Contents/Helpers/vaultwarden-accessd` at the bundle's `cli_version`;
-`--bundle` checks that version and records the payload hashes. `plan.json` lists
-each file's destination, owner and mode from
-[the native provider installation surface](implementation/issue-49-native-provider.md#concrete-installation-approval-surface).
-The generator runs no command and writes only into the output directory; it
-refuses system locations and never overwrites. Copying the files into place,
-creating accounts and loading the service remain separately reviewed manual
-steps.
+`--bundle` checks that version and records the payload hashes (the installer
+requires them). `plan.json` (schema 2) lists the accounts and group memberships and
+every directory and file of
+[the native provider installation surface](implementation/issue-49-native-provider.md#concrete-installation-approval-surface)
+with owner, group, numeric IDs, mode, link count and who creates it
+(`installer`, `bundle`, or `operator` for credentials). The generator runs no
+command and writes only into the output directory; it refuses system locations
+and never overwrites.
+
+## macOS provider installation, upgrade and removal
+
+`scripts/macos-provider-install.py` executes exactly a reviewed plan directory
+and the same bundle. Run it with the system Python under sudo on an Apple Silicon
+Mac; it refuses Intel, Rosetta and other systems, and every mutating command
+refuses without root. It rebuilds the plan from its own inputs and refuses any
+edited file, checks the bundle manifest, one hard link and the reviewed SHA-256
+of every binary, and runs `codesign --verify --strict` on them.
+
+```bash
+# Dry run (also the default with no subcommand): prints every action, changes nothing.
+python3 scripts/macos-provider-install.py plan --plan ~/vw-provider-plan --bundle /path/to/companion_slice.app
+sudo /usr/bin/python3 scripts/macos-provider-install.py install --plan ~/vw-provider-plan --bundle /path/to/companion_slice.app
+sudo /usr/bin/python3 scripts/macos-provider-install.py status
+```
+
+`install` creates the provider group, the human and agent socket groups
+(`dseditgroup`) and the hidden provider account (`dscl`: fixed UID, primary
+GID, plan GeneratedUID, shell `/usr/bin/false`, home `/var/empty`, no password),
+adds the provider to both socket groups and the operator to the human group,
+then creates the empty layout, copies the binaries into a new
+`versions/<version>/` through a staging directory and a rename (with the
+resolved plist as `versions/<version>/com.cantolla.vaultwarden-accessd.plist`),
+writes `native-identities.json`, `installer-receipt.json` and the LaunchDaemon.
+Any UID, GID, name or GeneratedUID collision refuses before the first write. An
+account or group that exactly matches the plan but was not created by this
+installer is refused unless you pass `--adopt-existing-accounts` after reviewing
+it; adopted accounts are never removed. An existing version directory is never
+overwritten: an identical one is accepted, a different one refuses.
+
+The installer never generates, copies or deletes credentials. Until
+`state/backend.json`, `provider-cert.pem`, `provider-key.pem` and
+`companion-ca.pem` exist (provider-owned, `0600`, one link) and the Keychain holds
+the API client secret, the service stays disabled (`launchctl disable`) and the
+installer prints the exact manual steps. Re-run the same `install` command
+afterwards: it changes nothing else and starts the service (`launchctl enable`,
+`bootstrap`). The provider runs as the provider account, never root, and always
+starts locked. Re-runs are idempotent.
+
+**Upgrade.** Generate and review a plan for the new version with the same
+identity inputs, then:
+
+```bash
+sudo /usr/bin/python3 scripts/macos-provider-install.py upgrade --plan ~/vw-provider-plan-0.6.0 \
+  --bundle /path/to/new/companion_slice.app --acknowledge-active-work
+```
+
+The order is fixed: install and verify the complete new version, close admission
+(`launchctl disable`), `launchctl bootout` (the plist keeps
+`AbandonProcessGroup`, so released consumers keep running; the installer never
+signals them), switch the LaunchDaemon plist and the receipt, then `enable` and
+`bootstrap`; the provider restarts locked and every new request needs a fresh
+approval. `--acknowledge-active-work` records that you notified the execution
+owner of active work. Failed verification leaves the current version active.
+State and Keychain are untouched. Identity changes (accounts, IDs, groups) are not
+an upgrade and are refused.
+
+**Rollback.** `rollback [--to-version V] --confirm-state-compatible
+--acknowledge-active-work` switches back to a recorded, re-verified version in
+the same order. Confirm first that the target understands the current native
+profile, account UUIDs and consumed-request schema; consumed approvals are never
+reactivated and no state backup is restored.
+
+**Uninstall.** `uninstall --acknowledge-active-work` closes admission, boots the
+service out, then removes only installer-owned, unchanged files: the
+LaunchDaemon plist, verified version directories, `native-identities.json` and
+empty `run/` directories. State, the Keychain and the accounts are preserved and
+the receipt is kept so a later install recognizes them. Anything changed or
+non-empty is retained, listed, and the command exits 3 (incomplete removal).
+`--purge` also removes `state/` (credentials, consumed-request tombstones and
+audit history). `--purge --remove-accounts` also removes the accounts and groups
+this installer created and its memberships; the operator account is never
+touched. Keychain items (service `vaultwarden-accessd`) are never deleted by the
+installer: remove them manually after reviewing them.
+
+`python3 scripts/test-macos-provider-install.py` exercises all of this under a
+temporary root prefix with fake `dscl`, `dseditgroup`, `launchctl`, `chown`,
+`stat` and `codesign`; no test uses sudo, creates an account, writes to
+`/Library` or talks to launchd. A real installation on a Mac has not been
+performed by the tests.
