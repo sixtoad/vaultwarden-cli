@@ -205,6 +205,51 @@ enrollment proofs are verified locally before sending, and a body over the
 16 KiB request limit is refused locally without consuming the ticket. Finish
 key work with `biometric_key_finish`. The synthetic v1 lifecycle is unchanged.
 
+### Secure Enclave signer and approval screens (issue 49 PR C/D)
+
+The Dart bindings for the bridge are generated (`lib/src/rust/api/biometric.dart`,
+`flutter_rust_bridge_codegen` 2.13.0). The provider controller pins both sessions
+with the saved provider leaf pin and client fingerprint after every
+reconciliation and disposable setup.
+
+**Signer** (`macos/Runner/Production*.swift`, channel
+`dev.vaultwarden.companionSlice/approvalKey`). One non-exportable Secure Enclave
+P-256 key per (provider identity, approval client), Keychain tag
+`dev.vaultwarden.companion.approval-v2.key.<SHA-256(provider || client)>`,
+data-protection Keychain, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`,
+access control `.privateKeyUsage` + `.biometryCurrentSet`. Each signature
+evaluates that access control on a fresh `LAContext` with no reuse window and
+no fallback button, so every approval needs its own touch, and adding or
+removing a fingerprint invalidates the key (enroll again). Before prompting and
+again after Touch ID, the signer parses the framed transcript and signs only an
+approval transcript (`dev.vaultwarden.provider.approval.v2`, action `approve`,
+its own provider, client and key id) or an enrollment transcript
+(`dev.vaultwarden.provider.approval-enroll.v2`, its own provider, client and
+public key). The synthetic key (`NativeTestKey`, its own tag and channel) builds
+its own synthetic-domain transcript and never receives these bytes; Swift and
+Rust tests check both directions. Sleep, window close and quit cancel an open
+prompt.
+
+**Enrollment** (Settings, "Touch ID approval key"): read the provider's key
+record, then enroll with a fresh approval password: `biometric_prepare`
+ticket, create the key (an existing key for the same provider and client is
+reused, never overwritten), one Touch ID proof of possession, then
+`biometric_enroll`. Revocation deletes the local key only after the provider
+confirmed it.
+
+**Approval** (request review): on a Mac with Touch ID, "Approve once with Touch
+ID" fetches the review again, refuses unless it is byte-identical to what was
+displayed and still decidable, asks Rust for the transcript, signs after Touch
+ID and sends one Decision v2 proof. Cancellation, unavailable or locked-out
+Touch ID, a missing or mismatched key, a provider without v2, a `null` binding
+or `require_password` send nothing and leave password approval available.
+Provider results map to final messages: approved, stale (obtain a fresh review),
+password required, rate limited, rejected (final) and lost response (status-only
+recovery). Expired, cancelled and already decided reviews show a final state.
+Macs without Touch ID show only password approval. While the system prompt is
+open the window's `inactive` transition does not suspend the provider session;
+hiding, sleep and close still do.
+
 ## Preserved synthetic contract and lifecycle
 
 The UI can select only synthetic fixture 1 or 2. Rust supplies their complete

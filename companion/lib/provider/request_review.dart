@@ -15,11 +15,22 @@ class RequestReview extends StatelessWidget {
     required this.onApprove,
     required this.onDeny,
     required this.onCancel,
+    this.touchIdOffered = false,
+    this.onTouchId,
+    this.touchIdNote = '',
+    this.touchIdMessage = '',
   });
   final core.ProviderSnapshot state;
   final String endpoint, origin;
   final TextEditingController password;
   final VoidCallback onApprove, onDeny, onCancel;
+
+  /// Whether this Mac has Touch ID. Without it only the password path shows.
+  final bool touchIdOffered;
+
+  /// Null when Touch ID cannot approve this review; `touchIdNote` says why.
+  final VoidCallback? onTouchId;
+  final String touchIdNote, touchIdMessage;
   @override
   Widget build(BuildContext context) {
     final review = state.review;
@@ -95,6 +106,34 @@ class RequestReview extends StatelessWidget {
           const Text(
             'Review expires within 55 seconds and at the request deadline. Every attempt consumes its ticket.',
           ),
+          if (!state.canDecide) ...[
+            const SizedBox(height: 16),
+            Text(
+              'This request can no longer be decided (${review.status}). Expired, cancelled and already decided requests are final; nothing can be approved from this review.',
+              key: const Key('review-final'),
+            ),
+          ],
+          if (touchIdMessage.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(touchIdMessage, key: const Key('touch-id-message')),
+          ],
+          if (touchIdOffered) ...[
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              key: const Key('approve-touch-id'),
+              onPressed: state.canDecide ? onTouchId : null,
+              icon: const Icon(Icons.fingerprint),
+              label: const Text('Approve once with Touch ID'),
+            ),
+            if (touchIdNote.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(touchIdNote, key: const Key('touch-id-note')),
+            ],
+            const SizedBox(height: 16),
+            const Text(
+              'Touch ID signs this exact review after fetching it again. If it is unavailable, cancelled or refused, nothing is sent and you can approve with your password instead.',
+            ),
+          ],
           const SizedBox(height: 24),
           accessPassword(password, 'Fresh approval password'),
           const SizedBox(height: 16),

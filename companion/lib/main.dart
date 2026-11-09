@@ -235,7 +235,7 @@ class _CompanionReviewState extends State<CompanionReview>
               const Text('Rust core connected', key: Key('core-connected')),
               const SizedBox(height: 12),
               const Text(
-                'Local demonstration only. No vault access, provider approval or execution.',
+                'Local demonstration only. No vault access, provider approval or execution. Provider requests are approved on the Requests page with a separate production key.',
               ),
               const SizedBox(height: 20),
               Text(

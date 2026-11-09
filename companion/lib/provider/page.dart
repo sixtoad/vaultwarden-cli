@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../platform/approval_key.dart';
 import '../platform/provider.dart';
 import '../app/access_shell.dart';
 import '../design/access_theme.dart';
@@ -12,14 +13,18 @@ import 'installation_settings.dart';
 import 'devices_view.dart';
 import 'controller.dart';
 import 'pilot_bundle.dart';
+import 'touch_id.dart';
+import 'touch_id_views.dart';
 
 class ProviderPage extends StatefulWidget {
   const ProviderPage({
     super.key,
     required this.platform,
     required this.syntheticBuilder,
+    this.approvalKeys,
   });
   final ProviderPlatform platform;
+  final ApprovalKeyPlatform? approvalKeys;
   final WidgetBuilder syntheticBuilder;
   @override
   State<ProviderPage> createState() => _ProviderPageState();
@@ -28,12 +33,14 @@ class ProviderPage extends StatefulWidget {
 class _ProviderPageState extends State<ProviderPage>
     with WidgetsBindingObserver {
   late ProviderController controller;
+  late TouchIdController touchId;
   final endpoint = TextEditingController(), pin = TextEditingController();
   final importPassword = TextEditingController(),
       approvalPassword = TextEditingController(),
       unlockPassword = TextEditingController();
   final pilotBundle = TextEditingController();
   final managementPassword = TextEditingController();
+  final touchIdPassword = TextEditingController();
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
   bool detailOpen = false;
@@ -46,7 +53,15 @@ class _ProviderPageState extends State<ProviderPage>
     controller = ProviderController(widget.platform)
       ..clearPasswords = clearPasswords;
     controller.addListener(changed);
-    unawaited(controller.initialize());
+    touchId = TouchIdController(
+      controller,
+      widget.approvalKeys ?? NativeApprovalKeyPlatform(),
+    )..addListener(changed);
+    unawaited(
+      controller.initialize().then((_) {
+        if (mounted) return touchId.refreshLocal();
+      }),
+    );
   }
 
   void changed() {
@@ -59,10 +74,19 @@ class _ProviderPageState extends State<ProviderPage>
     unlockPassword.clear();
     pilotBundle.clear();
     managementPassword.clear();
+    touchIdPassword.clear();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The system Touch ID prompt deactivates the window. Only while that
+    // prompt is open is `inactive` ignored; hiding, sleep and close still
+    // suspend (and the native signer cancels the prompt on sleep and close).
+    if (touchId.prompting &&
+        (state == AppLifecycleState.inactive ||
+            state == AppLifecycleState.resumed)) {
+      return;
+    }
     if (state == AppLifecycleState.resumed) controller.resume();
     if ([
       AppLifecycleState.inactive,
@@ -78,6 +102,8 @@ class _ProviderPageState extends State<ProviderPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     controller.removeListener(changed);
+    touchId.removeListener(changed);
+    touchId.dispose();
     controller.dispose();
     contentScroll.dispose();
     for (final field in [
@@ -88,6 +114,7 @@ class _ProviderPageState extends State<ProviderPage>
       unlockPassword,
       pilotBundle,
       managementPassword,
+      touchIdPassword,
     ]) {
       field.dispose();
     }
@@ -270,6 +297,10 @@ class _ProviderPageState extends State<ProviderPage>
               const Text(
                 'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
               ),
+            if (touchId.message.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(touchId.message, key: const Key('touch-id-message')),
+            ],
             if (state.statusId.isNotEmpty) ...[
               const SizedBox(height: 16),
               FactRow('Latest status request', state.statusId),
@@ -301,6 +332,10 @@ class _ProviderPageState extends State<ProviderPage>
         unawaited(controller.decide(false, ''));
       },
       onCancel: backToRequests,
+      touchIdOffered: touchId.available,
+      onTouchId: touchId.canApprove ? () => unawaited(touchId.approve()) : null,
+      touchIdNote: touchId.working ? '' : touchId.unavailableReason,
+      touchIdMessage: touchId.message,
     );
   }
 
@@ -329,6 +364,15 @@ class _ProviderPageState extends State<ProviderPage>
           ),
           const SizedBox(height: 24),
           const InstallationSettings(),
+          if (config.configured) ...[
+            TouchIdKeyPanel(
+              touchId: touchId,
+              keys: controller.keys,
+              password: touchIdPassword, // secrets-ignore: UI controller
+              enabled: controller.canManage && !controller.managementPending,
+            ),
+            const SizedBox(height: 24),
+          ],
           const ProviderCapabilities(),
           const SizedBox(height: 24),
           if (disposablePilotEnabled &&
