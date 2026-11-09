@@ -208,13 +208,25 @@ class TouchIdController extends ChangeNotifier {
     await platform.cancel(token);
   }
 
+  /// The local key could not be read (`unsafe`: not a Secure Enclave key
+  /// with an access control; `failed`: the Keychain read failed). Enrolling
+  /// then replaces it only after an explicit confirmation.
+  bool get localUnreadable =>
+      local == KeyOutcome.unsafe || local == KeyOutcome.failed;
+
+  static const unknownKeyId =
+      'This Mac\'s key could not be checked against the provider\'s current key. Nothing was sent; try again.';
+
   /// Enroll this Mac's key: management ticket, Secure Enclave key, proof of
   /// possession after Touch ID, then the fresh password. A local key is
   /// reused only when the provider holds it as current and it is usable;
   /// then nothing needs enrolling. Any other local key for this provider
   /// and client (retired, revoked, never enrolled, or invalidated by a
-  /// fingerprint change) can never approve again and is replaced.
-  Future<void> enroll(String password) async {
+  /// fingerprint change) can never approve again and is replaced. A local
+  /// key whose id cannot be computed is never deleted (the attempt ends),
+  /// and an unreadable one is deleted only with [replaceUnreadable], which
+  /// the key panel sets after the user confirmed the replacement.
+  Future<void> enroll(String password, {bool replaceUnreadable = false}) async {
     final b = binding;
     if (b == null || working || !available) return;
     _start();
@@ -230,13 +242,29 @@ class TouchIdController extends ChangeNotifier {
         return;
       }
       var key = await platform.read(b);
+      local = key.outcome;
+      final unreadable =
+          key.outcome == KeyOutcome.unsafe || key.outcome == KeyOutcome.failed;
+      if (unreadable && !replaceUnreadable) {
+        message =
+            'This Mac\'s approval key could not be read (${key.outcome.name}). Nothing was sent. Replace it to enroll: the unreadable key is deleted and a new one is created after you confirm. Until then, approve with your password.';
+        return;
+      }
       if (key.outcome == KeyOutcome.present ||
-          key.outcome == KeyOutcome.invalidated) {
+          key.outcome == KeyOutcome.invalidated ||
+          unreadable) {
         if (key.outcome == KeyOutcome.present &&
-            provider.keys.keyId.isNotEmpty &&
-            _keyId(key.publicKey) == provider.keys.keyId) {
-          message = 'This Mac\'s key is already the provider\'s current Touch ID key. Nothing was sent.';
-          return;
+            provider.keys.keyId.isNotEmpty) {
+          // Never delete on an unknown id: the key may be the current one.
+          final id = _keyId(key.publicKey);
+          if (id.isEmpty) {
+            message = unknownKeyId;
+            return;
+          }
+          if (id == provider.keys.keyId) {
+            message = 'This Mac\'s key is already the provider\'s current Touch ID key. Nothing was sent.';
+            return;
+          }
         }
         if ((await platform.delete(b)).outcome != KeyOutcome.deleted) {
           message = 'This Mac\'s old approval key could not be removed. Nothing was enrolled.';

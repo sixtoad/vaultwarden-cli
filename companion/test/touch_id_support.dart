@@ -29,6 +29,11 @@ class FakeKeys implements ApprovalKeyPlatform {
   /// fingerprint change).
   KeyOutcome presentOutcome = KeyOutcome.present;
   KeyOutcome signOutcome = KeyOutcome.signed;
+
+  /// When set, `read` reports this outcome (`unsafe`, `failed`) whatever
+  /// the key state; [readKey] replaces the public key a present read returns.
+  KeyOutcome? readOutcome;
+  Uint8List? readKey;
   int availabilityChecks = 0, reads = 0;
 
   /// When set, `sign` waits for it (the system prompt is open meanwhile).
@@ -45,9 +50,14 @@ class FakeKeys implements ApprovalKeyPlatform {
   }
 
   @override
-  Future<KeyReply> read(KeyBinding b) async => ++reads > 0 && present
-      ? KeyReply(presentOutcome, publicKey)
-      : KeyReply(KeyOutcome.absent);
+  Future<KeyReply> read(KeyBinding b) async {
+    reads++;
+    if (readOutcome != null) return KeyReply(readOutcome!);
+    return present
+        ? KeyReply(presentOutcome, readKey ?? publicKey)
+        : KeyReply(KeyOutcome.absent);
+  }
+
   @override
   Future<KeyReply> create(KeyBinding b) async {
     created.add(b);
@@ -60,6 +70,8 @@ class FakeKeys implements ApprovalKeyPlatform {
   Future<KeyReply> delete(KeyBinding b) async {
     deleted.add(b);
     present = false;
+    readOutcome = null;
+    readKey = null;
     return KeyReply(KeyOutcome.deleted);
   }
 

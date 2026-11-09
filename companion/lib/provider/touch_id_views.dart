@@ -50,6 +50,8 @@ class TouchIdKeyPanel extends StatelessWidget {
           KeyOutcome.present => 'Present in the Secure Enclave',
           KeyOutcome.invalidated =>
             'Invalidated by a fingerprint change (enroll again to replace it)',
+          KeyOutcome.unsafe || KeyOutcome.failed =>
+            'Present, but it could not be read (${touchId.local.name}). Replace it to enroll; approve with your password meanwhile.',
           _ => 'None',
         }, key: const Key('touch-id-local-key')),
         const Text(
@@ -71,9 +73,15 @@ class TouchIdKeyPanel extends StatelessWidget {
                   idle &&
                       touchId.available &&
                       keys.state != bio.BiometricKeyState.unsupported
-                  ? () => _withPassword(touchId.enroll)
+                  ? () => touchId.localUnreadable
+                        ? _confirmReplace(context)
+                        : _withPassword(touchId.enroll)
                   : null,
-              child: const Text('Enroll Touch ID key'),
+              child: Text(
+                touchId.localUnreadable
+                    ? 'Replace key and enroll'
+                    : 'Enroll Touch ID key',
+              ),
             ),
             OutlinedButton(
               key: const Key('touch-id-revoke'),
@@ -93,6 +101,32 @@ class TouchIdKeyPanel extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  /// An unreadable local key is deleted only after this confirmation.
+  Future<void> _confirmReplace(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Replace this Mac\'s approval key?'),
+        content: const Text(
+          'The key stored for this provider could not be read. Replacing it deletes it from this Mac and enrolls a new Secure Enclave key. If the provider still holds the old key as current, the new key replaces it there once enrollment completes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('touch-id-replace-confirm'),
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Delete and replace'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    _withPassword((secret) => touchId.enroll(secret, replaceUnreadable: true));
   }
 
   void _withPassword(Future<void> Function(String) action) {

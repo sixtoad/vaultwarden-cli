@@ -113,7 +113,7 @@ class _ProviderPageState extends State<ProviderPage>
       // `resumed` are deferred until the approval or enrollment ends
       // (`applyLifecycle`). Hiding, pausing and detaching still cancel the
       // prompt and suspend at once; the native signer also cancels it on
-      // sleep, display sleep, session switch, close and quit.
+      // sleep, display sleep, screen lock, session switch, close and quit.
       if (state == AppLifecycleState.inactive ||
           state == AppLifecycleState.resumed) {
         return;

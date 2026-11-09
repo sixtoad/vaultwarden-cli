@@ -270,6 +270,30 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
+    testWidgets('the prompt deactivating the window neither cancels nor drops '
+        'the approval', (tester) async {
+      final native = FixtureProviderPlatform()..approvalBinding = binding;
+      final keys = FakeKeys()..prompt = Completer();
+      await tester.pumpWidget(page(native, keys));
+      await openReview(tester);
+      await tester.ensureVisible(find.byKey(const Key('approve-touch-id')));
+      await tester.tap(find.byKey(const Key('approve-touch-id')));
+      await tester.pump();
+      // The system Touch ID sheet makes the window inactive while it is up.
+      lifecycle(tester, [AppLifecycleState.inactive]);
+      expect(keys.cancelled, isEmpty, reason: 'inactive is deferred');
+      keys.prompt!.complete();
+      await tester.pump();
+      await tester.pump();
+      lifecycle(tester, [AppLifecycleState.resumed]);
+      await tester.pumpAndSettle();
+      expect(keys.cancelled, isEmpty);
+      expect(decisions(native), hasLength(1), reason: 'approval still sent');
+      expect(decisions(native).single['proof'], isNotNull);
+      expect(find.text('Approved once with Touch ID.'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('switching away during the prompt suspends when it ends', (
       tester,
     ) async {
