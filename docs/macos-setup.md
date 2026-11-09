@@ -32,6 +32,14 @@ LABEL=system/com.cantolla.vaultwarden-accessd
 I=/usr/local/libexec/vw-provider-installer/scripts/macos-provider-install.py
 ```
 
+Always run the installer as `sudo /usr/bin/python3 -I $I …` from that root-owned
+copy: its trust check refuses a run from a checkout, and `-I` (isolated mode)
+keeps a user `.pth` file or `PYTHON*` variable from running code as root.
+
+Order matters: store the bootstrap secret (step 3), enroll the companion with the
+service stopped (step 4), and only then `start` (step 5). The installer's start
+gate requires `state/companion-identities.json`, which only enrollment creates.
+
 The LaunchDaemon runs `vaultwarden-accessd --state-root $STATE --backend-config
 $STATE/backend.json --agent-socket-dir /Library/VaultwardenAccess/run/agent
 --agent-socket-gid $AGENT_GID --companion-listen 127.0.0.1:8443
@@ -49,12 +57,13 @@ is missing, it leaves the service **disabled** (`launchctl disable`). A raw
 inspect the service through the installer's own verbs:
 
 ```sh
-sudo /usr/bin/python3 $I stop --acknowledge-active-work   # close admission, boot the service out
-sudo /usr/bin/python3 $I start                            # verify version + credential files, enable, bootstrap, wait for running
-sudo /usr/bin/python3 $I status                           # launchd state, pid, last exit code, accounts, sockets, credential files
+sudo /usr/bin/python3 -I $I stop --acknowledge-active-work   # close admission, boot the service out
+sudo /usr/bin/python3 -I $I start                            # verify version + credential files, enable, bootstrap, wait for running
+sudo /usr/bin/python3 -I $I status                           # launchd state, pid, last exit code, accounts, sockets, credential files
 ```
 
-`start` checks the four state files but cannot see the client secret (step 3):
+`start` checks the four state files and the enrollment record
+(`companion-identities.json`) but cannot see the client secret (step 3):
 check that yourself before starting. `AbandonProcessGroup` is set: stopping the
 provider never stops programs it already launched.
 
@@ -184,7 +193,7 @@ Enrollment reads the client certificate as the provider, so it must be a
 provider-owned `0600` file:
 
 ```sh
-sudo /usr/bin/python3 $I stop --acknowledge-active-work   # no-op if never started
+sudo /usr/bin/python3 -I $I stop --acknowledge-active-work   # no-op if never started
 sudo install -o $PROVIDER -g $PGROUP -m 0600 ~/vw-setup/tls/companion-client.pem $STATE/companion-client.pem
 cd / && sudo -u $PROVIDER $BIN/vaultwarden-accessd --state-root $STATE \
   --companion-enroll-cert $STATE/companion-client.pem \
@@ -199,8 +208,8 @@ sudo rm $STATE/companion-client.pem
 
 ```sh
 sudo ls -le $STATE/secrets                 # the bootstrap record from step 3 is there
-sudo /usr/bin/python3 $I start             # (or re-run the same `install` without --no-start)
-sudo /usr/bin/python3 $I status
+sudo /usr/bin/python3 -I $I start             # (or re-run the same `install` without --no-start)
+sudo /usr/bin/python3 -I $I status
 ```
 
 It starts **locked**. A `last exit code` other than 0 with a growing run count is
@@ -333,7 +342,7 @@ reaches a terminal state; `vw-access status <id>` and `vw-access history` show i
 ## 11. Verification
 
 ```sh
-sudo /usr/bin/python3 $I status
+sudo /usr/bin/python3 -I $I status
 sudo launchctl print $LABEL | grep -E 'state|pid|last exit'   # read-only view
 sudo ls -le $STATE $STATE/secrets        # provider-owned, 0700 dirs / 0600 files, no ACL
 $BIN/vw-access history --limit 10
