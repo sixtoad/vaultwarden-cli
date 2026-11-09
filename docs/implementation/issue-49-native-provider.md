@@ -203,30 +203,54 @@ account UID must never revive old enrollment.
 The installer implements the sequences above for a reviewed plan directory and
 the same arm64 bundle; it is source-tested with fake system tools and a
 temporary root prefix only. A real privileged installation has not been
-performed by the tests.
+performed.
 
+- **Review binding:** mutating runs require `--expect-plan-sha256` (the digest of
+  the reviewed `plan.json`, which carries the plist, identity and binary
+  hashes), a signature policy (`--team-id TEAMID`, checked with the designated
+  requirement `anchor apple generic and certificate leaf[subject.OU] = "TEAMID"`,
+  or `--allow-development-signature` for ad-hoc builds only), and a root-owned
+  copy of the installer: the script, the plan module, the templates and every
+  ancestor directory must be root-owned and not group/other-writable. Every
+  binary must be arm64-only (`lipo -archs`), whatever `bundle.json` says.
 - **Install:** refuses unless arm64 macOS and root; creates the provider group,
-  human/agent socket groups and hidden provider account with the plan's fixed
-  IDs and GeneratedUID, refusing every collision and any matching account it did
-  not create unless `--adopt-existing-accounts`; adds the provider to both socket
-  groups and the operator to the human group; creates the empty layout with the
-  owners and modes above; stages, verifies (bundle manifest, reviewed SHA-256, one
-  link, `codesign --verify --strict`) and renames a new `versions/<version>/` that
-  also holds the resolved plist; writes `native-identities.json`, its receipt and
-  the LaunchDaemon. Credentials are never generated or copied: the service stays
-  disabled until the four state files verify, and a re-run then starts it.
-- **Upgrade:** verify the complete new version, close admission (`launchctl
-  disable`), `bootout`, switch the versioned plist, `enable`, `bootstrap`; the
-  provider restarts locked. Requires `--acknowledge-active-work`; failed
-  verification leaves the current version active; never overwrites a version.
+  human/agent socket groups, the hidden provider account and the optional
+  restricted agent account (primary group: the agent group; no login shell;
+  hidden; never in the human, provider or `admin` groups) with the plan's fixed
+  IDs and GeneratedUIDs, refusing every collision and any matching account it did
+  not create unless `--adopt-existing-accounts` (never a group below GID 500 or a
+  well-known name). Group membership must be exactly the plan's and is verified
+  with `dsmemberutil`. It creates the empty layout with the owners and modes
+  above; stages, verifies (reviewed SHA-256, one link, architecture, signature)
+  and renames a new `versions/<version>/` that also holds the resolved plist;
+  writes `native-identities.json`, its receipt and the LaunchDaemon. The receipt
+  is written before each mutation (an account is recorded `creating`, then
+  `created`), so a re-run after a crash at any step converges. Credentials are
+  never generated or copied: the service stays disabled until the four state
+  files verify; start waits for launchd's `state = running` and reports the last
+  exit code otherwise. Standard streams stay `/dev/null` as required above.
+- **Upgrade:** verify the complete new version, record it in the receipt,
+  close admission (`launchctl disable`), `bootout`, switch the versioned plist,
+  `enable`, `bootstrap`; the provider restarts locked. Requires
+  `--acknowledge-active-work`; failed verification leaves the current version
+  active; never overwrites a version.
 - **Rollback:** only to a recorded, re-verified version and only with
   `--confirm-state-compatible`, in the same order. No state is restored.
+  Installed versions are verified against their stored plist copy and the
+  receipt's hashes, never against the checkout's current templates.
+- **Stop/start:** `stop --acknowledge-active-work` closes admission and boots the
+  service out (for offline companion enrollment); `start` verifies the active
+  version and credentials and starts it.
 - **Uninstall:** closes admission and boots out first, removes only unchanged
-  installer-owned files, preserves state, Keychain and accounts by default and
-  reports retained resources (exit 3). `--purge` removes `state/`;
-  `--purge --remove-accounts` removes accounts it created. Keychain items are
-  never deleted by the installer. Removing accounts without purging state is
-  refused, so a recreated UID/UUID cannot revive retained enrollment.
+  installer-owned files, clears the label's `launchctl disable` override once
+  the plist is gone, preserves state, Keychain and accounts by default and
+  reports retained resources (exit 3). `--purge` removes `state/` without
+  following links. `--purge --remove-accounts --confirm-secrets-removed` removes
+  the accounts it created only when nothing provider-owned was retained, after
+  writing their GeneratedUIDs to the root-owned `account-tombstones.json`; a later
+  install refuses a tombstoned GeneratedUID, so a recreated account cannot revive
+  old enrollment. Keychain items are never deleted by the installer: the
+  operator removes them and asserts it with `--confirm-secrets-removed`.
 
 ## Production Touch ID approval: owner decisions (2026-10-30)
 

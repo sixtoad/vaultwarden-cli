@@ -98,13 +98,14 @@ class PlanTests(unittest.TestCase):
         invalid = {
             'version': ['', '0.5', '0.5.4.1', 'v0.5.4', '00.5.4', '0.5.4+build', '0.5.4-', '../0.5.4', '0.5.4/x', '0.5.4 '],
             'provider_account': ['', 'Root', 'root', '1abc', 'a' * 33, 'a b', 'a/b', 'a<b', 'a$', '-x', 'ä'],
-            'provider_group': ['', 'wheel', 'Staff', 'g:1', 'a' * 33],
+            'provider_group': ['', 'wheel', 'Staff', 'staff', 'admin', 'everyone', 'g:1', 'a' * 33],
             'provider_uid': ['', '0', '-1', '+5', '05', '1.0', 'x', '4294967295', '99999999999', ' 5', '0x10'],
             'operator_uid': ['0', 'abc', '4294967296'],
             'human_gid': ['0', '012', '-3'],
             'agent_gid': ['0', '1e3'],
-            'provider_uuid': ['', '0' * 32, '0123456789ABCDEF0123456789ABCDEF', '01234567-89ab-cdef-0123-456789abcdef', 'g' * 32, 'a' * 31, 'a' * 33],
-            'operator_uuid': ['0123456789abcdef0123456789abcdeF', 'z' * 32],
+            'provider_uuid': ['', '0' * 32, '00000000-0000-0000-0000-000000000000', '0123456789-abcdef0123456789abcdef',
+                              '01234567-89ab-cdef-0123-456789abcde', 'g' * 32, 'a' * 31, 'a' * 33, ' ' + 'a' * 32],
+            'operator_uuid': ['z' * 32, '{01234567-89ab-cdef-0123-456789abcdef}'],
         }
         with tempfile.TemporaryDirectory() as temporary:
             for key, values in invalid.items():
@@ -258,6 +259,7 @@ class PlanTests(unittest.TestCase):
             f'{root}/versions/0.5.4/com.cantolla.vaultwarden-accessd.plist': ('root', 0, 'wheel', 0, '0444', 'installer'),
             f'{root}/native-identities.json': ('root', 0, 'wheel', 0, '0644', 'installer'),
             f'{root}/installer-receipt.json': ('root', 0, 'wheel', 0, '0644', 'installer'),
+            f'{root}/account-tombstones.json': ('root', 0, 'wheel', 0, '0644', 'installer'),
             f'{root}/versions/0.5.4/vaultwarden-accessd': ('root', 0, 'wheel', 0, '0555', 'bundle'),
             f'{root}/versions/0.5.4/vw-access': ('root', 0, 'wheel', 0, '0555', 'bundle'),
             f'{root}/state/backend.json': state,
@@ -275,6 +277,62 @@ class PlanTests(unittest.TestCase):
                                                      'shell': '/usr/bin/false', 'home': '/var/empty', 'hidden': True})
         self.assertEqual([(g['name'], g['gid'], g['members']) for g in accounts['groups']],
                          [('_vwaccess', 491, []), ('_vwhuman', 492, ['_vwaccess', 'operator']), ('_vwagent', 493, ['_vwaccess'])])
+        self.assertEqual(accounts['agent_users'], [])
+        self.assertEqual(accounts['forbidden_memberships'], {'agent_users': ['_vwhuman', '_vwaccess', 'admin'], 'provider_user': ['admin']})
+
+    def test_generated_uid_input_is_normalized_to_lowercase_hex(self):
+        # Review F12: dscl prints GeneratedUID uppercase with dashes.
+        for given in ['01234567-89AB-CDEF-0123-456789ABCDEF', '0123456789ABCDEF0123456789ABCDEF', '01234567-89ab-cdef-0123-456789abcdef']:
+            with self.subTest(given=given):
+                values = plan.validate_inputs(dict(INPUTS, provider_uuid=given))
+                self.assertEqual(values['provider_uuid'], INPUTS['provider_uuid'])
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'plan'
+            code, _ = quiet(plan.main, argv(output, operator_uuid='FEDCBA98-7654-3210-FEDC-BA9876543210'))
+            self.assertEqual(code, 0)
+            document = json.loads((output / 'plan.json').read_text())
+            self.assertEqual(document['inputs']['operator_uuid'], INPUTS['operator_uuid'])
+            self.assertEqual(json.loads((output / 'native-identities.json').read_text())['operator_uuid'], INPUTS['operator_uuid'])
+
+    def test_plist_key_set_is_exact(self):
+        # Review F10: Program (or any unreviewed key) must never ride along.
+        values = plan.validate_inputs(dict(INPUTS))
+        template = (plan.TEMPLATES / plan.PLIST_TEMPLATE).read_text()
+        for extra in ['<key>Program</key><string>/bin/sh</string>', '<key>Sockets</key><dict/>', '<key>MachServices</key><dict/>',
+                      '<key>LaunchOnlyOnce</key><true/>']:
+            with self.subTest(extra=extra), self.assertRaisesRegex(plan.PlanError, 'outside the reviewed set'):
+                plan.resolve_plist(template.replace('</dict></plist>', extra + '</dict></plist>'), values)
+        with self.assertRaisesRegex(plan.PlanError, 'lacks reviewed keys'):
+            plan.resolve_plist(template.replace('<key>ThrottleInterval</key><integer>30</integer>', ''), values)
+
+    def test_optional_agent_account_is_validated_and_planned(self):
+        # Review F6: one optional restricted agent account.
+        agent = {'agent_account': '_vwagent1', 'agent_uid': '601', 'agent_uuid': 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'}
+        values = plan.validate_inputs(dict(INPUTS, **agent))
+        self.assertEqual((values['agent_account'], values['agent_uid'], values['agent_uuid']), ('_vwagent1', 601, 'aaaaaaaabbbbccccddddeeeeeeeeeeee'))
+        document = json.loads(plan.build(values)[plan.PLAN_NAME])
+        self.assertEqual(document['accounts']['agent_users'], [{'name': '_vwagent1', 'uid': 601, 'uuid': 'aaaaaaaabbbbccccddddeeeeeeeeeeee',
+                                                                'primary_gid': 493, 'shell': '/usr/bin/false', 'home': '/var/empty', 'hidden': True}])
+        self.assertEqual(document['inputs']['agent_account'], '_vwagent1')
+        for partial in [{'agent_account': '_vwagent1'}, {'agent_uid': '601', 'agent_uuid': agent['agent_uuid']}]:
+            with self.subTest(partial=partial), self.assertRaisesRegex(plan.PlanError, 'together'):
+                plan.validate_inputs(dict(INPUTS, **partial))
+        for overrides in [{'agent_uid': '491'}, {'agent_uid': '501'}, {'agent_uuid': INPUTS['provider_uuid']}, {'agent_uuid': INPUTS['operator_uuid']},
+                          {'agent_account': '_vwaccess'}, {'agent_account': '_vwhuman'}, {'agent_account': 'admin'}, {'agent_uid': '0'}]:
+            with self.subTest(overrides=overrides), self.assertRaises(plan.PlanError):
+                plan.validate_inputs(dict(INPUTS, **dict(agent, **overrides)))
+        # Without the agent inputs plan.json carries no agent keys (no null inputs).
+        self.assertNotIn('agent_account', json.loads(plan.build(plan.validate_inputs(dict(INPUTS)))[plan.PLAN_NAME])['inputs'])
+
+    def test_generator_prints_the_plan_digest_the_installer_pins(self):
+        # Review F1: the human reviews plan.json and pins its digest on the installer command line.
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'plan'
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(plan.main(argv(output)), 0)
+            digest = hashlib.sha256((output / 'plan.json').read_bytes()).hexdigest()
+            self.assertIn(f'plan.json sha256: {digest}', out.getvalue())
+            self.assertIn(f'--expect-plan-sha256 {digest}', out.getvalue())
 
     def test_optional_group_inputs_are_validated(self):
         values = plan.validate_inputs(dict(INPUTS, provider_gid='494', human_group='vwh', agent_group='vwa'))

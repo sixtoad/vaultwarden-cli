@@ -35,12 +35,21 @@ PLIST_NAME = 'com.cantolla.vaultwarden-accessd.plist'
 IDENTITIES_NAME = 'native-identities.json'
 PLAN_NAME = 'plan.json'
 RECEIPT_NAME = 'installer-receipt.json'
+TOMBSTONES_NAME = 'account-tombstones.json'
 LAUNCH_DAEMONS = '/Library/LaunchDaemons'
 STATE_FILES = ('backend.json', 'provider-cert.pem', 'provider-key.pem', 'companion-ca.pem')
 BINARIES = ('vaultwarden-accessd', 'vw-access')
 PLAN_SCHEMA = 2
 # Optional inputs and their defaults. provider_gid defaults to the provider UID.
 OPTIONAL_DEFAULTS = {'provider_gid': None, 'human_group': '_vwhuman', 'agent_group': '_vwagent'}
+# One optional restricted agent account: all three or none (decision D20).
+AGENT_KEYS = ('agent_account', 'agent_uid', 'agent_uuid')
+NOLOGIN_SHELL = '/usr/bin/false'
+# Every LaunchDaemon key the reviewed template may carry; anything else (Program,
+# Sockets, MachServices, ...) is refused.
+PLIST_KEYS = frozenset({'Label', 'ProgramArguments', 'UserName', 'GroupName', 'InitGroups', 'WorkingDirectory', 'Umask',
+                        'ProcessType', 'RunAtLoad', 'KeepAlive', 'ThrottleInterval', 'AbandonProcessGroup',
+                        'SoftResourceLimits', 'HardResourceLimits', 'StandardOutPath', 'StandardErrorPath'})
 LABEL = 'com.cantolla.vaultwarden-accessd'
 INSTALL_ROOT = '/Library/VaultwardenAccess'
 BUNDLE_HELPERS = 'Contents/Helpers'
@@ -51,11 +60,16 @@ PLACEHOLDER = re.compile(r'@[A-Za-z0-9_]+@')
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?')
 NAME = re.compile(r'[a-z_][a-z0-9_-]{0,31}')
 UUID = re.compile(r'[0-9a-f]{32}')
+UUID_INPUT = re.compile(r'[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}')
 INTEGER = re.compile(r'[1-9][0-9]{0,9}')
 # 0 is root/wheel; 4294967295 is (uid_t)-1. Both are refused, as is any value
 # that does not fit an unsigned 32-bit id.
 ID_MAX = 4294967294
 RESERVED_NAMES = {'root', 'wheel'}
+# Well-known macOS groups/accounts that must never be created, adopted or used.
+WELL_KNOWN_NAMES = {'admin', 'staff', 'everyone', 'daemon', 'nobody', 'nogroup', 'localaccounts', 'netaccounts',
+                    'operator', 'kmem', 'sys', 'tty', 'certusers', 'accessibility', 'owner', 'group', 'interactusers',
+                    'authedusers', 'consoleusers', 'netusers', 'dialer', 'network', 'utmp', 'smmsp', 'mail'}
 # Never resolve straight into a live system location.
 FORBIDDEN_OUTPUT_ROOTS = ('/Library', '/System', '/private/var/root', '/usr', '/bin', '/sbin', '/etc', '/private/etc')
 
@@ -76,15 +90,24 @@ def parse_id(label, value):
     return number
 
 
+def normalize_uuid(value):
+    """dscl prints GeneratedUID uppercase with dashes; the provider uses 32 lowercase hex digits."""
+    if isinstance(value, str) and UUID_INPUT.fullmatch(value) is not None:
+        return value.replace('-', '').lower()
+    return value
+
+
 def parse_uuid(label, value):
-    require(isinstance(value, str) and UUID.fullmatch(value) is not None, f'{label} must be 32 lowercase hexadecimal digits without dashes')
+    value = normalize_uuid(value)
+    require(isinstance(value, str) and UUID.fullmatch(value) is not None,
+            f'{label} must be a GeneratedUID: 32 hexadecimal digits, optionally in the dashed 8-4-4-4-12 form')
     require(value != '0' * 32, f'{label} must not be the null UUID')
     return value
 
 
 def parse_name(label, value):
     require(isinstance(value, str) and NAME.fullmatch(value) is not None, f'{label} must be a short account/group name ([a-z_][a-z0-9_-]{{0,31}})')
-    require(value not in RESERVED_NAMES, f'{label} must not be {value}')
+    require(value not in RESERVED_NAMES and value not in WELL_KNOWN_NAMES, f'{label} must not be the system name {value}')
     return value
 
 
@@ -97,9 +120,10 @@ def validate_inputs(raw):
     """Return typed inputs or raise PlanError. Mirrors the provider's own checks."""
     expected = {'version', 'provider_account', 'provider_group', 'provider_uid', 'provider_uuid',
                 'operator_uid', 'operator_uuid', 'human_gid', 'agent_gid'}
-    require(set(raw) <= expected | set(OPTIONAL_DEFAULTS) and expected <= set(raw),
-            'inputs must be exactly: ' + ', '.join(sorted(expected)) + ' (optional: ' + ', '.join(sorted(OPTIONAL_DEFAULTS)) + ')')
-    raw = dict(raw)
+    optional = set(OPTIONAL_DEFAULTS) | set(AGENT_KEYS)
+    require(set(raw) <= expected | optional and expected <= set(raw),
+            'inputs must be exactly: ' + ', '.join(sorted(expected)) + ' (optional: ' + ', '.join(sorted(optional)) + ')')
+    raw = {key: value for key, value in raw.items() if value is not None}
     for key, default in OPTIONAL_DEFAULTS.items():
         if raw.get(key) is None:
             raw[key] = raw['provider_uid'] if key == 'provider_gid' else default
@@ -123,6 +147,16 @@ def validate_inputs(raw):
     require(values['provider_gid'] not in (values['human_gid'], values['agent_gid']), 'provider GID must differ from the human and agent GIDs')
     groups = [values['provider_group'], values['human_group'], values['agent_group']]
     require(len(set(groups)) == 3, 'provider, human and agent group names must differ')
+    given = [key for key in AGENT_KEYS if key in raw]
+    require(len(given) in (0, len(AGENT_KEYS)), 'the agent account needs --agent-account, --agent-uid and --agent-uuid together')
+    if given:
+        values['agent_account'] = parse_name('agent account', raw['agent_account'])
+        values['agent_uid'] = parse_id('agent UID', raw['agent_uid'])
+        values['agent_uuid'] = parse_uuid('agent UUID', raw['agent_uuid'])
+        require(values['agent_uid'] not in (values['provider_uid'], values['operator_uid']), 'agent UID must differ from the provider and operator UIDs')
+        require(values['agent_uuid'] not in (values['provider_uuid'], values['operator_uuid']), 'agent UUID must differ from the provider and operator UUIDs')
+        require(values['agent_account'] not in (values['provider_account'], values['provider_group'], values['human_group']),
+                'agent account name must differ from the provider account and the provider/human groups')
     return values
 
 
@@ -175,6 +209,9 @@ def check_plist(parsed, values):
         require(parsed.get(key) == value and type(parsed.get(key)) is type(value), f'plist {key} must be {value!r}')
     require('StandardInPath' not in parsed and 'EnvironmentVariables' not in parsed, 'plist must not add stdin or environment')
     require(parsed.get('UserName') != 'root', 'provider must not run as root')
+    unknown = sorted(set(parsed) - PLIST_KEYS)
+    require(not unknown, 'plist has keys outside the reviewed set: ' + ', '.join(unknown))
+    require(set(parsed) == PLIST_KEYS, 'plist lacks reviewed keys: ' + ', '.join(sorted(PLIST_KEYS - set(parsed))))
 
 
 def resolve_identities(template, values):
@@ -216,6 +253,13 @@ def _entry(path, owner, group, mode, created_by, **extra):
     return entry
 
 
+def agent_users(values):
+    if 'agent_account' not in values:
+        return []
+    return [{'name': values['agent_account'], 'uid': values['agent_uid'], 'uuid': values['agent_uuid'],
+             'primary_gid': values['agent_gid'], 'shell': NOLOGIN_SHELL, 'home': '/var/empty', 'hidden': True}]
+
+
 def plan_document(values, outputs):
     """Every account, directory and file of the documented layout.
 
@@ -248,6 +292,8 @@ def plan_document(values, outputs):
         _entry(f'{INSTALL_ROOT}/{IDENTITIES_NAME}', root, wheel, '0644', 'installer', links=1, source=IDENTITIES_NAME,
                sha256=hashlib.sha256(outputs[IDENTITIES_NAME]).hexdigest()),
         _entry(f'{INSTALL_ROOT}/{RECEIPT_NAME}', root, wheel, '0644', 'installer', links=1),
+        _entry(f'{INSTALL_ROOT}/{TOMBSTONES_NAME}', root, wheel, '0644', 'installer', links=1,
+               written_when='uninstall --remove-accounts; kept after removal'),
     ]
     for name in BINARIES:
         files.append(_entry(f'{version_dir}/{name}', root, wheel, '0555', 'bundle', links=1,
@@ -263,13 +309,16 @@ def plan_document(values, outputs):
         'inputs': {k: values[k] for k in sorted(values)},
         'accounts': {
             'provider_user': {'name': values['provider_account'], 'uid': values['provider_uid'], 'uuid': values['provider_uuid'],
-                              'primary_gid': values['provider_gid'], 'shell': '/usr/bin/false', 'home': '/var/empty', 'hidden': True},
+                              'primary_gid': values['provider_gid'], 'shell': NOLOGIN_SHELL, 'home': '/var/empty', 'hidden': True},
             'groups': [
                 {'name': values['provider_group'], 'gid': values['provider_gid'], 'members': []},
                 {'name': values['human_group'], 'gid': values['human_gid'], 'members': [values['provider_account'], 'operator']},
                 {'name': values['agent_group'], 'gid': values['agent_gid'], 'members': [values['provider_account']]},
             ],
             'operator': {'uid': values['operator_uid'], 'uuid': values['operator_uuid'], 'existing': True},
+            'agent_users': agent_users(values),
+            'forbidden_memberships': {'agent_users': [values['human_group'], values['provider_group'], 'admin'],
+                                      'provider_user': ['admin']},
         },
         'directories': directories,
         'files': files,
@@ -353,19 +402,23 @@ def main(argv=None):
     parser.add_argument('--provider-account', required=True)
     parser.add_argument('--provider-group', required=True)
     parser.add_argument('--provider-uid', required=True)
-    parser.add_argument('--provider-uuid', required=True, help='GeneratedUID, 32 lowercase hex digits, no dashes')
+    uuid_help = 'GeneratedUID: 32 hex digits or the dashed form dscl prints; recorded as 32 lowercase hex digits'
+    parser.add_argument('--provider-uuid', required=True, help=uuid_help)
     parser.add_argument('--operator-uid', required=True)
-    parser.add_argument('--operator-uuid', required=True, help='GeneratedUID, 32 lowercase hex digits, no dashes')
+    parser.add_argument('--operator-uuid', required=True, help=uuid_help)
     parser.add_argument('--human-gid', required=True)
     parser.add_argument('--agent-gid', required=True)
     parser.add_argument('--provider-gid', help='provider primary group GID (default: the provider UID)')
     parser.add_argument('--human-group', help=f"human socket group name (default: {OPTIONAL_DEFAULTS['human_group']})")
     parser.add_argument('--agent-group', help=f"agent socket group name (default: {OPTIONAL_DEFAULTS['agent_group']})")
+    parser.add_argument('--agent-account', help='optional restricted agent account (primary group: the agent group)')
+    parser.add_argument('--agent-uid', help='agent account UID (with --agent-account)')
+    parser.add_argument('--agent-uuid', help='agent account GeneratedUID (with --agent-account)')
     parser.add_argument('--bundle', type=Path, help='optional built macOS arm64 .app to cross-check version and hashes')
     args = parser.parse_args(argv)
     raw = {key: getattr(args, key) for key in ['version', 'provider_account', 'provider_group', 'provider_uid', 'provider_uuid',
                                                'operator_uid', 'operator_uuid', 'human_gid', 'agent_gid',
-                                               'provider_gid', 'human_group', 'agent_group']}
+                                               'provider_gid', 'human_group', 'agent_group', *AGENT_KEYS]}
     try:
         values = validate_inputs(raw)
         outputs = build(values)
@@ -376,6 +429,9 @@ def main(argv=None):
         print(f'macos-provider-plan: {error}', file=sys.stderr)
         return 2
     print(f'Installer plan written to {directory} (review material; nothing installed).')
+    digest = hashlib.sha256(outputs[PLAN_NAME]).hexdigest()
+    print(f'plan.json sha256: {digest}')
+    print(f'After reviewing the plan, pass --expect-plan-sha256 {digest} to scripts/macos-provider-install.py.')
     return 0
 
 

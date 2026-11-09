@@ -234,6 +234,15 @@ void main() {
         find.textContaining('reviewed command-line installer'),
         findsOneWidget,
       );
+      // App users get the documentation, not a repository-only script path.
+      expect(
+        find.textContaining('see docs/desktop-installation.md'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('scripts/macos-provider-install.py'),
+        findsNothing,
+      );
       expect(find.textContaining('this app does not install it'), findsOneWidget);
       expect(find.textContaining('Development signing only.'), findsOneWidget);
       expect(
