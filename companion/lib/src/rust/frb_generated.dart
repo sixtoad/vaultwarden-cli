@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api.dart';
+import 'api/biometric.dart';
 import 'api/installation.dart';
 import 'api/management.dart';
 import 'api/provider.dart';
@@ -70,7 +71,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 721524146;
+  int get rustContentHash => 98180100;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -83,6 +84,45 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
 abstract class RustLibApi extends BaseApi {
   Work crateApiBegin({required Operation operation});
+
+  Future<BiometricDecisionResult>
+  crateApiBiometricBiometricDecisionResultDefault();
+
+  ProviderWork crateApiBiometricBiometricKeyBegin({
+    required BiometricKeyCommand command,
+  });
+
+  ProviderWork crateApiBiometricBiometricKeyBeginEnroll({
+    required String password,
+    required List<int> publicKey,
+    required List<int> signature,
+  });
+
+  ProviderWork crateApiBiometricBiometricKeyBeginRevoke({
+    required String password,
+  });
+
+  BiometricKeySnapshot crateApiBiometricBiometricKeyConfigure({
+    required String providerIdentity,
+    required String approvalClient,
+  });
+
+  BiometricEnrollRequest crateApiBiometricBiometricKeyEnrollTranscript({
+    required List<int> publicKey,
+  });
+
+  BiometricKeySnapshot crateApiBiometricBiometricKeyFinish({
+    required int token,
+    required List<int> response,
+  });
+
+  Future<BiometricKeyOutcome> crateApiBiometricBiometricKeyOutcomeDefault();
+
+  BiometricKeySnapshot crateApiBiometricBiometricKeySnapshot();
+
+  Future<BiometricKeyState> crateApiBiometricBiometricKeyStateDefault();
+
+  Future<BiometricSupport> crateApiBiometricBiometricSupportDefault();
 
   Future<String> crateApiInstallationEnableCommands({
     required String root,
@@ -131,6 +171,21 @@ abstract class RustLibApi extends BaseApi {
     required String requestId,
     required String password,
   });
+
+  ProviderWork crateApiBiometricProviderBiometricBegin({
+    required BigInt handle,
+    required String keyId,
+    required List<int> signature,
+  });
+
+  ProviderBiometricState crateApiBiometricProviderBiometricPin({
+    required String providerIdentity,
+    required String approvalClient,
+  });
+
+  BiometricSigningRequest crateApiBiometricProviderBiometricPrepare();
+
+  ProviderBiometricState crateApiBiometricProviderBiometricState();
 
   ProviderSnapshot crateApiProviderProviderConfigure({
     required String uncertainId,
@@ -189,6 +244,322 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "begin", argNames: ["operation"]);
 
   @override
+  Future<BiometricDecisionResult>
+  crateApiBiometricBiometricDecisionResultDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_decision_result,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBiometricBiometricDecisionResultDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricDecisionResultDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_decision_result_default",
+        argNames: [],
+      );
+
+  @override
+  ProviderWork crateApiBiometricBiometricKeyBegin({
+    required BiometricKeyCommand command,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_biometric_key_command(command, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyBeginConstMeta,
+        argValues: [command],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyBeginConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_begin",
+        argNames: ["command"],
+      );
+
+  @override
+  ProviderWork crateApiBiometricBiometricKeyBeginEnroll({
+    required String password,
+    required List<int> publicKey,
+    required List<int> signature,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          sse_encode_list_prim_u_8_loose(publicKey, serializer);
+          sse_encode_list_prim_u_8_loose(signature, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyBeginEnrollConstMeta,
+        argValues: [password, publicKey, signature],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyBeginEnrollConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_begin_enroll",
+        argNames: ["password", "publicKey", "signature"],
+      );
+
+  @override
+  ProviderWork crateApiBiometricBiometricKeyBeginRevoke({
+    required String password,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyBeginRevokeConstMeta,
+        argValues: [password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyBeginRevokeConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_begin_revoke",
+        argNames: ["password"],
+      );
+
+  @override
+  BiometricKeySnapshot crateApiBiometricBiometricKeyConfigure({
+    required String providerIdentity,
+    required String approvalClient,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerIdentity, serializer);
+          sse_encode_String(approvalClient, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_key_snapshot,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyConfigureConstMeta,
+        argValues: [providerIdentity, approvalClient],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyConfigureConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_configure",
+        argNames: ["providerIdentity", "approvalClient"],
+      );
+
+  @override
+  BiometricEnrollRequest crateApiBiometricBiometricKeyEnrollTranscript({
+    required List<int> publicKey,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_8_loose(publicKey, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_enroll_request,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyEnrollTranscriptConstMeta,
+        argValues: [publicKey],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyEnrollTranscriptConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_enroll_transcript",
+        argNames: ["publicKey"],
+      );
+
+  @override
+  BiometricKeySnapshot crateApiBiometricBiometricKeyFinish({
+    required int token,
+    required List<int> response,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(token, serializer);
+          sse_encode_list_prim_u_8_loose(response, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_key_snapshot,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyFinishConstMeta,
+        argValues: [token, response],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyFinishConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_finish",
+        argNames: ["token", "response"],
+      );
+
+  @override
+  Future<BiometricKeyOutcome> crateApiBiometricBiometricKeyOutcomeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_key_outcome,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyOutcomeDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyOutcomeDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_outcome_default",
+        argNames: [],
+      );
+
+  @override
+  BiometricKeySnapshot crateApiBiometricBiometricKeySnapshot() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_key_snapshot,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeySnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeySnapshotConstMeta =>
+      const TaskConstMeta(debugName: "biometric_key_snapshot", argNames: []);
+
+  @override
+  Future<BiometricKeyState> crateApiBiometricBiometricKeyStateDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_key_state,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyStateDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyStateDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_state_default",
+        argNames: [],
+      );
+
+  @override
+  Future<BiometricSupport> crateApiBiometricBiometricSupportDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_support,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBiometricBiometricSupportDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricSupportDefaultConstMeta =>
+      const TaskConstMeta(debugName: "biometric_support_default", argNames: []);
+
+  @override
   Future<String> crateApiInstallationEnableCommands({
     required String root,
     required String directory,
@@ -202,7 +573,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 13,
             port: port_,
           );
         },
@@ -236,7 +607,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(token, serializer);
           sse_encode_u_32(epoch, serializer);
           sse_encode_box_autoadd_completion(completion, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -268,7 +639,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 15,
             port: port_,
           );
         },
@@ -296,7 +667,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_invalidation(reason, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -321,7 +692,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 17,
             port: port_,
           );
         },
@@ -354,7 +725,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_identity_kind(kind, serializer);
           sse_encode_String(id, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -382,7 +753,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(recovery, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -412,7 +783,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -437,7 +808,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -462,7 +833,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 22,
             port: port_,
           );
         },
@@ -489,7 +860,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -518,7 +889,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_provider_command(command, serializer);
           sse_encode_String(requestId, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -538,6 +909,115 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  ProviderWork crateApiBiometricProviderBiometricBegin({
+    required BigInt handle,
+    required String keyId,
+    required List<int> signature,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_64(handle, serializer);
+          sse_encode_String(keyId, serializer);
+          sse_encode_list_prim_u_8_loose(signature, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricProviderBiometricBeginConstMeta,
+        argValues: [handle, keyId, signature],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricProviderBiometricBeginConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_biometric_begin",
+        argNames: ["handle", "keyId", "signature"],
+      );
+
+  @override
+  ProviderBiometricState crateApiBiometricProviderBiometricPin({
+    required String providerIdentity,
+    required String approvalClient,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerIdentity, serializer);
+          sse_encode_String(approvalClient, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_biometric_state,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricProviderBiometricPinConstMeta,
+        argValues: [providerIdentity, approvalClient],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricProviderBiometricPinConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_biometric_pin",
+        argNames: ["providerIdentity", "approvalClient"],
+      );
+
+  @override
+  BiometricSigningRequest crateApiBiometricProviderBiometricPrepare() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_biometric_signing_request,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricProviderBiometricPrepareConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricProviderBiometricPrepareConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_biometric_prepare",
+        argNames: [],
+      );
+
+  @override
+  ProviderBiometricState crateApiBiometricProviderBiometricState() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_biometric_state,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricProviderBiometricStateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricProviderBiometricStateConstMeta =>
+      const TaskConstMeta(debugName: "provider_biometric_state", argNames: []);
+
+  @override
   ProviderSnapshot crateApiProviderProviderConfigure({
     required String uncertainId,
   }) {
@@ -546,7 +1026,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(uncertainId, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -576,7 +1056,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -604,7 +1084,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 31,
             port: port_,
           );
         },
@@ -631,7 +1111,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -656,7 +1136,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 33,
             port: port_,
           );
         },
@@ -680,7 +1160,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -706,7 +1186,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 35,
             port: port_,
           );
         },
@@ -734,7 +1214,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -756,7 +1236,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -779,9 +1259,95 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BiometricDecisionResult dco_decode_biometric_decision_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BiometricDecisionResult.values[raw as int];
+  }
+
+  @protected
+  BiometricEnrollRequest dco_decode_biometric_enroll_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return BiometricEnrollRequest(
+      keyId: dco_decode_String(arr[0]),
+      transcript: dco_decode_list_prim_u_8_strict(arr[1]),
+    );
+  }
+
+  @protected
+  BiometricKeyCommand dco_decode_biometric_key_command(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BiometricKeyCommand.values[raw as int];
+  }
+
+  @protected
+  BiometricKeyOutcome dco_decode_biometric_key_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BiometricKeyOutcome.values[raw as int];
+  }
+
+  @protected
+  BiometricKeySnapshot dco_decode_biometric_key_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return BiometricKeySnapshot(
+      configured: dco_decode_bool(arr[0]),
+      busy: dco_decode_bool(arr[1]),
+      state: dco_decode_biometric_key_state(arr[2]),
+      keyId: dco_decode_String(arr[3]),
+      canEnroll: dco_decode_bool(arr[4]),
+      canRevoke: dco_decode_bool(arr[5]),
+      outcome: dco_decode_biometric_key_outcome(arr[6]),
+      message: dco_decode_String(arr[7]),
+    );
+  }
+
+  @protected
+  BiometricKeyState dco_decode_biometric_key_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BiometricKeyState.values[raw as int];
+  }
+
+  @protected
+  BiometricRefusal dco_decode_biometric_refusal(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BiometricRefusal.values[raw as int];
+  }
+
+  @protected
+  BiometricSigningRequest dco_decode_biometric_signing_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return BiometricSigningRequest(
+      handle: dco_decode_u_64(arr[0]),
+      requestId: dco_decode_String(arr[1]),
+      keyId: dco_decode_String(arr[2]),
+      transcript: dco_decode_list_prim_u_8_strict(arr[3]),
+    );
+  }
+
+  @protected
+  BiometricSupport dco_decode_biometric_support(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BiometricSupport.values[raw as int];
+  }
+
+  @protected
   bool dco_decode_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
+  }
+
+  @protected
+  BiometricRefusal dco_decode_box_autoadd_biometric_refusal(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_biometric_refusal(raw);
   }
 
   @protected
@@ -984,6 +1550,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BiometricRefusal? dco_decode_opt_box_autoadd_biometric_refusal(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_biometric_refusal(raw);
+  }
+
+  @protected
   ManagedIdentity? dco_decode_opt_box_autoadd_managed_identity(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_managed_identity(raw);
@@ -1005,6 +1577,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Outcome dco_decode_outcome(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Outcome.values[raw as int];
+  }
+
+  @protected
+  ProviderBiometricState dco_decode_provider_biometric_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return ProviderBiometricState(
+      support: dco_decode_biometric_support(arr[0]),
+      bindingAvailable: dco_decode_bool(arr[1]),
+      biometricAllowed: dco_decode_bool(arr[2]),
+      keyId: dco_decode_String(arr[3]),
+      canPrepare: dco_decode_bool(arr[4]),
+      refusal: dco_decode_opt_box_autoadd_biometric_refusal(arr[5]),
+      result: dco_decode_biometric_decision_result(arr[6]),
+    );
   }
 
   @protected
@@ -1194,9 +1783,119 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BiometricDecisionResult sse_decode_biometric_decision_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return BiometricDecisionResult.values[inner];
+  }
+
+  @protected
+  BiometricEnrollRequest sse_decode_biometric_enroll_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_keyId = sse_decode_String(deserializer);
+    var var_transcript = sse_decode_list_prim_u_8_strict(deserializer);
+    return BiometricEnrollRequest(keyId: var_keyId, transcript: var_transcript);
+  }
+
+  @protected
+  BiometricKeyCommand sse_decode_biometric_key_command(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return BiometricKeyCommand.values[inner];
+  }
+
+  @protected
+  BiometricKeyOutcome sse_decode_biometric_key_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return BiometricKeyOutcome.values[inner];
+  }
+
+  @protected
+  BiometricKeySnapshot sse_decode_biometric_key_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_configured = sse_decode_bool(deserializer);
+    var var_busy = sse_decode_bool(deserializer);
+    var var_state = sse_decode_biometric_key_state(deserializer);
+    var var_keyId = sse_decode_String(deserializer);
+    var var_canEnroll = sse_decode_bool(deserializer);
+    var var_canRevoke = sse_decode_bool(deserializer);
+    var var_outcome = sse_decode_biometric_key_outcome(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return BiometricKeySnapshot(
+      configured: var_configured,
+      busy: var_busy,
+      state: var_state,
+      keyId: var_keyId,
+      canEnroll: var_canEnroll,
+      canRevoke: var_canRevoke,
+      outcome: var_outcome,
+      message: var_message,
+    );
+  }
+
+  @protected
+  BiometricKeyState sse_decode_biometric_key_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return BiometricKeyState.values[inner];
+  }
+
+  @protected
+  BiometricRefusal sse_decode_biometric_refusal(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return BiometricRefusal.values[inner];
+  }
+
+  @protected
+  BiometricSigningRequest sse_decode_biometric_signing_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_handle = sse_decode_u_64(deserializer);
+    var var_requestId = sse_decode_String(deserializer);
+    var var_keyId = sse_decode_String(deserializer);
+    var var_transcript = sse_decode_list_prim_u_8_strict(deserializer);
+    return BiometricSigningRequest(
+      handle: var_handle,
+      requestId: var_requestId,
+      keyId: var_keyId,
+      transcript: var_transcript,
+    );
+  }
+
+  @protected
+  BiometricSupport sse_decode_biometric_support(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return BiometricSupport.values[inner];
+  }
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
+  BiometricRefusal sse_decode_box_autoadd_biometric_refusal(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_biometric_refusal(deserializer));
   }
 
   @protected
@@ -1464,6 +2163,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BiometricRefusal? sse_decode_opt_box_autoadd_biometric_refusal(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_biometric_refusal(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   ManagedIdentity? sse_decode_opt_box_autoadd_managed_identity(
     SseDeserializer deserializer,
   ) {
@@ -1505,6 +2217,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return Outcome.values[inner];
+  }
+
+  @protected
+  ProviderBiometricState sse_decode_provider_biometric_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_support = sse_decode_biometric_support(deserializer);
+    var var_bindingAvailable = sse_decode_bool(deserializer);
+    var var_biometricAllowed = sse_decode_bool(deserializer);
+    var var_keyId = sse_decode_String(deserializer);
+    var var_canPrepare = sse_decode_bool(deserializer);
+    var var_refusal = sse_decode_opt_box_autoadd_biometric_refusal(
+      deserializer,
+    );
+    var var_result = sse_decode_biometric_decision_result(deserializer);
+    return ProviderBiometricState(
+      support: var_support,
+      bindingAvailable: var_bindingAvailable,
+      biometricAllowed: var_biometricAllowed,
+      keyId: var_keyId,
+      canPrepare: var_canPrepare,
+      refusal: var_refusal,
+      result: var_result,
+    );
   }
 
   @protected
@@ -1737,9 +2474,110 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_biometric_decision_result(
+    BiometricDecisionResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_enroll_request(
+    BiometricEnrollRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.keyId, serializer);
+    sse_encode_list_prim_u_8_strict(self.transcript, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_key_command(
+    BiometricKeyCommand self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_key_outcome(
+    BiometricKeyOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_key_snapshot(
+    BiometricKeySnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.configured, serializer);
+    sse_encode_bool(self.busy, serializer);
+    sse_encode_biometric_key_state(self.state, serializer);
+    sse_encode_String(self.keyId, serializer);
+    sse_encode_bool(self.canEnroll, serializer);
+    sse_encode_bool(self.canRevoke, serializer);
+    sse_encode_biometric_key_outcome(self.outcome, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_key_state(
+    BiometricKeyState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_refusal(
+    BiometricRefusal self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_signing_request(
+    BiometricSigningRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.handle, serializer);
+    sse_encode_String(self.requestId, serializer);
+    sse_encode_String(self.keyId, serializer);
+    sse_encode_list_prim_u_8_strict(self.transcript, serializer);
+  }
+
+  @protected
+  void sse_encode_biometric_support(
+    BiometricSupport self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_biometric_refusal(
+    BiometricRefusal self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_biometric_refusal(self, serializer);
   }
 
   @protected
@@ -1975,6 +2813,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_biometric_refusal(
+    BiometricRefusal? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_biometric_refusal(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_managed_identity(
     ManagedIdentity? self,
     SseSerializer serializer,
@@ -2014,6 +2865,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_outcome(Outcome self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_biometric_state(
+    ProviderBiometricState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_biometric_support(self.support, serializer);
+    sse_encode_bool(self.bindingAvailable, serializer);
+    sse_encode_bool(self.biometricAllowed, serializer);
+    sse_encode_String(self.keyId, serializer);
+    sse_encode_bool(self.canPrepare, serializer);
+    sse_encode_opt_box_autoadd_biometric_refusal(self.refusal, serializer);
+    sse_encode_biometric_decision_result(self.result, serializer);
   }
 
   @protected

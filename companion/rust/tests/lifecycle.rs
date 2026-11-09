@@ -263,3 +263,42 @@ fn unsafe_observation_survives_later_reviews_and_key_mutations() {
     }
     assert!(!Core::default().snapshot().unsafe_observed);
 }
+
+/// Issue 49: the synthetic demonstration and production Touch ID approval
+/// v2 are separate domains. A signature by the synthetic key over a
+/// production transcript (the provider's golden vector) never verifies as a
+/// synthetic proof, and the two transcripts start with different domains.
+#[test]
+fn production_v2_transcripts_never_verify_as_synthetic_proofs() {
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/approval-v2-golden.json"
+    ))
+    .unwrap();
+    for section in ["approval", "enroll"] {
+        let hex = golden[section]["transcript_hex"].as_str().unwrap();
+        let production: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect();
+        let (mut core, key) = ready();
+        let work = core.begin(Operation::Sign).unwrap();
+        let synthetic = transcript(&work).unwrap();
+        let domain =
+            |t: &[u8]| t[4..4 + u32::from_be_bytes(t[..4].try_into().unwrap()) as usize].to_vec();
+        assert_eq!(
+            domain(&synthetic),
+            b"dev.vaultwarden.companion.synthetic.v1"
+        );
+        assert!(domain(&production).starts_with(b"dev.vaultwarden.provider.approval"));
+        let signature: Signature = key.sign(&production);
+        core.finish(
+            work.token,
+            work.epoch,
+            Completion {
+                signature: signature.to_der().as_bytes().to_vec(),
+                ..result(Outcome::Verified)
+            },
+        );
+        assert_eq!(core.snapshot().verified, 0, "{section}");
+    }
+}
