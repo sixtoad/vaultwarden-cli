@@ -12,8 +12,9 @@ context: [docs/guided-enrollment.md, docs/secret-access-boundary.md, AGENTS.md]
 Implement issue #59 phase 1: a provider-side Rust protocol plus `vw-access`
 commands. It adds an agent or a companion device without hand-copying keys or
 certificates. Expiring single-use invitations come from the provider owner.
-A comparison code is bound to the session and shown at both ends. A human
-approves at both ends before the commit. There is no UI.
+A comparison code is bound to the session and shown only on the joining
+endpoint; the provider owner types it at the provider, which never displays
+it. A human approves at both ends before the commit. There is no UI.
 
 ## Security contract
 

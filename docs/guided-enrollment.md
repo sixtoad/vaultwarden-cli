@@ -10,9 +10,9 @@ Today a device or agent is added in one of two manual ways:
   the daemon stopped.
 
 Guided enrollment replaces that happy path. An already authorized human
-issues a short-lived, single-use invitation. Both endpoints show the same
-comparison code, and a human approves at **each** end. Only then is the
-endpoint enrolled.
+issues a short-lived, single-use invitation. The joining endpoint shows a
+comparison code, the provider owner types it at the provider, and a human
+approves at **each** end. Only then is the endpoint enrolled.
 
 The manual paths stay available for diagnostics and recovery.
 
@@ -92,21 +92,31 @@ T_full = T_join, role (agent: label, uid, gid | companion: label), provider_nonc
    - The role, `provider_nonce` and `HMAC(key(provider), T_full)`.
    - The joiner verifies this tag before showing anything, so a provider
      without the secret is detected (`ProviderNotAuthenticated`).
-3. **Comparison code (both ends).**
+3. **Comparison code (both ends derive it; only the joiner shows it).**
    - The code is `HKDF(salt = SHA-256(T_full), ikm = secret, info = domain || "comparison-code" || id)`,
      truncated to 64 bits and reduced to 8 decimal digits, shown as
      `1234-5678`.
    - The modulo bias is below 2^-37.
    - Any substituted key, nonce, role, channel or provider certificate
      changes the code.
+   - The provider **never displays** it: not in `enroll list`, not in any
+     `human.sock` reply, not after approval. The owner reads it on the
+     joining endpoint and types it into `enroll approve`, which compares it
+     with the provider's own derivation without early exit. If the provider
+     showed the code, the owner could copy it from the provider's own output
+     into `approve` without looking at the joiner, and the comparison would
+     prove nothing.
 4. **Confirm, status and cancel (joiner).**
    - Each carries `HMAC(key(control), domain || action || SHA-256(T_full))`.
+   - A cancel's action names its reason (`cancel/cancelled` or
+     `cancel/code_mismatch`), so the reason is authenticated too.
    - An agent's confirm also carries an Ed25519 signature by the new key
      over the `possession` control message.
 
-The code is not a secret. It lets two humans check that both screens belong
-to the same session. Because the code is derived with the secret, a passive
-observer cannot precompute it.
+The code is not a secret once shown. Typing it at the provider proves that
+the joiner's screen and the provider belong to the same session. Because
+the code is derived with the secret, a passive observer cannot precompute
+it.
 
 ## Message flow
 
@@ -117,8 +127,8 @@ Provider owner (human.sock)          Provider                      Joiner (agent
                                      ◀── EnrollJoin {nonce, mac}                    (agent: + public key)
                                      verify mac, refuse known/revoked identity
                                      ──▶ Joined {role, provider_nonce, provider_mac}
-  enroll list → code 1234-5678                                        shows role + code 1234-5678
-  enroll approve <id> --code <typed from joiner>                     human answers "yes"
+  enroll list → awaiting_approvals (no code)                         shows role + code 1234-5678
+  enroll approve <id> --code <read on the joiner, typed here>        human answers "yes"
                                      ◀── EnrollConfirm {mac, signature}  (re-sent until final)
                                      both approvals present → commit → Enrolled
                                      ──▶ State {enrolled: binding id | fingerprint}
@@ -151,10 +161,18 @@ AwaitingJoin ──join──▶ AwaitingApprovals{provider_approved, joiner_con
 - **Final states.** Every final state is terminal. There is no retry of a
   burned invitation: issue a new one.
 - **Retention.** Final sessions stay listable for 10 minutes, then are
-  forgotten.
+  forgotten. When the 32 retained sessions are full, the oldest finished
+  session is evicted, an `enrolled` one last (its joiner may still need a
+  lost final reply).
 - **Memory only.** Sessions are never persisted. A provider restart
   forgets every invitation, and joiners then see `invalid_invitation`
   (fail closed).
+- **Agent-socket admission.** An unpaired OS identity reaches the
+  enrollment messages only while a live session names it, or while a
+  session that **enrolled** it is retained (so a lost final reply is
+  recoverable). A cancelled, expired, aborted or failed session admits
+  nobody: the frame is refused before parsing, and the joiner reports
+  `invalid_invitation`.
 
 ### Limits
 
@@ -175,12 +193,16 @@ in the provider and transport tests listed below.
 | Replay of a join | **Byte-identical retransmission:** the identical reply, so a lost reply is recoverable. **After completion:** `already_used`. **Against another invitation:** the MAC fails. |
 | Replay of a confirm, status or cancel | The MAC is bound to the transcript hash, so it is accepted only for its own session. It is idempotent there; a commit never repeats. |
 | Duplicate join (the secret leaked) | A second, different join aborts the session (`duplicate_join`). The legitimate human sees the failure. |
-| Wrong secret or unknown id | Both are indistinguishable (`invalid_invitation`). Three bad proofs burn a live invitation. |
-| Mismatch at the provider | The owner types a code different from the provider's: `code_mismatch`, final, nothing enrolled. A malformed code (wrong length) is an input error and does not burn the session. |
+| Wrong secret or unknown id | Both are indistinguishable (`invalid_invitation`). Three bad proofs burn a live invitation; after that the agent socket no longer admits the invited UID, which the joiner also reports as `invalid_invitation`. |
+| Mismatch at the provider | The owner types a code different from the provider's own derivation: `code_mismatch`, final, nothing enrolled. A malformed code (wrong length) is an input error and does not burn the session. The provider never prints the code, so it cannot be copied from the provider side. |
 | Mismatch at the joiner | The joining human answers anything but `yes`: cancel with `code_mismatch`, final. |
-| Timeout or expiry | Any action after the deadline finds `expired`. An approved but unconfirmed session expires without enrolling. |
-| Cancellation | The owner (`enroll cancel`) or the joiner can cancel any live session, including after both approvals but before the commit. |
-| Offline peer | **Owner approves before the join:** `awaiting_peer`, no state change. **Joiner cannot reach the provider:** the join is retried identically up to three times. The confirm is re-sent until the client deadline. A client timeout keeps the key file, because the outcome is unknown. |
+| Timeout or expiry | An approved but unconfirmed session expires without enrolling. **Companion:** an action after the deadline finds `expired` (while the session is retained). **Agent socket:** an expired session admits nobody, so the frame is refused before parsing and the joiner reports `invalid_invitation`. **Owner:** `approve`/`cancel` answer `expired`. `enroll join` waits until the session's own expiry (plus 5 s), or less with `--timeout-seconds`. |
+| Cancellation | The owner (`enroll cancel`) or the joiner can cancel any live session, including after both approvals but before the commit. Afterwards the companion's next message finds `cancelled`; an agent joiner is refused before parsing and reports `invalid_invitation`. Cancelling before the join is the same. |
+| Offline peer | **Owner approves before the join:** `awaiting_peer`, no state change. **Joiner cannot reach the provider:** the join is retried identically up to three times, after 250 ms and 500 ms. The confirm is re-sent (250 ms doubling to 2 s after a lost reply, every second while waiting) until the deadline. A client timeout keeps the key file, because the outcome is unknown. |
+| Busy provider | Momentary contention on the sessions is answered `busy` on the agent socket (before parsing, never "not invited"), and a busy provider gate does not refuse an invited joiner's enrollment message. The joiner resends the identical message after 250 ms doubling to 2 s, until the deadline; `busy` is never a definitive failure. |
+| Provider restart | Every session is forgotten. The joiner's next message is refused (agent socket: before parsing) and reported as `invalid_invitation`, and the key file is deleted, **unless** a confirmation's reply had been lost before: that confirmation may have committed, so the outcome is unknown and the key file is kept (check `vw-access agent list`). |
+| Storage fault at join | If the identity store cannot say whether the joining key or device is known, the join is answered `unavailable` and the invitation stays open; only a definite "known" refuses it (`identity_refused`). |
+| First companion | With no companion enrolled yet (no registry file), the companion endpoint still starts. Zero identities authorize no command; only `enroll` with a live invitation is processed. The first guided commit creates the registry (`0600`, atomic rename, in the private provider directory). A present but invalid registry still stops the endpoint. |
 | Duplicate invitation | A second live invitation for the same role and label, or for an enabled agent label, is refused (`duplicate`). |
 | Revoked identity | **Never reactivated.** A known agent key (enabled or revoked) is refused at join, before any code is shown. A known companion fingerprint (enabled or revoked) is refused the same way. A matching label only ever creates a **new** binding; the revoked one stays revoked. The store refuses again at commit. |
 | Wrong OS identity | Only the UID/GID an agent invitation names passes kernel admission to the enrollment messages. Everyone else is refused before parsing. An invited agent still cannot submit work. |
@@ -195,8 +217,8 @@ On the provider host, as the operator:
 ```sh
 vw-access enroll invite-agent ci-runner --uid 42001 --gid 42003      # prints id + vwe1.… code
 vw-access enroll invite-companion "Studio Mac"
-vw-access enroll list                                                  # state, comparison code
-vw-access enroll approve <id> --code 1234-5678                        # type the joiner's code
+vw-access enroll list                                                  # state (never the code)
+vw-access enroll approve <id> --code 1234-5678                        # type the code the joiner shows
 vw-access enroll cancel <id>
 ```
 
@@ -209,15 +231,22 @@ vw-access enroll join --socket /run/vaultwarden-access/agent.sock --key-file ~/.
 `join` does the following:
 
 - **Invitation code.** It reads the code from the terminal with echo off.
-  The secret is never in argv.
+  The secret is never in argv, and the typed copy is wiped once parsed.
 - **Key file.** It creates a new 32-byte seed file, `0600`, and never
   replaces an existing one. This is the `vw-access submit --key-file`
-  format.
-- **Confirmation.** It shows the role and the comparison code, and requires
-  the person at that terminal to type `yes`. Without a terminal it refuses.
+  format. The directory must be owned by the agent account and not
+  group- or world-writable (the file may later be removed by path); the
+  creation and any removal are made durable with a directory `fsync`.
+- **Waiting.** It waits until the invitation expires (plus 5 s), or for
+  `--timeout-seconds` if that is shorter.
+- **Confirmation.** It shows the role and the comparison code, asks the
+  person at that terminal to read the code to the provider owner (who types
+  it into `enroll approve`), and requires them to type `yes`. Without a
+  terminal it refuses.
 - **Result.** It prints the binding id for `vw-access submit --binding-id`.
 - **Key cleanup.** The key file is deleted after a definitive failure. It is
-  kept when the outcome is unknown (client timeout).
+  kept when the outcome is unknown: a client timeout, or a provider that no
+  longer knows the session after a confirmation's reply was lost.
 
 The companion side of the protocol is `access::enrollment::joiner`, using
 `JoinAttempt::companion`. It is sent as the mTLS command
@@ -239,8 +268,8 @@ companion calls it through the Rust bridge.
 - a companion-side command to create, approve and cancel invitations from
   an administrator companion (today only the owner's `human.sock`);
 - Rust-bridge bindings for `JoinAttempt` and `JoinedSession`;
-- screens for the states above, with the code shown large and typed (or
-  compared) at the provider end;
+- screens for the states above, with the code shown large on the joining
+  device and typed (never displayed) at the provider end;
 - a manual connection fallback;
 - diagnostics kept off the happy path.
 
@@ -272,7 +301,9 @@ phase 2 item.
 
 **Not defended against:**
 
-- a human who approves without comparing;
+- a human who approves without comparing (mitigated: the owner must type
+  the code, and the provider never shows it, so it has to come from the
+  joiner's screen);
 - a compromised provider owner account;
 - a leaked secret combined with a human who ignores a mismatch.
 
