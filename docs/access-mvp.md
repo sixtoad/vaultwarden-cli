@@ -385,6 +385,10 @@ vw-access agent list
 vw-access agent revoke <binding-id>
 ```
 
+Guided enrollment (`vw-access enroll …`) pairs an agent without copying a key
+by hand: a single-use invitation, a comparison code shown at both ends and
+approval by a human at each end. See [guided-enrollment.md](guided-enrollment.md).
+
 All three commands use the private, kernel-authenticated `human.sock` and work
 while the vault is locked. Pairing does not unlock the vault or approve work.
 The public key must be canonical unpadded base64url encoding of a valid,

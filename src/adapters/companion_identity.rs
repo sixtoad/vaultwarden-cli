@@ -649,6 +649,43 @@ pub fn enroll(
     persist_registry(root, registry)?;
     Ok(fingerprint)
 }
+/// Whether a fingerprint was ever enrolled, including revoked ones.
+pub(crate) fn known(root: &Path, fingerprint: &str) -> Result<bool, SessionError> {
+    let registry = registry(&root.join(STORE_FILE))?;
+    Ok(registry
+        .identities
+        .iter()
+        .chain(&registry.revoked)
+        .any(|entry| entry.fingerprint == fingerprint))
+}
+/// Guided enrollment (#59). Caller holds the companion identity commit gate.
+/// A known fingerprint, enabled or revoked, is refused: revocation is
+/// permanent and a matching label never reactivates anything. The new
+/// approval client is never an administrator.
+pub(crate) fn enroll_online(
+    root: &Path,
+    fingerprint: &str,
+    label: &str,
+) -> Result<(), SessionError> {
+    if !valid_fingerprint(fingerprint) || !valid_label(label) {
+        return Err(SessionError::InvalidRequest);
+    }
+    let mut registry = registry(&root.join(STORE_FILE))?;
+    if registry
+        .identities
+        .iter()
+        .chain(&registry.revoked)
+        .any(|entry| entry.fingerprint == fingerprint)
+        || registry.identities.len() + registry.revoked.len() >= MAX_IDENTITIES
+    {
+        return Err(SessionError::InvalidRequest);
+    }
+    registry.identities.push(EnrolledCompanion {
+        fingerprint: fingerprint.into(),
+        label: label.into(),
+    });
+    persist_registry(root, registry)
+}
 pub fn revoke(root: &Path, fingerprint: &str) -> Result<(), SessionError> {
     if !valid_fingerprint(fingerprint) {
         return Err(SessionError::InvalidRequest);

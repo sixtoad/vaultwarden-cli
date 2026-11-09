@@ -1,6 +1,10 @@
 //! Bounded agent-only transport. Kernel identity is checked before JSON decoding.
 use crate::access::{
     application::ProviderApplication,
+    enrollment::{
+        EnrollmentRejection,
+        wire::{EnrollmentReply, EnrollmentRequest},
+    },
     ports::DirectReviewLauncher,
     protocol::{
         AgentEnvelope, AgentRejection, AgentResponse, MAX_REQUEST_FRAME_BYTES,
@@ -429,46 +433,62 @@ async fn serve_one(
 ) {
     let (eligibility_app, eligibility_permit, groups) =
         (app.clone(), permit.clone(), peer.groups.clone());
+    // A paired agent uses its binding; a peer named by a live invitation may
+    // additionally send enrollment messages, and nothing else (#59).
     let eligibility = tokio::task::spawn_blocking(move || {
         let _retained = eligibility_permit;
-        eligibility_app.agent_peer_eligible(peer.uid, &groups)
+        let binding = eligibility_app.agent_peer_eligible(peer.uid, &groups);
+        let enrollment = matches!(binding, Ok(()) | Err(AgentRejection::Unauthorized))
+            && eligibility_app.enrollment_peer_eligible(peer.uid, &groups);
+        (binding, enrollment)
     })
     .await;
-    let response = match eligibility {
-        Ok(Ok(())) => match read_frame(&mut stream, MAX_REQUEST_FRAME_BYTES, deadline).await {
-            Ok(bytes) => match AgentEnvelope::parse(&bytes) {
-                Ok(input) => {
-                    let retained = permit.clone();
-                    match tokio::task::spawn_blocking(move || {
-                        let _retained = retained;
-                        match input {
-                            AgentEnvelope::Submission(input) => app
-                                .submit_signed(peer.uid, &peer.groups, input, launcher.as_ref())
-                                .map(AgentResponse::pending),
-                            AgentEnvelope::Status(input) => app
-                                .signed_agent_status(peer.uid, &peer.groups, &input)
-                                .map(|state| AgentResponse::Status {
-                                    protocol_version: crate::access::PROTOCOL_VERSION,
-                                    request_id: input.request_id,
-                                    state,
-                                }),
+    let response: Result<Vec<u8>, AgentTransportError> = match eligibility {
+        Ok((binding, enrollment)) if binding.is_ok() || enrollment => {
+            match read_frame(&mut stream, MAX_REQUEST_FRAME_BYTES, deadline).await {
+                Ok(bytes) => {
+                    let agent = binding.and_then(|()| AgentEnvelope::parse(&bytes));
+                    match (agent, enrollment) {
+                        (Ok(input), _) => encode_response(
+                            &agent_request(app, peer, input, launcher, permit.clone()).await,
+                        ),
+                        (Err(category), true) => match EnrollmentRequest::parse(&bytes) {
+                            Ok(request) => {
+                                let retained = permit.clone();
+                                let groups = peer.groups.clone();
+                                encode_response(
+                                    &tokio::task::spawn_blocking(move || {
+                                        let _retained = retained;
+                                        app.enrollment_agent_message(peer.uid, &groups, &request)
+                                    })
+                                    .await
+                                    .unwrap_or_else(
+                                        |_error| {
+                                            EnrollmentReply::rejected(
+                                                EnrollmentRejection::Unavailable,
+                                            )
+                                        },
+                                    ),
+                                )
+                            }
+                            Err(_) => encode_response(&AgentResponse::rejected(category)),
+                        },
+                        (Err(category), false) => {
+                            encode_response(&AgentResponse::rejected(category))
                         }
-                    })
-                    .await
-                    {
-                        Ok(Ok(response)) => response,
-                        Ok(Err(category)) => AgentResponse::rejected(category),
-                        Err(_) => AgentResponse::rejected(AgentRejection::Unavailable),
                     }
                 }
-                Err(category) => AgentResponse::rejected(category),
-            },
-            Err(_) => AgentResponse::rejected(AgentRejection::Malformed),
-        },
-        Ok(Err(category)) => AgentResponse::rejected(category),
-        Err(_) => AgentResponse::rejected(AgentRejection::Unavailable),
+                Err(_) => encode_response(&AgentResponse::rejected(AgentRejection::Malformed)),
+            }
+        }
+        Ok((Err(category), _)) => encode_response(&AgentResponse::rejected(category)),
+        Ok((Ok(()), _)) | Err(_) => {
+            encode_response(&AgentResponse::rejected(AgentRejection::Unavailable))
+        }
     };
-    let _ignored = write_response(&mut stream, &response).await;
+    if let Ok(bytes) = response {
+        let _ignored = write_bytes(&mut stream, bytes).await;
+    }
     // Closing a Unix stream with unread input resets the peer, even after the
     // rejection was written. Discard only after the response's write-half EOF;
     // this never parses input and retains the original deadline and byte bound.
@@ -535,15 +555,52 @@ async fn read_frame(
     .await
     .map_err(|_error| AgentTransportError)?
 }
-async fn write_response(
-    stream: &mut UnixStream,
-    response: &AgentResponse,
-) -> Result<(), AgentTransportError> {
+async fn agent_request(
+    app: Arc<ProviderApplication>,
+    peer: PeerCredentials,
+    input: AgentEnvelope,
+    launcher: Arc<dyn DirectReviewLauncher>,
+    retained: Arc<tokio::sync::OwnedSemaphorePermit>,
+) -> AgentResponse {
+    match tokio::task::spawn_blocking(move || {
+        let _retained = retained;
+        match input {
+            AgentEnvelope::Submission(input) => app
+                .submit_signed(peer.uid, &peer.groups, input, launcher.as_ref())
+                .map(AgentResponse::pending),
+            AgentEnvelope::Status(input) => app
+                .signed_agent_status(peer.uid, &peer.groups, &input)
+                .map(|state| AgentResponse::Status {
+                    protocol_version: crate::access::PROTOCOL_VERSION,
+                    request_id: input.request_id,
+                    state,
+                }),
+        }
+    })
+    .await
+    {
+        Ok(Ok(response)) => response,
+        Ok(Err(category)) => AgentResponse::rejected(category),
+        Err(_) => AgentResponse::rejected(AgentRejection::Unavailable),
+    }
+}
+/// One LF-terminated JSON line within the agent response bound.
+fn encode_response(response: &impl serde::Serialize) -> Result<Vec<u8>, AgentTransportError> {
     let mut bytes = serde_json::to_vec(response).map_err(|_error| AgentTransportError)?;
     bytes.push(b'\n');
     if bytes.len() > MAX_RESPONSE_FRAME_BYTES {
         return Err(AgentTransportError);
     }
+    Ok(bytes)
+}
+#[cfg(all(test, target_os = "linux"))]
+async fn write_response(
+    stream: &mut UnixStream,
+    response: &impl serde::Serialize,
+) -> Result<(), AgentTransportError> {
+    write_bytes(stream, encode_response(response)?).await
+}
+async fn write_bytes(stream: &mut UnixStream, bytes: Vec<u8>) -> Result<(), AgentTransportError> {
     timeout(IO_TIMEOUT, async {
         stream
             .write_all(&bytes)
@@ -626,6 +683,24 @@ async fn exchange_envelope(
     path: &Path,
     input: &impl serde::Serialize,
 ) -> Result<AgentResponse, AgentTransportError> {
+    let response = exchange_raw(path, input).await?;
+    AgentResponse::parse(&response).map_err(|_error| AgentTransportError)
+}
+
+/// One guided-enrollment message (#59) to an authenticated provider socket.
+/// Never retries; a joiner resends the identical message after a lost reply.
+pub async fn enrollment_exchange(
+    path: &Path,
+    input: &EnrollmentRequest,
+) -> Result<EnrollmentReply, AgentTransportError> {
+    let response = exchange_raw(path, input).await?;
+    EnrollmentReply::parse(&response).map_err(|_error| AgentTransportError)
+}
+
+async fn exchange_raw(
+    path: &Path,
+    input: &impl serde::Serialize,
+) -> Result<Vec<u8>, AgentTransportError> {
     let deadline = Instant::now() + IO_TIMEOUT;
     let mut bytes = serde_json::to_vec(input).map_err(|_error| AgentTransportError)?;
     bytes.push(b'\n');
@@ -672,13 +747,16 @@ async fn exchange_envelope(
             resume.await.expect("exchange test controller dropped");
         }
     }
-    let response = read_frame(&mut stream, MAX_RESPONSE_FRAME_BYTES, deadline).await?;
-    AgentResponse::parse(&response).map_err(|_error| AgentTransportError)
+    read_frame(&mut stream, MAX_RESPONSE_FRAME_BYTES, deadline).await
 }
 
 #[cfg(all(test, target_os = "linux"))]
 #[path = "unix_socket_tests.rs"]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "unix_socket_enrollment_tests.rs"]
+mod enrollment_tests;
 
 #[cfg(all(test, target_os = "macos"))]
 mod native_tests {
