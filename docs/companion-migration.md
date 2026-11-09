@@ -501,11 +501,44 @@ The existing companion stays supported. Replacement requires evidence for:
   acceptance, as a separate authorized change.
 
 This slice opens an ordinary desktop window and exits when closed. No tray,
-background service, startup registration or notification API is implemented.
+background service or startup registration is implemented. Review notifications
+(macOS, #61) work only while the window is open; see below.
 Development bundles are CI artifacts only, not installers or release assets.
 Evidence for those capabilities is pending, not assumed from Flutter's support.
 SwiftUI removal and installed-app replacement remain blocked until the parity
 checklist and coordinated native acceptance are complete.
+
+## Review-request notifications (issue 61)
+
+macOS only. Settings → "Notify me when a request needs review" is off by default;
+turning it on is the only place the system permission prompt is shown (never at
+launch). A denial keeps the toggle off and says where to change it.
+
+- **When:** the companion still suspends on `inactive`, retiring reviews and the
+  foreground poll. While suspended, notifications are on and permitted, the
+  provider is configured and idle and no recovery is pending, a read-only watch
+  sends only `session` and `list` every 15 s (backing off to 60 s). It never
+  reviews, decides, unlocks, reads history or manages identities. A request id
+  first seen by the watch is announced once per process; ids seen while the
+  window is foreground are on screen and never announced. Closing the window
+  quits the app, so nothing is announced after close (menu-bar/background
+  lifetime remains a parity item).
+- **What:** the native side (`ReviewNotificationAdapter.swift`) owns the only
+  text, "Approval companion" / "A request needs your review.", with no user info,
+  categories or actions, so there is no approve or deny on a notification. Flutter
+  passes only an opaque random 22-character token (`ReviewNotificationContract`
+  refuses anything else, including a 43-character request id); the token maps to
+  the request id in Dart memory only.
+- **Open:** a click (default action only) unhides and activates the window and
+  hands Flutter the token. When the window is foreground and the provider idle,
+  the page runs the normal fresh `review` of that exact request: a pending
+  request shows the approval screen, an expired or decided one the final-state
+  view (#49 PR D), and one the provider no longer returns says it could not be
+  loaded. A token from an earlier process (the app relaunched from Notification
+  Center) opens the request list.
+- **Not verified on hardware:** the permission prompt, banner and lock-screen
+  text, click-through activation, launch from a notification, and delivery in
+  the ad-hoc signed sandboxed debug build.
 
 ## Desktop bundle installation slice (#50)
 

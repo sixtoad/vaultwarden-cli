@@ -47,8 +47,24 @@ class ProviderController extends ChangeNotifier {
   bool lastPerformSent = false;
   String _settlementId = '';
   String diagnostic = '';
-  int _context = 0, _backoff = 5;
-  Timer? _poll, _expiry;
+  int _context = 0, _backoff = 5, _watchBackoff = watchSeconds;
+  Timer? _poll, _expiry, _watch;
+
+  /// Every successful inbox read, with whether the window was foreground
+  /// (review notifications, #61). Request ids only; never review content.
+  void Function(List<String> ids, bool foreground)? onInbox;
+
+  /// Whether the background inbox watch may read (notifications enabled and
+  /// permitted). Without it nothing is read while the window is inactive.
+  bool Function()? watchAllowed;
+
+  /// The read-only inbox watch interval while the window is inactive.
+  static const watchSeconds = 15;
+
+  /// A request a notification opened, reviewed (freshly) once the window is
+  /// foreground again and the provider is idle.
+  String _pendingReview = '';
+  String get pendingReview => _pendingReview;
   void Function()? _unsubscribe;
   VoidCallback? clearPasswords;
   bool get eligible => !_disposed && !suspended && _routeCurrent;
@@ -245,11 +261,67 @@ class ProviderController extends ChangeNotifier {
     _poll?.cancel();
     invalidate();
     _ready = false;
+    _watch ??= Timer(Duration(seconds: _watchBackoff), _watchTick);
   }
 
   void resume() {
     suspended = false;
+    _watch?.cancel();
+    _watch = null;
     unawaited(refresh());
+  }
+
+  bool get _watchAdmissible =>
+      !_disposed &&
+      suspended &&
+      _loaded &&
+      platform.available &&
+      configuration.configured;
+
+  /// The background inbox watch (#61): while the window is inactive, read
+  /// only authority and the pending request ids so a new request can be
+  /// announced. No review, history, management, unlock or decision is ever
+  /// sent from here, and reviews stay retired.
+  Future<void> _watchTick() async {
+    _watch = null;
+    if (!_watchAdmissible) return; // resume() restarts the foreground poll
+    var success = true;
+    if ((watchAllowed?.call() ?? false) &&
+        !busy &&
+        !_held &&
+        recoveryId.isEmpty &&
+        !managementPending) {
+      success = await perform(core.ProviderCommand.session, watch: true);
+      if (success && _watchAdmissible && !state.locked) {
+        success = await perform(core.ProviderCommand.list, watch: true);
+      }
+      _watchBackoff = success
+          ? watchSeconds
+          : (_watchBackoff * 2).clamp(watchSeconds, 60);
+    }
+    if (_watchAdmissible) {
+      _watch ??= Timer(Duration(seconds: _watchBackoff), _watchTick);
+    } else if (eligible) {
+      // Resumed while the read was in flight: its refresh found us busy.
+      unawaited(refresh());
+    }
+  }
+
+  /// Review `id` freshly as soon as the window is foreground and idle.
+  void reviewWhenReady(String id) {
+    _pendingReview = id;
+    _reviewPending();
+  }
+
+  void cancelPendingReview() => _pendingReview = '';
+
+  void _reviewPending() {
+    if (_pendingReview.isEmpty || !eligible || !_ready || busy || _held) {
+      return;
+    }
+    final id = _pendingReview;
+    _pendingReview = '';
+    unawaited(review(id));
   }
 
   void setRouteCurrent(bool current) {
@@ -343,10 +415,17 @@ class ProviderController extends ChangeNotifier {
     String id = '',
     String password = '',
     core.ProviderWork Function()? begin,
+    bool watch = false,
   }) async {
     lastPerformSent = false;
-    if (!eligible ||
-        !_ready ||
+    if (watch &&
+        (!_watchAdmissible ||
+            (command != core.ProviderCommand.session &&
+                command != core.ProviderCommand.list))) {
+      return false;
+    }
+    if ((!watch && !eligible) ||
+        (!watch && !_ready) ||
         !platform.available ||
         !configuration.configured ||
         busy ||
@@ -399,6 +478,9 @@ class ProviderController extends ChangeNotifier {
     state = core.providerFinish(token: work.token, response: response);
     if (previousReview != state.reviewId) clearPasswords?.call();
     final accepted = state.outcome == core.ProviderOutcome.accepted;
+    if (command == core.ProviderCommand.list && accepted) {
+      onInbox?.call(List.of(state.requests), !watch && eligible);
+    }
     final rejectedDecision =
         [
           core.ProviderCommand.approve,
@@ -486,6 +568,7 @@ class ProviderController extends ChangeNotifier {
     }
     _backoff = success ? 5 : (_backoff * 2).clamp(5, 30);
     _schedule();
+    _reviewPending();
   }
 
   void _schedule() {
@@ -671,6 +754,7 @@ class ProviderController extends ChangeNotifier {
     clearPasswords = null;
     _poll?.cancel();
     _expiry?.cancel();
+    _watch?.cancel();
     _unsubscribe?.call();
     core.providerInvalidate();
     manage.managementInvalidate();
