@@ -78,7 +78,10 @@ if name == 'dscl':
             fail(56, f'<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)')
         value = table[rname].get(args[3])
         if value is None:
-            fail(181, 'No such key: ' + args[3])
+            # Real dscl (macOS 26/27, probed 2026-11-09) for an existing record that lacks the key,
+            # /Groups and /Users alike: exit 0, empty stdout, 'No such key: <attr>' on stderr.
+            # A missing record: exit 56, '<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)' on stderr.
+            sys.stderr.write('No such key: ' + args[3] + '\n'); sys.exit(0)
         print(f'{args[3]}: {value}')
     elif op == '-create':
         if state.get('fail_create'):
@@ -112,6 +115,8 @@ elif name == 'dseditgroup':
         groups.pop(group)
     save()
 elif name == 'dsmemberutil':
+    if args == ['flushcache']:
+        sys.exit(0)
     assert args[0] == 'checkmembership'
     opts = dict(zip(args[1::2], args[2::2]))
     if opts['-U'] not in users or opts['-G'] not in groups: fail(70, 'Unable to find user or group')
@@ -174,7 +179,9 @@ elif name == 'codesign':
         if b'UNSIGNED' in data: fail(1, 'code object is not signed at all')
         if '-R' in args:
             requirement = args[args.index('-R') + 1]
-            assert requirement.startswith('=anchor apple generic and certificate leaf[subject.OU] = "'), requirement
+            prefix = ('=anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and '
+                      'certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "')
+            assert requirement.startswith(prefix), requirement
             if team != requirement.split('"')[1]: fail(3, 'test-requirement: code failed to satisfy specified code requirement(s)')
 elif name == 'lipo':
     assert args[0] == '-archs'
@@ -247,7 +254,8 @@ class Host:
 
     def mutating_calls(self):
         reads = {('dscl', '-list'), ('dscl', '-read'), ('launchctl', 'print'), ('launchctl', 'print-disabled'), ('stat', '-f'),
-                 ('codesign', '--verify'), ('codesign', '-d'), ('lipo', '-archs'), ('dsmemberutil', 'checkmembership')}
+                 ('codesign', '--verify'), ('codesign', '-d'), ('lipo', '-archs'), ('dsmemberutil', 'checkmembership'),
+                 ('dsmemberutil', 'flushcache')}
         return [c for c in self.calls() if (c[0], c[2] if c[0] == 'dscl' else c[1]) not in reads]
 
     def bundle(self, version, payload_extra=b'', tag=''):
@@ -278,14 +286,28 @@ class Host:
     def path(self, destination):
         return self.root / destination.lstrip('/')
 
-    def provision_credentials(self):
+    def provider_owned(self, path):
+        info = os.lstat(path)
+        birth = info.st_birthtime if hasattr(info, 'st_birthtime') else info.st_ctime_ns
+        self.update(lambda s, k=f'{info.st_ino}:{birth}': s['owners'].__setitem__(k, [491, 491]))
+
+    def provision_credentials(self, secret=True):
         for name in plan.STATE_FILES:
             path = self.path(f'{ROOT}/state/{name}')
             path.write_bytes(b'synthetic credential placeholder\n')
             path.chmod(0o600)
-            info = os.lstat(path)
-            birth = info.st_birthtime if hasattr(info, 'st_birthtime') else info.st_ctime_ns
-            self.update(lambda s, k=f'{info.st_ino}:{birth}': s['owners'].__setitem__(k, [491, 491]))
+            self.provider_owned(path)
+        if secret:
+            self.provision_secret()
+
+    def provision_secret(self, mode=0o600):
+        # PR #71: the API client secret is a provider-owned file store under state/secrets/.
+        secrets = self.path(f'{ROOT}/state/secrets')
+        if not secrets.exists():
+            secrets.mkdir(0o700); secrets.chmod(0o700); self.provider_owned(secrets)
+        path = secrets / 'vaultwarden-accessd.bootstrap-client-secret'
+        path.write_bytes(b'synthetic secret\n'); path.chmod(mode)
+        self.provider_owned(path)
 
     def snapshot(self):
         files = []
@@ -456,7 +478,7 @@ class InstallTests(InstallerTestCase):
                          (self.bundle1 / 'Contents/Helpers/vaultwarden-accessd').read_bytes())
         self.assertEqual(state['launchd'], {'loaded': False, 'running': False, 'disabled': True})
         self.assertIn('Next manual steps', out)
-        self.assertIn(f'sudo install -o _vwaccess -g _vwaccess -m 0600 /path/to/backend.json {ROOT}/state/backend.json', out)
+        self.assertIn(f'sudo install -o _vwaccess -g _vwaccess -m 0600 ~/vw-setup/backend.json {ROOT}/state/backend.json', out)
         receipt = self.receipt()
         self.assertEqual((receipt['created'], receipt['active_version'], receipt['status']),
                          ({'users': ['_vwaccess'], 'groups': ['_vwaccess', '_vwhuman', '_vwagent']}, '0.5.4', 'installed'))
@@ -683,7 +705,7 @@ class LifecycleTests(InstallerTestCase):
         code, out, _ = self.run_installer('status')
         self.assertEqual(code, 1); self.assertIn('2 hard links', out)
 
-    def test_uninstall_preserves_state_accounts_and_keychain(self):
+    def test_uninstall_preserves_state_secrets_and_accounts(self):
         code, _, err = self.run_installer('uninstall')
         self.assertEqual(code, 2); self.assertIn('--acknowledge-active-work', err)
         code, out, _ = self.assertOk(self.run_installer('uninstall', '--acknowledge-active-work'))
@@ -691,11 +713,11 @@ class LifecycleTests(InstallerTestCase):
         self.assertFalse(self.host.path(f'{ROOT}/versions').exists())
         self.assertFalse(self.host.path(f'{ROOT}/native-identities.json').exists())
         self.assertFalse(self.host.path(f'{ROOT}/run').exists())
-        self.assertEqual(sorted(os.listdir(self.host.path(f'{ROOT}/state'))), sorted(plan.STATE_FILES))
+        self.assertEqual(sorted(os.listdir(self.host.path(f'{ROOT}/state'))), sorted(plan.STATE_FILES + ('secrets',)))
         state = self.host.state()
         self.assertEqual(state['launchd']['loaded'], False)
         self.assertIn('_vwaccess', state['users']); self.assertIn('_vwhuman', state['groups'])
-        self.assertIn('never deleted by the installer', out)
+        self.assertIn(f'preserved {ROOT}/state (provider state, secrets/ file store', out)
         self.assertEqual(self.receipt()['status'], 'uninstalled')
         # A later install recognizes its own accounts and the preserved state.
         self.assertOk(self.install())
@@ -715,7 +737,7 @@ class LifecycleTests(InstallerTestCase):
         self.assertOk(self.run_installer('uninstall', '--acknowledge-active-work', '--purge'))
         self.assertFalse(self.host.path(f'{ROOT}/state').exists())
         self.assertIn('_vwaccess', self.host.state()['users'])
-        self.assertOk(self.run_installer('uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts', '--confirm-secrets-removed'))
+        self.assertOk(self.run_installer('uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts'))
         state = self.host.state()
         self.assertNotIn('_vwaccess', state['users'])
         for group in ['_vwaccess', '_vwhuman', '_vwagent']:
@@ -794,7 +816,8 @@ class ReviewPinningTests(InstallerTestCase):
         code, _, err = self.run_installer('install', '--plan', str(plan_dir), '--bundle', str(app), *pin, '--team-id', 'abc')
         self.assertEqual(code, 2); self.assertIn('10 uppercase', err)
         self.assertOk(self.run_installer('install', '--plan', str(plan_dir), '--bundle', str(app), *pin, '--team-id', 'ABCDE12345'))
-        requirement = '=anchor apple generic and certificate leaf[subject.OU] = "ABCDE12345"'
+        requirement = ('=anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and '
+                       'certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "ABCDE12345"')
         verifies = [c for c in self.host.calls() if c[:2] == ['codesign', '--verify'] and c[-1].endswith('versions/0.6.0/vaultwarden-accessd')]
         self.assertTrue(verifies and all(c[1:5] == ['--verify', '--strict', '-R', requirement] for c in verifies))
         self.assertEqual(self.receipt()['versions']['0.6.0']['signature'], {'team_id': 'ABCDE12345'})
@@ -888,15 +911,20 @@ class AccountRemovalTests(LifecycleBase):
     def remove_all(self, *extra):
         return self.run_installer('uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts', *extra)
 
-    def test_remove_accounts_requires_the_secret_removal_assertion(self):
-        code, _, err = self.remove_all()
-        self.assertEqual(code, 2); self.assertIn('--confirm-secrets-removed', err)
-        self.assertIn('_vwaccess', self.host.state()['users'])
-        self.assertEqual(self.host.state()['launchd']['loaded'], True)
+    def test_remove_accounts_needs_no_keychain_assertion_and_purges_the_secret_store(self):
+        # PR #71: the provider secrets are a file store under state/secrets/, removed by --purge.
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit):
+            installer.main(['uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts', '--confirm-secrets-removed'])
+        self.assertIn('unrecognized arguments', err.getvalue())
+        code, out, _ = self.assertOk(self.remove_all())
+        self.assertNotIn('Keychain', out)
+        self.assertFalse(self.host.path(f'{ROOT}/state').exists())
+        self.assertNotIn('_vwaccess', self.host.state()['users'])
 
     def test_retained_resources_keep_the_accounts(self):
         (self.host.path(f'{ROOT}/run/human') / 'admin.sock').write_text('')
-        code, out, _ = self.remove_all('--confirm-secrets-removed')
+        code, out, _ = self.remove_all()
         self.assertEqual(code, 3)
         self.assertIn('accounts _vwaccess', out); self.assertIn('not removed: provider resources were retained', out)
         state = self.host.state()
@@ -905,7 +933,7 @@ class AccountRemovalTests(LifecycleBase):
         self.assertFalse(self.host.path(f'{ROOT}/account-tombstones.json').exists())
 
     def test_removed_generated_uid_is_never_reused(self):
-        self.assertOk(self.remove_all('--confirm-secrets-removed'))
+        self.assertOk(self.remove_all())
         tombstones = json.loads(self.host.path(f'{ROOT}/account-tombstones.json').read_text())
         self.assertEqual(tombstones['removed'], [{'name': '_vwaccess', 'uid': 491, 'uuid': PROVIDER_UUID}])
         code, _, err = self.install()
@@ -916,8 +944,8 @@ class AccountRemovalTests(LifecycleBase):
         self.assertOk(self.install(plan_dir=plan_dir))
         self.assertEqual(json.loads(self.host.path(f'{ROOT}/account-tombstones.json').read_text()), tombstones)
         # A second uninstall with nothing installed is a no-op.
-        self.assertOk(self.remove_all('--confirm-secrets-removed'))
-        self.assertOk(self.remove_all('--confirm-secrets-removed'))
+        self.assertOk(self.remove_all())
+        self.assertOk(self.remove_all())
 
 
 class CrashSafetyTests(InstallerTestCase):
@@ -977,7 +1005,7 @@ class CrashSafetyTests(InstallerTestCase):
             self.assertOk(self.install())
 
         def argv():
-            return ['uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts', '--confirm-secrets-removed']
+            return ['uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts']
         self.converges(prepare, argv)
         self.assertNotIn('_vwaccess', self.host.state()['users'])
 
@@ -1009,13 +1037,32 @@ class CrashSafetyTests(InstallerTestCase):
             return write(instance, destination, *args, **kwargs)
         with patch.object(installer.Installer, 'write_file', spy):
             self.assertOk(self.run_installer('upgrade', '--plan', str(plan2), '--bundle', str(bundle2), *self.pinned(plan2), '--acknowledge-active-work'))
-        self.assertEqual(seen, [(['0.5.4', '0.6.0'], {'from': '0.5.4', 'to': '0.6.0'})])
+        self.assertEqual(seen, [(['0.5.4', '0.6.0'], {'from': '0.5.4', 'to': '0.6.0', 'by': 'upgrade'})])
         self.assertNotIn('switching', self.receipt())
+
+    def test_rollback_recovers_from_a_crash_after_any_step(self):
+        def prepare():
+            self.assertOk(self.install())
+            self.host.provision_credentials()
+            self.assertOk(self.install())
+            self.bundle2 = self.host.bundle('0.6.0')
+            self.plan2 = self.host.plan('0.6.0', self.bundle2)
+            self.assertOk(self.run_installer('upgrade', '--plan', str(self.plan2), '--bundle', str(self.bundle2),
+                                             *self.pinned(self.plan2), '--acknowledge-active-work'))
+
+        def argv():
+            return ['rollback', '--acknowledge-active-work', '--confirm-state-compatible']
+        self.converges(prepare, argv)
+        receipt = self.receipt()
+        self.assertEqual((receipt['active_version'], receipt['previous_version']), ('0.5.4', '0.6.0'))
+        self.assertNotIn('switching', receipt)
+        self.assertEqual(self.host.state()['launchd']['program'], f'{ROOT}/versions/0.5.4/vaultwarden-accessd')
+        self.assertOk(self.run_installer('status'))
 
     def test_removal_of_already_absent_accounts_is_idempotent(self):
         self.assertOk(self.install())
         self.host.update(lambda s: (s['users'].pop('_vwaccess'), s['groups'].pop('_vwagent')))
-        code, out, _ = self.assertOk(self.run_installer('uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts', '--confirm-secrets-removed'))
+        code, out, _ = self.assertOk(self.run_installer('uninstall', '--acknowledge-active-work', '--purge', '--remove-accounts'))
         self.assertIn('user _vwaccess is already absent', out); self.assertIn('group _vwagent is already absent', out)
         self.assertNotIn('_vwhuman', self.host.state()['groups'])
 
@@ -1185,17 +1232,25 @@ class OperatorGuidanceTests(InstallerTestCase):
 
     def test_next_steps_cover_enrollment_certificates_and_backend_fields(self):
         code, out, _ = self.assertOk(self.install())
-        for expected in ['subjectAltName', 'IP:127.0.0.1', 'CLIENT CA', 'server CA (DER), the server leaf pin and its own client PKCS#12',
-                         'server (HTTPS origin), client_id, email, encrypted_key', 'kdf_iterations',
+        for expected in ['docs/macos-setup.md', 'vw-access setup tls', 'vw-access setup backend-json', 'vw-access setup agent-key',
+                         'subjectAltName', 'IP:127.0.0.1', 'server (HTTPS origin), client_id, email, encrypted_key', 'kdf_iterations',
+                         f'{ROOT}/state/secrets/vaultwarden-accessd.bootstrap-client-secret',
+                         f'cd / && sudo -u _vwaccess {ROOT}/versions/0.5.4/vaultwarden-accessd --state-root {ROOT}/state --store-bootstrap-secret',
                          'stop --acknowledge-active-work',
-                         f'sudo install -o _vwaccess -g _vwaccess -m 0600 /path/to/client.pem {ROOT}/state/enroll-client.pem',
-                         f'--companion-enroll-cert {ROOT}/state/enroll-client.pem',
-                         f'{ROOT}/versions/0.5.4/vw-access --state-root {ROOT}/run/human',
+                         f'sudo install -o _vwaccess -g _vwaccess -m 0600 ~/vw-setup/tls/companion-client.pem {ROOT}/state/companion-client.pem',
+                         f'--companion-enroll-cert {ROOT}/state/companion-client.pem',
+                         f'{ROOT}/versions/0.5.4/vw-access history --limit 5',
                          'docs/desktop-installation.md#macos-provider-credentials-and-companion-enrollment']:
             self.assertIn(expected, out)
+        self.assertNotIn('Keychain', out)
+        self.assertNotIn('Keychain', installer.__doc__)
         doc = (HERE.parent / 'docs/desktop-installation.md').read_text()
         self.assertIn('## macOS provider credentials and companion enrollment', doc)
-        self.assertNotIn('the Keychain holds\nthe API client secret, the service stays disabled', doc)
+        self.assertIn('macos-setup.md', doc)
+        section = doc[doc.index('## macOS provider installation, upgrade and removal'):]
+        section = section[:section.index('\n## ', section.index('## macOS provider credentials'))] if '\n## ' in section[section.index('## macOS provider credentials'):] else section
+        self.assertNotIn('Keychain', section)
+        self.assertIn('--store-bootstrap-secret', section)
 
 
 class DirectoryServiceOutputTests(InstallerTestCase):
@@ -1218,6 +1273,149 @@ class DirectoryServiceOutputTests(InstallerTestCase):
         self.assertIsNone(reader.read_attribute('Users', '_vwaccess', 'NoSuchAttribute'))
         self.assertIsNone(reader.read_attribute('Users', 'nobody-here', 'UniqueID'))
         self.assertEqual(reader.users()['_vwaccess'], 491)
+
+
+class ReviewRound2Tests(LifecycleBase):
+    """Review round 2 on PR #70."""
+
+    def test_dscl_missing_key_reads_as_absent_as_real_dscl_reports_it(self):
+        # Probed 2026-11-09 on this Mac (macOS 27.0.1): `dscl . -read /Groups/nobody GroupMembership` and
+        # `dscl . -read /Users/<me> NoSuchAttrX` exit 0, print nothing on stdout and 'No such key: <attr>'
+        # on stderr; `dscl . -read /Groups/<missing> GroupMembership` exits 56 (eDSRecordNotFound).
+        reader = installer.Installer(self.host.root, True, out=lambda _: None)
+        self.assertIsNone(reader.read_attribute('Groups', '_vwaccess', 'GroupMembership'))
+        self.assertEqual(reader.members('_vwaccess'), [])
+        weird = subprocess.CompletedProcess([], 0, '', 'something else entirely\n')
+        with patch.object(installer.Installer, 'tool', return_value=weird):
+            with self.assertRaisesRegex(installer.InstallError, 'unexpected dscl output'):
+                reader.read_attribute('Groups', '_vwaccess', 'GroupMembership')
+        self.assertOk(self.run_installer('status'))
+
+    def test_designated_requirement_is_the_full_developer_id_requirement(self):
+        self.assertEqual(installer.designated_requirement('ABCDE12345'),
+                         '=anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and '
+                         'certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "ABCDE12345"')
+        for team in ['abcde12345', 'ABCDE1234', 'ABCDE123456', 'ABCDE1234"', 'ABCDE-1234', '', None]:
+            with self.subTest(team=team), self.assertRaises(installer.InstallError):
+                installer.designated_requirement(team)
+
+    def test_membership_cache_is_flushed_before_the_post_creation_checks(self):
+        self.fresh_host()
+        self.assertOk(self.install())
+        calls = self.host.calls()
+        last_edit = max(i for i, c in enumerate(calls) if c[:3] == ['dseditgroup', '-o', 'edit'])
+        after = [c for c in calls[last_edit + 1:] if c[0] == 'dsmemberutil']
+        self.assertEqual(after[0], ['dsmemberutil', 'flushcache'])
+        self.assertIn('checkmembership', [c[1] for c in after[1:]])
+
+    def test_root_dry_run_checks_code_trust_too(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            script = Path(temporary) / 'macos-provider-install.py'
+            script.write_text('# not root-owned\n')
+            with patch.object(installer, 'code_paths', return_value=[script]):
+                for argv in [('plan', '--plan', str(self.plan1), '--bundle', str(self.bundle1)),
+                             ('upgrade', '--plan', str(self.plan2), '--bundle', str(self.bundle2), '--dry-run'),
+                             ('status',)]:
+                    with self.subTest(argv=argv[0]):
+                        code, _, err = self.run_installer(*argv)
+                        self.assertEqual(code, 2); self.assertIn('run a root-owned copy of the installer', err)
+                with patch.object(installer, 'effective_uid', return_value=501):
+                    self.assertOk(self.run_installer('plan', '--plan', str(self.plan1), '--bundle', str(self.bundle1)))
+
+    def untrusted_copy(self, temporary, marker):
+        scripts = Path(temporary) / 'scripts'
+        scripts.mkdir()
+        for name in ('macos-provider-install.py', 'macos-provider-plan.py'):
+            shutil.copy(HERE / name, scripts / name)
+        with open(scripts / 'macos-provider-plan.py', 'a') as stream:
+            stream.write(f'\nopen({str(marker)!r}, "a").write("plan executed\\n")\n')
+        return scripts
+
+    def test_plan_module_is_not_executed_before_the_code_trust_check(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = Path(temporary) / 'marker'
+            scripts = self.untrusted_copy(temporary, marker)
+            with self.assertRaisesRegex(installer.InstallError, 'non-root'):
+                installer.load_plan_module(scripts / 'macos-provider-plan.py', euid=0)
+            self.assertFalse(marker.exists())
+            module = installer.load_plan_module(scripts / 'macos-provider-plan.py', euid=501)
+            self.assertTrue(marker.exists()); self.assertEqual(module.LABEL, LABEL)
+
+    def test_the_script_directory_cannot_shadow_standard_library_imports(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = Path(temporary) / 'shadowed'
+            scripts = self.untrusted_copy(temporary, Path(temporary) / 'unused')
+            for module in ('argparse', 'json', 'hashlib', 'plistlib', 'fcntl', 'subprocess', 'platform'):
+                (scripts / f'{module}.py').write_text(f'open({str(marker)!r}, "a").write("{module}\\n")\nraise SystemExit(99)\n')
+            result = REAL_RUN(['/usr/bin/python3', str(scripts / 'macos-provider-install.py'), '--help'],
+                              capture_output=True, text=True, cwd=str(scripts), timeout=60)
+            self.assertFalse(marker.exists(), marker.read_text() if marker.exists() else '')
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def malformed(self, destination, document):
+        path = self.host.path(destination)
+        path.chmod(0o644)
+        path.write_text(json.dumps(document))
+
+    def test_malformed_receipt_is_refused_cleanly(self):
+        good = self.receipt()
+        broken = [{k: v for k, v in good.items() if k != 'created'}, dict(good, versions=[]), dict(good, active_version=5),
+                  dict(good, created={'users': '_vwaccess', 'groups': []}), dict(good, memberships_added=[['_vwaccess']]),
+                  dict(good, versions={'0.5.4': {'binaries': {}}}), dict(good, inputs=None), dict(good, switching={'to': 1})]
+        for document in broken:
+            for argv in [('status',), ('start',), ('uninstall', '--acknowledge-active-work'),
+                         ('rollback', '--acknowledge-active-work', '--confirm-state-compatible')]:
+                with self.subTest(case=broken.index(document), argv=argv[0]):
+                    self.malformed(f'{ROOT}/installer-receipt.json', document)
+                    code, _, err = self.run_installer(*argv)
+                    self.assertEqual(code, 2); self.assertIn('installer receipt is malformed', err)
+
+    def test_malformed_tombstones_are_refused_cleanly(self):
+        self.host.path(f'{ROOT}/account-tombstones.json').write_text('{}')
+        for removed in [[{'name': '_x'}], [{'name': '_x', 'uid': '1', 'uuid': 'a' * 32}], 'x']:
+            with self.subTest(removed=removed):
+                self.malformed(f'{ROOT}/account-tombstones.json', {'schema': 1, 'label': LABEL, 'removed': removed})
+                code, _, err = self.install()
+                self.assertEqual(code, 2); self.assertIn('account tombstones are malformed', err)
+
+    def test_the_service_waits_for_the_provider_secret_store(self):
+        self.fresh_host()
+        self.assertOk(self.install())
+        self.host.provision_credentials(secret=False)
+        code, out, _ = self.assertOk(self.install())
+        self.assertFalse(self.host.state()['launchd'].get('loaded'))
+        self.assertIn(f'credential: {ROOT}/state/secrets is missing', out)
+        self.host.provision_secret(mode=0o644)
+        code, out, _ = self.assertOk(self.install())
+        self.assertFalse(self.host.state()['launchd'].get('loaded'))
+        self.assertIn('vaultwarden-accessd.bootstrap-client-secret mode 0644, expected 0600', out)
+        self.host.provision_secret()
+        self.assertOk(self.install())
+        self.assertTrue(self.host.state()['launchd']['running'])
+
+    def test_rollback_rerun_converges_on_the_pending_target(self):
+        self.assertOk(self.upgrade('--acknowledge-active-work'))
+        rollback = ('rollback', '--acknowledge-active-work', '--confirm-state-compatible')
+        self.host.update(lambda s: s.__setitem__('fail_bootstrap', True))
+        code, _, err = self.run_installer(*rollback)
+        self.assertEqual(code, 2)
+        receipt = self.receipt()
+        self.assertEqual((receipt['active_version'], receipt['switching']['to']), ('0.5.4', '0.5.4'))
+        code, out, _ = self.run_installer('status')
+        self.assertEqual(code, 1); self.assertIn('switch to 0.5.4 is pending', out)
+        self.host.update(lambda s: s.pop('fail_bootstrap'))
+        self.assertOk(self.run_installer(*rollback))
+        self.assertEqual(self.host.state()['launchd']['program'], f'{ROOT}/versions/0.5.4/vaultwarden-accessd')
+        receipt = self.receipt()
+        self.assertEqual((receipt['active_version'], receipt['previous_version']), ('0.5.4', '0.6.0'))
+        self.assertNotIn('switching', receipt)
+        self.assertOk(self.run_installer('status'))
+        # A re-run of the completed rollback is a no-op, not a flip back; an explicit target still switches.
+        code, out, _ = self.assertOk(self.run_installer(*rollback))
+        self.assertIn('Already rolled back to 0.5.4', out)
+        self.assertEqual(self.receipt()['active_version'], '0.5.4')
+        self.assertOk(self.run_installer(*rollback, '--to-version', '0.6.0'))
+        self.assertEqual(self.receipt()['active_version'], '0.6.0')
 
 
 class RealProcessToolTests(InstallerTestCase):

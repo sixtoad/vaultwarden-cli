@@ -55,6 +55,9 @@ INSTALL_ROOT = '/Library/VaultwardenAccess'
 BUNDLE_HELPERS = 'Contents/Helpers'
 # Rust reads the identity record with a 4096-byte cap (src/adapters/native/identity.rs).
 IDENTITIES_MAX = 4096
+# Largest bundle payload hashed or copied (bytes); larger payloads are refused, never read whole.
+MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
+READ_CHUNK = 1024 * 1024
 
 PLACEHOLDER = re.compile(r'@[A-Za-z0-9_]+@')
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?')
@@ -335,6 +338,26 @@ def build(values, templates=TEMPLATES):
     return outputs
 
 
+def payload_sha256(path):
+    """sha256 of one payload, read through a no-follow descriptor and never past MAX_PAYLOAD_BYTES."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0))
+    except OSError as error:
+        raise PlanError(f'cannot open bundle payload {path}: {error}') from None
+    digest, total = hashlib.sha256(), 0
+    try:
+        while True:
+            chunk = os.read(descriptor, min(READ_CHUNK, MAX_PAYLOAD_BYTES + 1 - total))
+            if not chunk:
+                break
+            total += len(chunk)
+            require(total <= MAX_PAYLOAD_BYTES, f'bundle payload {path} is too large (over {MAX_PAYLOAD_BYTES} bytes)')
+            digest.update(chunk)
+    finally:
+        os.close(descriptor)
+    return digest.hexdigest()
+
+
 def check_bundle(bundle, version):
     """Optional cross-check that a built macOS arm64 bundle ships this version."""
     manifest_path = bundle / 'Contents/Resources/bundle.json'
@@ -351,7 +374,7 @@ def check_bundle(bundle, version):
         require(entry is not None and entry.get('executable') is True, f'bundle lacks {BUNDLE_HELPERS}/{name}')
         path = bundle / BUNDLE_HELPERS / name
         require(path.is_file() and not path.is_symlink(), f'bundle payload missing: {path}')
-        require(hashlib.sha256(path.read_bytes()).hexdigest() == entry.get('sha256'), f'bundle payload damaged: {path}')
+        require(payload_sha256(path) == entry.get('sha256'), f'bundle payload damaged: {path}')
     return {name: payloads[f'{BUNDLE_HELPERS}/{name}']['sha256'] for name in ['vaultwarden-accessd', 'vw-access']}
 
 

@@ -237,6 +237,31 @@ class PlanTests(unittest.TestCase):
             with self.assertRaisesRegex(plan.PlanError, 'damaged'):
                 plan.check_bundle(app, '0.5.4')
 
+    def test_bundle_payload_reads_are_bounded(self):
+        # Review round 2: a payload larger than the cap is refused without reading it whole.
+        with tempfile.TemporaryDirectory() as temporary:
+            app = Path(temporary) / 'companion_slice.app'
+            helpers = app / 'Contents/Helpers'; helpers.mkdir(parents=True)
+            (app / 'Contents/Resources').mkdir()
+            payloads = []
+            for name in ['vaultwarden-accessd', 'vw-access']:
+                (helpers / name).write_bytes(b'0123456789' * 4)
+                payloads.append({'path': f'Contents/Helpers/{name}', 'sha256': hashlib.sha256((helpers / name).read_bytes()).hexdigest(), 'executable': True})
+            (app / 'Contents/Resources/bundle.json').write_text(json.dumps(
+                {'platform': 'macos', 'architecture': 'aarch64', 'cli_version': '0.5.4', 'roles': {'protected_provider': True}, 'payloads': payloads}))
+            self.assertEqual(plan.MAX_PAYLOAD_BYTES, 256 * 1024 * 1024)
+            with patch.object(plan, 'MAX_PAYLOAD_BYTES', 40):
+                self.assertEqual(sorted(plan.check_bundle(app, '0.5.4')), ['vaultwarden-accessd', 'vw-access'])
+            reads = []
+            real_read = os.read
+            def counting_read(fd, size):
+                reads.append(size)
+                return real_read(fd, size)
+            with patch.object(plan, 'MAX_PAYLOAD_BYTES', 39), patch.object(plan.os, 'read', counting_read):
+                with self.assertRaisesRegex(plan.PlanError, 'too large'):
+                    plan.check_bundle(app, '0.5.4')
+            self.assertTrue(reads and sum(reads) <= 40 + 1024 * 1024, reads)
+
     def test_plan_covers_every_directory_and_file_of_the_documented_layout(self):
         document = json.loads(plan.build(plan.validate_inputs(dict(INPUTS)))[plan.PLAN_NAME])
         self.assertEqual(document['schema'], 2)

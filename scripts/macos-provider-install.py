@@ -10,8 +10,8 @@ scripts/macos-provider-plan.py (with --bundle) and the same arm64 bundle:
   rollback   switch back to a recorded version with the same order
   stop       close admission and boot the service out (consumers keep running)
   start      start the installed active version once its credentials verify
-  uninstall  remove service, plist, versions and identities; keep state,
-             Keychain and accounts unless --purge / --remove-accounts
+  uninstall  remove service, plist, versions and identities; keep state
+             (secrets included) and accounts unless --purge / --remove-accounts
   status     read-only verification of the installed layout, accounts and service
 
 Every mutating command also takes --dry-run. install and upgrade require
@@ -21,73 +21,48 @@ generator and by the dry run) and a signature policy (--team-id TEAMID or
 plan module and the templates are root-owned and not writable by any other
 account, ancestors included (run a root-owned copy).
 
-Credentials (state/backend.json, TLS identity, companion CA, Keychain bootstrap
-secret) are never generated, copied or deleted: install creates the empty
-layout and prints the manual steps. The service is started only when the four
-state files are present; the Keychain secret cannot be checked by the installer.
+Credentials (state/backend.json, TLS identity, companion CA and the provider
+secret file store state/secrets/) are never generated, copied or deleted except
+by uninstall --purge: install creates the empty layout and prints the manual
+steps (docs/macos-setup.md). The service is started only when the four state
+files and the stored API client secret are present with the documented owner
+and modes.
 
 Requirements: docs/implementation/issue-49-native-provider.md. Runs with the
-system /usr/bin/python3 (3.9) under sudo; standard library only.
+system /usr/bin/python3 (3.9) under sudo, preferably isolated (-I); standard
+library only.
 """
+import os
+import sys
+# Before any other import: the script's own directory (and the cwd) never shadows a
+# standard-library module, even when this file is run as `python3 <path>` as root.
+# (os and sys are already loaded by the interpreter's startup, never from sys.path.)
+if __name__ == '__main__':
+    _shadowing = {os.path.realpath(os.path.dirname(os.path.abspath(__file__))), os.path.realpath(os.getcwd())}
+    sys.path[:] = [entry for entry in sys.path if entry and os.path.realpath(entry) not in _shadowing]
+    del _shadowing
+
 import argparse
 import fcntl
 import hashlib
 import importlib.util
 import json
-import os
 from pathlib import Path
 import platform
 import re
 import stat
 import subprocess
-import sys
 import time
 
 sys.dont_write_bytecode = True
 
-_spec = importlib.util.spec_from_file_location('macos_provider_plan', Path(__file__).resolve().with_name('macos-provider-plan.py'))
-plan = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(plan)
-
-INSTALL_ROOT = plan.INSTALL_ROOT
-LABEL = plan.LABEL
-SERVICE = f'system/{LABEL}'
-DAEMON_PLIST = f'{plan.LAUNCH_DAEMONS}/{plan.PLIST_NAME}'
-RECEIPT = f'{INSTALL_ROOT}/{plan.RECEIPT_NAME}'
-IDENTITIES = f'{INSTALL_ROOT}/{plan.IDENTITIES_NAME}'
-TOMBSTONES = f'{INSTALL_ROOT}/{plan.TOMBSTONES_NAME}'
-RECEIPT_SCHEMA = 2
-TOMBSTONES_SCHEMA = 1
-KEYCHAIN_SERVICE = 'vaultwarden-accessd'
-KEYCHAIN_ACCOUNTS = ('bootstrap-client-secret', 'revocable-session')
-MAX_PAYLOAD = 256 * 1024 * 1024
-MAX_SMALL = 1024 * 1024
-# Absolute system tools. Never resolved through PATH for the real root.
-SYSTEM_TOOLS = {
-    'dscl': '/usr/bin/dscl',
-    'dseditgroup': '/usr/sbin/dseditgroup',
-    'dsmemberutil': '/usr/bin/dsmemberutil',
-    'launchctl': '/bin/launchctl',
-    'chown': '/usr/sbin/chown',
-    'stat': '/usr/bin/stat',
-    'codesign': '/usr/bin/codesign',
-    'lipo': '/usr/bin/lipo',
-}
-FAKE_TOOLS_ENV = 'VW_PROVIDER_INSTALLER_FAKE_TOOLS'
-TOOL_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', 'LC_ALL': 'C'}
-EXIT_REFUSED, EXIT_INCOMPLETE = 2, 3
-ADMIN_GROUP = 'admin'
-OPERATOR = 'operator'  # plan.json's placeholder for the operator account in group members
-MIN_ADOPTABLE_GID = 500
-NOLOGIN_SHELLS = ('/usr/bin/false', '/sbin/nologin', '/usr/sbin/nologin')
-TEAM_ID = re.compile(r'[A-Z0-9]{10}')
-SHA256 = re.compile(r'[0-9a-f]{64}')
-# start() waits this long for launchd to report "state = running".
-START_WAIT_SECONDS = 10.0
-START_POLL_SECONDS = 0.5
+HERE = Path(__file__).resolve().parent
+PLAN_PATH = HERE / 'macos-provider-plan.py'
+# Mirrors plan.PLIST_TEMPLATE / IDENTITIES_TEMPLATE under plan.TEMPLATES: checked before the
+# plan module is executed, and compared with it right after.
+TEMPLATE_NAMES = ('com.cantolla.vaultwarden-accessd.plist.in', 'native-identities.json.in')
 # Owners allowed for the code that runs as root (and every ancestor directory).
 TRUSTED_CODE_OWNERS = (0,)
-DOCS_CREDENTIALS = 'docs/desktop-installation.md#macos-provider-credentials-and-companion-enrollment'
 
 
 class InstallError(Exception):
@@ -99,19 +74,8 @@ def require(condition, message):
         raise InstallError(message)
 
 
-# Seams for tests; production reads the real process and host.
-def effective_uid():
-    return os.geteuid()
-
-
-def host_platform():
-    return sys.platform, platform.machine()
-
-
-def code_paths():
-    """Files whose content runs as root: this script, the plan module and the templates it resolves."""
-    return [Path(__file__).resolve(), Path(plan.__file__).resolve(),
-            plan.TEMPLATES / plan.PLIST_TEMPLATE, plan.TEMPLATES / plan.IDENTITIES_TEMPLATE]
+def mode_text(mode):
+    return '%04o' % mode
 
 
 def check_code_trust(paths, owners=None, top='/'):
@@ -137,6 +101,85 @@ def check_code_trust(paths, owners=None, top='/'):
                     'run a root-owned copy of the installer (docs/desktop-installation.md#macos-provider-installation-upgrade-and-removal)')
 
 
+def load_plan_module(path=PLAN_PATH, euid=None):
+    """Execute the plan module; as root only after this script, it and the templates are proven root-owned."""
+    path = Path(path)
+    if (os.geteuid() if euid is None else euid) == 0:
+        templates = path.resolve().parents[1] / 'packaging/macos/native'
+        check_code_trust([Path(__file__).resolve(), path] + [templates / name for name in TEMPLATE_NAMES])
+    spec = importlib.util.spec_from_file_location('macos_provider_plan', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    require((module.PLIST_TEMPLATE, module.IDENTITIES_TEMPLATE) == TEMPLATE_NAMES
+            and Path(module.TEMPLATES) == path.resolve().parents[1] / 'packaging/macos/native',
+            'the plan module names other templates than the installer checks')
+    return module
+
+
+try:
+    plan = load_plan_module()
+except InstallError as _error:
+    if __name__ != '__main__':
+        raise
+    print(f'macos-provider-install: {_error}', file=sys.stderr)
+    sys.exit(2)
+
+INSTALL_ROOT = plan.INSTALL_ROOT
+LABEL = plan.LABEL
+SERVICE = f'system/{LABEL}'
+DAEMON_PLIST = f'{plan.LAUNCH_DAEMONS}/{plan.PLIST_NAME}'
+RECEIPT = f'{INSTALL_ROOT}/{plan.RECEIPT_NAME}'
+IDENTITIES = f'{INSTALL_ROOT}/{plan.IDENTITIES_NAME}'
+TOMBSTONES = f'{INSTALL_ROOT}/{plan.TOMBSTONES_NAME}'
+RECEIPT_SCHEMA = 2
+TOMBSTONES_SCHEMA = 1
+# PR #71: the provider keeps its API client secret in a file store, not the Keychain.
+SECRETS_DIR = f'{INSTALL_ROOT}/state/secrets'
+BOOTSTRAP_SECRET = f'{SECRETS_DIR}/vaultwarden-accessd.bootstrap-client-secret'
+MAX_PAYLOAD = plan.MAX_PAYLOAD_BYTES
+MAX_SMALL = 1024 * 1024
+# Absolute system tools. Never resolved through PATH for the real root.
+SYSTEM_TOOLS = {
+    'dscl': '/usr/bin/dscl',
+    'dseditgroup': '/usr/sbin/dseditgroup',
+    'dsmemberutil': '/usr/bin/dsmemberutil',
+    'launchctl': '/bin/launchctl',
+    'chown': '/usr/sbin/chown',
+    'stat': '/usr/bin/stat',
+    'codesign': '/usr/bin/codesign',
+    'lipo': '/usr/bin/lipo',
+}
+FAKE_TOOLS_ENV = 'VW_PROVIDER_INSTALLER_FAKE_TOOLS'
+TOOL_ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', 'LC_ALL': 'C'}
+EXIT_REFUSED, EXIT_INCOMPLETE = 2, 3
+ADMIN_GROUP = 'admin'
+OPERATOR = 'operator'  # plan.json's placeholder for the operator account in group members
+MIN_ADOPTABLE_GID = 500
+NOLOGIN_SHELLS = ('/usr/bin/false', '/sbin/nologin', '/usr/sbin/nologin')
+TEAM_ID = re.compile(r'[A-Z0-9]{10}')
+SHA256 = re.compile(r'[0-9a-f]{64}')
+# start() waits this long for launchd to report "state = running".
+START_WAIT_SECONDS = 10.0
+START_POLL_SECONDS = 0.5
+DOCS_CREDENTIALS = 'docs/desktop-installation.md#macos-provider-credentials-and-companion-enrollment'
+DOCS_SETUP = 'docs/macos-setup.md'
+
+
+# Seams for tests; production reads the real process and host.
+def effective_uid():
+    return os.geteuid()
+
+
+def host_platform():
+    return sys.platform, platform.machine()
+
+
+def code_paths():
+    """Files whose content runs as root: this script, the plan module and the templates it resolves."""
+    return [Path(__file__).resolve(), Path(plan.__file__).resolve(),
+            plan.TEMPLATES / plan.PLIST_TEMPLATE, plan.TEMPLATES / plan.IDENTITIES_TEMPLATE]
+
+
 def generated_uid(hex32):
     """dscl GeneratedUID form: uppercase with dashes."""
     h = hex32.upper()
@@ -145,10 +188,6 @@ def generated_uid(hex32):
 
 def normalize_uuid(text):
     return text.strip().replace('-', '').lower()
-
-
-def mode_text(mode):
-    return '%04o' % mode
 
 
 def sha256(data):
@@ -239,11 +278,21 @@ class Installer:
         return {name: normalize_uuid(value) for name, value in self._list('Users', 'GeneratedUID').items() if value is not None}
 
     def read_attribute(self, kind, name, attribute):
-        """Values of one attribute; None when the record or the key is missing (dscl exits non-zero)."""
+        """Values of one attribute; None when the record or the key is missing.
+
+        Real dscl (probed on macOS 26/27 for /Users and /Groups): a record lacking the key
+        exits 0 with empty stdout and 'No such key: <attribute>' on stderr; a missing record
+        exits 56 (eDSRecordNotFound).
+        """
         result = self.tool('dscl', '.', '-read', f'/{kind}/{name}', attribute, mutating=False, check=False)
         if result.returncode != 0:
             return None
         text = result.stdout.strip()
+        if not text:
+            message = result.stderr.strip()
+            require(not message or message.startswith('No such key:'),
+                    f'unexpected dscl output for {kind}/{name} {attribute}: {message[:200]!r}')
+            return None
         prefix = attribute + ':'
         require(text.startswith(prefix), f'unexpected dscl output for {kind}/{name} {attribute}')
         return text[len(prefix):].split()
@@ -366,6 +415,8 @@ class Installer:
             raise InstallError(f'{what} unreadable: {error}') from None
         require(isinstance(document, dict) and document.get('schema') == schema and document.get('label') == LABEL,
                 f'{what} has an unknown schema')
+        problem = (receipt_problem if schema == RECEIPT_SCHEMA and destination == RECEIPT else tombstones_problem)(document)
+        require(problem is None, f'{what} {"are" if what.endswith("s") else "is"} malformed ({problem}); inspect {destination} before re-running')
         return document
 
     def read_receipt(self):
@@ -381,7 +432,7 @@ class Installer:
 
     def read_tombstones(self):
         document = self.read_json(TOMBSTONES, TOMBSTONES_SCHEMA, 'account tombstones')
-        return [] if document is None else list(document.get('removed', []))
+        return [] if document is None else list(document['removed'])
 
     def save_tombstones(self, removed):
         self.write_file(TOMBSTONES, encode({'schema': TOMBSTONES_SCHEMA, 'label': LABEL, 'removed': removed}), 0, 0, 0o644, replace=True)
@@ -448,6 +499,91 @@ class Installer:
         except InstallError as error:
             raise InstallError(f'{error}. The service is not running; inspect with status, and use rollback to '
                                'return to the previous recorded version if needed') from None
+
+
+# ---- receipt and tombstone structure ----------------------------------------------------
+def _is_str_list(value):
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _is_optional_str(value):
+    return value is None or isinstance(value, str)
+
+
+def _accounts_problem(value, key):
+    if not (isinstance(value, dict) and set(value) == {'users', 'groups'} and _is_str_list(value['users']) and _is_str_list(value['groups'])):
+        return f'{key} must hold users and groups name lists'
+    return None
+
+
+def _signature_problem(value):
+    if value is None or value == {'development': True}:
+        return None
+    if isinstance(value, dict) and set(value) == {'team_id'} and isinstance(value['team_id'], str) and TEAM_ID.fullmatch(value['team_id']):
+        return None
+    return 'a version signature must be null, {"development": true} or {"team_id": TEAMID}'
+
+
+def _version_problem(name, record):
+    if not (isinstance(record, dict) and {'binaries', 'plist_sha256', 'signature'} <= set(record)):
+        return f'version {name} must record binaries, plist_sha256 and signature'
+    binaries = record['binaries']
+    if not (isinstance(binaries, dict) and sorted(binaries) == sorted(plan.BINARIES)
+            and all(isinstance(v, str) and SHA256.fullmatch(v) for v in binaries.values())):
+        return f'version {name} binaries must map {", ".join(plan.BINARIES)} to sha256 digests'
+    if not (isinstance(record['plist_sha256'], str) and SHA256.fullmatch(record['plist_sha256'])):
+        return f'version {name} plist_sha256 must be a sha256 digest'
+    return _signature_problem(record['signature'])
+
+
+def receipt_problem(document):
+    """None for a structurally complete receipt; else the first problem found."""
+    required = {'inputs': dict, 'status': str, 'identities_sha256': str, 'created': dict, 'adopted': dict,
+                'memberships_added': list, 'versions': dict}
+    for key, kind in required.items():
+        if not isinstance(document.get(key), kind):
+            return f'{key} must be a {kind.__name__}'
+    if document['status'] not in ('installed', 'uninstalled'):
+        return 'status must be installed or uninstalled'
+    if not all(isinstance(k, str) and isinstance(v, (str, int)) and not isinstance(v, bool) for k, v in document['inputs'].items()):
+        return 'inputs must map names to strings or integers'
+    for key in ('created', 'adopted') + (('creating',) if 'creating' in document else ()):
+        problem = _accounts_problem(document[key], key)
+        if problem:
+            return problem
+    if not all(isinstance(pair, list) and len(pair) == 2 and _is_str_list(pair) for pair in document['memberships_added']):
+        return 'memberships_added must be [user, group] pairs'
+    for name, record in document['versions'].items():
+        problem = _version_problem(name, record)
+        if problem:
+            return problem
+    for key in ('active_version', 'previous_version'):
+        if not _is_optional_str(document.get(key)):
+            return f'{key} must be a version or null'
+    if document['status'] == 'installed' and document.get('active_version') not in (None, *document['versions']):
+        return 'active_version is not a recorded version'
+    for key in ('switching', 'last_switch'):
+        if key in document:
+            pending = document[key]
+            if not (isinstance(pending, dict) and {'from', 'to'} <= set(pending) <= {'from', 'to', 'by'}
+                    and _is_optional_str(pending['from']) and isinstance(pending['to'], str)
+                    and pending.get('by', 'upgrade') in ('upgrade', 'rollback')):
+                return f'{key} must record from, to and by'
+    if 'switching' in document and document['switching']['to'] not in document['versions']:
+        return 'switching must name a recorded target version'
+    return None
+
+
+def tombstones_problem(document):
+    removed = document.get('removed')
+    if not isinstance(removed, list):
+        return 'removed must be a list'
+    for entry in removed:
+        if not (isinstance(entry, dict) and set(entry) == {'name', 'uid', 'uuid'} and isinstance(entry['name'], str)
+                and isinstance(entry['uid'], int) and not isinstance(entry['uid'], bool)
+                and isinstance(entry['uuid'], str) and plan.UUID.fullmatch(entry['uuid'])):
+            return 'each removed account must record name, numeric uid and a 32-hex uuid'
+    return None
 
 
 def encode(document):
@@ -542,7 +678,11 @@ def signature_policy(args, required):
 
 
 def designated_requirement(team):
-    return f'=anchor apple generic and certificate leaf[subject.OU] = "{team}"'
+    """Apple's Developer ID requirement for one team: the Developer ID CA (intermediate marker
+    1.2.840.113635.100.6.2.6) and a Developer ID Application leaf (1.2.840.113635.100.6.1.13)."""
+    require(isinstance(team, str) and TEAM_ID.fullmatch(team) is not None, 'team identifier must be 10 uppercase letters or digits')
+    return ('=anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and '
+            f'certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "{team}"')
 
 
 def binary_problems(installer, path, policy):
@@ -747,6 +887,8 @@ def apply_accounts(installer, values, actions, receipt):
                 installer.save_receipt(receipt)
             installer.tool('dseditgroup', '-o', 'edit', '-a', user, '-t', 'user', group, mutating=True)
     if not installer.dry_run:
+        # opendirectoryd caches membership: flush it so the checks below see the new records.
+        installer.tool('dsmemberutil', 'flushcache', mutating=False)
         check = account_actions(installer, values, receipt, adopt=False)
         require(not (check['create_groups'] or check['create_users'] or check['finish_groups'] or check['finish_users']),
                 'accounts are not visible after creation')
@@ -918,35 +1060,61 @@ def credential_status(installer, files):
             problems.append(f'{entry["path"]} is missing')
         else:
             problems.extend(found)
+    problems.extend(secret_store_problems(installer, files))
     return not problems, problems
+
+
+def secret_store_problems(installer, files):
+    """Decision R2-8: the service starts only once the provider stored its API client secret.
+
+    The store (written by `vaultwarden-accessd --store-bootstrap-secret`, PR #71) is the
+    provider-owned 0700 state/secrets/ with the single-link 0600 bootstrap record; the
+    provider re-checks it (and refuses ACLs) at every read. Without it the provider fails
+    closed and launchd would restart it in a loop.
+    """
+    owner = next(entry for entry in files.values() if entry['created_by'] == 'operator')
+    ids = {'owner': owner['owner'], 'group': owner['group'], 'owner_id': owner['owner_id'], 'group_id': owner['group_id']}
+    for path, kind, mode in [(SECRETS_DIR, 'dir', '0700'), (BOOTSTRAP_SECRET, 'file', '0600')]:
+        try:
+            found = installer.inspect(dict(ids, path=path, mode=mode), kind)
+        except (OSError, InstallError) as error:
+            return [f'{path} unreadable ({error}); run as root']
+        if found is None:
+            return [f'{path} is missing (store it with --store-bootstrap-secret, {DOCS_SETUP})']
+        if found:
+            return found
+    return []
 
 
 def next_steps(values, version, operator):
     account, group = values['provider_account'], values['provider_group']
     state, vdir = f'{INSTALL_ROOT}/state', f'{INSTALL_ROOT}/versions/{version}'
-    command = 'sudo /usr/bin/python3 <root-owned installer copy>/scripts/macos-provider-install.py'
+    command = 'sudo /usr/bin/python3 -I <root-owned installer copy>/scripts/macos-provider-install.py'
     lines = [
-        f'Next manual steps (the installer never generates or copies credentials; details: {DOCS_CREDENTIALS}):',
-        '  1. backend.json: the account setup fields server (HTTPS origin), client_id, email, encrypted_key and',
-        '     kdf_iterations (plus encrypted_private_key and org_keys for organizations); no secrets.',
-        '  2. provider-cert.pem / provider-key.pem: a loopback server identity whose certificate has subjectAltName',
-        '     IP:127.0.0.1. companion-ca.pem is the CLIENT CA that verifies companion client certificates. The app',
-        '     itself needs the server CA (DER), the server leaf pin and its own client PKCS#12.',
-        '     Install each file provider-owned, 0600, one link:',
+        f'Next manual steps ({DOCS_SETUP}; the installer never generates or copies credentials; summary: {DOCS_CREDENTIALS}):',
+        f'  1. As the operator: {vdir}/vw-access setup tls --out-dir ~/vw-setup/tls --server-ip 127.0.0.1 --client-name "Mac operator"',
+        '     (server identity with subjectAltName IP:127.0.0.1, a separate companion client CA, the companion PKCS#12).',
+        f'  2. As the operator: {vdir}/vw-access setup backend-json --from-cli-login --out ~/vw-setup/backend.json',
+        '     (fields server (HTTPS origin), client_id, email, encrypted_key and kdf_iterations; no secrets).',
+        '     Install each state file provider-owned, 0600, one link:',
     ]
-    lines += [f'       sudo install -o {account} -g {group} -m 0600 /path/to/{name} {state}/{name}' for name in plan.STATE_FILES]
+    sources = {'backend.json': '~/vw-setup/backend.json'}
+    lines += [f'       sudo install -o {account} -g {group} -m 0600 {sources.get(name, "~/vw-setup/tls/" + name)} {state}/{name}'
+              for name in plan.STATE_FILES]
     lines += [
-        f'  3. Keychain: the API client secret, service {KEYCHAIN_SERVICE}, account bootstrap-client-secret, in the Keychain',
-        '     the provider account reads (an open installed-qualification item; the installer cannot check it).',
+        f'  3. API client secret, prompted without echo into the provider file store {BOOTSTRAP_SECRET}:',
+        f'       cd / && sudo -u {account} {vdir}/vaultwarden-accessd --state-root {state} --store-bootstrap-secret',
         '  4. Enroll the companion client certificate with the service stopped (the PEM must be provider-owned 0600):',
         f'       {command} stop --acknowledge-active-work',
-        f'       sudo install -o {account} -g {group} -m 0600 /path/to/client.pem {state}/enroll-client.pem',
-        f'       sudo -u {account} {vdir}/vaultwarden-accessd --state-root {state} --companion-enroll-cert {state}/enroll-client.pem \\',
+        f'       sudo install -o {account} -g {group} -m 0600 ~/vw-setup/tls/companion-client.pem {state}/companion-client.pem',
+        f'       cd / && sudo -u {account} {vdir}/vaultwarden-accessd --state-root {state} --companion-enroll-cert {state}/companion-client.pem \\',
         f'         --companion-client-ca {state}/companion-ca.pem --companion-label "Mac operator"',
-        f'       sudo rm {state}/enroll-client.pem',
-        f'  5. {command} start   (or re-run install): it starts once the four state files verify.',
-        f'  Administration: {vdir}/vw-access --state-root {INSTALL_ROOT}/run/human (operator {operator}, group {values["human_group"]}).',
-        f'  Restricted agents use {INSTALL_ROOT}/run/agent/agent.sock with their own UID and effective GID {values["agent_gid"]}.',
+        f'       sudo rm {state}/companion-client.pem',
+        f'  5. {command} start   (or re-run install): it starts once the state files and the secret verify.',
+        f'  Administration: {vdir}/vw-access history --limit 5 (operator {operator}, group {values["human_group"]}; '
+        f'the human socket {INSTALL_ROOT}/run/human is the default state root).',
+        f'  Agents: an account with primary GID {values["agent_gid"]} creates its key with {vdir}/vw-access setup agent-key '
+        f'and uses {INSTALL_ROOT}/run/agent/agent.sock.',
         '  The provider always starts locked: unlock with a fresh password approval in the companion.',
     ]
     return '\n'.join(lines)
@@ -1073,23 +1241,41 @@ def start_if_ready(installer, files, target, stopped=False):
 
 
 def switch(installer, receipt, target, plist_bytes, files):
-    """Documented order: (verified and recorded already) close admission, bootout, switch, bootstrap locked."""
-    installer.close_admission()
-    installer.stop()
-    installer.write_file(DAEMON_PLIST, plist_bytes, 0, 0, 0o644, replace=True)
-    if receipt['active_version'] != target:
-        receipt['previous_version'], receipt['active_version'] = receipt['active_version'], target
-    receipt.pop('switching', None)
-    installer.save_receipt(receipt)
-    start_if_ready(installer, files, target, stopped=True)
+    """Documented order: (verified and recorded already) close admission, bootout, switch, bootstrap locked.
+
+    The `switching` marker stays in the receipt until the service is verified running (or
+    deliberately left stopped for incomplete credentials), so a re-run converges on its target.
+    """
+    current = installer.read_small(installer.fs(DAEMON_PLIST)) if os.path.lexists(installer.fs(DAEMON_PLIST)) else None
+    if receipt['active_version'] == target and current == plist_bytes:
+        # An interrupted switch already replaced the plist after the bootout: only the start remains.
+        start_if_ready(installer, files, target)
+    else:
+        installer.close_admission()
+        installer.stop()
+        installer.write_file(DAEMON_PLIST, plist_bytes, 0, 0, 0o644, replace=True)
+        if receipt['active_version'] != target:
+            receipt['previous_version'], receipt['active_version'] = receipt['active_version'], target
+            installer.save_receipt(receipt)
+        start_if_ready(installer, files, target, stopped=True)
+    finish_switch(installer, receipt)
 
 
-def record_switch(installer, receipt, target):
-    """Recorded before the plist changes, so a re-run after a crash recognizes the target plist."""
-    pending = {'from': receipt['active_version'], 'to': target}
-    if receipt.get('switching') != pending:
-        receipt['switching'] = pending
+def finish_switch(installer, receipt):
+    """Clear the marker of a switch whose target is active and verified; remember it as the last switch."""
+    pending = receipt.get('switching')
+    if pending is not None and pending['to'] == receipt['active_version']:
+        receipt['last_switch'] = dict(receipt.pop('switching'))
         installer.save_receipt(receipt)
+
+
+def record_switch(installer, receipt, target, by):
+    """Recorded before the plist changes, so a re-run after a crash recognizes the target plist."""
+    pending = receipt.get('switching')
+    if pending is not None and pending['to'] == target:
+        return  # an interrupted switch to the same target: keep its original record
+    receipt['switching'] = {'from': receipt['active_version'], 'to': target, 'by': by}
+    installer.save_receipt(receipt)
 
 
 def installed_receipt(installer):
@@ -1116,6 +1302,7 @@ def command_upgrade(installer, args):
         require(current == plist_bytes, f'version {active} is active but {DAEMON_PLIST} names another version')
         installer.out(f'Version {active} is already active')
         start_if_ready(installer, reviewed.files, active)
+        finish_switch(installer, receipt)
         return 0
     installer.out(f'Upgrading native provider {active} -> {reviewed.version}')
     # 1. Verify a complete new version before closing admission.
@@ -1124,7 +1311,7 @@ def command_upgrade(installer, args):
     if receipt['versions'].get(reviewed.version) != record:
         receipt['versions'][reviewed.version] = record
         installer.save_receipt(receipt)
-    record_switch(installer, receipt, reviewed.version)
+    record_switch(installer, receipt, reviewed.version, 'upgrade')
     switch(installer, receipt, reviewed.version, plist_bytes, reviewed.files)
     return 0
 
@@ -1132,9 +1319,22 @@ def command_upgrade(installer, args):
 def command_rollback(installer, args):
     receipt = installed_receipt(installer)
     active = receipt['active_version']
-    target = args.to_version or receipt.get('previous_version')
-    require(target, 'no previous version recorded; pass --to-version')
-    require(target != active, f'version {target} is already active')
+    pending = receipt.get('switching')
+    resuming = pending is not None and pending.get('by') == 'rollback' and args.to_version in (None, pending['to'])
+    if resuming:
+        # A re-run of an interrupted rollback converges on its target; it never flips back.
+        target = pending['to']
+        installer.out(f'Resuming the interrupted rollback to {target}')
+    else:
+        last = receipt.get('last_switch') or {}
+        if args.to_version is None and last.get('by') == 'rollback' and last.get('to') == active:
+            # A re-run of a completed rollback is a no-op, never a flip back; --to-version switches again.
+            installer.out(f'Already rolled back to {active} (from {last.get("from")}); pass --to-version to switch again')
+            start_if_ready(installer, layout_files(receipt_values(receipt, active)), active)
+            return 0
+        target = args.to_version or receipt.get('previous_version')
+        require(target, 'no previous version recorded; pass --to-version')
+        require(target != active, f'version {target} is already active')
     require(target in receipt['versions'], f'version {target} was not installed by this installer')
     problems = verify_version(installer, target, receipt['versions'][target])
     require(not problems, f'version {target} failed verification; the current version stays active: ' + '; '.join(problems))
@@ -1145,8 +1345,8 @@ def command_rollback(installer, args):
             f'consumed approvals are never reactivated. Pass --confirm-state-compatible once {target} is confirmed compatible')
     require_acknowledged(installer, args)
     files = layout_files(receipt_values(receipt, target))
-    installer.out(f'Rolling back native provider {active} -> {target}')
-    record_switch(installer, receipt, target)
+    installer.out(f'Rolling back native provider {pending["from"] if resuming else active} -> {target}')
+    record_switch(installer, receipt, target, 'rollback')
     switch(installer, receipt, target, plist_bytes, files)
     return 0
 
@@ -1170,6 +1370,7 @@ def command_start(installer, args):
     complete, missing = credential_status(installer, files)
     require(complete, 'credentials incomplete: ' + '; '.join(missing))
     start_if_ready(installer, files, active)
+    finish_switch(installer, receipt)
     return 0
 
 
@@ -1210,9 +1411,6 @@ def remove_accounts(installer, receipt, retained):
 def command_uninstall(installer, args):
     require(not args.remove_accounts or args.purge,
             '--remove-accounts requires --purge: a recreated account with the same UID/UUID must never revive retained enrollment')
-    require(not args.remove_accounts or args.confirm_secrets_removed,
-            '--remove-accounts requires --confirm-secrets-removed: first delete the provider Keychain items '
-            f'(service {KEYCHAIN_SERVICE}) yourself; the installer cannot see or delete them')
     receipt = installer.read_receipt()
     if receipt is None and os.path.lexists(installer.fs(TOMBSTONES)):
         installer.out('Nothing installed by this installer (accounts were removed earlier; tombstones kept)')
@@ -1221,7 +1419,7 @@ def command_uninstall(installer, args):
     require_acknowledged(installer, args)
     receipt_accounts(receipt)
     retained = []
-    installer.out('Uninstalling native provider (state, Keychain and accounts are preserved unless requested)')
+    installer.out('Uninstalling native provider (state, its secrets/ file store and accounts are preserved unless requested)')
     daemon = installer.fs(DAEMON_PLIST)
     # Close admission and stop the service first; consumers are never signalled. Nothing is
     # disabled again once the plist is gone and nothing is loaded.
@@ -1259,20 +1457,19 @@ def command_uninstall(installer, args):
     state = installer.fs(f'{INSTALL_ROOT}/state')
     if args.purge and os.path.lexists(state):
         require(state.is_dir() and not state.is_symlink(), f'{INSTALL_ROOT}/state is not a directory')
-        installer.act(f'purge {INSTALL_ROOT}/state (provider state, audit history and credential files)', lambda: remove_tree(state))
+        installer.act(f'purge {INSTALL_ROOT}/state (provider state, audit history, credential files and the secrets/ store)',
+                      lambda: remove_tree(state))
     elif os.path.lexists(state):
-        installer.out(f'  preserved {INSTALL_ROOT}/state')
-    installer.out(f'  Keychain items (service {KEYCHAIN_SERVICE}, accounts {", ".join(KEYCHAIN_ACCOUNTS)}) are never deleted by the installer.')
-    if not args.remove_accounts:
-        installer.out('  Remove them manually from the Keychain the provider account used, after reviewing them, if wanted.')
+        installer.out(f'  preserved {INSTALL_ROOT}/state (provider state, secrets/ file store and credential files; --purge removes it)')
     receipt.update({'status': 'uninstalled', 'versions': {}, 'active_version': None, 'previous_version': None})
     receipt.pop('switching', None)
+    receipt.pop('last_switch', None)
     if args.remove_accounts:
         remove_accounts(installer, receipt, retained)
     else:
         names = receipt['created']['users'] + receipt['created']['groups']
         if names:
-            installer.out(f'  preserved accounts {", ".join(names)} (pass --purge --remove-accounts --confirm-secrets-removed to remove them)')
+            installer.out(f'  preserved accounts {", ".join(names)} (pass --purge --remove-accounts to remove them)')
     if args.remove_accounts and not retained:
         # Tombstones stay in the install root so a later install never reuses a removed GeneratedUID.
         installer.act(f'remove {RECEIPT}', lambda: os.unlink(installer.fs(RECEIPT)))
@@ -1368,6 +1565,10 @@ def command_status(installer, args):
     values = receipt_values(receipt, active)
     document = layout(values)
     problems = []
+    pending = receipt.get('switching')
+    if pending is not None:
+        problems.append(f'{pending.get("by", "upgrade")} switch to {pending["to"]} is pending (from {pending["from"]}); '
+                        'the service was not verified running: re-run the same command')
     lines, account_problems = account_report(installer, values, receipt)
     installer.out('accounts:')
     for line in lines:
@@ -1445,8 +1646,6 @@ def parser():
     sub = add('uninstall', 'remove the service and installer-owned files')
     sub.add_argument('--purge', action='store_true', help='also remove the provider state directory (credentials, audit history)')
     sub.add_argument('--remove-accounts', action='store_true', help='with --purge: remove accounts and groups this installer created')
-    sub.add_argument('--confirm-secrets-removed', action='store_true',
-                     help='with --remove-accounts: you deleted the provider Keychain items (the installer cannot)')
     sub.add_argument('--acknowledge-active-work', action='store_true')
     add('status', 'verify the installation (read-only)', mutating=False)
     return top
@@ -1469,7 +1668,8 @@ def main(argv=None, out=print):
         require(system == 'darwin' and machine == 'arm64', f'native provider requires macOS on Apple Silicon (arm64); this is {system}/{machine}')
         mutating = args.command not in ('plan', 'status') and not dry_run
         require(not mutating or effective_uid() == 0, f'{args.command} must run as root (sudo); use --dry-run or plan to preview')
-        if mutating:
+        if effective_uid() == 0:
+            # Any run as root executes this code as root, a dry run or status included.
             check_code_trust(code_paths())
         installer = Installer(args.root, dry_run, out)
         lock = None

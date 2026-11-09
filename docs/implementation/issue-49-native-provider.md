@@ -237,20 +237,28 @@ performed.
 - **Rollback:** only to a recorded, re-verified version and only with
   `--confirm-state-compatible`, in the same order. No state is restored.
   Installed versions are verified against their stored plist copy and the
-  receipt's hashes, never against the checkout's current templates.
+  receipt's hashes, never against the checkout's current templates. The
+  receipt's `switching` marker (from, to, by) stays until the target runs, so a
+  re-run of an interrupted rollback resumes towards its target and a re-run of a
+  completed one is a no-op (`--to-version` switches again).
 - **Stop/start:** `stop --acknowledge-active-work` closes admission and boots the
   service out (for offline companion enrollment); `start` verifies the active
   version and credentials and starts it.
 - **Uninstall:** closes admission and boots out first, removes only unchanged
   installer-owned files, clears the label's `launchctl disable` override once
-  the plist is gone, preserves state, Keychain and accounts by default and
-  reports retained resources (exit 3). `--purge` removes `state/` without
-  following links. `--purge --remove-accounts --confirm-secrets-removed` removes
-  the accounts it created only when nothing provider-owned was retained, after
-  writing their GeneratedUIDs to the root-owned `account-tombstones.json`; a later
-  install refuses a tombstoned GeneratedUID, so a recreated account cannot revive
-  old enrollment. Keychain items are never deleted by the installer: the
-  operator removes them and asserts it with `--confirm-secrets-removed`.
+  the plist is gone, preserves state (including the provider's `state/secrets/`
+  file store, PR #71) and accounts by default and reports retained resources
+  (exit 3). `--purge` removes `state/`, secrets included, without following
+  links. `--purge --remove-accounts` removes the accounts it created only when
+  nothing provider-owned was retained, after writing their GeneratedUIDs to the
+  root-owned `account-tombstones.json`; a later install refuses a tombstoned
+  GeneratedUID, so a recreated account cannot revive old enrollment. (Review
+  round 2: `--confirm-secrets-removed` is gone; it asserted Keychain removal,
+  and the provider no longer keeps its secrets in a Keychain.)
+- **Start gate:** the service starts only when the four state files and the
+  stored API client secret (`state/secrets/` `0700`,
+  `vaultwarden-accessd.bootstrap-client-secret` `0600`, provider-owned, one link)
+  verify (review round 2, decision R2-8).
 
 ## Production Touch ID approval: owner decisions (2026-10-30)
 

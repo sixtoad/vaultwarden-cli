@@ -187,8 +187,12 @@ identity record and every binary's SHA-256; the installer also rebuilds the plan
 from its own inputs and refuses any edited file. The code that runs as root
 cannot be pinned that way, so mutating commands refuse unless the installer
 script, `macos-provider-plan.py`, the templates and every ancestor directory are
-root-owned and not group- or other-writable. Run a root-owned copy of the
-reviewed commit:
+root-owned and not group- or other-writable; this check runs for every run as
+root (a dry run and `status` included) and before the plan module is executed.
+Run the script itself first (`python3 -I` keeps the environment and the current
+directory out of the import path; the script also drops its own directory and
+the current directory from it before importing anything). Run a root-owned copy
+of the reviewed commit:
 
 ```bash
 sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/vw-provider-installer
@@ -200,19 +204,22 @@ I=/usr/local/libexec/vw-provider-installer/scripts/macos-provider-install.py
 ```
 
 Choose the signature policy: `--team-id TEAMID` requires an Apple-issued
-signature of that team (`codesign --verify --strict -R '=anchor apple generic and
-certificate leaf[subject.OU] = "TEAMID"'`, required whenever the binaries carry a
-team identifier); `--allow-development-signature` accepts ad-hoc development
+Developer ID signature of that team (`codesign --verify --strict -R '=anchor
+apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and
+certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate
+leaf[subject.OU] = "TEAMID"'`: the Developer ID intermediate and a Developer ID
+Application leaf; TEAMID is 10 uppercase letters or digits; required whenever
+the binaries carry a team identifier); `--allow-development-signature` accepts ad-hoc development
 builds only. Every binary must also be an arm64-only Mach-O (`lipo -archs`),
 whatever `bundle.json` says. The policy is recorded per version and reused by
 `status`, `rollback` and `uninstall`.
 
 ```bash
 # Dry run (also the default with no subcommand): prints every action and the plan digest, changes nothing.
-python3 $I plan --plan ~/vw-provider-plan --bundle /path/to/companion_slice.app
-sudo /usr/bin/python3 $I install --plan ~/vw-provider-plan --bundle /path/to/companion_slice.app \
+/usr/bin/python3 -I $I plan --plan ~/vw-provider-plan --bundle /path/to/companion_slice.app
+sudo /usr/bin/python3 -I $I install --plan ~/vw-provider-plan --bundle /path/to/companion_slice.app \
   --expect-plan-sha256 <reviewed digest> --allow-development-signature
-sudo /usr/bin/python3 $I status
+sudo /usr/bin/python3 -I $I status
 ```
 
 `install` creates the provider group, the human and agent socket groups
@@ -222,7 +229,9 @@ sudo /usr/bin/python3 $I status
 the operator to the human group. Group membership must be exactly the plan's;
 the agent account belongs to the agent group only through its primary GID and
 never to the human, provider or `admin` groups. Memberships are verified with
-`dsmemberutil checkmembership`. It then creates the empty layout, copies the
+`dsmemberutil checkmembership` after `dsmemberutil flushcache`. A record without
+an attribute reads as no values (real `dscl . -read` exits 0 with `No such key:`
+on stderr). It then creates the empty layout, copies the
 binaries into a new `versions/<version>/` through a staging directory and a
 rename (with the resolved plist as
 `versions/<version>/com.cantolla.vaultwarden-accessd.plist`), writes
@@ -235,25 +244,30 @@ never removed. An existing version directory is never overwritten: an identical
 one is accepted, a different one refuses. The receipt is written before every
 mutation it records, so a re-run after an interruption at any step converges.
 
-The installer never generates, copies or deletes credentials. Until
-`state/backend.json`, `provider-cert.pem`, `provider-key.pem` and
-`companion-ca.pem` exist (provider-owned, `0600`, one link), the service stays
-disabled (`launchctl disable`) and the installer prints the manual steps (see
-the next section). It cannot see the Keychain secret, so it does not wait for
-it. Re-run the same `install` command (or `start`) afterwards: it changes nothing
+The installer never generates or copies credentials (only `uninstall --purge`
+deletes them). Until `state/backend.json`, `provider-cert.pem`,
+`provider-key.pem` and `companion-ca.pem` exist (provider-owned, `0600`, one
+link) and the provider has stored its API client secret in its file store
+(`state/secrets/`, provider-owned `0700`, with
+`vaultwarden-accessd.bootstrap-client-secret` provider-owned `0600`, one link),
+the service stays disabled (`launchctl disable`) and the installer prints the
+manual steps (see the next section and [macos-setup.md](macos-setup.md)).
+Re-run the same `install` command (or `start`) afterwards: it changes nothing
 else and starts the service (`launchctl enable`, `bootstrap`), then waits for
 launchd to report `state = running` and otherwise reports the last exit code.
 The provider runs as the provider account, never root, and always starts locked.
 `stop --acknowledge-active-work` closes admission and boots the service out;
 `start` verifies the active version and credentials and starts it. `status`
 shows the launchd state, PID and last exit code, the accounts and memberships,
-the sockets in `run/human` and `run/agent`, and the credential files.
+the sockets in `run/human` and `run/agent`, the credential files and the secret
+store, and any pending switch. A receipt or tombstone file that is not the
+documented structure is refused with a clean error naming the file.
 
 **Upgrade.** Generate and review a plan for the new version with the same
 identity inputs, then:
 
 ```bash
-sudo /usr/bin/python3 $I upgrade --plan ~/vw-provider-plan-0.6.0 --bundle /path/to/new/companion_slice.app \
+sudo /usr/bin/python3 -I $I upgrade --plan ~/vw-provider-plan-0.6.0 --bundle /path/to/new/companion_slice.app \
   --expect-plan-sha256 <reviewed digest> --allow-development-signature --acknowledge-active-work
 ```
 
@@ -264,8 +278,8 @@ installer never signals them), switch the LaunchDaemon plist and the receipt,
 then `enable` and `bootstrap`; the provider restarts locked and every new request
 needs a fresh approval. `--acknowledge-active-work` records that you notified the
 execution owner of active work. Failed verification leaves the current version
-active. A re-run of an interrupted upgrade finishes it. State and Keychain are
-untouched. Identity changes (accounts, IDs, groups) are not an upgrade and are
+active. A re-run of an interrupted upgrade finishes it. State (secrets included)
+is untouched. Identity changes (accounts, IDs, groups) are not an upgrade and are
 refused.
 
 **Rollback.** `rollback [--to-version V] --confirm-state-compatible
@@ -275,17 +289,27 @@ against the checkout's templates, which may have changed). Confirm first that th
 target understands the current native profile, account UUIDs and consumed-request
 schema; consumed approvals are never reactivated and no state backup is restored.
 
+Interrupted switches converge. Before the plist changes, the receipt records the
+switch (`switching`: from, to, and whether an upgrade or a rollback started it);
+the marker stays until the target's service is verified running (or deliberately
+left stopped because credentials are incomplete), and `status` reports it as a
+problem meanwhile. Re-running the same `rollback` command with a rollback
+pending resumes it towards its recorded target, even when the receipt already
+names that target active; it never flips back to the version it left. Once a
+rollback completed, re-running it is a no-op that only makes sure the service
+runs; pass `--to-version V` to switch again. A failed upgrade's pending switch
+does not capture `rollback`: it switches back to the previous version as usual.
+
 **Uninstall.** `uninstall --acknowledge-active-work` closes admission, boots the
 service out, then removes only installer-owned, unchanged files: the
 LaunchDaemon plist, verified version directories, `native-identities.json` and
 empty `run/` directories, and clears the label's `launchctl disable` override.
-State, the Keychain and the accounts are preserved and the receipt is kept so a
-later install recognizes them. Anything changed or non-empty is retained, listed,
+State (including the `state/secrets/` file store) and the accounts are
+preserved and the receipt is kept so a later install recognizes them. Anything changed or non-empty is retained, listed,
 and the command exits 3 (incomplete removal). `--purge` also removes `state/`
-(credentials, consumed-request tombstones and audit history) without following
-any link. Keychain items (service `vaultwarden-accessd`) are never deleted by the
-installer: remove them yourself. `--purge --remove-accounts
---confirm-secrets-removed` (the flag asserts you removed them) also removes the
+(credentials, the provider secret file store, consumed-request tombstones and
+audit history) without following any link. `--purge --remove-accounts` also
+removes the
 accounts and groups this installer created and its memberships, but only when
 nothing provider-owned was retained. Their GeneratedUIDs are first written to the
 root-owned `/Library/VaultwardenAccess/account-tombstones.json`, which stays
@@ -295,48 +319,58 @@ account can never revive old enrollment. The operator account is never touched.
 `python3 scripts/test-macos-provider-install.py` exercises all of this under a
 temporary root prefix with fake `dscl`, `dseditgroup`, `dsmemberutil`,
 `launchctl`, `chown`, `stat`, `codesign` and `lipo`, including a crash after
-every single step of install, upgrade and full removal; no test uses sudo,
+every single step of install, upgrade, rollback and full removal; no test uses sudo,
 creates an account, writes to `/Library` or talks to launchd. A real installation
 on a Mac has not been performed.
 
 ## macOS provider credentials and companion enrollment
 
-The installer prints these steps; this is the reference. Each state file is
-provider-owned, mode `0600`, one link:
+The complete post-install sequence (certificates, `backend.json`, the API client
+secret, enrollment, the companion app, an agent account and key) is
+[macos-setup.md](macos-setup.md). The installer prints a summary; this is the
+reference for what it checks. Each state file is provider-owned, mode `0600`,
+one link:
 `sudo install -o _vwaccess -g _vwaccess -m 0600 <file> /Library/VaultwardenAccess/state/<name>`.
 
-- `backend.json`: the account setup fields described in
-  [access-mvp.md](access-mvp.md#human-setup-and-launch): `server` (an HTTPS
-  origin), `client_id`, `email`, `encrypted_key` and `kdf_iterations`, plus
-  `encrypted_private_key` and `org_keys` for organization bindings. No secrets.
-- `provider-cert.pem` / `provider-key.pem`: the loopback server identity. The
-  certificate must carry **subjectAltName IP:127.0.0.1** with server-auth usage.
-- `companion-ca.pem`: the **client** CA that verifies companion client
-  certificates, not the server CA. The companion app itself needs the server CA
-  (DER), the server leaf pin and its own client PKCS#12.
-- Keychain: the API client secret, service `vaultwarden-accessd`, account
-  `bootstrap-client-secret`, in the Keychain the provider account reads (where
-  that is for a non-login service account is an open installed-qualification
-  item). The installer cannot check it.
+- `provider-cert.pem` / `provider-key.pem` / `companion-ca.pem`: generated by
+  `vw-access setup tls` (as the operator). The server certificate carries
+  **subjectAltName IP:127.0.0.1** with server-auth usage; `companion-ca.pem` is
+  the **client** CA that verifies companion client certificates, not the server
+  CA. The companion app itself needs the server CA (DER), the server leaf pin and
+  its own client PKCS#12.
+- `backend.json`: written by `vw-access setup backend-json` with the account
+  setup fields described in [access-mvp.md](access-mvp.md#human-setup-and-launch):
+  `server` (an HTTPS origin), `client_id`, `email`, `encrypted_key` and
+  `kdf_iterations`, plus `encrypted_private_key` and `org_keys` for organization
+  bindings. No secrets.
+- The API client secret: a file store under `state/secrets/` (provider-owned
+  `0700`; each record a provider-owned `0600` single-link file), written by the
+  provider itself, prompted without echo:
+  `cd / && sudo -u _vwaccess /Library/VaultwardenAccess/versions/<version>/vaultwarden-accessd --state-root /Library/VaultwardenAccess/state --store-bootstrap-secret`.
+  The installer requires `secrets/` and
+  `vaultwarden-accessd.bootstrap-client-secret` with that owner and mode before it
+  starts the service: without the secret the provider fails closed and launchd
+  would restart it in a loop.
 
 Enroll the companion client certificate with the service stopped; the client
 PEM must be provider-owned `0600` with one link, so copy it in rather than
 pointing at your own file:
 
 ```bash
-sudo /usr/bin/python3 $I stop --acknowledge-active-work
-sudo install -o _vwaccess -g _vwaccess -m 0600 /path/to/client.pem /Library/VaultwardenAccess/state/enroll-client.pem
-sudo -u _vwaccess /Library/VaultwardenAccess/versions/<version>/vaultwarden-accessd \
+sudo /usr/bin/python3 -I $I stop --acknowledge-active-work
+sudo install -o _vwaccess -g _vwaccess -m 0600 ~/vw-setup/tls/companion-client.pem /Library/VaultwardenAccess/state/companion-client.pem
+cd / && sudo -u _vwaccess /Library/VaultwardenAccess/versions/<version>/vaultwarden-accessd \
   --state-root /Library/VaultwardenAccess/state \
-  --companion-enroll-cert /Library/VaultwardenAccess/state/enroll-client.pem \
+  --companion-enroll-cert /Library/VaultwardenAccess/state/companion-client.pem \
   --companion-client-ca /Library/VaultwardenAccess/state/companion-ca.pem --companion-label "Mac operator"
-sudo rm /Library/VaultwardenAccess/state/enroll-client.pem
-sudo /usr/bin/python3 $I start
+sudo rm /Library/VaultwardenAccess/state/companion-client.pem
+sudo /usr/bin/python3 -I $I start
 ```
 
-The administrative CLI is
-`/Library/VaultwardenAccess/versions/<version>/vw-access --state-root
-/Library/VaultwardenAccess/run/human`, reachable by the operator through the human
-group. Restricted agents use `/Library/VaultwardenAccess/run/agent/agent.sock`
-with their own UID and the agent GID. The provider always starts locked: unlock
-with a fresh password approval in the companion.
+The administrative CLI is `/Library/VaultwardenAccess/versions/<version>/vw-access`
+(its default state root is the human endpoint `/Library/VaultwardenAccess/run/human`),
+reachable by the operator through the human group. Restricted agents create their
+key with `vw-access setup agent-key` and use
+`/Library/VaultwardenAccess/run/agent/agent.sock` with their own UID and the agent
+GID. The provider always starts locked: unlock with a fresh password approval in
+the companion.
