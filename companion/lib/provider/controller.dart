@@ -43,6 +43,10 @@ class ProviderController extends ChangeNotifier {
   /// (and so occupy or invalidate the review) until it has been sent.
   bool _held = false;
 
+  /// The last metadata reconciliation succeeded; the background watch reads
+  /// only with configuration that was confirmed in the foreground.
+  bool _trusted = false;
+
   /// Whether the last `perform` handed a request to the platform.
   bool lastPerformSent = false;
   String _settlementId = '';
@@ -191,9 +195,11 @@ class ProviderController extends ChangeNotifier {
       _pinBiometric();
       _loaded = true;
       _ready = true;
+      _trusted = true;
       diagnostic = '';
     } catch (_) {
       _ready = false;
+      _trusted = false;
       invalidate();
       diagnostic = 'Saved provider setup is unavailable. Check the dedicated client identity.';
     } finally {
@@ -275,6 +281,7 @@ class ProviderController extends ChangeNotifier {
       !_disposed &&
       suspended &&
       _loaded &&
+      _trusted &&
       platform.available &&
       configuration.configured;
 
@@ -284,9 +291,10 @@ class ProviderController extends ChangeNotifier {
   /// sent from here, and reviews stay retired.
   Future<void> _watchTick() async {
     _watch = null;
-    if (!_watchAdmissible) return; // resume() restarts the foreground poll
+    if (_disposed) return;
     var success = true;
-    if ((watchAllowed?.call() ?? false) &&
+    if (_watchAdmissible &&
+        (watchAllowed?.call() ?? false) &&
         !busy &&
         !_held &&
         recoveryId.isEmpty &&
@@ -299,7 +307,8 @@ class ProviderController extends ChangeNotifier {
           ? watchSeconds
           : (_watchBackoff * 2).clamp(watchSeconds, 60);
     }
-    if (_watchAdmissible) {
+    if (suspended && !_disposed) {
+      // Also while setup is still loading or unconfirmed: check again later.
       _watch ??= Timer(Duration(seconds: _watchBackoff), _watchTick);
     } else if (eligible) {
       // Resumed while the read was in flight: its refresh found us busy.
@@ -479,7 +488,9 @@ class ProviderController extends ChangeNotifier {
     if (previousReview != state.reviewId) clearPasswords?.call();
     final accepted = state.outcome == core.ProviderOutcome.accepted;
     if (command == core.ProviderCommand.list && accepted) {
-      onInbox?.call(List.of(state.requests), !watch && eligible);
+      // Foreground is judged when the reply lands: a watch read that
+      // finishes after the window came back is on screen, not announced.
+      onInbox?.call(List.of(state.requests), eligible);
     }
     final rejectedDecision =
         [

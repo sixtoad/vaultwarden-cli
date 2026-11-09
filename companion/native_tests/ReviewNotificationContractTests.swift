@@ -1,3 +1,4 @@
+import UserNotifications
 import XCTest
 @testable import NativeContract
 
@@ -21,15 +22,19 @@ final class ReviewNotificationContractTests: XCTestCase {
     }
 
     func testOnlyTheDefaultActionOpens() {
-        XCTAssertTrue(ReviewNotificationContract.opens(actionIdentifier: "default", defaultAction: "default"))
-        XCTAssertFalse(ReviewNotificationContract.opens(actionIdentifier: "dismiss", defaultAction: "default"))
-        XCTAssertFalse(ReviewNotificationContract.opens(actionIdentifier: "approve", defaultAction: "default"))
+        let open = UNNotificationDefaultActionIdentifier
+        XCTAssertTrue(ReviewNotificationContract.opens(actionIdentifier: open, defaultAction: open))
+        XCTAssertFalse(ReviewNotificationContract.opens(actionIdentifier: UNNotificationDismissActionIdentifier, defaultAction: open))
+        XCTAssertFalse(ReviewNotificationContract.opens(actionIdentifier: "approve", defaultAction: open))
     }
 
     func testStatusNames() {
         XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: 0), "notDetermined")
         XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: 1), "denied")
-        XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: 2), "authorized")
+        XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: UNAuthorizationStatus.notDetermined.rawValue), "notDetermined")
+        XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: UNAuthorizationStatus.denied.rawValue), "denied")
+        XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: UNAuthorizationStatus.authorized.rawValue), "authorized")
+        XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: UNAuthorizationStatus.provisional.rawValue), "authorized")
         XCTAssertEqual(ReviewNotificationContract.statusName(rawValue: 99), "unavailable")
     }
 }

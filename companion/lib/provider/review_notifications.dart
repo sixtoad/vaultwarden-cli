@@ -24,6 +24,10 @@ class ReviewNotifier extends ChangeNotifier {
   NotificationPermission permission = NotificationPermission.unavailable;
   String message = '';
   Set<String> _known = {};
+
+  /// The first inbox read after launch or a provider change is a baseline:
+  /// requests already pending then are not announced (no burst).
+  bool _baselined = false;
   final Set<String> _announced = {};
   final Map<String, String> _tokens = {};
 
@@ -33,6 +37,9 @@ class ReviewNotifier extends ChangeNotifier {
   /// Notifications are posted only when on in Settings and permitted.
   bool get active =>
       available && enabled && permission == NotificationPermission.authorized;
+
+  /// What the Settings switch shows: on only while notifications can post.
+  bool get switchedOn => active;
 
   void _publish() {
     if (!_disposed) notifyListeners();
@@ -60,6 +67,9 @@ class ReviewNotifier extends ChangeNotifier {
       permission = await platform.permission();
     } catch (_) {
       permission = NotificationPermission.unavailable;
+    }
+    if (enabled && permission == NotificationPermission.denied) {
+      message = deniedText;
     }
     _publish();
   }
@@ -101,7 +111,9 @@ class ReviewNotifier extends ChangeNotifier {
   void observe(List<String> ids, {required bool foreground}) {
     final fresh = ids.where((id) => !_known.contains(id)).toList();
     _known = ids.toSet();
-    if (foreground || !active) {
+    final baseline = !_baselined;
+    _baselined = true;
+    if (foreground || !active || baseline) {
       _announced.addAll(fresh);
       _trim();
       return;
@@ -110,7 +122,13 @@ class ReviewNotifier extends ChangeNotifier {
       if (!_announced.add(id)) continue;
       final token = _token();
       _tokens[token] = id;
-      unawaited(platform.post(token).catchError((Object _) {}));
+      unawaited(
+        platform.post(token).catchError((Object _) {
+          // Not shown: forget it so the next read can announce it again.
+          _announced.remove(id);
+          _tokens.remove(token);
+        }),
+      );
     }
     _trim();
   }
@@ -121,6 +139,7 @@ class ReviewNotifier extends ChangeNotifier {
   /// A different provider: forget everything learned from the old one.
   void reset() {
     _known = {};
+    _baselined = false;
     _announced.clear();
     _tokens.clear();
   }
@@ -165,7 +184,7 @@ class ReviewNotificationSettings extends StatelessWidget {
         SwitchListTile(
           key: const Key('review-notifications'),
           contentPadding: EdgeInsets.zero,
-          value: notifier.enabled,
+          value: notifier.switchedOn,
           onChanged: available && !notifier.busy
               ? (value) => unawaited(notifier.setEnabled(value))
               : null,

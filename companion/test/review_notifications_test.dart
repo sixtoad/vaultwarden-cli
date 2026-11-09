@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -85,10 +86,37 @@ void main() {
       expect(n.resolve(fake.posted.single), isNull);
     });
 
+    test('the first read after launch is a baseline: no burst', () async {
+      final fake = FakeNotifications();
+      final n = ReviewNotifier(fake);
+      await n.load();
+      n.observe([providerId, secondId], foreground: false);
+      expect(fake.posted, isEmpty, reason: 'already pending at launch');
+      n.reset(); // another provider: a new baseline
+      n.observe([providerId], foreground: false);
+      expect(fake.posted, isEmpty);
+      n.observe([providerId, secondId], foreground: false);
+      expect(fake.posted, hasLength(1));
+    });
+
+    test('a post that fails is announced again on the next read', () async {
+      final fake = _FailingOnce();
+      final n = ReviewNotifier(fake);
+      await n.load();
+      n.observe([], foreground: true);
+      n.observe([secondId], foreground: false);
+      await Future<void>.delayed(Duration.zero);
+      expect(fake.posted, isEmpty);
+      n.observe([], foreground: false);
+      n.observe([secondId], foreground: false);
+      expect(fake.posted, hasLength(1));
+    });
+
     test('the token carries nothing from the request', () async {
       final fake = FakeNotifications();
       final n = ReviewNotifier(fake);
       await n.load();
+      n.observe([], foreground: true);
       n.observe([secondId], foreground: false);
       final token = fake.posted.single;
       expect(token, matches(tokenShape));
@@ -105,22 +133,25 @@ void main() {
       expect(n.active, isFalse);
     });
 
-    test('loading never prompts; only the toggle asks for permission', () async {
-      final fake = FakeNotifications(
-        status: NotificationPermission.notDetermined,
-        saved: false,
-      );
-      final n = ReviewNotifier(fake);
-      await n.load();
-      expect(fake.prompts, 0);
-      await n.setEnabled(true);
-      expect(fake.prompts, 1);
-      expect(n.active, isTrue);
-      expect(fake.saved, isTrue);
-      await n.setEnabled(false);
-      expect(fake.saved, isFalse);
-      expect(n.active, isFalse);
-    });
+    test(
+      'loading never prompts; only the toggle asks for permission',
+      () async {
+        final fake = FakeNotifications(
+          status: NotificationPermission.notDetermined,
+          saved: false,
+        );
+        final n = ReviewNotifier(fake);
+        await n.load();
+        expect(fake.prompts, 0);
+        await n.setEnabled(true);
+        expect(fake.prompts, 1);
+        expect(n.active, isTrue);
+        expect(fake.saved, isTrue);
+        await n.setEnabled(false);
+        expect(fake.saved, isFalse);
+        expect(n.active, isFalse);
+      },
+    );
 
     test('permission denied: stays off, explains, posts nothing', () async {
       final fake = FakeNotifications(
@@ -135,13 +166,29 @@ void main() {
       expect(n.message, ReviewNotifier.deniedText);
       n.observe([secondId], foreground: false);
       expect(fake.posted, isEmpty);
-      // Revoked later in System Settings: the saved setting no longer posts.
+      // Saved on, but denied in System Settings before launch.
       final later = FakeNotifications(status: NotificationPermission.denied);
       final m = ReviewNotifier(later);
       await m.load();
       expect(m.message, ReviewNotifier.deniedText);
+      expect(m.switchedOn, isFalse);
+      m.observe([], foreground: true);
       m.observe([secondId], foreground: false);
       expect(later.posted, isEmpty);
+    });
+
+    test('revoked while away: the switch reads off and explains', () async {
+      final fake = FakeNotifications();
+      final n = ReviewNotifier(fake);
+      await n.load();
+      expect(n.switchedOn, isTrue);
+      fake.status = NotificationPermission.denied;
+      await n.refreshPermission();
+      expect(n.switchedOn, isFalse);
+      expect(n.message, ReviewNotifier.deniedText);
+      n.observe([], foreground: true);
+      n.observe([secondId], foreground: false);
+      expect(fake.posted, isEmpty);
     });
   });
 
@@ -168,6 +215,7 @@ void main() {
       );
       final n = ReviewNotifier(_Authorized(native));
       await n.load();
+      n.observe([], foreground: true);
       n.observe([secondId], foreground: false);
       await Future<void>.delayed(Duration.zero);
       final post = calls.singleWhere((c) => c.method == 'post');
@@ -252,6 +300,30 @@ void main() {
           .map((c) => c['command'])
           .toSet();
       expect(watched, {'session', 'list'});
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('a watch read that lands after the window came back is not '
+        'announced', (tester) async {
+      final held = _HeldList();
+      native = held;
+      await tester.pumpWidget(page());
+      await tester.pumpAndSettle();
+      held.requestIds = [providerId, secondId];
+      held.hold = Completer<void>();
+      lifecycle(tester, [AppLifecycleState.inactive]);
+      await tester.pump(const Duration(seconds: 16));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+      expect(held.commands.last['command'], 'list', reason: 'list in flight');
+      lifecycle(tester, [AppLifecycleState.resumed]);
+      held.hold!.complete();
+      held.hold = null;
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(notes.posted, isEmpty, reason: 'the window is in front');
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -390,4 +462,31 @@ class _Authorized implements ReviewNotificationPlatform {
   Future<void> post(String token) => native.post(token);
   @override
   Future<String?> listen(void Function(String token) onOpen) async => null;
+}
+
+class _FailingOnce extends FakeNotifications {
+  bool failed = false;
+  @override
+  Future<void> post(String token) async {
+    if (!failed) {
+      failed = true;
+      throw StateError('Synthetic post failure');
+    }
+    posted.add(token);
+  }
+}
+
+class _HeldList extends FixtureProviderPlatform {
+  Completer<void>? hold;
+  @override
+  Future<Uint8List> send(Uint8List body) async {
+    final command = jsonDecode(utf8.decode(body)) as Map<String, dynamic>;
+    final gate = hold;
+    if (command['command'] == 'list' && gate != null) {
+      final reply = super.send(body);
+      await gate.future;
+      return reply;
+    }
+    return super.send(body);
+  }
 }

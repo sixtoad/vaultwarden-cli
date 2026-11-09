@@ -129,12 +129,14 @@ class _ProviderPageState extends State<ProviderPage>
         destination = AccessDestination.requests;
         detailOpen = false;
         notificationRequest = '';
-        notificationNote = 'That notification is from an earlier session. Pending requests are listed here.';
+        notificationNote = 'That notification is no longer available. Pending requests are listed here.';
       });
       unawaited(controller.refresh());
       return;
     }
-    controller.invalidate();
+    // Never retire an operation in flight (a decision, a Touch ID prompt):
+    // the fresh review simply waits until the provider is idle.
+    if (!controller.busy && !touchId.lifecycleExempt) controller.invalidate();
     setState(() {
       destination = AccessDestination.requests;
       detailOpen = true;
@@ -159,10 +161,12 @@ class _ProviderPageState extends State<ProviderPage>
   String _notifiedProvider = '';
   void changed() {
     // Notification tokens and announced ids belong to one provider.
-    final provider = controller.configuration.pin;
+    final c = controller.configuration;
+    final provider = '${c.endpoint}|${c.pin}|${c.fingerprint}';
     if (provider != _notifiedProvider) {
       _notifiedProvider = provider;
       notifier.reset();
+      controller.cancelPendingReview();
     }
     if (notificationRequest.isNotEmpty &&
         controller.state.review?.id == notificationRequest) {

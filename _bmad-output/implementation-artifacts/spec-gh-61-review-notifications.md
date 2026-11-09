@@ -2,7 +2,7 @@
 title: 'Review-request notifications in the macOS companion (#61)'
 type: 'feature'
 created: '2026-11-09'
-status: 'in-review'
+status: 'done'
 context: ['{project-root}/docs/companion-migration.md', '{project-root}/AGENTS.md']
 ---
 
@@ -57,6 +57,10 @@ context: ['{project-root}/docs/companion-migration.md', '{project-root}/AGENTS.m
 **Acceptance Criteria:**
 - Given a notification for X fired and X was then approved/expired, when it is opened, then a fresh review shows the final-state view with no password field.
 - Given the toggle is off or permission is denied, when a new request appears in the background, then nothing is posted.
+
+## Spec Change Log
+
+- Review round 1 (2 reviewers, no HIGH): patched first-read burst (baseline), switch shown from effective state + denial text on revocation, foreground judged at reply, watch rescheduled while loading and gated on a confirmed reconcile, failed posts retried, pending review cancelled on provider change, no invalidation of an in-flight decision/prompt on click, Swift tests use real UN identifiers. Deferred: per-request withdrawal of delivered notifications. KEEP: token-only payload, native fixed copy, session/list-only watch guard.
 
 ## Design Notes
 
