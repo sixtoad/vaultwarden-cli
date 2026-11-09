@@ -26,16 +26,25 @@ class FakeNotifications implements ReviewNotificationPlatform {
   bool saved;
   int prompts = 0;
   final List<String> posted = [];
+  final List<String> withdrawn = [];
+  final List<bool> watching = [];
+
+  /// Permission-related calls in order (`arm`, `request`).
+  final List<String> events = [];
   void Function(String token)? onOpen;
-  String? launched;
+  List<String> launched = [];
 
   @override
   Future<NotificationPermission> permission() async => status;
   @override
   Future<NotificationPermission> requestPermission() async {
+    events.add('request');
     prompts++;
     return status = answer;
   }
+
+  @override
+  Future<void> armPermissionRequest() async => events.add('arm');
 
   @override
   Future<bool> enabled() async => saved;
@@ -44,13 +53,18 @@ class FakeNotifications implements ReviewNotificationPlatform {
   @override
   Future<void> post(String token) async => posted.add(token);
   @override
-  Future<String?> listen(void Function(String token) onOpen) async {
+  Future<void> withdraw(List<String> tokens) async => withdrawn.addAll(tokens);
+  @override
+  Future<void> setWatching(bool value) async => watching.add(value);
+  @override
+  Future<List<String>> listen(void Function(String token) onOpen) async {
     this.onOpen = onOpen;
     return launched;
   }
 }
 
 const secondId = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+const thirdId = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
 final tokenShape = RegExp(r'^[A-Za-z0-9_-]{22}$');
 
 Map<String, dynamic> reviewOf(String id, Map<String, dynamic> status) {
@@ -99,18 +113,80 @@ void main() {
       expect(fake.posted, hasLength(1));
     });
 
-    test('a post that fails is announced again on the next read', () async {
-      final fake = _FailingOnce();
+    test(
+      'a post that fails is retried while the request stays pending',
+      () async {
+        final fake = _FailingOnce();
+        final n = ReviewNotifier(fake);
+        await n.load();
+        n.observe([], foreground: true);
+        n.observe([secondId], foreground: false);
+        await Future<void>.delayed(Duration.zero);
+        expect(fake.posted, isEmpty);
+        // Still pending on the very next read: announced now.
+        n.observe([secondId], foreground: false);
+        await Future<void>.delayed(Duration.zero);
+        expect(fake.posted, hasLength(1));
+        expect(n.resolve(fake.posted.single), secondId);
+        n.observe([secondId], foreground: false);
+        expect(fake.posted, hasLength(1), reason: 'once it was shown');
+      },
+    );
+
+    test(
+      'a request that leaves the pending list withdraws its notification',
+      () async {
+        final fake = FakeNotifications();
+        final n = ReviewNotifier(fake);
+        await n.load();
+        n.observe([providerId], foreground: true);
+        n.observe([providerId, secondId], foreground: false);
+        final token = fake.posted.single;
+        n.observe([providerId, secondId], foreground: false);
+        expect(fake.withdrawn, isEmpty, reason: 'still pending');
+        n.observe([providerId], foreground: false); // decided or expired
+        expect(fake.withdrawn, [token]);
+        n.observe([providerId], foreground: true);
+        expect(fake.withdrawn, [token], reason: 'withdrawn once');
+        expect(
+          n.resolve(token),
+          secondId,
+          reason: 'a racing click still routes',
+        );
+        // Still pending with the window in front: left for the user to click.
+        n.observe([providerId, thirdId], foreground: false);
+        final other = fake.posted.last;
+        n.observe([providerId, thirdId], foreground: true);
+        expect(fake.withdrawn, [token]);
+        n.observe([providerId], foreground: true);
+        expect(fake.withdrawn, [token, other]);
+      },
+    );
+
+    test('a provider change withdraws what the old one announced', () async {
+      final fake = FakeNotifications();
       final n = ReviewNotifier(fake);
       await n.load();
       n.observe([], foreground: true);
       n.observe([secondId], foreground: false);
-      await Future<void>.delayed(Duration.zero);
-      expect(fake.posted, isEmpty);
-      n.observe([], foreground: false);
-      n.observe([secondId], foreground: false);
-      expect(fake.posted, hasLength(1));
+      n.reset();
+      expect(fake.withdrawn, fake.posted);
     });
+
+    test(
+      'the background watch holds the activity only while it runs',
+      () async {
+        final fake = FakeNotifications();
+        final n = ReviewNotifier(fake);
+        await n.load();
+        n.setWatching(true);
+        n.setWatching(true);
+        n.setWatching(false);
+        n.setWatching(false);
+        await Future<void>.delayed(Duration.zero);
+        expect(fake.watching, [true, false]);
+      },
+    );
 
     test('the token carries nothing from the request', () async {
       final fake = FakeNotifications();
@@ -142,9 +218,12 @@ void main() {
         );
         final n = ReviewNotifier(fake);
         await n.load();
+        await n.refreshPermission();
         expect(fake.prompts, 0);
+        expect(fake.events, isEmpty, reason: 'never armed outside the toggle');
         await n.setEnabled(true);
         expect(fake.prompts, 1);
+        expect(fake.events, ['arm', 'request']);
         expect(n.active, isTrue);
         expect(fake.saved, isTrue);
         await n.setEnabled(false);
@@ -235,6 +314,56 @@ void main() {
       }
       await expectLater(native.post(secondId), throwsFormatException);
     });
+
+    test(
+      'withdraw sends only valid tokens; the watch activity is a bool',
+      () async {
+        final native = NativeReviewNotificationPlatform(
+          macOS: true,
+          channel: channel,
+        );
+        await native.withdraw(['AAAAAAAAAAAAAAAAAAAAAA']);
+        await native.withdraw([]);
+        await expectLater(native.withdraw([secondId]), throwsFormatException);
+        await native.setWatching(true);
+        expect(calls.map((c) => c.method), ['withdraw', 'watching']);
+        expect(calls.first.arguments, {
+          'tokens': ['AAAAAAAAAAAAAAAAAAAAAA'],
+        });
+        expect(calls.last.arguments, true);
+      },
+    );
+
+    test('the toggle arms the native prompt right before asking', () async {
+      final native = NativeReviewNotificationPlatform(
+        macOS: true,
+        channel: channel,
+      );
+      await native.armPermissionRequest();
+      await native.requestPermission();
+      expect(calls.map((c) => c.method), [
+        'armAuthorization',
+        'requestAuthorization',
+      ]);
+    });
+
+    test('every click queued before Flutter listened is handed over', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return call.method == 'listen'
+                ? ['AAAAAAAAAAAAAAAAAAAAAA', secondId, 'BBBBBBBBBBBBBBBBBBBBBB']
+                : null;
+          });
+      final native = NativeReviewNotificationPlatform(
+        macOS: true,
+        channel: channel,
+      );
+      expect(await native.listen((_) {}), [
+        'AAAAAAAAAAAAAAAAAAAAAA',
+        'BBBBBBBBBBBBBBBBBBBBBB',
+      ]);
+    });
   });
 
   group('the page', () {
@@ -300,6 +429,9 @@ void main() {
           .map((c) => c['command'])
           .toSet();
       expect(watched, {'session', 'list'});
+      expect(notes.watching, [true], reason: 'kept out of App Nap while away');
+      await back(tester);
+      expect(notes.watching, [true, false]);
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -390,7 +522,7 @@ void main() {
     testWidgets('a token from an earlier session opens the request list', (
       tester,
     ) async {
-      notes.launched = 'AAAAAAAAAAAAAAAAAAAAAA';
+      notes.launched = ['AAAAAAAAAAAAAAAAAAAAAA', 'BBBBBBBBBBBBBBBBBBBBBB'];
       await tester.pumpWidget(page());
       await tester.pumpAndSettle();
       expect(reviews(), isEmpty);
@@ -410,6 +542,11 @@ void main() {
       await tester.pump(const Duration(seconds: 60));
       expect(native.commands.length, before);
       expect(notes.posted, isEmpty);
+      expect(
+        notes.watching,
+        isNot(contains(true)),
+        reason: 'no watch, no activity',
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -459,9 +596,15 @@ class _Authorized implements ReviewNotificationPlatform {
   @override
   Future<void> setEnabled(bool value) async {}
   @override
+  Future<void> armPermissionRequest() async {}
+  @override
   Future<void> post(String token) => native.post(token);
   @override
-  Future<String?> listen(void Function(String token) onOpen) async => null;
+  Future<void> withdraw(List<String> tokens) async {}
+  @override
+  Future<void> setWatching(bool value) async {}
+  @override
+  Future<List<String>> listen(void Function(String token) onOpen) async => [];
 }
 
 class _FailingOnce extends FakeNotifications {

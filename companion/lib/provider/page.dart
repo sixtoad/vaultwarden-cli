@@ -74,6 +74,7 @@ class _ProviderPageState extends State<ProviderPage>
     controller.onInbox = (ids, foreground) =>
         notifier.observe(ids, foreground: foreground);
     controller.watchAllowed = () => notifier.active;
+    controller.onWatching = notifier.setWatching;
     unawaited(
       start().catchError((Object error, StackTrace stack) {
         FlutterError.reportError(
@@ -104,13 +105,17 @@ class _ProviderPageState extends State<ProviderPage>
   Future<void> startNotifications() async {
     await notifier.load();
     if (!mounted) return;
-    String? launched;
+    var launched = <String>[];
     try {
       launched = await notifier.platform.listen(openNotification);
     } catch (_) {
-      launched = null;
+      launched = [];
     }
-    if (launched != null && mounted) openNotification(launched);
+    // Every click queued before Flutter listened, oldest first; the last
+    // one is what the page ends up showing.
+    for (final token in launched) {
+      if (mounted) openNotification(token);
+    }
   }
 
   /// A notification was clicked. The native side has brought the window

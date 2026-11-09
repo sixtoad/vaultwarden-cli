@@ -10,9 +10,17 @@ import UserNotifications
     static let shared = ReviewNotificationAdapter()
     private static let enabledKey = "reviewNotificationsEnabled"
     private var channel: FlutterMethodChannel?
-    /// A click that arrived before Flutter attached (launch from a notification).
-    private var pendingOpen: String?
+    /// Clicks that arrived before Flutter listened (launch from a notification).
+    private var pendingOpens = ReviewNotificationContract.PendingOpens()
     private var listening = false
+    private var authorization = ReviewNotificationContract.AuthorizationGate()
+    /// Keeps App Nap off the background watch's timer while it runs.
+    private let watchActivity = ReviewNotificationContract.WatchActivity(
+        begin: {
+            ProcessInfo.processInfo.beginActivity(options: ReviewNotificationContract.watchActivityOptions,
+                                                  reason: ReviewNotificationContract.watchActivityReason)
+        },
+        end: { ProcessInfo.processInfo.endActivity($0) })
 
     /// Set the delegate before launch finishes so a launch click is delivered.
     func install() { UNUserNotificationCenter.current().delegate = self }
@@ -21,6 +29,7 @@ import UserNotifications
         let channel = FlutterMethodChannel(name: "dev.vaultwarden.companionSlice/notifications", binaryMessenger: messenger)
         self.channel = channel
         listening = false
+        watchActivity.set(false)
         channel.setMethodCallHandler { [weak self] call, result in
             guard let self else { result(FlutterError(code: "unavailable", message: nil, details: nil)); return }
             MainActor.assumeIsolated { self.handle(call, result: result) }
@@ -35,8 +44,15 @@ import UserNotifications
                 let name = ReviewNotificationContract.statusName(rawValue: settings.authorizationStatus.rawValue)
                 DispatchQueue.main.async { result(name) }
             }
+        case "armAuthorization":
+            // Called only by the Settings toggle, right before it asks.
+            authorization.arm(now: Date())
+            result(nil)
         case "requestAuthorization":
-            // Only ever called from the Settings toggle (explicit user action).
+            // Refused unless the toggle armed it just now with the app in front.
+            guard authorization.consume(now: Date(), appActive: NSApp.isActive) else {
+                result(FlutterError(code: "not_armed", message: nil, details: nil)); return
+            }
             center.requestAuthorization(options: [.alert, .sound]) { _, _ in
                 UNUserNotificationCenter.current().getNotificationSettings { settings in
                     let name = ReviewNotificationContract.statusName(rawValue: settings.authorizationStatus.rawValue)
@@ -64,12 +80,22 @@ import UserNotifications
                     if error == nil { result(nil) } else { result(FlutterError(code: "post_failed", message: nil, details: nil)) }
                 }
             }
+        case "withdraw":
+            // The request was decided or expired: its banner goes too.
+            guard let tokens = ReviewNotificationContract.tokens(fromWithdraw: call.arguments) else {
+                result(FlutterError(code: "invalid", message: nil, details: nil)); return
+            }
+            center.removeDeliveredNotifications(withIdentifiers: tokens)
+            center.removePendingNotificationRequests(withIdentifiers: tokens)
+            result(nil)
+        case "watching":
+            guard let value = call.arguments as? Bool else { result(FlutterError(code: "invalid", message: nil, details: nil)); return }
+            watchActivity.set(value)
+            result(nil)
         case "listen":
-            // Flutter is ready for clicks; return one that launched the app.
+            // Flutter is ready for clicks; return those that arrived before.
             listening = true
-            let token = pendingOpen
-            pendingOpen = nil
-            result(token)
+            result(pendingOpens.drain())
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -77,8 +103,9 @@ import UserNotifications
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                             withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        // The app is frontmost: the request list is already on screen.
-        completionHandler([])
+        // Frontmost, Flutter posts only when the review route is not current,
+        // so the request is not on screen: show it (D7).
+        completionHandler(ReviewNotificationContract.foregroundPresentation)
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
@@ -101,6 +128,6 @@ import UserNotifications
             window.makeKeyAndOrderFront(nil)
         }
         NSApp.activate(ignoringOtherApps: true)
-        if listening, let channel { channel.invokeMethod("open", arguments: token) } else { pendingOpen = token }
+        if listening, let channel { channel.invokeMethod("open", arguments: token) } else { pendingOpens.enqueue(token) }
     }
 }

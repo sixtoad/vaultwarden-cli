@@ -23,13 +23,20 @@ class ReviewNotifier extends ChangeNotifier {
   bool enabled = false, busy = false, _disposed = false;
   NotificationPermission permission = NotificationPermission.unavailable;
   String message = '';
-  Set<String> _known = {};
 
   /// The first inbox read after launch or a provider change is a baseline:
   /// requests already pending then are not announced (no burst).
   bool _baselined = false;
+
+  /// Ids already announced or seen on screen: the only dedupe. An id whose
+  /// post failed is removed again, so the next read retries it while the
+  /// request is still pending.
   final Set<String> _announced = {};
   final Map<String, String> _tokens = {};
+
+  /// Tokens whose notification may still be delivered, by request id.
+  final Map<String, String> _delivered = {};
+  bool _watching = false;
 
   bool get available =>
       platform.available && permission != NotificationPermission.unavailable;
@@ -89,9 +96,13 @@ class ReviewNotifier extends ChangeNotifier {
         message = 'Review notifications are off.';
         return;
       }
-      permission = permission == NotificationPermission.notDetermined
-          ? await platform.requestPermission()
-          : await platform.permission();
+      if (permission == NotificationPermission.notDetermined) {
+        // The explicit toggle is the one path that arms the native prompt.
+        await platform.armPermissionRequest();
+        permission = await platform.requestPermission();
+      } else {
+        permission = await platform.permission();
+      }
       enabled = permission == NotificationPermission.authorized;
       await platform.setEnabled(enabled);
       message = enabled
@@ -109,28 +120,50 @@ class ReviewNotifier extends ChangeNotifier {
   /// Every successful inbox read. A request seen while foreground is on
   /// screen already; one first seen while away is announced once.
   void observe(List<String> ids, {required bool foreground}) {
-    final fresh = ids.where((id) => !_known.contains(id)).toList();
-    _known = ids.toSet();
+    final pending = ids.toSet();
+    // Decided or expired: its delivered notification goes too. The token
+    // stays resolvable, so a click racing the removal opens the final state.
+    _withdraw([
+      for (final entry in _delivered.entries)
+        if (!pending.contains(entry.key)) entry.value,
+    ]);
+    _delivered.removeWhere((id, _) => !pending.contains(id));
+    final fresh = ids.where((id) => !_announced.contains(id)).toList();
     final baseline = !_baselined;
     _baselined = true;
     if (foreground || !active || baseline) {
       _announced.addAll(fresh);
-      _trim();
+      _trim(pending);
       return;
     }
     for (final id in fresh) {
-      if (!_announced.add(id)) continue;
+      _announced.add(id);
       final token = _token();
       _tokens[token] = id;
+      _delivered[id] = token;
       unawaited(
         platform.post(token).catchError((Object _) {
-          // Not shown: forget it so the next read can announce it again.
+          // Not shown: forget it so the next read announces it again.
           _announced.remove(id);
           _tokens.remove(token);
+          if (_delivered[id] == token) _delivered.remove(id);
         }),
       );
     }
-    _trim();
+    _trim(pending);
+  }
+
+  void _withdraw(List<String> tokens) {
+    if (tokens.isEmpty) return;
+    unawaited(platform.withdraw(tokens).catchError((Object _) {}));
+  }
+
+  /// The background watch started or stopped: hold the native activity that
+  /// keeps its timer out of App Nap only while it runs.
+  void setWatching(bool value) {
+    if (_watching == value || (value && !platform.available)) return;
+    _watching = value;
+    unawaited(platform.setWatching(value).catchError((Object _) {}));
   }
 
   /// The request a notification token stands for, if this process sent it.
@@ -138,7 +171,8 @@ class ReviewNotifier extends ChangeNotifier {
 
   /// A different provider: forget everything learned from the old one.
   void reset() {
-    _known = {};
+    _withdraw(_delivered.values.toList());
+    _delivered.clear();
     _baselined = false;
     _announced.clear();
     _tokens.clear();
@@ -149,12 +183,17 @@ class ReviewNotifier extends ChangeNotifier {
     return base64Url.encode(bytes).replaceAll('=', '');
   }
 
-  void _trim() {
+  /// Bounds memory. Ids still pending are never forgotten (that would
+  /// announce them again); only ones that left the list are dropped, oldest
+  /// first.
+  void _trim(Set<String> pending) {
     while (_tokens.length > remembered) {
       _tokens.remove(_tokens.keys.first);
     }
-    while (_announced.length > remembered) {
-      _announced.remove(_announced.first);
+    if (_announced.length <= remembered) return;
+    final stale = _announced.where((id) => !pending.contains(id)).toList();
+    for (final id in stale.take(_announced.length - remembered)) {
+      _announced.remove(id);
     }
   }
 

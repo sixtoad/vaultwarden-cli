@@ -526,9 +526,14 @@ off and says where to change it.
   announced. The first inbox read after launch or a provider change is a
   baseline, so already-pending requests do not burst. Sleep also suspends, so
   after wake the watch may post behind a locked screen; the text is generic by
-  design. A failed post is retried on the next read. Delivered notifications are
-  not withdrawn when their request is decided (a click then shows the final
-  state); they are cleared when notifications are turned off. Closing the window
+  design. A failed post is retried on every read while the request stays
+  pending (dedupe is per announced id; the launch baseline is separate). While
+  the watch runs, the native side holds a `userInitiatedAllowingIdleSystemSleep`
+  process activity so App Nap does not throttle its timer with the window
+  hidden or occluded; the Mac may still sleep when idle, and the activity is
+  released when the window comes back. When a request leaves the pending list
+  (decided or expired) its delivered notification is withdrawn; all are cleared
+  when notifications are turned off or the provider changes. Closing the window
   quits the app, so nothing is announced after close (menu-bar/background
   lifetime remains a parity item).
 - **What:** the native side (`ReviewNotificationAdapter.swift`) owns the only
@@ -536,14 +541,19 @@ off and says where to change it.
   categories or actions, so there is no approve or deny on a notification. Flutter
   passes only an opaque random 22-character token (`ReviewNotificationContract`
   refuses anything else, including a 43-character request id); the token maps to
-  the request id in Dart memory only.
+  the request id in Dart memory only. With the app frontmost a notification is
+  still shown as a banner (Flutter posts only when the review route is not
+  current, so the request is not on screen). The permission prompt is refused
+  natively unless the Settings toggle armed it within 10 s with the app in
+  front (one-shot).
 - **Open:** a click (default action only) unhides and activates the window and
   hands Flutter the token. When the window is foreground and the provider idle,
   the page runs the normal fresh `review` of that exact request: a pending
   request shows the approval screen, an expired or decided one the final-state
   view (#49 PR D), and one the provider no longer returns says it could not be
   loaded. A token from an earlier process (the app relaunched from Notification
-  Center) opens the request list.
+  Center) opens the request list. Clicks that arrive before Flutter listens are
+  queued (up to 8, oldest first) and handed over together.
 - **Not verified on hardware:** the permission prompt, banner and lock-screen
   text, click-through activation, launch from a notification, and delivery in
   the ad-hoc signed sandboxed debug build.

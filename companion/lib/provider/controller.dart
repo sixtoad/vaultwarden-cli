@@ -62,6 +62,16 @@ class ProviderController extends ChangeNotifier {
   /// permitted). Without it nothing is read while the window is inactive.
   bool Function()? watchAllowed;
 
+  /// The background watch started (true) or stopped (false): the page holds
+  /// a native activity meanwhile so App Nap does not throttle its timer.
+  void Function(bool running)? onWatching;
+  bool _watchRunning = false;
+  void _setWatchRunning(bool value) {
+    if (_watchRunning == value) return;
+    _watchRunning = value;
+    onWatching?.call(value);
+  }
+
   /// The read-only inbox watch interval while the window is inactive.
   static const watchSeconds = 15;
 
@@ -268,12 +278,14 @@ class ProviderController extends ChangeNotifier {
     invalidate();
     _ready = false;
     _watch ??= Timer(Duration(seconds: _watchBackoff), _watchTick);
+    _setWatchRunning(watchAllowed?.call() ?? false);
   }
 
   void resume() {
     suspended = false;
     _watch?.cancel();
     _watch = null;
+    _setWatchRunning(false);
     unawaited(refresh());
   }
 
@@ -766,6 +778,7 @@ class ProviderController extends ChangeNotifier {
     _poll?.cancel();
     _expiry?.cancel();
     _watch?.cancel();
+    _setWatchRunning(false);
     _unsubscribe?.call();
     core.providerInvalidate();
     manage.managementInvalidate();
