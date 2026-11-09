@@ -408,6 +408,14 @@ fn peer_uid(stream: &UnixStream) -> Result<u32, HumanTransportError> {
         Ok(uid)
     }
 }
+/// The installed native human endpoint directory from the root-owned identity
+/// record, used by `vw-access` when no `--state-root` is given on macOS.
+#[cfg(target_os = "macos")]
+pub fn installed_human_socket_dir() -> Option<std::path::PathBuf> {
+    super::native::identity::load()
+        .ok()
+        .map(|config| config.human_socket_dir)
+}
 #[cfg(target_os = "macos")]
 fn private_directory(root: &Path) -> Result<(), HumanTransportError> {
     let config = super::native::identity::load().map_err(|_error| HumanTransportError)?;

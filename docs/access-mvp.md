@@ -22,9 +22,14 @@ The provider has no agent-facing item lookup, secret export or password command.
 ## Supported platform
 
 The provider and human terminal client (`vaultwarden-accessd` and `vw-access`)
-require Linux. Their access and adapter library modules are compiled only on Linux.
-On other platforms both binaries exit unsuccessfully with a fixed unsupported-platform
-message, before parsing arguments or accessing provider state, keyrings or transports.
+run on Linux and on native Apple Silicon macOS. On macOS the provider is installed
+as a LaunchDaemon under a dedicated account; follow
+[the macOS post-install setup](macos-setup.md) (certificates, `backend.json`, the
+provider secret file store, companion enrollment, agents and a first request);
+the Linux-specific steps below (user unit, Secret Service keyring, loopback
+browser UI) do not apply there. On other platforms, Intel Macs and Rosetta both
+binaries exit unsuccessfully with a fixed unsupported-platform message, before
+parsing arguments or accessing provider state, keyrings or transports.
 The general `vaultwarden-cli` retains its existing cross-platform support. Native
 macOS and Windows provider transports require future platform-specific adapters;
 there is no fallback that relaxes Linux ownership, socket or execution checks.
@@ -47,7 +52,9 @@ specified below.
    metadata fails closed; there is no sync/enumeration fallback.
 3. Through the human desktop's OS-keyring manager, provision the account API
    client secret as service **`vaultwarden-accessd`**, account
-   **`bootstrap-client-secret`**. Do not put it, the master password, access or
+   **`bootstrap-client-secret`** (or run `vaultwarden-accessd --state-root <dir>
+   --store-bootstrap-secret`, which prompts for it). The native macOS provider
+   stores it in its state directory instead; see [macOS setup](macos-setup.md). Do not put it, the master password, access or
    refresh tokens, or derived keys in setup, command arguments or environment.
    This is separate from the direct CLI's `vaultwarden-cli` keyring namespace.
 4. Provision a dedicated loopback HTTPS identity. Have a CA trusted by the human's
@@ -440,7 +447,9 @@ account, change group memberships or grant access to provider state.
 Pair the agent's public key through the human interface described above. Provision
 its corresponding raw 32-byte Ed25519 seed separately, in an agent-owned regular
 file with mode `0600`; PEM, JSON, base64 text, symbolic links, trailing bytes and permissive
-modes are rejected. No key generation or password prompt is added. As that
+modes are rejected. `vw-access setup agent-key --out <new-file>`, run as the
+agent account, writes such a seed (refusing an existing file) and prints the
+public key to pair; no password prompt is involved. As that
 restricted UID, submit without a TTY, stdin, human state access or browser access:
 
 ```sh

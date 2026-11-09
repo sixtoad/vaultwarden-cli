@@ -11,7 +11,9 @@ pub mod human_socket;
 pub mod loopback_ui;
 #[cfg(target_os = "macos")]
 pub mod native;
+pub mod provider_secret_file;
 pub mod session;
+pub mod setup_tools;
 pub(crate) mod ssh_agent;
 pub mod ssh_material;
 #[cfg(target_os = "linux")]

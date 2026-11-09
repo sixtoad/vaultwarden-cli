@@ -151,6 +151,22 @@ pub fn clear_persisted_session() -> Result<(), SessionError> {
     ProviderKeyring.clear()
 }
 
+/// Provision the API client secret into the provider's configured secret store
+/// (the native macOS provider's file store, or the OS keyring elsewhere).
+pub fn store_bootstrap_secret(secret: &SensitiveString) -> Result<(), SessionError> {
+    if secret.expose().is_empty() || secret.expose().len() > 4096 {
+        return Err(SessionError::InvalidRequest);
+    }
+    ProviderKeyring::entry(BOOTSTRAP_ACCOUNT)?
+        .set_password(secret.expose())
+        .map_err(|_error| SessionError::BackendUnavailable)
+}
+
+/// Validate a backend setup file exactly as the provider will read it.
+pub fn validate_setup(path: &Path) -> Result<(), SessionError> {
+    load_setup(path).map(drop)
+}
+
 /// Read setup only, not Config::load(), which also restores CLI authority.
 pub(crate) fn load_setup(path: &Path) -> Result<Config, SessionError> {
     #[cfg(target_os = "macos")]
