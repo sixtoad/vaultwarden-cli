@@ -57,11 +57,40 @@ class _ProviderPageState extends State<ProviderPage>
       controller,
       widget.approvalKeys ?? NativeApprovalKeyPlatform(),
     )..addListener(changed);
+    touchId.onExemptionEnded = applyLifecycle;
     unawaited(
-      controller.initialize().then((_) {
-        if (mounted) return touchId.refreshLocal();
+      start().catchError((Object error, StackTrace stack) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'provider page',
+          ),
+        );
       }),
     );
+  }
+
+  /// Initialize the provider, and read Touch ID and the local key even when
+  /// that fails (password approval and Settings still need them).
+  Future<void> start() async {
+    try {
+      await controller.initialize();
+    } finally {
+      if (mounted) await touchId.refreshLocal();
+    }
+  }
+
+  /// After a Touch ID approval or enrollment: the window's lifecycle events
+  /// were partly ignored while the system prompt was up, so apply the
+  /// current state now. Anything but `resumed` suspends.
+  void applyLifecycle() {
+    if (!mounted) return;
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      if (controller.suspended) controller.resume();
+    } else {
+      controller.suspend();
+    }
   }
 
   void changed() {
@@ -79,15 +108,24 @@ class _ProviderPageState extends State<ProviderPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // The system Touch ID prompt deactivates the window. Only while that
-    // prompt is open is `inactive` ignored; hiding, sleep and close still
-    // suspend (and the native signer cancels the prompt on sleep and close).
-    if (touchId.prompting &&
-        (state == AppLifecycleState.inactive ||
-            state == AppLifecycleState.resumed)) {
+    if (touchId.lifecycleExempt) {
+      // The system Touch ID prompt deactivates the window, so `inactive` and
+      // `resumed` are deferred until the approval or enrollment ends
+      // (`applyLifecycle`). Hiding, pausing and detaching still cancel the
+      // prompt and suspend at once; the native signer also cancels it on
+      // sleep, display sleep, session switch, close and quit.
+      if (state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.resumed) {
+        return;
+      }
+      unawaited(touchId.cancel());
+      controller.suspend();
       return;
     }
-    if (state == AppLifecycleState.resumed) controller.resume();
+    if (state == AppLifecycleState.resumed) {
+      controller.resume();
+      unawaited(touchId.refreshLocal());
+    }
     if ([
       AppLifecycleState.inactive,
       AppLifecycleState.hidden,

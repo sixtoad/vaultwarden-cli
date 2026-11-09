@@ -220,35 +220,63 @@ data-protection Keychain, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`,
 access control `.privateKeyUsage` + `.biometryCurrentSet`. Each signature
 evaluates that access control on a fresh `LAContext` with no reuse window and
 no fallback button, so every approval needs its own touch, and adding or
-removing a fingerprint invalidates the key (enroll again). Before prompting and
+removing a fingerprint invalidates the key. The key's label records a digest of
+the enrolled-biometry state it was created under; when that state differs,
+read and sign report `invalidated` without a prompt and enrollment replaces the
+key (see below). Before prompting and
 again after Touch ID, the signer parses the framed transcript and signs only an
 approval transcript (`dev.vaultwarden.provider.approval.v2`, action `approve`,
 its own provider, client and key id) or an enrollment transcript
 (`dev.vaultwarden.provider.approval-enroll.v2`, its own provider, client and
 public key). The synthetic key (`NativeTestKey`, its own tag and channel) builds
 its own synthetic-domain transcript and never receives these bytes; Swift and
-Rust tests check both directions. Sleep, window close and quit cancel an open
-prompt.
+Rust tests check both directions. Sleep, display sleep, session switch
+(`sessionDidResignActive`), window close and quit cancel an open prompt.
+Signatures are numbered per Dart session (a random nonce per channel client),
+so a Dart hot restart starts its own numbering; the admission rules
+(`ProductionSignerGate`: one signature at a time, increasing numbers, cancel
+only by session and number) are covered by the Swift package tests.
 
 **Enrollment** (Settings, "Touch ID approval key"): read the provider's key
 record, then enroll with a fresh approval password: `biometric_prepare`
-ticket, create the key (an existing key for the same provider and client is
-reused, never overwritten), one Touch ID proof of possession, then
-`biometric_enroll`. Revocation deletes the local key only after the provider
-confirmed it.
+ticket, then the key. A local key for the same provider and client is kept
+only when the provider holds it as its current key (SHA-256 of the public key
+equals the provider's key id) and it is usable; then nothing needs enrolling
+and nothing is sent. Any other local key (never enrolled, retired by an
+administrator, revoked with a lost response, or invalidated by a fingerprint
+change) can never approve again: it is deleted explicitly and a fresh key is
+created. Then one Touch ID proof of possession and `biometric_enroll`.
+Revocation deletes the local key only after the provider confirmed it; if that
+confirmation is lost, the next enrollment replaces the leftover key.
 
 **Approval** (request review): on a Mac with Touch ID, "Approve once with Touch
-ID" fetches the review again, refuses unless it is byte-identical to what was
+ID" re-checks Touch ID availability, fetches the review again, refuses unless
+it (and the displayed authenticated origin) is byte-identical to what was
 displayed and still decidable, asks Rust for the transcript, signs after Touch
-ID and sends one Decision v2 proof. Cancellation, unavailable or locked-out
+ID and sends one Decision v2 proof. Automatic and explicit re-reads are held
+while the prompt is open, so a poll cannot occupy or invalidate the review;
+selecting another request cancels the prompt. Every path that ends without
+sending (the review changed during the prompt, the controller refused or the
+prepared handle went stale) says "Nothing was sent; try again." Cancellation, unavailable or locked-out
 Touch ID, a missing or mismatched key, a provider without v2, a `null` binding
 or `require_password` send nothing and leave password approval available.
 Provider results map to final messages: approved, stale (obtain a fresh review),
 password required, rate limited, rejected (final) and lost response (status-only
-recovery). Expired, cancelled and already decided reviews show a final state.
-Macs without Touch ID show only password approval. While the system prompt is
-open the window's `inactive` transition does not suspend the provider session;
-hiding, sleep and close still do.
+recovery). Expired, already decided, running, completed and failed requests
+show a final-state view only: no password field and no approve or deny
+controls (#61). Macs without Touch ID show only password approval; availability
+is read again on every resume. While an approval or enrollment with a system
+prompt runs, the window's `inactive` and `resumed` transitions are deferred:
+when it ends, the app reads the current lifecycle state and suspends unless the
+window is `resumed` (resuming a session that was suspended meanwhile). Hiding,
+pausing and detaching still cancel the prompt and suspend at once.
+
+**Not hardware-verified** (unit tests with fakes only): the native prompt
+cancellation on sleep, display sleep, session switch, close and quit; the
+fingerprint-change detection and recovery (biometry-state label, `invalidated`
+outcome, key replacement); and the lifecycle behaviour around the system
+prompt (which transitions macOS actually sends while it is open, and whether
+the signature reply arrives before or after `resumed`).
 
 ## Preserved synthetic contract and lifecycle
 

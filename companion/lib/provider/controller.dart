@@ -38,6 +38,13 @@ class ProviderController extends ChangeNotifier {
   bool _routeCurrent = true, _ready = false, _loaded = false;
   bool _activityCurrent = false;
   bool _reconciling = false, _operation = false;
+
+  /// A Touch ID prompt owns the next exchange: the poll must not re-read
+  /// (and so occupy or invalidate the review) until it has been sent.
+  bool _held = false;
+
+  /// Whether the last `perform` handed a request to the platform.
+  bool lastPerformSent = false;
   String _settlementId = '';
   String diagnostic = '';
   int _context = 0, _backoff = 5;
@@ -220,6 +227,19 @@ class ProviderController extends ChangeNotifier {
     _publish();
   }
 
+  /// Pause automatic and explicit re-reads while a Touch ID prompt is open;
+  /// the prepared approval is sent (or refused) before polling resumes.
+  void holdPolling() {
+    _held = true;
+    _poll?.cancel();
+  }
+
+  void releasePolling() {
+    if (!_held) return;
+    _held = false;
+    _schedule();
+  }
+
   void suspend() {
     suspended = true;
     _poll?.cancel();
@@ -324,6 +344,7 @@ class ProviderController extends ChangeNotifier {
     String password = '',
     core.ProviderWork Function()? begin,
   }) async {
+    lastPerformSent = false;
     if (!eligible ||
         !_ready ||
         !platform.available ||
@@ -364,6 +385,7 @@ class ProviderController extends ChangeNotifier {
     final pendingId = recoveryId;
     _publish();
     Uint8List response;
+    lastPerformSent = true;
     try {
       response = await platform.send(work.body);
     } catch (_) {
@@ -408,6 +430,7 @@ class ProviderController extends ChangeNotifier {
 
   Future<void> refresh({bool automatic = false}) async {
     _poll?.cancel();
+    if (_held) return; // releasePolling reschedules
     if (!eligible || busy) {
       _schedule();
       return;

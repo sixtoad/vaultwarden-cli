@@ -20,10 +20,21 @@ class TouchIdController extends ChangeNotifier {
   String message = '';
   int _token = 0;
   int? _active;
-  bool _disposed = false;
+  bool _disposed = false, _exempt = false;
+
+  /// Called when an approval or enrollment ends, so the page applies the
+  /// window's current lifecycle state (it ignored `inactive`/`resumed`
+  /// while the system prompt was up).
+  VoidCallback? onExemptionEnded;
 
   /// A Touch ID prompt is open (the window may be inactive meanwhile).
   bool get prompting => _active != null;
+
+  /// An approval or enrollment with a system prompt is running.
+  bool get lifecycleExempt => _exempt;
+
+  static const notSent =
+      'Touch ID signed, but the review changed or the approval could not start. Nothing was sent; try again.';
 
   KeyBinding? get binding {
     final c = provider.configuration;
@@ -77,6 +88,26 @@ class TouchIdController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  String _origin(String id) =>
+      provider.management.originId == id ? provider.management.originText : '';
+
+  void _start() {
+    working = true;
+    _exempt = true;
+    message = '';
+    provider.holdPolling();
+    _publish();
+  }
+
+  void _end() {
+    _active = null;
+    provider.releasePolling();
+    working = false;
+    _exempt = false;
+    _publish();
+    if (!_disposed) onExemptionEnded?.call();
+  }
+
   Future<void> refreshLocal() async {
     available = await platform.touchIdAvailable();
     final b = binding;
@@ -85,18 +116,31 @@ class TouchIdController extends ChangeNotifier {
   }
 
   /// Fetch a fresh review, require it to be exactly what was displayed,
-  /// then sign its transcript after Touch ID and send one proof.
+  /// then sign its transcript after Touch ID and send one proof. Polling is
+  /// held meanwhile; any path that does not send says so.
   Future<void> approve() async {
     if (!canApprove) return;
     final id = provider.state.reviewId, shown = provider.state.reviewText;
+    final origin = _origin(id);
     final b = binding!;
-    working = true;
-    message = '';
-    _publish();
+    // Selecting another request (or any invalidation) cancels the prompt.
+    void watch() {
+      if (provider.state.reviewId != id) unawaited(cancel());
+    }
+
+    _start();
+    provider.addListener(watch);
+    var recover = false;
     try {
+      available = await platform.touchIdAvailable();
+      if (!available) {
+        message = unavailableReason;
+        return;
+      }
       await provider.review(id);
       if (provider.state.reviewId != id ||
           provider.state.reviewText != shown ||
+          _origin(id) != origin ||
           !provider.state.canDecide) {
         message = 'The request changed or is no longer pending. Nothing was approved. Check the refreshed review.';
         return;
@@ -126,6 +170,10 @@ class TouchIdController extends ChangeNotifier {
         message = _signFailure(reply.outcome);
         return;
       }
+      if (provider.state.reviewId != id || !provider.state.canDecide) {
+        message = notSent;
+        return;
+      }
       await provider.perform(
         core.ProviderCommand.approve,
         begin: () => bio.providerBiometricBegin(
@@ -134,29 +182,42 @@ class TouchIdController extends ChangeNotifier {
           signature: reply.signature,
         ),
       );
-      message = resultText(review?.result ?? bio.BiometricDecisionResult.none);
-      if (provider.recoveryId.isNotEmpty) await provider.refresh();
+      if (!provider.lastPerformSent) {
+        message = notSent;
+        return;
+      }
+      final text = resultText(
+        review?.result ?? bio.BiometricDecisionResult.none,
+      );
+      message = text.isNotEmpty ? text : 'The provider answer was not a Touch ID result. Check the request status before trying again.';
+      recover = provider.recoveryId.isNotEmpty;
     } finally {
-      _active = null;
-      working = false;
-      _publish();
+      provider.removeListener(watch);
+      _end();
     }
+    if (recover) await provider.refresh();
   }
 
+  int? _cancelled;
+
+  /// Cancel the open prompt (once per prompt).
   Future<void> cancel() async {
     final token = _active;
-    if (token != null) await platform.cancel(token);
+    if (token == null || token == _cancelled) return;
+    _cancelled = token;
+    await platform.cancel(token);
   }
 
-  /// Enroll this Mac's key: management ticket, Secure Enclave key (reused
-  /// when one exists for this provider and client), proof of possession
-  /// after Touch ID, then the fresh password. Never deletes a key.
+  /// Enroll this Mac's key: management ticket, Secure Enclave key, proof of
+  /// possession after Touch ID, then the fresh password. A local key is
+  /// reused only when the provider holds it as current and it is usable;
+  /// then nothing needs enrolling. Any other local key for this provider
+  /// and client (retired, revoked, never enrolled, or invalidated by a
+  /// fingerprint change) can never approve again and is replaced.
   Future<void> enroll(String password) async {
     final b = binding;
     if (b == null || working || !available) return;
-    working = true;
-    message = '';
-    _publish();
+    _start();
     try {
       await provider.performKey(
         () => bio.biometricKeyBegin(
@@ -169,7 +230,22 @@ class TouchIdController extends ChangeNotifier {
         return;
       }
       var key = await platform.read(b);
-      if (key.outcome == KeyOutcome.absent) key = await platform.create(b);
+      if (key.outcome == KeyOutcome.present ||
+          key.outcome == KeyOutcome.invalidated) {
+        if (key.outcome == KeyOutcome.present &&
+            provider.keys.keyId.isNotEmpty &&
+            _keyId(key.publicKey) == provider.keys.keyId) {
+          message = 'This Mac\'s key is already the provider\'s current Touch ID key. Nothing was sent.';
+          return;
+        }
+        if ((await platform.delete(b)).outcome != KeyOutcome.deleted) {
+          message = 'This Mac\'s old approval key could not be removed. Nothing was enrolled.';
+          return;
+        }
+        key = await platform.create(b);
+      } else if (key.outcome == KeyOutcome.absent) {
+        key = await platform.create(b);
+      }
       if (key.outcome != KeyOutcome.present &&
           key.outcome != KeyOutcome.created) {
         message =
@@ -207,9 +283,18 @@ class TouchIdController extends ChangeNotifier {
       );
       message = provider.keys.message;
     } finally {
-      _active = null;
-      working = false;
+      _end();
       await refreshLocal();
+    }
+  }
+
+  /// The provider's key id for `publicKey` (SHA-256 of the SEC1 point, as
+  /// Rust computes it for the current ticket); empty when unavailable.
+  static String _keyId(Uint8List publicKey) {
+    try {
+      return bio.biometricKeyEnrollTranscript(publicKey: publicKey).keyId;
+    } catch (_) {
+      return '';
     }
   }
 
@@ -255,7 +340,8 @@ class TouchIdController extends ChangeNotifier {
   static String _signFailure(KeyOutcome outcome) => switch (outcome) {
     KeyOutcome.cancelled => 'Touch ID was cancelled. Nothing was sent. Try again or approve with your password.',
     KeyOutcome.unavailable => 'Touch ID is unavailable or locked out. Nothing was sent. Approve with your password.',
-    KeyOutcome.absent || KeyOutcome.missingKey => 'This Mac has no approval key for this provider. Nothing was sent. Enroll it in Settings, or approve with your password.',
+    KeyOutcome.invalidated => 'A fingerprint change invalidated this Mac\'s Touch ID key. Nothing was sent. Enroll again in Settings (a new key replaces it), or approve with your password.',
+    KeyOutcome.absent => 'This Mac has no approval key for this provider. Nothing was sent. Enroll it in Settings, or approve with your password.',
     KeyOutcome.refused => 'This Mac\'s key does not match the enrolled key or the request binding. Nothing was sent.',
     _ =>
       'Touch ID signing failed. Nothing was sent. Approve with your password.',

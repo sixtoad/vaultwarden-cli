@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../design/components.dart';
@@ -35,6 +37,7 @@ class RequestReview extends StatelessWidget {
   Widget build(BuildContext context) {
     final review = state.review;
     if (review == null) return const SizedBox.shrink();
+    if (isFinal(review.status)) return _finalView(review);
     return AccessPanel(
       child: Column(
         key: const Key('provider-review'),
@@ -106,13 +109,6 @@ class RequestReview extends StatelessWidget {
           const Text(
             'Review expires within 55 seconds and at the request deadline. Every attempt consumes its ticket.',
           ),
-          if (!state.canDecide) ...[
-            const SizedBox(height: 16),
-            Text(
-              'This request can no longer be decided (${review.status}). Expired, cancelled and already decided requests are final; nothing can be approved from this review.',
-              key: const Key('review-final'),
-            ),
-          ],
           if (touchIdMessage.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(touchIdMessage, key: const Key('touch-id-message')),
@@ -161,6 +157,52 @@ class RequestReview extends StatelessWidget {
       ),
     );
   }
+
+  /// Whether the provider's status is final (anything but `pending`). An
+  /// unreadable status counts as final: no approval controls for it.
+  static bool isFinal(String status) {
+    try {
+      return (jsonDecode(status) as Map<String, dynamic>)['status'] !=
+          'pending';
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Expired, decided, running, completed or failed requests (#61): the
+  /// state only, no password field, no approval or denial controls.
+  Widget _finalView(core.ProviderReview review) => AccessPanel(
+    child: Column(
+      key: const Key('provider-review'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AccessHeading(
+          'Request is final',
+          'This request can no longer be approved or denied.',
+        ),
+        FactRow('Request ID', review.id, key: const Key('review-id')),
+        FactRow('Provider endpoint', endpoint),
+        FactRow(
+          'Operation',
+          review.operation,
+          key: const Key('review-operation'),
+        ),
+        FactRow('Target', review.target, key: const Key('review-target')),
+        FactRow('Status', review.status, key: const Key('review-status')),
+        const SizedBox(height: 16),
+        const Text(
+          'Expired, cancelled and already decided requests are final; nothing can be approved from this review.',
+          key: Key('review-final'),
+        ),
+        if (touchIdMessage.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(touchIdMessage, key: const Key('touch-id-message')),
+        ],
+        const SizedBox(height: 16),
+        TextButton(onPressed: onCancel, child: const Text('Back to requests')),
+      ],
+    ),
+  );
 
   Widget _argument(core.ProviderReview review, int i) => FactRow(
     'Argument [$i]',

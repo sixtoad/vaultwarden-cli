@@ -46,15 +46,14 @@ class TouchIdKeyPanel extends StatelessWidget {
           keys.configured ? _providerState : 'Provider not pinned',
           key: const Key('touch-id-provider-state'),
         ),
-        FactRow(
-          'Key on this Mac',
-          touchId.local == KeyOutcome.present
-              ? 'Present in the Secure Enclave'
-              : 'None',
-          key: const Key('touch-id-local-key'),
-        ),
+        FactRow('Key on this Mac', switch (touchId.local) {
+          KeyOutcome.present => 'Present in the Secure Enclave',
+          KeyOutcome.invalidated =>
+            'Invalidated by a fingerprint change (enroll again to replace it)',
+          _ => 'None',
+        }, key: const Key('touch-id-local-key')),
         const Text(
-          'One non-exportable Secure Enclave key per provider and client identity. Every approval needs its own touch; adding or removing a fingerprint invalidates the key, which must then be enrolled again.',
+          'One non-exportable Secure Enclave key per provider and client identity. Every approval needs its own touch. Adding or removing a fingerprint invalidates the key; enrolling again replaces it, as it replaces any key the provider no longer holds as current.',
         ),
         const SizedBox(height: 12),
         accessPassword(password, 'Fresh approval password for key changes'),
