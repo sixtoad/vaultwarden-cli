@@ -106,7 +106,7 @@ class _InstallationSettingsState extends State<InstallationSettings> {
           const SizedBox(height: 12),
           Text(
             current.roles['desktop_approval'] == true
-                ? 'Desktop approval: macOS can approve through the existing pinned-TLS Linux-provider connection. Touch ID approval of the native macOS provider is not offered in this app yet (#50).'
+                ? 'Desktop approval: on Apple Silicon this bundle ships the native provider and the protected commands. The approval settings list the approval methods this version of the app offers.'
                 : 'Desktop approval transport is not implemented on this platform.',
           ),
           const SizedBox(height: 12),

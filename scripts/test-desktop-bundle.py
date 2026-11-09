@@ -243,7 +243,15 @@ class BundleTests(unittest.TestCase):
     def test_expected_architecture_is_optional_and_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
             root, manifest, _ = self.synthetic_populate(temporary, 'linux', 'x86_64')
-            bundle.check_expected_architecture(root, manifest, '')
+            # Optional for a local manual run, with a warning...
+            with patch.dict(os.environ, {'CI': '', 'GITHUB_ACTIONS': ''}), patch('sys.stderr') as stderr:
+                bundle.check_expected_architecture(root, manifest, '')
+            self.assertIn('DESKTOP_EXPECTED_ARCHITECTURE', ''.join(call.args[0] for call in stderr.write.call_args_list))
+            # ...but required in CI, so a job cannot drop the check by accident.
+            for key in ['CI', 'GITHUB_ACTIONS']:
+                with patch.dict(os.environ, {'CI': '', 'GITHUB_ACTIONS': '', key: 'true'}):
+                    with self.assertRaisesRegex(ValueError, 'DESKTOP_EXPECTED_ARCHITECTURE is required'):
+                        bundle.check_expected_architecture(root, manifest, '')
             bundle.check_expected_architecture(root, manifest, 'x86_64')
             self.assertIsNone(bundle.archive_architecture('linux', 'x86_64'))
             self.assertIsNone(bundle.archive_architecture('windows', 'x86_64'))

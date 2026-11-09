@@ -195,6 +195,9 @@ def check_expected_architecture(root, manifest, expected):
     bundle must never carry them.
     """
     if not expected:
+        if any(os.environ.get(key, '').lower() == 'true' for key in ('CI', 'GITHUB_ACTIONS')):
+            raise ValueError('DESKTOP_EXPECTED_ARCHITECTURE is required in CI (arm64 or x86_64)')
+        print('warning: DESKTOP_EXPECTED_ARCHITECTURE is not set; the bundle architecture is not checked', file=sys.stderr)
         return
     expected = {'arm64': 'aarch64', 'AMD64': 'x86_64'}.get(expected, expected)
     if expected not in ('aarch64', 'x86_64'):
