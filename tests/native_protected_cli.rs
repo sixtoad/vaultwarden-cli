@@ -152,8 +152,37 @@ fn native_bootstrap_secret_goes_to_the_private_state_file_store_from_stdin_only(
         .arg("--state-root")
         .arg(&unsafe_state)
         .arg("--store-bootstrap-secret");
-    assert!(!run_with_stdin(command, b"secret\n").status.success());
+    let output = run_with_stdin(command, b"secret-sentinel\n");
+    assert!(!output.status.success());
     assert_eq!(std::fs::read_dir(&unsafe_state).unwrap().count(), 0);
+    // The failure names its class (never the secret), not a bare "unavailable".
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cannot store the bootstrap secret")
+            && stderr.contains("state directory must be mode 0700"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("secret-sentinel"));
+}
+
+#[test]
+fn native_vw_access_without_installed_endpoint_names_the_identity_record() {
+    let identities = std::path::Path::new("/Library/VaultwardenAccess/native-identities.json");
+    if identities.exists() {
+        // An installed provider makes the default resolvable; nothing to check here.
+        return;
+    }
+    let root = private_root();
+    let output = isolated(env!("CARGO_BIN_EXE_vw-access"), root.path())
+        .args(["history", "--limit", "1"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "vw-access: no installed endpoint found at \
+         /Library/VaultwardenAccess/native-identities.json; pass --state-root\n"
+    );
 }
 
 #[test]
@@ -191,6 +220,63 @@ fn native_setup_commands_write_private_outputs_without_provider_state() {
             "user.0000",
             "--encrypted-key",
             "2.aXY=|ZGF0YQ==|bWFj",
+            "--kdf-iterations",
+            "600000",
+            "--out",
+        ])
+        .arg(&backend)
+        .output()
+        .unwrap();
+    // The KDF cannot be read from a CLI login: it must be stated explicitly.
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("--kdf pbkdf2 is required"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!backend.exists());
+    let argon = isolated(vw, root.path())
+        .args([
+            "setup",
+            "backend-json",
+            "--server",
+            "https://vault.example.test",
+            "--email",
+            "human@example.test",
+            "--client-id",
+            "user.0000",
+            "--encrypted-key",
+            "2.aXY=|ZGF0YQ==|bWFj",
+            "--kdf",
+            "argon2id",
+            "--kdf-iterations",
+            "3",
+            "--out",
+        ])
+        .arg(&backend)
+        .output()
+        .unwrap();
+    assert!(!argon.status.success());
+    assert!(
+        String::from_utf8_lossy(&argon.stderr).contains("Argon2id accounts are not supported"),
+        "{}",
+        String::from_utf8_lossy(&argon.stderr)
+    );
+    assert!(!backend.exists());
+    let output = isolated(vw, root.path())
+        .args([
+            "setup",
+            "backend-json",
+            "--server",
+            "https://vault.example.test",
+            "--email",
+            "human@example.test",
+            "--client-id",
+            "user.0000",
+            "--encrypted-key",
+            "2.aXY=|ZGF0YQ==|bWFj",
+            "--kdf",
+            "pbkdf2",
             "--kdf-iterations",
             "600000",
             "--out",

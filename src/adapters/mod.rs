@@ -11,6 +11,8 @@ pub mod human_socket;
 pub mod loopback_ui;
 #[cfg(target_os = "macos")]
 pub mod native;
+// The native macOS provider only: Linux keeps the Secret Service keyring.
+#[cfg(target_os = "macos")]
 pub mod provider_secret_file;
 pub mod session;
 pub mod setup_tools;

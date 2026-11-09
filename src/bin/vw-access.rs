@@ -158,6 +158,9 @@ enum SetupCommand {
         client_id: Option<String>,
         #[arg(long)]
         encrypted_key: Option<String>,
+        /// The account's KDF: only `pbkdf2` is supported (required; a CLI login does not record it).
+        #[arg(long, value_parser = ["pbkdf2", "argon2id"])]
+        kdf: Option<String>,
         #[arg(long)]
         kdf_iterations: Option<u32>,
     },
@@ -314,6 +317,13 @@ fn main() -> ExitCode {
     #[cfg(target_os = "macos")]
     if args.state_root.is_none() {
         args.state_root = vaultwarden_cli::adapters::human_socket::installed_human_socket_dir();
+        if args.state_root.is_none() {
+            eprintln!(
+                "vw-access: no installed endpoint found at {}; pass --state-root",
+                vaultwarden_cli::adapters::human_socket::INSTALLED_IDENTITIES_PATH
+            );
+            return ExitCode::from(2);
+        }
     }
     if args.state_root.is_none() {
         eprintln!("vw-access: invalid command; use --help");
@@ -635,6 +645,7 @@ fn run_setup(command: SetupCommand) -> Result<(), String> {
             email,
             client_id,
             encrypted_key,
+            kdf,
             kdf_iterations,
         } => {
             let source = if from_cli_login {
@@ -652,6 +663,7 @@ fn run_setup(command: SetupCommand) -> Result<(), String> {
                     email,
                     client_id,
                     encrypted_key,
+                    kdf,
                     kdf_iterations,
                 },
             )

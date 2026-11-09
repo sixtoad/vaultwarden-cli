@@ -408,6 +408,9 @@ fn peer_uid(stream: &UnixStream) -> Result<u32, HumanTransportError> {
         Ok(uid)
     }
 }
+/// The root-owned record naming the installed native endpoints.
+#[cfg(target_os = "macos")]
+pub const INSTALLED_IDENTITIES_PATH: &str = super::native::identity::IDENTITIES_PATH;
 /// The installed native human endpoint directory from the root-owned identity
 /// record, used by `vw-access` when no `--state-root` is given on macOS.
 #[cfg(target_os = "macos")]

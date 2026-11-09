@@ -81,8 +81,15 @@ pub struct BackendFields {
     pub email: Option<String>,
     pub client_id: Option<String>,
     pub encrypted_key: Option<String>,
+    /// The account's KDF as stated by the operator (`pbkdf2`); the CLI login does not record it.
+    pub kdf: Option<String>,
     pub kdf_iterations: Option<u32>,
 }
+
+pub const KDF_REQUIRED: &str = "--kdf pbkdf2 is required: a vaultwarden-cli login does not record the account's KDF \
+     (web vault: Settings > Security > Keys); state it with --kdf pbkdf2 --kdf-iterations N";
+pub const KDF_ARGON2: &str =
+    "Argon2id accounts are not supported: the provider derives the master key with PBKDF2 only";
 
 /// Build the provider `backend.json` from an existing `vaultwarden-cli login`
 /// `config.json` (optional) overridden by explicit fields. The result contains
@@ -126,21 +133,28 @@ pub fn backend_json(
             "encrypted_key must be an authenticated type-2 key (2.iv|data|mac)".into(),
         ));
     }
+    // A vaultwarden-cli login stores kdf_iterations but not the KDF type, and an
+    // Argon2id account's iteration count is a small number that would pass as a
+    // (weak, wrong) PBKDF2 count: the operator states both explicitly.
+    match overrides.kdf.as_deref() {
+        Some("pbkdf2") => {}
+        Some("argon2id") => return Err(SetupError::Invalid(KDF_ARGON2.into())),
+        _ => return Err(SetupError::Invalid(KDF_REQUIRED.into())),
+    }
+    if source.get("kdf").is_some_and(|kdf| kdf != 0) {
+        return Err(SetupError::Invalid(KDF_ARGON2.into()));
+    }
     let kdf_iterations = overrides
         .kdf_iterations
-        .or_else(|| {
-            source
-                .get("kdf_iterations")
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|v| u32::try_from(v).ok())
-        })
         .filter(|v| (1..=2_000_000).contains(v))
         .ok_or_else(|| {
-            SetupError::Invalid("kdf_iterations (PBKDF2, 1-2000000) is required".into())
+            SetupError::Invalid("--kdf-iterations (PBKDF2, 1-2000000) is required".into())
         })?;
-    if source.get("kdf").is_some_and(|kdf| kdf != 0) {
+    if let Some(recorded) = source.get("kdf_iterations").filter(|v| !v.is_null())
+        && recorded.as_u64() != Some(u64::from(kdf_iterations))
+    {
         return Err(SetupError::Invalid(
-            "only PBKDF2 accounts (kdf 0) are supported".into(),
+            "--kdf-iterations differs from the kdf_iterations of the vaultwarden-cli login".into(),
         ));
     }
     let mut setup = serde_json::json!({
@@ -264,6 +278,7 @@ const CA_CONFIG: &str = "[req]\ndistinguished_name=dn\nx509_extensions=ext\nprom
 /// `p12_password` is passed to openssl on its stdin, never in argv or env.
 pub fn tls_bundle(request: &TlsRequest, p12_password: &str) -> Result<TlsSummary, SetupError> {
     validate_tls_request(request, p12_password)?;
+    create_private_parents(&request.out_dir)?;
     std::fs::DirBuilder::new()
         .mode(0o700)
         .create(&request.out_dir)
@@ -280,6 +295,42 @@ pub fn tls_bundle(request: &TlsRequest, p12_password: &str) -> Result<TlsSummary
         let _ignored = std::fs::remove_dir_all(&request.out_dir);
     }
     result
+}
+
+/// Create the missing ancestors of `path` (for example `~/vw-setup`) one level
+/// at a time, each `0700`, without following a link at the new name, and check
+/// that each new directory is a private directory of the running user. Existing
+/// ancestors are used as they are.
+fn create_private_parents(path: &Path) -> Result<(), SetupError> {
+    use std::os::unix::fs::MetadataExt;
+    let mut missing = Vec::new();
+    let mut parent = path.parent();
+    while let Some(directory) = parent.filter(|p| !p.as_os_str().is_empty()) {
+        match std::fs::symlink_metadata(directory) {
+            Ok(_) => break,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                missing.push(directory.to_path_buf());
+                parent = directory.parent();
+            }
+            Err(_) => return Err(SetupError::Write(directory.into())),
+        }
+    }
+    let euid = unsafe { libc::geteuid() };
+    for directory in missing.into_iter().rev() {
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&directory)
+            .map_err(|_error| SetupError::Write(directory.clone()))?;
+        let metadata = std::fs::symlink_metadata(&directory)
+            .map_err(|_error| SetupError::Write(directory.clone()))?;
+        if !metadata.is_dir() || metadata.uid() != euid || metadata.mode() & 0o077 != 0 {
+            return Err(SetupError::Invalid(format!(
+                "{} is not a private directory of the running user",
+                directory.display()
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn validate_tls_request(request: &TlsRequest, p12_password: &str) -> Result<(), SetupError> {
@@ -629,7 +680,54 @@ mod tests {
         let dir = private_dir();
         let source = dir.path().join("config.json");
         std::fs::write(&source, serde_json::to_vec(&cli_config()).unwrap()).unwrap();
-        let bytes = backend_json(Some(&source), &BackendFields::default()).unwrap();
+        // config.json carries no KDF type: an explicit PBKDF2 statement is required.
+        assert_eq!(
+            backend_json(Some(&source), &BackendFields::default()),
+            Err(SetupError::Invalid(KDF_REQUIRED.into()))
+        );
+        let pbkdf2 = BackendFields {
+            kdf: Some("pbkdf2".into()),
+            kdf_iterations: Some(600_000),
+            ..BackendFields::default()
+        };
+        for fields in [
+            BackendFields {
+                kdf: Some("argon2id".into()),
+                kdf_iterations: Some(3),
+                ..BackendFields::default()
+            },
+            BackendFields {
+                kdf: Some("argon2id".into()),
+                ..pbkdf2.clone()
+            },
+        ] {
+            assert_eq!(
+                backend_json(Some(&source), &fields),
+                Err(SetupError::Invalid(KDF_ARGON2.into()))
+            );
+        }
+        // The iteration count is stated too, and must agree with the login's.
+        assert!(
+            backend_json(
+                Some(&source),
+                &BackendFields {
+                    kdf_iterations: None,
+                    ..pbkdf2.clone()
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            backend_json(
+                Some(&source),
+                &BackendFields {
+                    kdf_iterations: Some(100_000),
+                    ..pbkdf2.clone()
+                }
+            )
+            .is_err()
+        );
+        let bytes = backend_json(Some(&source), &pbkdf2).unwrap();
         let text = String::from_utf8(bytes.clone()).unwrap();
         for forbidden in [
             "token-sentinel",
@@ -653,6 +751,7 @@ mod tests {
             email: Some("other@example.test".into()),
             client_id: Some("user.1111".into()),
             encrypted_key: Some("2.aXY=|ZGF0YQ==|bWFj".into()),
+            kdf: Some("pbkdf2".into()),
             kdf_iterations: Some(1),
         };
         let value: serde_json::Value =
@@ -679,10 +778,7 @@ mod tests {
             let mut config = cli_config();
             config[field] = bad;
             std::fs::write(&source, serde_json::to_vec(&config).unwrap()).unwrap();
-            assert!(
-                backend_json(Some(&source), &BackendFields::default()).is_err(),
-                "{field}"
-            );
+            assert!(backend_json(Some(&source), &pbkdf2).is_err(), "{field}");
         }
         let fields = BackendFields {
             encrypted_key: Some("0.legacy".into()),
@@ -716,7 +812,8 @@ mod tests {
         crate::install_rustls_crypto_provider();
         let dir = private_dir();
         let request = TlsRequest {
-            out_dir: dir.path().join("tls"),
+            // Missing parents (e.g. ~/vw-setup) are created private, not refused.
+            out_dir: dir.path().join("vw-setup").join("nested").join("tls"),
             openssl,
             server_ips: vec!["127.0.0.1".parse().unwrap()],
             server_dns: vec![],
@@ -727,10 +824,12 @@ mod tests {
             tls_bundle(&request, "short"),
             Err(SetupError::Invalid(_))
         ));
-        assert!(!request.out_dir.exists());
+        assert!(!dir.path().join("vw-setup").exists());
         let summary = tls_bundle(&request, "synthetic-password").unwrap();
         let out = &request.out_dir;
         assert_eq!(mode(out), 0o700);
+        assert_eq!(mode(&dir.path().join("vw-setup")), 0o700);
+        assert_eq!(mode(&dir.path().join("vw-setup/nested")), 0o700);
         let mut names: Vec<_> = std::fs::read_dir(out)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())

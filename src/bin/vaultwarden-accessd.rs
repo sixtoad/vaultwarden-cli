@@ -109,7 +109,12 @@ fn run(args: Args) -> Result<(), ()> {
     vaultwarden_cli::adapters::provider_secret_file::ProviderSecretFileStore::install_default(
         &args.state_root,
     )
-    .map_err(|_error| ())?;
+    .map_err(|error| {
+        eprintln!(
+            "vaultwarden-accessd: cannot use the provider secret store: {}",
+            vaultwarden_cli::adapters::session::keyring_error_class(&error)
+        );
+    })?;
     if args.store_bootstrap_secret {
         return store_bootstrap_secret();
     }
@@ -296,17 +301,20 @@ fn run(args: Args) -> Result<(), ()> {
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn store_bootstrap_secret() -> Result<(), ()> {
     use std::io::{IsTerminal, Read};
+    let refuse =
+        |class: &str| eprintln!("vaultwarden-accessd: cannot store the bootstrap secret: {class}");
     let secret = if std::io::stdin().is_terminal() {
         zeroize::Zeroizing::new(
-            rpassword::prompt_password("API client secret: ").map_err(|_error| ())?,
+            rpassword::prompt_password("API client secret: ")
+                .map_err(|_error| refuse("cannot read the secret from the terminal"))?,
         )
     } else {
         let mut raw = zeroize::Zeroizing::new(Vec::new());
         std::io::stdin()
             .take(4097)
             .read_to_end(&mut raw)
-            .map_err(|_error| ())?;
-        let text = std::str::from_utf8(&raw).map_err(|_error| ())?;
+            .map_err(|_error| refuse("cannot read the secret from standard input"))?;
+        let text = std::str::from_utf8(&raw).map_err(|_error| refuse("the secret is not UTF-8"))?;
         zeroize::Zeroizing::new(text.strip_suffix('\n').unwrap_or(text).to_owned())
     };
     if secret.is_empty() || secret.contains(['\n', '\r']) {
@@ -316,7 +324,7 @@ fn store_bootstrap_secret() -> Result<(), ()> {
     vaultwarden_cli::adapters::session::store_bootstrap_secret(
         &vaultwarden_cli::access::ports::SensitiveString::new(secret.to_string()),
     )
-    .map_err(|_error| ())?;
+    .map_err(|class| refuse(&class))?;
     eprintln!("vaultwarden-accessd: bootstrap client secret stored");
     Ok(())
 }

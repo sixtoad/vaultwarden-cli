@@ -1,8 +1,9 @@
 # Native macOS provider: setup after installation
 
 This is the post-install sequence for the native Apple Silicon provider, after
-`scripts/macos-provider-install.py` (PR #70) has created the accounts, the empty
-layout under `/Library/VaultwardenAccess` and the LaunchDaemon. It covers the
+`scripts/macos-provider-install.py` (PR #70), run from its root-owned copy, has
+created the accounts, the empty layout under `/Library/VaultwardenAccess` and the
+LaunchDaemon. It covers the
 TLS identities, `backend.json`, the API client secret, the companion enrollment,
 an agent account and key, a first operation and a first approved request.
 
@@ -27,7 +28,8 @@ Conventions used below (substitute your values from the reviewed plan):
 BIN=/Library/VaultwardenAccess/versions/$V        # vaultwarden-accessd, vw-access
 STATE=/Library/VaultwardenAccess/state             # provider-owned 0700
 LABEL=system/com.cantolla.vaultwarden-accessd
-PLIST=/Library/LaunchDaemons/com.cantolla.vaultwarden-accessd.plist
+# the installer's root-owned copy (docs/desktop-installation.md, PR #70)
+I=/usr/local/libexec/vw-provider-installer/scripts/macos-provider-install.py
 ```
 
 The LaunchDaemon runs `vaultwarden-accessd --state-root $STATE --backend-config
@@ -40,17 +42,21 @@ $STATE/provider-key.pem --companion-client-ca $STATE/companion-ca.pem`.
 
 The provider refuses to serve the companion endpoint until at least one companion
 certificate is enrolled, so a service started too early exits and launchd restarts
-it every 30 s. Install with `--no-start`, or stop it:
+it every 30 s. The installer already keeps it stopped: with `--no-start`, or while
+`state/backend.json`, `provider-cert.pem`, `provider-key.pem` or `companion-ca.pem`
+is missing, it leaves the service **disabled** (`launchctl disable`). A raw
+`launchctl bootstrap` of a disabled label is refused, so always stop, start and
+inspect the service through the installer's own verbs:
 
 ```sh
-# stop (the installer has no stop/start verbs; launchctl is the interface)
-sudo launchctl bootout $LABEL
-# start
-sudo launchctl bootstrap system $PLIST
+sudo /usr/bin/python3 $I stop --acknowledge-active-work   # close admission, boot the service out
+sudo /usr/bin/python3 $I start                            # verify version + credential files, enable, bootstrap, wait for running
+sudo /usr/bin/python3 $I status                           # launchd state, pid, last exit code, accounts, sockets, credential files
 ```
 
-`AbandonProcessGroup` is set: stopping the provider never stops programs it
-already launched.
+`start` checks the four state files but cannot see the client secret (step 3):
+check that yourself before starting. `AbandonProcessGroup` is set: stopping the
+provider never stops programs it already launched.
 
 ## 1. Certificates (as the operator, in your own account)
 
@@ -59,6 +65,9 @@ umask 077
 $BIN/vw-access setup tls --out-dir ~/vw-setup/tls \
   --server-ip 127.0.0.1 --client-name "Mac operator"
 ```
+
+Missing parents of `--out-dir` (here `~/vw-setup`) are created `0700` and must end
+up owned by you; the output directory itself must not exist yet.
 
 The PKCS#12 password is prompted twice without echo (or read as one line from
 stdin when stdin is not a terminal); it is never an argument. The command runs
@@ -88,8 +97,16 @@ certificate changes the pin: re-enter it in the companion.
 From an existing `vaultwarden-cli login` of the same account (API-key login):
 
 ```sh
-$BIN/vw-access setup backend-json --from-cli-login --out ~/vw-setup/backend.json
+$BIN/vw-access setup backend-json --from-cli-login --kdf pbkdf2 --kdf-iterations 600000 \
+  --out ~/vw-setup/backend.json
 ```
+
+`--kdf pbkdf2 --kdf-iterations N` are always required: a `vaultwarden-cli` login
+records an iteration count but not the KDF type, and an Argon2id account's small
+iteration count would otherwise pass as a (wrong) PBKDF2 count. Read both from the
+web vault (*Settings → Security → Keys*). Argon2id accounts are refused (the
+provider derives keys with PBKDF2 only), and with `--from-cli-login`/`--cli-config`
+the count must equal the login's `kdf_iterations`.
 
 or explicitly (`--cli-config PATH` reads another `config.json`; explicit flags
 override it):
@@ -97,7 +114,7 @@ override it):
 ```sh
 $BIN/vw-access setup backend-json --out ~/vw-setup/backend.json \
   --server https://vault.example.com --email you@example.com \
-  --client-id user.xxxxxxxx --encrypted-key '2.…|…|…' --kdf-iterations 600000
+  --client-id user.xxxxxxxx --encrypted-key '2.…|…|…' --kdf pbkdf2 --kdf-iterations 600000
 ```
 
 Only `server`, `email`, `client_id`, `encrypted_key`, `kdf_iterations` and, when
@@ -128,13 +145,35 @@ its state directory instead of the Keychain:
 `secrets/` is created `0700`, each record is a single-link `0600` regular file
 owned by the provider, opened without following links, replaced atomically and
 synced. Anything else (wrong owner, mode, a link, an ACL grant) is refused and the
-provider fails closed. Root can read these files, as it could read the TLS key
+provider fails closed. A temporary `.<record>.<24 hex>.tmp` left by a crash during a
+write is removed the next time the store is opened (only that exact name, a
+provider-owned single-link `0600` file older than a minute, never through a link). Root can read these files, as it could read the TLS key
 next to them or a System keychain. Provision the secret by prompt (no echo; or one
 line on stdin), never as an argument:
 
 ```sh
 cd / && sudo -u $PROVIDER $BIN/vaultwarden-accessd --state-root $STATE --store-bootstrap-secret
+# check the record exists before the first start/unlock (owner $PROVIDER, -rw-------, no ACL lines):
+sudo ls -le $STATE/secrets
 ```
+
+A refusal names its class and never the secret, for example "state directory not
+owned by the running user; run as the provider account (with the installer
+defaults: `sudo -u _vwaccess`)" when run as root or as yourself, or "… must be
+mode 0700". Fix the named property; the store never repairs it.
+
+**One-time cleanup after a pre-file-store provider.** If you ran a macOS provider
+build from before this store (it used the login Keychain), its items stay in the
+Keychain of the account that ran it and are no longer read. Delete them once, as
+that account:
+
+```sh
+security delete-generic-password -s vaultwarden-accessd -a bootstrap-client-secret
+security delete-generic-password -s vaultwarden-accessd -a revocable-session
+```
+
+"could not be found" means there was nothing to delete. There is no automatic
+migration: provision the secret again with the command above.
 
 Linux keeps the Secret Service keyring; the direct `vaultwarden-cli` keeps the
 login Keychain. The session record is cleared at every start, lock and expiry.
@@ -145,6 +184,7 @@ Enrollment reads the client certificate as the provider, so it must be a
 provider-owned `0600` file:
 
 ```sh
+sudo /usr/bin/python3 $I stop --acknowledge-active-work   # no-op if never started
 sudo install -o $PROVIDER -g $PGROUP -m 0600 ~/vw-setup/tls/companion-client.pem $STATE/companion-client.pem
 cd / && sudo -u $PROVIDER $BIN/vaultwarden-accessd --state-root $STATE \
   --companion-enroll-cert $STATE/companion-client.pem \
@@ -158,14 +198,15 @@ sudo rm $STATE/companion-client.pem
 ## 5. Start the provider
 
 ```sh
-sudo launchctl bootstrap system $PLIST     # or re-run the installer's `install` without --no-start
-sudo launchctl print $LABEL | grep -E 'state|pid|last exit'
-sudo /usr/bin/python3 scripts/macos-provider-install.py status
+sudo ls -le $STATE/secrets                 # the bootstrap record from step 3 is there
+sudo /usr/bin/python3 $I start             # (or re-run the same `install` without --no-start)
+sudo /usr/bin/python3 $I status
 ```
 
 It starts **locked**. A `last exit code` other than 0 with a growing run count is
-a crash loop: stop it and check steps 2–4 (all four state files `0600` owned by
-the provider, a companion enrolled, the secret store safe).
+a crash loop: `$I stop --acknowledge-active-work` and check steps 2–4 (all four
+state files `0600` owned by the provider, a companion enrolled, the secret store
+safe).
 
 ## 6. Companion app
 
@@ -188,7 +229,9 @@ The operator must be a member of `$HUMAN` (the installer adds it; log out and in
 once). On macOS `vw-access` now defaults `--state-root` to the human endpoint
 directory named by the root-owned `/Library/VaultwardenAccess/native-identities.json`
 (`/Library/VaultwardenAccess/run/human`), so no flag or environment variable is
-needed; `--state-root`/`VAULTWARDEN_ACCESS_STATE_ROOT` still override it.
+needed; `--state-root`/`VAULTWARDEN_ACCESS_STATE_ROOT` still override it. When
+that record is missing or unsafe, `vw-access` says `no installed endpoint found at
+/Library/VaultwardenAccess/native-identities.json; pass --state-root` and exits 2.
 
 ```sh
 $BIN/vw-access history --limit 5     # works while locked
@@ -290,8 +333,8 @@ reaches a terminal state; `vw-access status <id>` and `vw-access history` show i
 ## 11. Verification
 
 ```sh
-sudo /usr/bin/python3 scripts/macos-provider-install.py status
-sudo launchctl print $LABEL | grep -E 'state|pid|last exit'
+sudo /usr/bin/python3 $I status
+sudo launchctl print $LABEL | grep -E 'state|pid|last exit'   # read-only view
 sudo ls -le $STATE $STATE/secrets        # provider-owned, 0700 dirs / 0600 files, no ACL
 $BIN/vw-access history --limit 10
 $BIN/vw-access agent list

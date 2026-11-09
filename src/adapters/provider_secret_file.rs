@@ -10,7 +10,7 @@
 //! keychain. It implements the `keyring-core` store API, so callers keep the
 //! keyring semantics: an absent record is `NoEntry`; anything unsafe or
 //! unreadable is an error and fails closed. It is installed only by the native
-//! macOS provider; Linux keeps the Secret Service store.
+//! macOS provider and compiled only on macOS; Linux keeps the Secret Service store.
 use keyring_core::{
     Credential, Entry, Error, Result,
     api::{CredentialApi, CredentialPersistence, CredentialStoreApi},
@@ -101,25 +101,127 @@ fn euid() -> u32 {
     unsafe { libc::geteuid() }
 }
 
-#[cfg(target_os = "macos")]
 fn no_acl_grants(file: &File) -> Result<()> {
     crate::adapters::native::platform::no_acl(file).map_err(|_error| unsafe_state("ACL grant"))
 }
-#[cfg(not(target_os = "macos"))]
-#[allow(clippy::unnecessary_wraps)]
-const fn no_acl_grants(_file: &File) -> Result<()> {
-    Ok(())
-}
 
-fn private_directory(file: &File) -> Result<()> {
+/// Remedy for a directory the running user does not own (typically root or the operator).
+const RUN_AS_PROVIDER: &str =
+    "run as the provider account (with the installer defaults: `sudo -u _vwaccess`)";
+
+fn private_directory(file: &File, what: &str) -> Result<()> {
     no_acl_grants(file)?;
     let metadata = file
         .metadata()
         .map_err(|error| io_failure("metadata", &error))?;
-    if !metadata.is_dir() || metadata.uid() != euid() || metadata.mode() & 0o7777 != 0o700 {
-        return Err(unsafe_state("directory must be provider-owned 0700"));
+    if !metadata.is_dir() {
+        return Err(unsafe_state(&format!("{what} is not a directory")));
+    }
+    if metadata.uid() != euid() {
+        return Err(unsafe_state(&format!(
+            "{what} not owned by the running user; {RUN_AS_PROVIDER}"
+        )));
+    }
+    if metadata.mode() & 0o7777 != 0o700 {
+        return Err(unsafe_state(&format!("{what} must be mode 0700")));
     }
     Ok(())
+}
+
+/// Explain why the state root failed the ancestry check, without weakening it:
+/// this only runs after the check refused, and only chooses the message.
+fn state_root_refusal(state_root: &Path) -> Error {
+    match open_at(
+        None,
+        std::os::unix::ffi::OsStrExt::as_bytes(state_root.as_os_str()),
+        libc::O_RDONLY | libc::O_DIRECTORY,
+    ) {
+        Err(error) if error.raw_os_error() == Some(libc::EACCES) => unsafe_state(&format!(
+            "state directory not accessible to the running user; {RUN_AS_PROVIDER}"
+        )),
+        Err(error) if error.raw_os_error() == Some(libc::ENOENT) => {
+            unsafe_state("state directory does not exist")
+        }
+        Ok(file) if file.metadata().is_ok_and(|m| m.uid() != euid()) => unsafe_state(&format!(
+            "state directory not owned by the running user; {RUN_AS_PROVIDER}"
+        )),
+        _ => unsafe_state(
+            "state directory or an ancestor is a symlink, carries an ACL grant or is writable by another account",
+        ),
+    }
+}
+
+/// Crash leftovers of `write`: `.<record>.<24 lowercase hex>.tmp`, exactly.
+fn is_temporary_name(name: &[u8]) -> bool {
+    let Some(inner) = name
+        .strip_prefix(b".")
+        .and_then(|rest| rest.strip_suffix(b".tmp"))
+    else {
+        return false;
+    };
+    let Some(split) = inner.iter().rposition(|b| *b == b'.') else {
+        return false;
+    };
+    let (record, random) = (&inner[..split], &inner[split + 1..]);
+    let Some(dot) = record.iter().position(|b| *b == b'.') else {
+        return false;
+    };
+    let (service, account) = (
+        std::str::from_utf8(&record[..dot]),
+        std::str::from_utf8(&record[dot + 1..]),
+    );
+    random.len() == 24
+        && random
+            .iter()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b))
+        && matches!((service, account), (Ok(service), Ok(account)) if record_name(service, account).is_ok())
+}
+
+/// A temporary younger than this may belong to a concurrent writer.
+const STALE_TEMPORARY_SECONDS: i64 = 60;
+
+/// Best effort: remove crash-leftover temporaries that match the exact name
+/// pattern and are euid-owned, single-link, `0600` regular files older than a
+/// minute. Never follows links; anything else is left untouched.
+fn sweep_stale_temporaries(directory: &File) {
+    let names = {
+        let fd = unsafe { libc::fcntl(directory.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 0) };
+        if fd < 0 {
+            return;
+        }
+        let stream = unsafe { libc::fdopendir(fd) };
+        if stream.is_null() {
+            unsafe { libc::close(fd) };
+            return;
+        }
+        unsafe { libc::rewinddir(stream) };
+        let mut names = Vec::new();
+        loop {
+            let entry = unsafe { libc::readdir(stream) };
+            if entry.is_null() {
+                break;
+            }
+            let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
+            if is_temporary_name(name.to_bytes()) {
+                names.push(name.to_owned());
+            }
+        }
+        unsafe { libc::closedir(stream) };
+        names
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX)
+        });
+    for name in names {
+        let Ok(Some(stat)) = stat_at(directory, &name) else {
+            continue;
+        };
+        if private_stat(&stat).is_ok() && now - stat.st_mtime >= STALE_TEMPORARY_SECONDS {
+            unsafe { libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), 0) };
+        }
+    }
 }
 
 fn private_record(metadata: &std::fs::Metadata) -> Result<()> {
@@ -203,17 +305,9 @@ impl SecretRecord {
     /// Open and validate the state root. On macOS the whole ancestry must have
     /// no untrusted writers, as the provider state store requires.
     fn root(&self) -> Result<File> {
-        #[cfg(target_os = "macos")]
         let root = crate::adapters::native::platform::open_no_writers(&self.state_root, false)
-            .map_err(|_error| unsafe_state("state root ancestry"))?;
-        #[cfg(not(target_os = "macos"))]
-        let root = open_at(
-            None,
-            std::os::unix::ffi::OsStrExt::as_bytes(self.state_root.as_os_str()),
-            libc::O_RDONLY | libc::O_DIRECTORY,
-        )
-        .map_err(|error| io_failure("open state root", &error))?;
-        private_directory(&root)?;
+            .map_err(|_error| state_root_refusal(&self.state_root))?;
+        private_directory(&root, "state directory")?;
         Ok(root)
     }
 
@@ -237,7 +331,8 @@ impl SecretRecord {
             libc::O_RDONLY | libc::O_DIRECTORY,
         ) {
             Ok(directory) => {
-                private_directory(&directory)?;
+                private_directory(&directory, "secrets directory")?;
+                sweep_stale_temporaries(&directory);
                 Ok(Some((root, directory)))
             }
             Err(error) if error.raw_os_error() == Some(libc::ENOENT) && !create => Ok(None),
@@ -594,6 +689,81 @@ mod tests {
             ));
         }
         assert!(ProviderSecretFileStore::new(Path::new("relative")).is_err());
+    }
+
+    #[test]
+    fn crash_leftover_temporaries_are_swept_and_nothing_else() {
+        let (dir, root) = private_root();
+        let record = entry(&root, SESSION_ACCOUNT);
+        record.set_password("first").unwrap();
+        let secrets = root.join(SECRETS_DIRECTORY);
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        let leftover = |name: &str, age: Option<std::time::SystemTime>| {
+            let path = secrets.join(name);
+            std::fs::write(&path, "partial").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            if let Some(time) = age {
+                File::options()
+                    .write(true)
+                    .open(&path)
+                    .unwrap()
+                    .set_modified(time)
+                    .unwrap();
+            }
+            path
+        };
+        let hex = "0123456789abcdef01234567";
+        let stale = leftover(
+            &format!(".vaultwarden-accessd.revocable-session.{hex}.tmp"),
+            Some(old),
+        );
+        let stale_bootstrap = leftover(
+            &format!(".vaultwarden-accessd.bootstrap-client-secret.{hex}.tmp"),
+            Some(old),
+        );
+        // A writer's in-flight temporary (recent) is never taken from under it.
+        let fresh = leftover(
+            &format!(".vaultwarden-accessd.revocable-session.{hex}.tmp").replace("0123", "fedc"),
+            None,
+        );
+        // Near misses of the exact pattern are not ours.
+        let kept: Vec<PathBuf> = [
+            ".vaultwarden-accessd.revocable-session.0123.tmp",
+            ".vaultwarden-accessd.revocable-session.0123456789abcdefg1234567.tmp",
+            ".vaultwarden-accessd.revocable-session.0123456789abcdef01234567.tmp.bak",
+            "vaultwarden-accessd.revocable-session.0123456789abcdef01234567.tmp",
+            ".vaultwarden-accessd..0123456789abcdef01234567.tmp",
+            ".tmp",
+        ]
+        .iter()
+        .map(|name| leftover(name, Some(old)))
+        .collect();
+        // A matching name with a second link, a wrong mode or as a symlink is left alone.
+        let linked = leftover(&format!(".vaultwarden-accessd.a.{hex}.tmp"), Some(old));
+        std::fs::hard_link(&linked, dir.path().join("second-link")).unwrap();
+        let wide = leftover(&format!(".vaultwarden-accessd.b.{hex}.tmp"), Some(old));
+        std::fs::set_permissions(&wide, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let outside = dir.path().join("outside");
+        std::fs::write(&outside, "outside").unwrap();
+        let symlink = secrets.join(format!(".vaultwarden-accessd.c.{hex}.tmp"));
+        std::os::unix::fs::symlink(&outside, &symlink).unwrap();
+        // Opening the store for a read sweeps; the record itself is untouched.
+        assert_eq!(record.get_password().unwrap(), "first");
+        assert!(!stale.exists());
+        assert!(!stale_bootstrap.exists());
+        for path in kept.iter().chain([&fresh, &linked, &wide]) {
+            assert!(path.exists(), "{}", path.display());
+        }
+        assert!(std::fs::symlink_metadata(&symlink).is_ok());
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "outside");
+        // A write sweeps too.
+        let again = leftover(
+            &format!(".vaultwarden-accessd.revocable-session.{hex}.tmp"),
+            Some(old),
+        );
+        record.set_password("second").unwrap();
+        assert!(!again.exists());
+        assert_eq!(record.get_password().unwrap(), "second");
     }
 
     #[test]
