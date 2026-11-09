@@ -148,6 +148,11 @@ def serve(directory, mode):
                     events[0]["ticket"] = "must-not-be-admitted"
                 return self.reply(200, {"version": 1, "history_version": 1, "events": events})
             if command == "review":
+                if body.get("version") == 2:
+                    # A pinned companion asks for version 2. Like the real
+                    # provider without a Touch ID binding, answer v2 with a
+                    # null approval_binding: password approval stays available.
+                    return self.reply(200, dict(review, version=2, approval_binding=None))
                 return self.reply(200, review)
             if command == "decision":
                 if body.get("decision") == "deny" and "password" in body:
