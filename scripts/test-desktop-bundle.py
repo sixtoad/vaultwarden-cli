@@ -207,6 +207,16 @@ class BundleTests(unittest.TestCase):
                 self.assertEqual(entry['sha256'], bundle.artifact.digest(helpers / name))
             signed = [call.args[0][-1] for call in run.call_args_list if call.args[0][:4] == ['/usr/bin/codesign', '--force', '--sign', '-'] and len(call.args[0]) == 5]
             self.assertEqual(sorted(Path(p).name for p in signed), ['companion-command', 'vaultwarden-accessd', 'vaultwarden-cli', 'vw-access'])
+            # A release job that promises arm64 accepts exactly this helper set,
+            # and the archive name says arm64.
+            bundle.check_expected_architecture(root, manifest, 'arm64')
+            bundle.check_expected_architecture(root, manifest, 'aarch64')
+            self.assertEqual(bundle.archive_architecture('macos', manifest['architecture']), 'arm64')
+            with self.assertRaisesRegex(ValueError, 'not the expected x86_64'):
+                bundle.check_expected_architecture(root, manifest, 'x86_64')
+            (helpers / 'vaultwarden-accessd').unlink()
+            with self.assertRaisesRegex(ValueError, 'bundled commands'):
+                bundle.check_expected_architecture(root, manifest, 'arm64')
             (helpers / 'vaultwarden-accessd').write_bytes(b'replaced')
             with self.assertRaisesRegex(ValueError, 'damaged'):
                 bundle.verify(root, manifest)
@@ -218,6 +228,30 @@ class BundleTests(unittest.TestCase):
             self.assertEqual(manifest['architecture'], 'x86_64')
             self.assertEqual(set(manifest['commands']), {'vaultwarden-cli'})
             self.assertEqual(manifest['roles'], {'protected_requesting': False, 'desktop_approval': True, 'protected_provider': False, 'vault_cli': True})
+            for name in ['vw-access', 'vaultwarden-accessd']:
+                self.assertFalse((root / 'Contents/Helpers' / name).exists())
+            bundle.check_expected_architecture(root, manifest, 'x86_64')
+            self.assertEqual(bundle.archive_architecture('macos', manifest['architecture']), 'x86_64')
+            # An Intel build can never satisfy a job that publishes the arm64 archive.
+            with self.assertRaisesRegex(ValueError, 'not the expected aarch64'):
+                bundle.check_expected_architecture(root, manifest, 'arm64')
+            # Nor may an Intel bundle carry the protected commands.
+            (root / 'Contents/Helpers/vw-access').write_bytes(b'stray')
+            with self.assertRaisesRegex(ValueError, 'bundled commands'):
+                bundle.check_expected_architecture(root, manifest, 'x86_64')
+
+    def test_expected_architecture_is_optional_and_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest, _ = self.synthetic_populate(temporary, 'linux', 'x86_64')
+            bundle.check_expected_architecture(root, manifest, '')
+            bundle.check_expected_architecture(root, manifest, 'x86_64')
+            self.assertIsNone(bundle.archive_architecture('linux', 'x86_64'))
+            self.assertIsNone(bundle.archive_architecture('windows', 'x86_64'))
+            with self.assertRaisesRegex(ValueError, 'unsupported expected architecture'):
+                bundle.check_expected_architecture(root, manifest, 'riscv64')
+            manifest = dict(manifest, commands={'vaultwarden-cli': 'commands/vaultwarden-cli'})
+            with self.assertRaisesRegex(ValueError, 'advertised protected commands'):
+                bundle.check_expected_architecture(root, manifest, 'x86_64')
 
     def test_linux_and_windows_protected_commands_are_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:

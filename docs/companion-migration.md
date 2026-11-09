@@ -370,7 +370,8 @@ the PR check history records the matching native runs.
 
 ## Coordinated check of the development artifact
 
-CI uploads an inner `companion-<platform>-development.tar.gz`, its `.sha256`,
+CI uploads an inner `companion-<platform>-development.tar.gz` (on macOS
+`companion-macos-<arm64|x86_64>-development.tar.gz`), its `.sha256`,
 `artifact.json` source/content inventory, and release smoke evidence. The tar
 preserves executable permissions and framework links; packaging verifies a fresh
 extraction against the complete original inventory. The smoke entrypoint uses
@@ -384,8 +385,8 @@ On the operator's Mac, use the artifact from the passing run for the exact
 revision being accepted. Verify and extract the inner tar into a fresh directory:
 
 ```sh
-shasum -a 256 -c companion-macos-development.tar.gz.sha256
-tar -xzf companion-macos-development.tar.gz -C /path/to/fresh-test-directory
+shasum -a 256 -c companion-macos-arm64-development.tar.gz.sha256
+tar -xzf companion-macos-arm64-development.tar.gz -C /path/to/fresh-test-directory
 open "/path/to/fresh-test-directory/companion_slice.app"
 ```
 

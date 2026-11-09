@@ -87,12 +87,17 @@ def smoke(executable, evidence, use_file=False):
     print("Release AOT bridge, native contract and rendered fixture checks passed.")
 
 
-def package(root, evidence, platform, revision, dirty, disposable_pilot=False):
+def package(root, evidence, platform, revision, dirty, disposable_pilot=False, architecture=None):
     if disposable_pilot and platform != "macos":
         raise ValueError("disposable pilot artifacts require macOS")
+    if architecture is not None and architecture not in ("arm64", "x86_64"):
+        raise ValueError("unsupported archive architecture")
     expected = inventory(root)
     variant = "disposable-pilot" if disposable_pilot else "development"
-    archive = evidence / f"companion-{platform}-{variant}.tar.gz"
+    # macOS publishes one archive per architecture (only arm64 carries the
+    # protected commands), so its name states which one it is.
+    qualifier = f"-{architecture}" if architecture else ""
+    archive = evidence / f"companion-{platform}{qualifier}-{variant}.tar.gz"
     name = ("companion_disposable_pilot.app" if disposable_pilot else "companion_slice.app") if platform == "macos" else f"companion-{platform}"
     with tarfile.open(archive, "w:gz", dereference=False) as output:
         output.add(root, arcname=name)

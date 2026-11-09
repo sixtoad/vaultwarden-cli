@@ -180,6 +180,39 @@ def populate(repo, root, platform, source):
     return manifest
 
 
+def archive_architecture(platform, architecture):
+    """Archive-name qualifier: macOS archives exist per architecture."""
+    if platform != 'macos':
+        return None
+    return {'aarch64': 'arm64'}.get(architecture, architecture)
+
+
+def check_expected_architecture(root, manifest, expected):
+    """Fail a build whose host or helper set is not the one the job promises.
+
+    A release job that publishes the arm64 macOS archive must not silently ship
+    an Intel bundle (no protected commands) if its runner changes, and an Intel
+    bundle must never carry them.
+    """
+    if not expected:
+        return
+    expected = {'arm64': 'aarch64', 'AMD64': 'x86_64'}.get(expected, expected)
+    if expected not in ('aarch64', 'x86_64'):
+        raise ValueError(f'unsupported expected architecture: {expected}')
+    if manifest['architecture'] != expected:
+        raise ValueError(f"bundle architecture {manifest['architecture']} is not the expected {expected}")
+    platform = manifest['platform']
+    suffix = '.exe' if platform == 'windows' else ''
+    command_dir = root / ('Contents/Helpers' if platform == 'macos' else 'commands')
+    protected = protected_commands(platform, expected)
+    shipped = sorted(p.name for p in command_dir.iterdir())
+    wanted = sorted(name + suffix for name in ['companion-command', 'vaultwarden-cli', *protected])
+    if shipped != wanted:
+        raise ValueError(f'bundled commands {shipped} are not the expected {wanted}')
+    if ('vw-access' in manifest['commands']) != bool(protected) or manifest['roles']['protected_provider'] != bool(protected):
+        raise ValueError('advertised protected commands do not match the expected architecture')
+
+
 def verify_macos_entitlements(root):
     result = subprocess.run(['/usr/bin/codesign', '-d', '--entitlements', ':-', str(root)], capture_output=True, check=True)
     entitlements = plistlib.loads(result.stdout)
@@ -224,8 +257,10 @@ def main():
             raise RuntimeError('Build inputs changed during packaging: ' + ', '.join(changed))
         root, _ = artifact.locate(repo, args.platform)
         manifest = populate(repo, root, args.platform, source)
+        check_expected_architecture(root, manifest, os.environ.get('DESKTOP_EXPECTED_ARCHITECTURE', ''))
         (evidence / 'bundle.json').write_text(json.dumps(manifest, indent=2) + '\n')
-        archive = artifact.package(root, evidence, args.platform, source['revision'], source['source_dirty'])
+        archive = artifact.package(root, evidence, args.platform, source['revision'], source['source_dirty'],
+                                   architecture=archive_architecture(args.platform, manifest['architecture']))
         # Exercise the production launcher against the freshly extracted archive,
         # not the build directory or a self-exiting GUI test entrypoint.
         import tarfile

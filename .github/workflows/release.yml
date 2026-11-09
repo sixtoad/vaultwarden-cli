@@ -122,7 +122,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26-intel, windows-latest]
+        # macOS publishes two archives: arm64 (Apple Silicon) with the native
+        # protected commands, and x86_64 (Intel) with the vault CLI only.
+        include:
+          - os: ubuntu-24.04
+            architecture: x86_64
+          - os: macos-26
+            architecture: arm64
+          - os: macos-26-intel
+            architecture: x86_64
+          - os: windows-latest
+            architecture: x86_64
+    env:
+      DESKTOP_EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
     defaults:
       run:
         shell: bash
@@ -149,7 +161,7 @@ jobs:
         run: bash scripts/build-desktop-bundle.sh "$RUNNER_TEMP/desktop-release"
       - uses: actions/upload-artifact@v7
         with:
-          name: desktop-${{ runner.os }}
+          name: desktop-${{ runner.os }}-${{ matrix.architecture }}
           path: ${{ runner.temp }}/desktop-release
           retention-days: 7
 

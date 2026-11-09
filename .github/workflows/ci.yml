@@ -67,13 +67,26 @@ jobs:
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-26-intel' && 90 || 45 }}
+    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 90 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        # ARM capacity left the native/TLS gate unacquired; Intel runs the same
-        # universal-library checks. The disposable pilot retains ARM coverage.
-        os: [ubuntu-24.04, macos-26-intel, windows-latest]
+        # Only an Apple Silicon bundle carries and advertises the native
+        # protected commands (vw-access, vaultwarden-accessd); the Intel bundle
+        # stays supported for the vault CLI and must never carry them.
+        # DESKTOP_EXPECTED_ARCHITECTURE makes packaging fail if a runner label
+        # ever resolves to the other architecture.
+        include:
+          - os: ubuntu-24.04
+            architecture: x86_64
+          - os: macos-26
+            architecture: arm64
+          - os: macos-26-intel
+            architecture: x86_64
+          - os: windows-latest
+            architecture: x86_64
+    env:
+      DESKTOP_EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
     defaults:
       run:
         shell: bash
@@ -102,7 +115,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: companion-slice-${{ runner.os }}-development
+          name: companion-slice-${{ runner.os }}-${{ matrix.architecture }}-development
           path: |
             ${{ runner.temp }}/desktop-evidence
             companion/test/failures
