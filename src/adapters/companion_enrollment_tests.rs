@@ -43,9 +43,8 @@ fn guided_companion_enrollment_needs_both_humans_and_grants_no_administration() 
         [4; 32],
     )
     .unwrap();
-    let session = attempt
-        .accept(&enroll(&service, &f, &device, attempt.request().clone()))
-        .unwrap();
+    let joined = enroll(&service, &f, &device, attempt.request().clone());
+    let session = attempt.accept(&joined).unwrap();
     // Joined and confirmed by the device: still no access to anything.
     let reply = enroll(&service, &f, &device, session.confirm(None));
     assert!(matches!(
