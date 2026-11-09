@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 
@@ -10,9 +11,11 @@ enum KeyOutcome {
   created,
   deleted,
   signed,
+
+  /// The key exists, but a fingerprint change invalidated it.
+  invalidated,
   cancelled,
   unavailable,
-  missingKey,
   refused,
   failed,
   unsafe,
@@ -60,9 +63,23 @@ class NativeApprovalKeyPlatform implements ApprovalKeyPlatform {
     : _macOS = macOS ?? Platform.isMacOS,
       _channel =
           channel ??
-          const MethodChannel('dev.vaultwarden.companionSlice/approvalKey');
+          const MethodChannel('dev.vaultwarden.companionSlice/approvalKey'),
+      _session = _nonce();
   final bool _macOS;
   final MethodChannel _channel;
+
+  /// Signature numbers are per session: the native side restarts its
+  /// counter for a new session (a Dart hot restart keeps the native signer
+  /// but restarts the Dart counter, which would otherwise be refused).
+  final String _session;
+
+  static String _nonce() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
 
   @override
   Future<bool> touchIdAvailable() async {
@@ -92,6 +109,7 @@ class NativeApprovalKeyPlatform implements ApprovalKeyPlatform {
     int token,
   ) => _call('sign', {
     ...binding.arguments,
+    'session': _session,
     'token': token,
     'purpose': purpose.name,
     'transcript': transcript,
@@ -101,7 +119,10 @@ class NativeApprovalKeyPlatform implements ApprovalKeyPlatform {
   Future<void> cancel(int token) async {
     if (!_macOS) return;
     try {
-      await _channel.invokeMethod<void>('cancel', token);
+      await _channel.invokeMethod<void>('cancel', {
+        'session': _session,
+        'token': token,
+      });
     } on PlatformException {
       /* The pending signature still owns its slot. */
     } on MissingPluginException {

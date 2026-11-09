@@ -5,7 +5,10 @@ import Security
 
 enum ProductionOutcome: String {
     case present, absent, created, deleted, signed
-    case cancelled, unavailable, missingKey, refused, failed, unsafe
+    /// The key exists but `.biometryCurrentSet` no longer admits it: the
+    /// enrolled finger set changed since it was created.
+    case invalidated
+    case cancelled, unavailable, refused, failed, unsafe
 }
 
 struct ProductionReply {
@@ -43,13 +46,38 @@ enum ProductionApprovalKey {
 
     static func accessFlags() -> SecAccessControlCreateFlags { [.privateKeyUsage, .biometryCurrentSet] }
 
+    /// The current enrolled-biometry state (it changes when a finger is
+    /// added or removed), or nil when it cannot be read (no sensor, lockout).
+    static func biometryState() -> Data? {
+        let context = LAContext()
+        defer { context.invalidate() }
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else { return nil }
+        if #available(macOS 15, *) { return context.domainState.biometry.stateHash }
+        return context.evaluatedPolicyDomainState
+    }
+
+    /// The key's label records a digest of the biometry state it was created under.
+    static func stateLabel(_ state: Data) -> String {
+        "biometry-state:" + SHA256.hash(data: state).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Only positive evidence counts: a recorded state that differs from a
+    /// readable current one. A missing label or state never invalidates.
+    static func invalidated(label: String?, currentState: Data?) -> Bool {
+        guard let label, label.hasPrefix("biometry-state:"), let currentState else { return false }
+        return label != stateLabel(currentState)
+    }
+
     /// The stored key and its public point, without any prompt.
     static func read(_ binding: ProductionBinding) -> ProductionReply {
         let context = context()
         defer { context.invalidate() }
         switch lookup(binding, context) {
         case .failure(let reply): return reply
-        case .found(_, let publicKey, _): return ProductionReply(outcome: .present, publicKey: publicKey)
+        case .found(let key, let publicKey, _):
+            let label = (SecKeyCopyAttributes(key) as? [String: Any])?[kSecAttrLabel as String] as? String
+            return ProductionReply(outcome: invalidated(label: label, currentState: biometryState()) ? .invalidated : .present,
+                                   publicKey: publicKey)
         }
     }
 
@@ -68,11 +96,13 @@ enum ProductionApprovalKey {
                                                           accessFlags(), nil) else {
             return ProductionReply(outcome: .failed)
         }
+        var privateAttributes: [String: Any] = [kSecAttrIsPermanent as String: true,
+            kSecAttrApplicationTag as String: binding.tag, kSecAttrAccessControl as String: access]
+        if let state = biometryState() { privateAttributes[kSecAttrLabel as String] = stateLabel(state) }
         let attributes: [String: Any] = [kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
             kSecAttrKeySizeInBits as String: 256, kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecUseDataProtectionKeychain as String: true, kSecUseAuthenticationContext as String: context,
-            kSecPrivateKeyAttrs as String: [kSecAttrIsPermanent as String: true,
-                kSecAttrApplicationTag as String: binding.tag, kSecAttrAccessControl as String: access]]
+            kSecPrivateKeyAttrs as String: privateAttributes]
         guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, nil) else {
             return ProductionReply(outcome: .failed)
         }
@@ -100,7 +130,11 @@ enum ProductionApprovalKey {
         switch lookup(binding, context) {
         case .failure(let reply):
             context.invalidate(); completion(reply); return
-        case .found(_, let publicKey, let control):
+        case .found(let key, let publicKey, let control):
+            let label = (SecKeyCopyAttributes(key) as? [String: Any])?[kSecAttrLabel as String] as? String
+            if invalidated(label: label, currentState: biometryState()) {
+                context.invalidate(); completion(ProductionReply(outcome: .invalidated)); return
+            }
             guard ProductionTranscript.admits(transcript, purpose: purpose, binding: binding, publicKey: publicKey) else {
                 context.invalidate(); completion(ProductionReply(outcome: .refused)); return
             }

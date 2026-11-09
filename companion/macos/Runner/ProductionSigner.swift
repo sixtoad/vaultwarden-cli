@@ -9,18 +9,22 @@ import LocalAuthentication
 final class ProductionSigner {
     private let channel: FlutterMethodChannel
     private let worker = DispatchQueue(label: "dev.vaultwarden.companionSlice.production-signer")
-    private var active: (token: UInt32, context: LAContext)?
-    private var lastToken: UInt32 = 0
+    private let gate = ProductionSignerGate()
     private var observers: [NSObjectProtocol] = []
 
     init(messenger: FlutterBinaryMessenger) {
         channel = FlutterMethodChannel(name: "dev.vaultwarden.companionSlice/approvalKey", binaryMessenger: messenger)
         channel.setMethodCallHandler { [weak self] call, result in self?.handle(call, result: result) }
-        for (center, name) in [(NSWorkspace.shared.notificationCenter, NSWorkspace.willSleepNotification),
+        // Sleep, display sleep, fast user switching (session resigned), window
+        // close and quit cancel an open prompt; it never outlives the session.
+        let workspace = NSWorkspace.shared.notificationCenter
+        for (center, name) in [(workspace, NSWorkspace.willSleepNotification),
+                               (workspace, NSWorkspace.screensDidSleepNotification),
+                               (workspace, NSWorkspace.sessionDidResignActiveNotification),
                                (NotificationCenter.default, NSWindow.willCloseNotification),
                                (NotificationCenter.default, NSApplication.willTerminateNotification)] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                self?.active?.context.invalidate()
+                self?.gate.cancelActive()
             })
         }
     }
@@ -30,12 +34,13 @@ final class ProductionSigner {
         case "availability":
             result(ProductionApprovalKey.availability() ? "touchID" : "unavailable")
         case "cancel":
-            if let token = call.arguments as? NSNumber, active?.token == token.uint32Value {
-                active?.context.invalidate()
+            if let args = call.arguments as? [String: Any], args.count == 2,
+               let session = args["session"] as? String, let token = args["token"] as? NSNumber {
+                gate.cancel(session: session, token: token.uint32Value)
             }
             result(nil)
         case "read", "create", "delete":
-            guard active == nil, let binding = binding(call.arguments, keys: []) else {
+            guard gate.idle, let binding = binding(call.arguments, keys: []) else {
                 result(FlutterError(code: "invalid_request", message: "Invalid or overlapping key operation", details: nil)); return
             }
             let method = call.method
@@ -45,24 +50,27 @@ final class ProductionSigner {
                 DispatchQueue.main.async { result(self.encode(reply)) }
             }
         case "sign":
-            guard active == nil, let args = call.arguments as? [String: Any],
-                  let binding = binding(args, keys: ["token", "purpose", "transcript"]),
-                  let token = args["token"] as? NSNumber, token.uint32Value > lastToken,
+            guard gate.idle, let args = call.arguments as? [String: Any],
+                  let binding = binding(args, keys: ["session", "token", "purpose", "transcript"]),
+                  let session = args["session"] as? String,
+                  let token = (args["token"] as? NSNumber)?.uint32Value,
                   let purpose = (args["purpose"] as? String).flatMap(ProductionPurpose.init(rawValue:)),
                   let transcript = (args["transcript"] as? FlutterStandardTypedData)?.data,
                   transcript.count <= 4096 else {
                 result(FlutterError(code: "invalid_request", message: "Invalid or overlapping signature", details: nil)); return
             }
             let context = ProductionApprovalKey.context()
-            lastToken = token.uint32Value
-            active = (token.uint32Value, context)
+            guard gate.begin(session: session, token: token, cancel: { context.invalidate() }) else {
+                context.invalidate()
+                result(FlutterError(code: "invalid_request", message: "Invalid or overlapping signature", details: nil)); return
+            }
             let reason = purpose == .approve ? "approve one provider request" : "enroll this Mac's Touch ID approval key"
             let queue = worker
             worker.async {
                 ProductionApprovalKey.sign(binding, purpose: purpose, transcript: transcript, reason: reason,
                                            context: context, worker: queue) { reply in
                     DispatchQueue.main.async {
-                        if self.active?.token == token.uint32Value { self.active = nil }
+                        self.gate.finish(session: session, token: token)
                         result(self.encode(reply))
                     }
                 }

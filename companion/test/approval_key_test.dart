@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:companion_slice/platform/approval_key.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -37,6 +36,56 @@ void main() {
           1,
         )).outcome,
         KeyOutcome.unavailable,
+      );
+    },
+  );
+
+  testWidgets(
+    'signatures and cancels carry a per-client session nonce, so a hot restart never reuses the native counter',
+    (tester) async {
+      const name = 'test/approvalKey';
+      final calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel(name),
+        (call) async {
+          calls.add(call);
+          return call.method == 'cancel'
+              ? null
+              : {
+                  'outcome': 'cancelled',
+                  'publicKey': Uint8List(0),
+                  'signature': Uint8List(0),
+                };
+        },
+      );
+      const binding = KeyBinding('p', 'c');
+      final first = NativeApprovalKeyPlatform(
+        macOS: true,
+        channel: const MethodChannel(name),
+      );
+      final restarted = NativeApprovalKeyPlatform(
+        macOS: true,
+        channel: const MethodChannel(name),
+      );
+      await first.sign(binding, KeyPurpose.approve, Uint8List(1), 1);
+      await first.cancel(1);
+      await restarted.sign(binding, KeyPurpose.enroll, Uint8List(1), 1);
+      final sessions = [
+        for (final call in calls) (call.arguments as Map)['session'],
+      ];
+      for (final session in sessions) {
+        expect(session, matches(RegExp(r'^[0-9a-f]{32}$')));
+      }
+      expect(sessions[0], sessions[1], reason: 'cancel names its own session');
+      expect(
+        sessions[0],
+        isNot(sessions[2]),
+        reason: 'a new client is a new session',
+      );
+      expect(calls[1].arguments, {'session': sessions[0], 'token': 1});
+      expect(
+        KeyOutcome.values.map((o) => o.name),
+        isNot(contains('missingKey')),
       );
     },
   );

@@ -265,32 +265,57 @@ fn unsafe_observation_survives_later_reviews_and_key_mutations() {
 }
 
 /// Issue 49: the synthetic demonstration and production Touch ID approval
-/// v2 are separate domains. A signature by the synthetic key over a
-/// production transcript (the provider's golden vector) never verifies as a
-/// synthetic proof, and the two transcripts start with different domains.
+/// v2 are separate signing domains. The same key signs the SAME framed bytes
+/// twice, once under the synthetic domain and once relabelled with each
+/// production v2 domain: only the synthetic-domain signature verifies as a
+/// synthetic proof, so the domain field alone separates them. The provider's
+/// golden v2 transcripts carry exactly those production domains.
 #[test]
-fn production_v2_transcripts_never_verify_as_synthetic_proofs() {
+fn the_same_bytes_signed_under_a_production_domain_never_verify_as_synthetic_proofs() {
+    fn fields(t: &[u8]) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        let mut rest = t;
+        while !rest.is_empty() {
+            let len = u32::from_be_bytes(rest[..4].try_into().unwrap()) as usize;
+            out.push(rest[4..4 + len].to_vec());
+            rest = &rest[4 + len..];
+        }
+        out
+    }
+    fn frame(fields: &[Vec<u8>]) -> Vec<u8> {
+        fields
+            .iter()
+            .flat_map(|f| (f.len() as u32).to_be_bytes().into_iter().chain(f.clone()))
+            .collect()
+    }
     let golden: serde_json::Value = serde_json::from_str(include_str!(
         "../../../tests/fixtures/approval-v2-golden.json"
     ))
     .unwrap();
-    for section in ["approval", "enroll"] {
+    for (section, domain) in [
+        ("approval", &b"dev.vaultwarden.provider.approval.v2"[..]),
+        (
+            "enroll",
+            &b"dev.vaultwarden.provider.approval-enroll.v2"[..],
+        ),
+    ] {
         let hex = golden[section]["transcript_hex"].as_str().unwrap();
         let production: Vec<u8> = (0..hex.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
             .collect();
+        assert_eq!(fields(&production)[0], domain, "{section}");
+
+        // Relabelled: identical bytes except the domain field.
         let (mut core, key) = ready();
         let work = core.begin(Operation::Sign).unwrap();
         let synthetic = transcript(&work).unwrap();
-        let domain =
-            |t: &[u8]| t[4..4 + u32::from_be_bytes(t[..4].try_into().unwrap()) as usize].to_vec();
-        assert_eq!(
-            domain(&synthetic),
-            b"dev.vaultwarden.companion.synthetic.v1"
-        );
-        assert!(domain(&production).starts_with(b"dev.vaultwarden.provider.approval"));
-        let signature: Signature = key.sign(&production);
+        let mut relabelled = fields(&synthetic);
+        assert_eq!(relabelled[0], b"dev.vaultwarden.companion.synthetic.v1");
+        relabelled[0] = domain.to_vec();
+        let relabelled = frame(&relabelled);
+        assert_eq!(relabelled[4 + domain.len()..], synthetic[4 + 38..]);
+        let signature: Signature = key.sign(&relabelled);
         core.finish(
             work.token,
             work.epoch,
@@ -299,6 +324,12 @@ fn production_v2_transcripts_never_verify_as_synthetic_proofs() {
                 ..result(Outcome::Verified)
             },
         );
-        assert_eq!(core.snapshot().verified, 0, "{section}");
+        assert_eq!(core.snapshot().verified, 0, "{section} relabelled");
+
+        // Control: the same key over the synthetic-domain bytes verifies.
+        let (mut core, key) = ready();
+        let work = core.begin(Operation::Sign).unwrap();
+        core.finish(work.token, work.epoch, proof(&work, &key));
+        assert_eq!(core.snapshot().verified, 1, "{section} control");
     }
 }

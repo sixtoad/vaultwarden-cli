@@ -100,3 +100,51 @@ extension Data {
         self.init(bytes)
     }
 }
+
+/// Admission state of the production signer channel, kept free of Flutter
+/// and LocalAuthentication so the Swift package tests it. At most one
+/// signature is open; read, create and delete wait for it. A signature is
+/// numbered by the Dart side, strictly increasing within one Dart session
+/// (a random nonce per channel client). A new session, such as after a Dart
+/// hot restart, starts its own numbering instead of being refused forever.
+/// Cancel acts only on the open signature of the same session and number.
+final class ProductionSignerGate {
+    private var session = ""
+    private var lastToken: UInt32 = 0
+    private var active: (session: String, token: UInt32, cancel: () -> Void)?
+
+    /// No signature is open.
+    var idle: Bool { active == nil }
+
+    /// A session is 32 lowercase hex characters (16 random bytes).
+    static func validSession(_ value: String) -> Bool {
+        value.utf8.count == 32 && value.utf8.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }
+    }
+
+    /// Opens the signature `token` of `session`, or refuses an overlapping,
+    /// replayed or malformed one. `cancel` aborts its native prompt.
+    func begin(session: String, token: UInt32, cancel: @escaping () -> Void) -> Bool {
+        guard active == nil, Self.validSession(session), token > 0 else { return false }
+        if session != self.session {
+            self.session = session
+            lastToken = 0
+        }
+        guard token > lastToken else { return false }
+        lastToken = token
+        active = (session, token, cancel)
+        return true
+    }
+
+    /// The signature ended (signed, refused or cancelled).
+    func finish(session: String, token: UInt32) {
+        if let open = active, open.session == session, open.token == token { active = nil }
+    }
+
+    /// Cancels the open signature only when it is exactly this one.
+    func cancel(session: String, token: UInt32) {
+        if let open = active, open.session == session, open.token == token { open.cancel() }
+    }
+
+    /// Sleep, screen lock, window close or quit: cancel whatever is open.
+    func cancelActive() { active?.cancel() }
+}
