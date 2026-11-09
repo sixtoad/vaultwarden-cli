@@ -10,9 +10,11 @@ into a caller-chosen output directory:
   plan.json                                destinations, owners, modes, hashes
 
 It installs nothing: it starts no process, changes no account or service and
-writes nowhere except the output directory, which must be new or empty. The
-destinations in plan.json are what a separately reviewed, manual installation
-would use (docs/implementation/issue-49-native-provider.md).
+writes nowhere except the output directory, which must be new or empty.
+plan.json lists the accounts and every directory and file of the documented
+layout (docs/implementation/issue-49-native-provider.md) with its owner, group,
+mode and link count. scripts/macos-provider-install.py executes exactly a
+reviewed plan directory; credentials are never part of a plan.
 """
 import argparse
 import hashlib
@@ -32,6 +34,13 @@ IDENTITIES_TEMPLATE = 'native-identities.json.in'
 PLIST_NAME = 'com.cantolla.vaultwarden-accessd.plist'
 IDENTITIES_NAME = 'native-identities.json'
 PLAN_NAME = 'plan.json'
+RECEIPT_NAME = 'installer-receipt.json'
+LAUNCH_DAEMONS = '/Library/LaunchDaemons'
+STATE_FILES = ('backend.json', 'provider-cert.pem', 'provider-key.pem', 'companion-ca.pem')
+BINARIES = ('vaultwarden-accessd', 'vw-access')
+PLAN_SCHEMA = 2
+# Optional inputs and their defaults. provider_gid defaults to the provider UID.
+OPTIONAL_DEFAULTS = {'provider_gid': None, 'human_group': '_vwhuman', 'agent_group': '_vwagent'}
 LABEL = 'com.cantolla.vaultwarden-accessd'
 INSTALL_ROOT = '/Library/VaultwardenAccess'
 BUNDLE_HELPERS = 'Contents/Helpers'
@@ -88,7 +97,12 @@ def validate_inputs(raw):
     """Return typed inputs or raise PlanError. Mirrors the provider's own checks."""
     expected = {'version', 'provider_account', 'provider_group', 'provider_uid', 'provider_uuid',
                 'operator_uid', 'operator_uuid', 'human_gid', 'agent_gid'}
-    require(set(raw) == expected, 'inputs must be exactly: ' + ', '.join(sorted(expected)))
+    require(set(raw) <= expected | set(OPTIONAL_DEFAULTS) and expected <= set(raw),
+            'inputs must be exactly: ' + ', '.join(sorted(expected)) + ' (optional: ' + ', '.join(sorted(OPTIONAL_DEFAULTS)) + ')')
+    raw = dict(raw)
+    for key, default in OPTIONAL_DEFAULTS.items():
+        if raw.get(key) is None:
+            raw[key] = raw['provider_uid'] if key == 'provider_gid' else default
     values = {
         'version': parse_version(raw['version']),
         'provider_account': parse_name('provider account', raw['provider_account']),
@@ -99,10 +113,16 @@ def validate_inputs(raw):
         'operator_uuid': parse_uuid('operator UUID', raw['operator_uuid']),
         'human_gid': parse_id('human GID', raw['human_gid']),
         'agent_gid': parse_id('agent GID', raw['agent_gid']),
+        'provider_gid': parse_id('provider GID', raw['provider_gid']),
+        'human_group': parse_name('human group', raw['human_group']),
+        'agent_group': parse_name('agent group', raw['agent_group']),
     }
     require(values['provider_uid'] != values['operator_uid'], 'provider and operator UIDs must differ')
     require(values['provider_uuid'] != values['operator_uuid'], 'provider and operator UUIDs must differ')
     require(values['human_gid'] != values['agent_gid'], 'human and agent GIDs must differ')
+    require(values['provider_gid'] not in (values['human_gid'], values['agent_gid']), 'provider GID must differ from the human and agent GIDs')
+    groups = [values['provider_group'], values['human_group'], values['agent_group']]
+    require(len(set(groups)) == 3, 'provider, human and agent group names must differ')
     return values
 
 
@@ -189,24 +209,70 @@ def resolve_identities(template, values):
     return data
 
 
+def _entry(path, owner, group, mode, created_by, **extra):
+    entry = {'path': path, 'owner': owner[0], 'owner_id': owner[1], 'group': group[0], 'group_id': group[1],
+             'mode': mode, 'created_by': created_by}
+    entry.update(extra)
+    return entry
+
+
 def plan_document(values, outputs):
+    """Every account, directory and file of the documented layout.
+
+    created_by: 'installer' (created and owned by the installer), 'bundle'
+    (copied from the verified bundle), 'operator' (provisioned manually through
+    the approved credential procedure; never generated or copied by the
+    installer).
+    """
     version = values['version']
+    root, wheel = ('root', 0), ('wheel', 0)
+    provider = (values['provider_account'], values['provider_uid'])
+    provider_group = (values['provider_group'], values['provider_gid'])
+    human = (values['human_group'], values['human_gid'])
+    agent = (values['agent_group'], values['agent_gid'])
+    version_dir = f'{INSTALL_ROOT}/versions/{version}'
+    plist_sha = hashlib.sha256(outputs[PLIST_NAME]).hexdigest()
+    directories = [
+        _entry(INSTALL_ROOT, root, wheel, '0755', 'installer'),
+        _entry(f'{INSTALL_ROOT}/versions', root, wheel, '0755', 'installer'),
+        _entry(version_dir, root, wheel, '0555', 'installer'),
+        _entry(f'{INSTALL_ROOT}/state', provider, provider_group, '0700', 'installer'),
+        _entry(f'{INSTALL_ROOT}/run', root, wheel, '0755', 'installer'),
+        _entry(f'{INSTALL_ROOT}/run/human', provider, human, '0750', 'installer'),
+        _entry(f'{INSTALL_ROOT}/run/agent', provider, agent, '0750', 'installer'),
+        _entry(f'{INSTALL_ROOT}/run/ssh', provider, provider_group, '0700', 'installer'),
+    ]
+    files = [
+        _entry(f'{LAUNCH_DAEMONS}/{PLIST_NAME}', root, wheel, '0644', 'installer', links=1, source=PLIST_NAME, sha256=plist_sha),
+        _entry(f'{version_dir}/{PLIST_NAME}', root, wheel, '0444', 'installer', links=1, source=PLIST_NAME, sha256=plist_sha),
+        _entry(f'{INSTALL_ROOT}/{IDENTITIES_NAME}', root, wheel, '0644', 'installer', links=1, source=IDENTITIES_NAME,
+               sha256=hashlib.sha256(outputs[IDENTITIES_NAME]).hexdigest()),
+        _entry(f'{INSTALL_ROOT}/{RECEIPT_NAME}', root, wheel, '0644', 'installer', links=1),
+    ]
+    for name in BINARIES:
+        files.append(_entry(f'{version_dir}/{name}', root, wheel, '0555', 'bundle', links=1,
+                            source=f'bundle:{BUNDLE_HELPERS}/{name}', version_from='bundle.json cli_version'))
+    for name in STATE_FILES:
+        files.append(_entry(f'{INSTALL_ROOT}/state/{name}', provider, provider_group, '0600', 'operator', links=1))
     return {
-        'schema': 1,
+        'schema': PLAN_SCHEMA,
         'installs': False,
-        'note': 'Review material only. Nothing has been installed. Development signing only; Apple Silicon (arm64) only; Intel and Rosetta are unsupported.',
+        'note': 'Review material only. Nothing has been installed. Development signing only; Apple Silicon (arm64) only; Intel and Rosetta are unsupported. Credentials (created_by operator) are never generated or copied by the installer.',
         'version': version,
+        'label': LABEL,
         'inputs': {k: values[k] for k in sorted(values)},
-        'files': [
-            {'source': PLIST_NAME, 'sha256': hashlib.sha256(outputs[PLIST_NAME]).hexdigest(),
-             'destination': f'/Library/LaunchDaemons/{PLIST_NAME}', 'owner': 'root', 'group': 'wheel', 'mode': '0644'},
-            {'source': IDENTITIES_NAME, 'sha256': hashlib.sha256(outputs[IDENTITIES_NAME]).hexdigest(),
-             'destination': f'{INSTALL_ROOT}/{IDENTITIES_NAME}', 'owner': 'root', 'group': 'wheel', 'mode': '0644'},
-            {'source': f'bundle:{BUNDLE_HELPERS}/vaultwarden-accessd', 'destination': payload_destination(version),
-             'owner': 'root', 'group': 'wheel', 'mode': '0555', 'version_from': 'bundle.json cli_version'},
-            {'source': f'bundle:{BUNDLE_HELPERS}/vw-access', 'destination': f'{INSTALL_ROOT}/versions/{version}/vw-access',
-             'owner': 'root', 'group': 'wheel', 'mode': '0555', 'version_from': 'bundle.json cli_version'},
-        ],
+        'accounts': {
+            'provider_user': {'name': values['provider_account'], 'uid': values['provider_uid'], 'uuid': values['provider_uuid'],
+                              'primary_gid': values['provider_gid'], 'shell': '/usr/bin/false', 'home': '/var/empty', 'hidden': True},
+            'groups': [
+                {'name': values['provider_group'], 'gid': values['provider_gid'], 'members': []},
+                {'name': values['human_group'], 'gid': values['human_gid'], 'members': [values['provider_account'], 'operator']},
+                {'name': values['agent_group'], 'gid': values['agent_gid'], 'members': [values['provider_account']]},
+            ],
+            'operator': {'uid': values['operator_uid'], 'uuid': values['operator_uuid'], 'existing': True},
+        },
+        'directories': directories,
+        'files': files,
     }
 
 
@@ -244,7 +310,7 @@ def attach_bundle_hashes(outputs, hashes):
     plan = json.loads(outputs[PLAN_NAME])
     for entry in plan['files']:
         for name, digest in hashes.items():
-            if entry['source'] == f'bundle:{BUNDLE_HELPERS}/{name}':
+            if entry.get('source') == f'bundle:{BUNDLE_HELPERS}/{name}':
                 entry['sha256'] = digest
     outputs[PLAN_NAME] = (json.dumps(plan, indent=2, ensure_ascii=True) + '\n').encode()
 
@@ -292,10 +358,14 @@ def main(argv=None):
     parser.add_argument('--operator-uuid', required=True, help='GeneratedUID, 32 lowercase hex digits, no dashes')
     parser.add_argument('--human-gid', required=True)
     parser.add_argument('--agent-gid', required=True)
+    parser.add_argument('--provider-gid', help='provider primary group GID (default: the provider UID)')
+    parser.add_argument('--human-group', help=f"human socket group name (default: {OPTIONAL_DEFAULTS['human_group']})")
+    parser.add_argument('--agent-group', help=f"agent socket group name (default: {OPTIONAL_DEFAULTS['agent_group']})")
     parser.add_argument('--bundle', type=Path, help='optional built macOS arm64 .app to cross-check version and hashes')
     args = parser.parse_args(argv)
     raw = {key: getattr(args, key) for key in ['version', 'provider_account', 'provider_group', 'provider_uid', 'provider_uuid',
-                                               'operator_uid', 'operator_uuid', 'human_gid', 'agent_gid']}
+                                               'operator_uid', 'operator_uuid', 'human_gid', 'agent_gid',
+                                               'provider_gid', 'human_group', 'agent_group']}
     try:
         values = validate_inputs(raw)
         outputs = build(values)

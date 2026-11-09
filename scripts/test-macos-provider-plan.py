@@ -81,7 +81,7 @@ class PlanTests(unittest.TestCase):
             })
             document = json.loads((output / 'plan.json').read_text())
             self.assertIs(document['installs'], False)
-            files = {entry['destination']: entry for entry in document['files']}
+            files = {entry['path']: entry for entry in document['files']}
             self.assertEqual(files['/Library/VaultwardenAccess/versions/0.5.4/vaultwarden-accessd']['source'], 'bundle:Contents/Helpers/vaultwarden-accessd')
             self.assertEqual(files['/Library/LaunchDaemons/com.cantolla.vaultwarden-accessd.plist']['sha256'],
                              hashlib.sha256((output / 'com.cantolla.vaultwarden-accessd.plist').read_bytes()).hexdigest())
@@ -225,7 +225,7 @@ class PlanTests(unittest.TestCase):
             output = Path(temporary) / 'plan'
             code, _ = quiet(plan.main, argv(output) + ['--bundle', str(app)])
             self.assertEqual(code, 0)
-            files = {e['destination']: e for e in json.loads((output / 'plan.json').read_text())['files']}
+            files = {e['path']: e for e in json.loads((output / 'plan.json').read_text())['files']}
             self.assertEqual(files['/Library/VaultwardenAccess/versions/0.5.4/vaultwarden-accessd']['sha256'], payloads[0]['sha256'])
             for changes in [{'cli_version': '0.5.5'}, {'architecture': 'x86_64'}, {'roles': {'protected_provider': False}}, {'payloads': payloads[1:]}]:
                 store(**changes)
@@ -235,6 +235,54 @@ class PlanTests(unittest.TestCase):
             (helpers / 'vaultwarden-accessd').write_bytes(b'replaced')
             with self.assertRaisesRegex(plan.PlanError, 'damaged'):
                 plan.check_bundle(app, '0.5.4')
+
+    def test_plan_covers_every_directory_and_file_of_the_documented_layout(self):
+        document = json.loads(plan.build(plan.validate_inputs(dict(INPUTS)))[plan.PLAN_NAME])
+        self.assertEqual(document['schema'], 2)
+        root = '/Library/VaultwardenAccess'
+        def rows(entries):
+            return {e['path']: (e['owner'], e['owner_id'], e['group'], e['group_id'], e['mode'], e['created_by']) for e in entries}
+        self.assertEqual(rows(document['directories']), {
+            root: ('root', 0, 'wheel', 0, '0755', 'installer'),
+            f'{root}/versions': ('root', 0, 'wheel', 0, '0755', 'installer'),
+            f'{root}/versions/0.5.4': ('root', 0, 'wheel', 0, '0555', 'installer'),
+            f'{root}/state': ('_vwaccess', 491, '_vwaccess', 491, '0700', 'installer'),
+            f'{root}/run': ('root', 0, 'wheel', 0, '0755', 'installer'),
+            f'{root}/run/human': ('_vwaccess', 491, '_vwhuman', 492, '0750', 'installer'),
+            f'{root}/run/agent': ('_vwaccess', 491, '_vwagent', 493, '0750', 'installer'),
+            f'{root}/run/ssh': ('_vwaccess', 491, '_vwaccess', 491, '0700', 'installer'),
+        })
+        state = ('_vwaccess', 491, '_vwaccess', 491, '0600', 'operator')
+        self.assertEqual(rows(document['files']), {
+            '/Library/LaunchDaemons/com.cantolla.vaultwarden-accessd.plist': ('root', 0, 'wheel', 0, '0644', 'installer'),
+            f'{root}/versions/0.5.4/com.cantolla.vaultwarden-accessd.plist': ('root', 0, 'wheel', 0, '0444', 'installer'),
+            f'{root}/native-identities.json': ('root', 0, 'wheel', 0, '0644', 'installer'),
+            f'{root}/installer-receipt.json': ('root', 0, 'wheel', 0, '0644', 'installer'),
+            f'{root}/versions/0.5.4/vaultwarden-accessd': ('root', 0, 'wheel', 0, '0555', 'bundle'),
+            f'{root}/versions/0.5.4/vw-access': ('root', 0, 'wheel', 0, '0555', 'bundle'),
+            f'{root}/state/backend.json': state,
+            f'{root}/state/provider-cert.pem': state,
+            f'{root}/state/provider-key.pem': state,
+            f'{root}/state/companion-ca.pem': state,
+        })
+        self.assertTrue(all(e['links'] == 1 for e in document['files']))
+        # Credentials are listed for review but never carry a source or hash.
+        for entry in document['files']:
+            if entry['created_by'] == 'operator':
+                self.assertNotIn('source', entry); self.assertNotIn('sha256', entry)
+        accounts = document['accounts']
+        self.assertEqual(accounts['provider_user'], {'name': '_vwaccess', 'uid': 491, 'uuid': INPUTS['provider_uuid'], 'primary_gid': 491,
+                                                     'shell': '/usr/bin/false', 'home': '/var/empty', 'hidden': True})
+        self.assertEqual([(g['name'], g['gid'], g['members']) for g in accounts['groups']],
+                         [('_vwaccess', 491, []), ('_vwhuman', 492, ['_vwaccess', 'operator']), ('_vwagent', 493, ['_vwaccess'])])
+
+    def test_optional_group_inputs_are_validated(self):
+        values = plan.validate_inputs(dict(INPUTS, provider_gid='494', human_group='vwh', agent_group='vwa'))
+        self.assertEqual((values['provider_gid'], values['human_group'], values['agent_group']), (494, 'vwh', 'vwa'))
+        for overrides in [{'provider_gid': INPUTS['human_gid']}, {'provider_gid': INPUTS['agent_gid']}, {'provider_gid': '0'},
+                          {'human_group': '_vwaccess'}, {'agent_group': '_vwhuman'}, {'human_group': 'wheel'}, {'agent_group': 'Bad'}]:
+            with self.subTest(overrides=overrides), self.assertRaises(plan.PlanError):
+                plan.validate_inputs(dict(INPUTS, **overrides))
 
     def test_shipped_templates_resolve_with_their_declared_placeholders_only(self):
         values = plan.validate_inputs(dict(INPUTS))
