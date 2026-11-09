@@ -15,15 +15,16 @@ final class ProductionSigner {
     init(messenger: FlutterBinaryMessenger) {
         channel = FlutterMethodChannel(name: "dev.vaultwarden.companionSlice/approvalKey", binaryMessenger: messenger)
         channel.setMethodCallHandler { [weak self] call, result in self?.handle(call, result: result) }
-        // Sleep, display sleep, fast user switching (session resigned), window
-        // close and quit cancel an open prompt; it never outlives the session.
-        let workspace = NSWorkspace.shared.notificationCenter
-        for (center, name) in [(workspace, NSWorkspace.willSleepNotification),
-                               (workspace, NSWorkspace.screensDidSleepNotification),
-                               (workspace, NSWorkspace.sessionDidResignActiveNotification),
-                               (NotificationCenter.default, NSWindow.willCloseNotification),
-                               (NotificationCenter.default, NSApplication.willTerminateNotification)] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+        // Sleep, display sleep, fast user switching, screen lock, window
+        // close and quit cancel an open prompt (`ProductionSignerGate.cancelTriggers`).
+        for trigger in ProductionSignerGate.cancelTriggers {
+            let center: NotificationCenter, name: String
+            switch trigger {
+            case .workspace(let value): (center, name) = (NSWorkspace.shared.notificationCenter, value)
+            case .distributed(let value): (center, name) = (DistributedNotificationCenter.default(), value)
+            case .local(let value): (center, name) = (NotificationCenter.default, value)
+            }
+            observers.append(center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
                 self?.gate.cancelActive()
             })
         }

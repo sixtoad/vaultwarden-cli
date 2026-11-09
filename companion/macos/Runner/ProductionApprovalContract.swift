@@ -147,4 +147,25 @@ final class ProductionSignerGate {
 
     /// Sleep, screen lock, window close or quit: cancel whatever is open.
     func cancelActive() { active?.cancel() }
+
+    /// The notifications on which `ProductionSigner` calls `cancelActive`,
+    /// by center and name (AppKit's names spelled out so the package tests
+    /// them without AppKit): sleep, display sleep, fast user switching
+    /// (session resigned), screen lock without display sleep (only the
+    /// distributed `com.apple.screenIsLocked` reports it), window close and
+    /// quit. An open prompt never outlives the unlocked session.
+    static let cancelTriggers: [ProductionCancelTrigger] = [
+        .workspace("NSWorkspaceWillSleepNotification"),
+        .workspace("NSWorkspaceScreensDidSleepNotification"),
+        .workspace("NSWorkspaceSessionDidResignActiveNotification"),
+        .distributed("com.apple.screenIsLocked"),
+        .local("NSWindowWillCloseNotification"),
+        .local("NSApplicationWillTerminateNotification"),
+    ]
+}
+
+/// A notification center (NSWorkspace's, the distributed one or the app's
+/// default) and the name observed on it.
+enum ProductionCancelTrigger: Hashable {
+    case workspace(String), distributed(String), local(String)
 }

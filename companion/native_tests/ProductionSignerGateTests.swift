@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import NativeContract
 
@@ -74,5 +75,23 @@ final class ProductionSignerGateTests: XCTestCase {
         XCTAssertFalse(ProductionApprovalKey.invalidated(label: label, currentState: nil))
         XCTAssertEqual(ProductionOutcome(rawValue: "invalidated"), .invalidated)
         XCTAssertNil(ProductionOutcome(rawValue: "missingKey"))
+    }
+
+    func testScreenLockWithoutDisplaySleepCancelsThePrompt() {
+        // Review round 2 (L6): locking the screen (Ctrl-Cmd-Q) leaves the
+        // display on and the session active, so only the distributed
+        // `com.apple.screenIsLocked` notification reports it.
+        let triggers = ProductionSignerGate.cancelTriggers
+        XCTAssertTrue(triggers.contains(.distributed("com.apple.screenIsLocked")))
+        // The names the app registers are AppKit's own.
+        XCTAssertEqual(Set(triggers), [
+            .workspace(NSWorkspace.willSleepNotification.rawValue),
+            .workspace(NSWorkspace.screensDidSleepNotification.rawValue),
+            .workspace(NSWorkspace.sessionDidResignActiveNotification.rawValue),
+            .distributed("com.apple.screenIsLocked"),
+            .local(NSWindow.willCloseNotification.rawValue),
+            .local(NSApplication.willTerminateNotification.rawValue),
+        ])
+        XCTAssertEqual(triggers.count, 6, "no duplicate registration")
     }
 }
