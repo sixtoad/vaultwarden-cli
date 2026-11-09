@@ -4,12 +4,14 @@ use super::*;
 use crate::access::{
     direct_request_tests::{Fixture, Launcher, fixture, input},
     enrollment::{
-        EnrolleeKind, EnrollmentState, InvitationRequest,
+        EnrolleeKind, EnrollmentRejection, EnrollmentState, InvitationRequest, IssuedInvitation,
+        Party,
         joiner::{InvitationCode, JoinAttempt},
     },
 };
 
 const UID: u32 = 41071;
+const OTHER_UID: u32 = 41073;
 const GID: u32 = 42071;
 
 async fn serve(f: &Fixture, uid: u32, frame: &impl serde::Serialize) -> Vec<u8> {
@@ -42,31 +44,52 @@ async fn serve(f: &Fixture, uid: u32, frame: &impl serde::Serialize) -> Vec<u8> 
     response
 }
 
+/// `serve` from a plain thread, so a test can hold a provider lock meanwhile.
+fn serve_blocking(f: &Fixture, uid: u32, frame: &impl serde::Serialize) -> Vec<u8> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(serve(f, uid, frame))
+}
+
+/// What the joiner's client makes of the provider's bytes.
+fn joiner_sees(bytes: &[u8]) -> EnrollmentReply {
+    enrollment_reply(bytes).expect("an enrollment-shaped reply, never a transport error")
+}
+
+fn invite(f: &Fixture, label: &str, uid: u32) -> IssuedInvitation {
+    f.app
+        .enrollment_invite(
+            f.app.human_owner(),
+            InvitationRequest {
+                kind: EnrolleeKind::Agent {
+                    label: label.into(),
+                    uid,
+                    gid: GID,
+                },
+                ttl_seconds: None,
+            },
+        )
+        .unwrap()
+}
+
+fn attempt(issued: &IssuedInvitation, key: &SigningKey) -> JoinAttempt {
+    JoinAttempt::agent(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        key,
+        [2; 32],
+    )
+}
+
 #[tokio::test]
 async fn only_an_invited_identity_reaches_enrollment_and_it_never_submits() {
     let f = fixture();
     let owner = f.app.human_owner();
     let key = SigningKey::from_bytes(&[71; 32]);
     let unauthorized = br#"{"status":"rejected","protocol_version":1,"category":"unauthorized"}"#;
-    let issued = f
-        .app
-        .enrollment_invite(
-            owner,
-            InvitationRequest {
-                kind: EnrolleeKind::Agent {
-                    label: "socket".into(),
-                    uid: UID,
-                    gid: GID,
-                },
-                ttl_seconds: None,
-            },
-        )
-        .unwrap();
-    let attempt = JoinAttempt::agent(
-        InvitationCode::parse(&issued.invitation_code).unwrap(),
-        &key,
-        [2; 32],
-    );
+    let issued = invite(&f, "socket", UID);
+    let attempt = attempt(&issued, &key);
     // Another unpaired account is refused before its frame is parsed.
     assert_eq!(serve(&f, UID + 1, attempt.request()).await, unauthorized);
     // The invited account may not submit work with its future key.
@@ -95,6 +118,88 @@ async fn only_an_invited_identity_reaches_enrollment_and_it_never_submits() {
         }
     ));
     assert!(f.app.agent_peer_eligible(UID, &[GID]).is_ok());
-    // Without a live invitation, enrollment messages are refused again.
-    assert_eq!(serve(&f, UID + 1, &session.status()).await, unauthorized);
+    // Lost final reply: the now paired account re-sends its confirmation and
+    // learns the outcome; nothing is committed twice.
+    let again =
+        EnrollmentReply::parse(&serve(&f, UID, &session.confirm(Some(&key))).await).unwrap();
+    assert_eq!(again, reply);
+    assert_eq!(f.app.list_agents(owner).unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_cancelled_session_no_longer_admits_the_invited_identity() {
+    let f = fixture();
+    let unauthorized = br#"{"status":"rejected","protocol_version":1,"category":"unauthorized"}"#;
+    let key = SigningKey::from_bytes(&[73; 32]);
+    let issued = invite(&f, "cancelled", OTHER_UID);
+    let attempt = attempt(&issued, &key);
+    let reply = EnrollmentReply::parse(&serve(&f, OTHER_UID, attempt.request()).await).unwrap();
+    let session = attempt.accept(&reply).unwrap();
+    let cancelled = f
+        .app
+        .enrollment_cancel(f.app.human_owner(), &issued.id)
+        .unwrap();
+    assert_eq!(
+        cancelled.state,
+        EnrollmentState::Cancelled {
+            by: Party::Provider
+        }
+    );
+    // Once nothing can be enrolled any more, the invited identity is an
+    // ordinary unpaired account again: refused before parsing, and the
+    // joiner reads that as an invalid invitation.
+    let refused = serve(&f, OTHER_UID, &session.status()).await;
+    assert_eq!(refused, unauthorized);
+    assert_eq!(
+        joiner_sees(&refused),
+        EnrollmentReply::rejected(EnrollmentRejection::InvalidInvitation)
+    );
+}
+
+#[test]
+fn contention_is_a_retryable_busy_and_a_held_gate_does_not_refuse_enrollment() {
+    let f = fixture();
+    let key = SigningKey::from_bytes(&[74; 32]);
+    let issued = invite(&f, "busy", UID);
+    let attempt = attempt(&issued, &key);
+    // The sessions are momentarily locked: busy, never "not invited".
+    let mut held = Vec::new();
+    f.app
+        .enrollment_hold_for_test(|| held = serve_blocking(&f, UID, attempt.request()));
+    assert_eq!(
+        joiner_sees(&held),
+        EnrollmentReply::rejected(EnrollmentRejection::Busy)
+    );
+    let joined = joiner_sees(&serve_blocking(&f, UID, attempt.request()));
+    let session = attempt.accept(&joined).unwrap();
+    // The provider's gate is busy with other work: an invited joiner's
+    // enrollment message is still answered in the enrollment vocabulary.
+    let mut status = Vec::new();
+    f.app
+        .management_hold_gate_for_test(|| status = serve_blocking(&f, UID, &session.status()));
+    assert!(matches!(
+        joiner_sees(&status),
+        EnrollmentReply::State {
+            state: EnrollmentState::AwaitingApprovals { .. },
+            ..
+        }
+    ));
+}
+
+#[tokio::test]
+async fn after_a_provider_restart_the_joiner_sees_an_invalid_invitation() {
+    let f = fixture();
+    let key = SigningKey::from_bytes(&[75; 32]);
+    let issued = invite(&f, "restart", UID);
+    let attempt = attempt(&issued, &key);
+    let joined = joiner_sees(&serve(&f, UID, attempt.request()).await);
+    let session = attempt.accept(&joined).unwrap();
+    // A restarted provider has forgotten every invitation (memory only).
+    let restarted = fixture();
+    for message in [session.status(), session.confirm(Some(&key))] {
+        assert_eq!(
+            joiner_sees(&serve(&restarted, UID, &message).await),
+            EnrollmentReply::rejected(EnrollmentRejection::InvalidInvitation)
+        );
+    }
 }

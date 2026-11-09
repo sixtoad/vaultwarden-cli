@@ -2,7 +2,7 @@
 use crate::access::{
     application::ProviderApplication,
     enrollment::{
-        EnrollmentRejection,
+        EnrollmentAdmission, EnrollmentRejection,
         wire::{EnrollmentReply, EnrollmentRequest},
     },
     ports::DirectReviewLauncher,
@@ -434,13 +434,29 @@ async fn serve_one(
     let (eligibility_app, eligibility_permit, groups) =
         (app.clone(), permit.clone(), peer.groups.clone());
     // A paired agent uses its binding; a peer named by a live invitation may
-    // additionally send enrollment messages, and nothing else (#59).
+    // additionally send enrollment messages, and nothing else (#59). A busy
+    // provider gate does not hide an invitation: the invited peer's
+    // enrollment message is still answered in the enrollment vocabulary.
     let eligibility = tokio::task::spawn_blocking(move || {
         let _retained = eligibility_permit;
         let binding = eligibility_app.agent_peer_eligible(peer.uid, &groups);
-        let enrollment = matches!(binding, Ok(()) | Err(AgentRejection::Unauthorized))
-            && eligibility_app.enrollment_peer_eligible(peer.uid, &groups);
-        (binding, enrollment)
+        let admission = if matches!(
+            binding,
+            Ok(()) | Err(AgentRejection::Unauthorized | AgentRejection::Busy)
+        ) {
+            eligibility_app.enrollment_peer_eligible(peer.uid, &groups)
+        } else {
+            EnrollmentAdmission::Refused
+        };
+        // Contention on the sessions is busy, never "not invited": still
+        // refused before parsing, but retryable for the joiner.
+        let binding = match (binding, admission) {
+            (Err(AgentRejection::Unauthorized), EnrollmentAdmission::Busy) => {
+                Err(AgentRejection::Busy)
+            }
+            (binding, _) => binding,
+        };
+        (binding, admission == EnrollmentAdmission::Admitted)
     })
     .await;
     let response: Result<Vec<u8>, AgentTransportError> = match eligibility {
@@ -693,8 +709,31 @@ pub async fn enrollment_exchange(
     path: &Path,
     input: &EnrollmentRequest,
 ) -> Result<EnrollmentReply, AgentTransportError> {
-    let response = exchange_raw(path, input).await?;
-    EnrollmentReply::parse(&response).map_err(|_error| AgentTransportError)
+    enrollment_reply(&exchange_raw(path, input).await?)
+}
+
+/// Decode the provider's reply to an enrollment message.
+///
+/// Kernel admission refuses a peer before reading its frame, so that refusal
+/// is the agent socket's closed rejection, not an enrollment reply. It is
+/// mapped here, never left as a transport error: `unauthorized` means no live
+/// invitation names this OS identity (indistinguishable from an unknown
+/// invitation, e.g. after a provider restart or cancellation), `busy` is
+/// momentary contention and retryable.
+pub(crate) fn enrollment_reply(bytes: &[u8]) -> Result<EnrollmentReply, AgentTransportError> {
+    if let Ok(reply) = EnrollmentReply::parse(bytes) {
+        return Ok(reply);
+    }
+    let Ok(AgentResponse::Rejected { category, .. }) = AgentResponse::parse(bytes) else {
+        return Err(AgentTransportError);
+    };
+    Ok(EnrollmentReply::rejected(match category {
+        AgentRejection::Unauthorized => EnrollmentRejection::InvalidInvitation,
+        AgentRejection::Busy => EnrollmentRejection::Busy,
+        AgentRejection::Malformed => EnrollmentRejection::Malformed,
+        AgentRejection::UnsupportedVersion => EnrollmentRejection::UnsupportedVersion,
+        _ => EnrollmentRejection::Unavailable,
+    }))
 }
 
 async fn exchange_raw(

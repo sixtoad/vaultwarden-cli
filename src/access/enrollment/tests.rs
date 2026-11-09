@@ -17,12 +17,17 @@ const OWNER: u32 = 501;
 #[derive(Default)]
 struct Hooks {
     refused: Vec<String>,
+    /// The identity store cannot answer `admissible`.
+    store_down: bool,
     commits: Vec<(EnrolleeKind, Joiner, u32)>,
     fail_commit: Option<FailureReason>,
 }
 impl EnrollmentHooks for Hooks {
-    fn admissible(&mut self, _: &EnrolleeKind, joiner: &Joiner) -> bool {
-        !self.refused.contains(&joiner.fingerprint)
+    fn admissible(&mut self, _: &EnrolleeKind, joiner: &Joiner) -> Result<bool, FailureReason> {
+        if self.store_down {
+            return Err(FailureReason::Unavailable);
+        }
+        Ok(!self.refused.contains(&joiner.fingerprint))
     }
     fn commit(
         &mut self,
@@ -136,8 +141,8 @@ fn agent_happy_path_requires_both_humans_and_shows_the_same_code() {
     assert_eq!(joined.kind, agent_kind());
     let provider_view = view(&mut book, &issued.id, 2);
     assert_eq!(
-        provider_view.comparison_code.as_deref(),
-        Some(joined.comparison_code.as_str())
+        provider_view.joiner_fingerprint,
+        Some(hex(&transcript::hash(&key(3).verifying_key().to_bytes())))
     );
     assert!(joined.comparison_code.len() == 9 && joined.comparison_code.as_bytes()[4] == b'-');
     // The joiner's approval alone never enrolls.
@@ -212,6 +217,61 @@ fn agent_happy_path_requires_both_humans_and_shows_the_same_code() {
         EnrollmentState::Enrolled { .. }
     ));
     assert_eq!(hooks.commits.len(), 1);
+}
+
+/// The owner learns the code only from the joiner's screen and types it. A
+/// code the provider printed could be copied into `approve` without ever
+/// looking at the joiner, which would void the comparison.
+#[test]
+fn the_provider_never_displays_the_comparison_code() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(&mut book, agent_kind(), 1);
+    let joined = agent_join(&mut book, &issued, &mut hooks);
+    let digits = joined.comparison_code.replace('-', "");
+    let leaks = |views: &[EnrollmentView]| {
+        let text = serde_json::to_string(views).unwrap();
+        text.contains(&joined.comparison_code) || text.contains(&digits)
+    };
+    assert!(!leaks(&book.list(now(2))), "joined, nothing approved");
+    send(
+        &mut book,
+        &agent_peer(),
+        &joined.confirm(Some(&key(3))),
+        3,
+        &mut hooks,
+    );
+    assert!(!leaks(&book.list(now(3))), "joiner confirmed");
+    let approved = book
+        .approve(&issued.id, &joined.comparison_code, OWNER, now(4))
+        .unwrap();
+    assert!(!leaks(std::slice::from_ref(&approved)), "approve reply");
+    assert!(!leaks(&book.list(now(4))), "provider approved");
+}
+
+/// Agent-socket admission after a final state: only a committed enrollment
+/// keeps admitting its joiner (a lost final reply matters there), and only
+/// while retained.
+#[test]
+fn only_an_enrolled_session_keeps_admitting_its_joiner() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let cancelled = invite(&mut book, agent_kind(), 2);
+    agent_join(&mut book, &cancelled, &mut hooks);
+    book.cancel(&cancelled.id, now(1)).unwrap();
+    assert!(!book.peer_eligible(&agent_peer(), now(1)));
+    let issued = invite(&mut book, agent_kind(), 1);
+    let joined = agent_join(&mut book, &issued, &mut hooks);
+    book.approve(&issued.id, &joined.comparison_code, OWNER, now(2))
+        .unwrap();
+    send(
+        &mut book,
+        &agent_peer(),
+        &joined.confirm(Some(&key(3))),
+        3,
+        &mut hooks,
+    );
+    assert!(book.peer_eligible(&agent_peer(), now(4)));
+    let forgotten = 3 + FINAL_RETENTION.as_secs();
+    assert!(!book.peer_eligible(&agent_peer(), now(forgotten)));
 }
 
 #[test]
@@ -468,10 +528,10 @@ fn invitations_expire_and_expired_sessions_are_forgotten_later() {
         book.approve(&issued.id, &joined.comparison_code, OWNER, now(late)),
         Err(HumanEnrollmentError::Expired)
     );
-    // The joined identity may still observe the outcome, until forgotten.
-    assert!(book.peer_eligible(&agent_peer(), now(late)));
+    // Nothing can be enrolled any more: the agent socket admits nobody for
+    // it (only a committed enrollment keeps admitting its joiner).
+    assert!(!book.peer_eligible(&agent_peer(), now(late)));
     let forgotten = late + FINAL_RETENTION.as_secs();
-    assert!(!book.peer_eligible(&agent_peer(), now(forgotten)));
     assert!(book.list(now(forgotten)).is_empty());
     let reply = send(
         &mut book,
@@ -733,7 +793,28 @@ fn a_revoked_or_known_identity_is_refused_before_any_code_is_shown() {
             reason: FailureReason::IdentityRefused
         }
     );
-    assert!(refused.comparison_code.is_none());
+    assert!(refused.joiner_fingerprint.is_none());
+}
+
+#[test]
+fn a_store_that_cannot_answer_at_join_is_unavailable_and_burns_nothing() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(&mut book, agent_kind(), 1);
+    let attempt = JoinAttempt::agent(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        &key(3),
+        [5; 32],
+    );
+    hooks.store_down = true;
+    let reply = send(&mut book, &agent_peer(), attempt.request(), 1, &mut hooks);
+    assert_eq!(rejection(&reply), EnrollmentRejection::Unavailable);
+    assert_eq!(
+        view(&mut book, &issued.id, 1).state,
+        EnrollmentState::AwaitingJoin {}
+    );
+    hooks.store_down = false;
+    let reply = send(&mut book, &agent_peer(), attempt.request(), 2, &mut hooks);
+    assert!(attempt.accept(&reply).is_ok());
 }
 
 #[test]
@@ -907,4 +988,79 @@ fn comparison_codes_depend_on_every_transcript_input() {
     assert_eq!(transcript::normalize_code("1234-567x"), None);
     assert!(transcript::codes_equal("1234-5678", "1234-5678"));
     assert!(!transcript::codes_equal("1234-5678", "1234-5679"));
+}
+
+/// The joiner's cancel reason is covered by its MAC: a relay that swaps
+/// "cancelled" for "code mismatch" (or back) is refused like a wrong proof.
+#[test]
+fn the_cancel_reason_is_authenticated() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(&mut book, agent_kind(), 1);
+    let joined = agent_join(&mut book, &issued, &mut hooks);
+    let EnrollmentRequest::EnrollCancel {
+        protocol_version,
+        invitation_id,
+        mac,
+        ..
+    } = joined.cancel(JoinerCancelReason::Cancelled)
+    else {
+        panic!("not a cancel")
+    };
+    let swapped = EnrollmentRequest::EnrollCancel {
+        protocol_version,
+        invitation_id,
+        reason: JoinerCancelReason::CodeMismatch,
+        mac,
+    };
+    let reply = send(&mut book, &agent_peer(), &swapped, 2, &mut hooks);
+    assert_eq!(rejection(&reply), EnrollmentRejection::InvalidInvitation);
+    assert_eq!(
+        view(&mut book, &issued.id, 2).state,
+        EnrollmentState::AwaitingApprovals {
+            provider_approved: false,
+            joiner_confirmed: false
+        }
+    );
+    let reply = send(
+        &mut book,
+        &agent_peer(),
+        &joined.cancel(JoinerCancelReason::Cancelled),
+        3,
+        &mut hooks,
+    );
+    assert_eq!(
+        state_of(&reply),
+        EnrollmentState::Cancelled { by: Party::Joiner }
+    );
+}
+
+/// When the retained sessions are full, a just-enrolled session (whose
+/// joiner may still need its lost final reply) is evicted last.
+#[test]
+fn eviction_keeps_enrolled_sessions_over_other_finished_ones() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(&mut book, agent_kind(), 1);
+    let joined = agent_join(&mut book, &issued, &mut hooks);
+    book.approve(&issued.id, &joined.comparison_code, OWNER, now(2))
+        .unwrap();
+    send(
+        &mut book,
+        &agent_peer(),
+        &joined.confirm(Some(&key(3))),
+        3,
+        &mut hooks,
+    );
+    for seed in 2..=(MAX_RETAINED_SESSIONS as u8) {
+        let other = invite(&mut book, agent_kind(), seed);
+        book.cancel(&other.id, now(4)).unwrap();
+    }
+    assert_eq!(book.list(now(5)).len(), MAX_RETAINED_SESSIONS);
+    invite(&mut book, agent_kind(), 99);
+    let views = book.list(now(5));
+    assert_eq!(views.len(), MAX_RETAINED_SESSIONS);
+    assert!(
+        views
+            .iter()
+            .any(|v| v.id == issued.id && matches!(v.state, EnrollmentState::Enrolled { .. }))
+    );
 }

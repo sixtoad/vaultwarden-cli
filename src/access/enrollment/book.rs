@@ -27,8 +27,11 @@ pub struct Joiner {
 
 /// Provider-side effects the book cannot decide alone.
 pub trait EnrollmentHooks {
-    /// Refuse an identity that is already enrolled or was ever revoked.
-    fn admissible(&mut self, kind: &EnrolleeKind, joiner: &Joiner) -> bool;
+    /// `Ok(false)` refuses an identity that is already enrolled or was ever
+    /// revoked, which burns the invitation. `Err` means the store could not
+    /// answer: the join is refused as `unavailable` and the invitation stays
+    /// open, because a storage fault is no verdict on the joining identity.
+    fn admissible(&mut self, kind: &EnrolleeKind, joiner: &Joiner) -> Result<bool, FailureReason>;
     /// Durably enroll; called once, after both humans approved.
     fn commit(
         &mut self,
@@ -127,9 +130,6 @@ impl Session {
                 0
             },
             joiner_fingerprint: joined.map(|j| j.joiner.fingerprint.clone()),
-            comparison_code: matches!(self.phase, Phase::Joined(_))
-                .then(|| joined.map(|j| j.code.clone()))
-                .flatten(),
         }
     }
 }
@@ -177,8 +177,17 @@ impl Book {
         if live >= MAX_LIVE_INVITATIONS {
             return Err(HumanEnrollmentError::LimitReached);
         }
+        // Evict the oldest finished session, but an enrolled one last: its
+        // joiner may still need the final reply it lost (sessions are in
+        // creation order).
         while self.sessions.len() >= MAX_RETAINED_SESSIONS {
-            let Some(oldest) = self.sessions.iter().position(|s| !s.live()) else {
+            let enrolled = |s: &Session| matches!(s.state(), EnrollmentState::Enrolled { .. });
+            let Some(oldest) = self
+                .sessions
+                .iter()
+                .position(|s| !s.live() && !enrolled(s))
+                .or_else(|| self.sessions.iter().position(|s| !s.live()))
+            else {
                 return Err(HumanEnrollmentError::LimitReached);
             };
             self.sessions.remove(oldest);
@@ -191,7 +200,15 @@ impl Book {
             return Err(HumanEnrollmentError::Unavailable);
         }
         let id_text = b64(&id);
-        let code = Zeroizing::new(format!("{INVITATION_PREFIX}.{id_text}.{}", b64(&*secret)));
+        // The only plain copy of the secret is the returned code itself,
+        // which `IssuedInvitation` wipes on drop.
+        let secret_text = Zeroizing::new(b64(&*secret));
+        let mut code = String::with_capacity(INVITATION_PREFIX.len() + id_text.len() + 45);
+        code.push_str(INVITATION_PREFIX);
+        code.push('.');
+        code.push_str(&id_text);
+        code.push('.');
+        code.push_str(&secret_text);
         self.sessions.push(Session {
             id,
             id_text: id_text.clone(),
@@ -203,7 +220,7 @@ impl Book {
         });
         Ok(IssuedInvitation {
             id: id_text,
-            invitation_code: code.to_string(),
+            invitation_code: code,
             kind: request.kind,
             expires_in_seconds: ttl,
         })
@@ -286,16 +303,20 @@ impl Book {
     }
 
     /// Kernel admission for an unpaired agent: only the OS identity a live
-    /// invitation names may reach the enrollment messages. After a join it
-    /// may keep observing the outcome while the session is retained, so a
-    /// lost final reply is recoverable; every message still needs the MAC.
+    /// invitation names may reach the enrollment messages. After a final
+    /// state only an enrollment that committed keeps admitting it (while
+    /// retained), because only there does a lost final reply matter: the
+    /// joiner must learn that its key is now bound. A cancelled, expired,
+    /// aborted or failed session admits nobody; the joiner then reads the
+    /// pre-parse refusal as `invalid_invitation`. Every message still needs
+    /// the MAC.
     pub fn peer_eligible(&mut self, peer: &Peer, now: Duration) -> bool {
         self.tick(now);
         matches!(peer, Peer::Agent { .. })
-            && self
-                .sessions
-                .iter()
-                .any(|s| (s.live() || s.joined().is_some()) && peer.matches(&s.kind))
+            && self.sessions.iter().any(|s| {
+                (s.live() || matches!(s.state(), EnrollmentState::Enrolled { .. }))
+                    && peer.matches(&s.kind)
+            })
     }
 
     /// One joiner message. `provider_identity` is empty on the agent socket
@@ -357,7 +378,7 @@ impl Book {
                 Ok(EnrollmentReply::state(&session.id_text, session.state()))
             }
             EnrollmentRequest::EnrollCancel { reason, mac, .. } => {
-                control(session, peer, t::CANCEL, mac, now)?;
+                control(session, peer, t::cancel_action(*reason), mac, now)?;
                 if session.live() {
                     session.finish(
                         match reason {
@@ -461,7 +482,10 @@ fn join(
         }
         Phase::Open => {}
     }
-    if !hooks.admissible(&session.kind, &joiner) {
+    let admissible = hooks
+        .admissible(&session.kind, &joiner)
+        .map_err(|_error| EnrollmentRejection::Unavailable)?;
+    if !admissible {
         session.finish(
             EnrollmentState::Failed {
                 reason: FailureReason::IdentityRefused,

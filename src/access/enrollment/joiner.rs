@@ -196,7 +196,7 @@ impl JoinedSession {
             protocol_version: ENROLLMENT_PROTOCOL_VERSION,
             invitation_id: self.code.id(),
             reason,
-            mac: self.control_mac(t::CANCEL),
+            mac: self.control_mac(t::cancel_action(reason)),
         }
     }
 }

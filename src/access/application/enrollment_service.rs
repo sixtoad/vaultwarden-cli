@@ -7,7 +7,8 @@ use crate::access::{
     agent_binding::{AgentBinding, AgentBindingStatus, AgentPairing},
     direct_request::{AuthenticatedHuman, DirectRequestError},
     enrollment::{
-        EnrolledIdentity, EnrolleeKind, EnrollmentRejection, EnrollmentView, FailureReason,
+        EnrolledIdentity, EnrolleeKind, EnrollmentAdmission, EnrollmentRejection, EnrollmentView,
+        FailureReason,
         HumanEnrollmentError, InvitationRequest, IssuedInvitation, Peer,
         book::{Book, EnrollmentHooks, Joiner},
         wire::{EnrollmentReply, EnrollmentRequest},
@@ -95,21 +96,35 @@ impl ProviderApplication {
         self.enrollment_book()?.cancel(id, self.clock.now())
     }
 
-    /// Kernel admission of an otherwise unpaired agent peer. Never waits.
-    pub fn enrollment_peer_eligible(&self, uid: u32, groups: &[u32]) -> bool {
+    /// Run `action` while the enrollment sessions are locked (contention seam).
+    #[cfg(test)]
+    pub(crate) fn enrollment_hold_for_test(&self, action: impl FnOnce()) {
+        let _guard = self.enrollment.lock().unwrap();
+        action();
+    }
+
+    /// Kernel admission of an otherwise unpaired agent peer. Never waits:
+    /// contention is reported as `Busy`, never as "not invited".
+    pub fn enrollment_peer_eligible(&self, uid: u32, groups: &[u32]) -> EnrollmentAdmission {
         if self.admission_closed() || uid == self.owner.uid() {
-            return false;
+            return EnrollmentAdmission::Refused;
         }
-        let Ok(mut book) = self.enrollment.try_lock() else {
-            return false;
+        let mut book = match self.enrollment.try_lock() {
+            Ok(book) => book,
+            Err(std::sync::TryLockError::WouldBlock) => return EnrollmentAdmission::Busy,
+            Err(std::sync::TryLockError::Poisoned(_)) => return EnrollmentAdmission::Refused,
         };
-        book.peer_eligible(
+        if book.peer_eligible(
             &Peer::Agent {
                 uid,
                 groups: groups.to_vec(),
             },
             self.clock.now(),
-        )
+        ) {
+            EnrollmentAdmission::Admitted
+        } else {
+            EnrollmentAdmission::Refused
+        }
     }
 
     /// One joiner message from the agent socket, after kernel admission.
@@ -183,11 +198,13 @@ struct AgentHooks<'a> {
 }
 
 impl EnrollmentHooks for AgentHooks<'_> {
-    fn admissible(&mut self, _: &EnrolleeKind, joiner: &Joiner) -> bool {
-        // Any binding with this key, enabled or revoked, refuses it.
+    fn admissible(&mut self, _: &EnrolleeKind, joiner: &Joiner) -> Result<bool, FailureReason> {
+        // Any binding with this key, enabled or revoked, refuses it. A store
+        // that cannot answer is unavailable, not a refusal.
         self.app
             .list_agents(self.app.owner)
-            .is_ok_and(|agents| agents.iter().all(|a| a.fingerprint != joiner.fingerprint))
+            .map(|agents| agents.iter().all(|a| a.fingerprint != joiner.fingerprint))
+            .map_err(|_error| FailureReason::Unavailable)
     }
 
     fn commit(

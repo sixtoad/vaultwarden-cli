@@ -417,7 +417,11 @@ impl Companion {
         client_ca: &Path,
         identity_store: &Path,
     ) -> Result<Self, SessionError> {
-        identity::enrolled(identity_store)?;
+        // An absent registry in the private provider directory is zero
+        // companions: every command except guided enrollment is refused
+        // (`authorized` finds no identity), so the first companion can be
+        // enrolled online (#59). A present but invalid registry still fails.
+        identity::enrolled_or_none(identity_store)?;
         crate::install_rustls_crypto_provider();
         let certificates = identity::private_file(certificate)?;
         let key = identity::private_file(private_key)?;

@@ -50,9 +50,13 @@ impl Hooks<'_> {
 }
 
 impl EnrollmentHooks for Hooks<'_> {
-    fn admissible(&mut self, _: &EnrolleeKind, joiner: &Joiner) -> bool {
-        self.root()
-            .is_some_and(|root| identity::known(root, &joiner.fingerprint) == Ok(false))
+    fn admissible(&mut self, _: &EnrolleeKind, joiner: &Joiner) -> Result<bool, FailureReason> {
+        // An unreadable registry is unavailable: it neither refuses the
+        // device nor burns the invitation.
+        let root = self.root().ok_or(FailureReason::Unavailable)?;
+        identity::known(root, &joiner.fingerprint)
+            .map(|known| !known)
+            .map_err(|_error| FailureReason::Unavailable)
     }
 
     fn commit(

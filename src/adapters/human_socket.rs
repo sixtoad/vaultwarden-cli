@@ -906,6 +906,28 @@ mod tests {
             agents
         );
     }
+    /// Admits every joiner and never commits: enough to reach the joined state.
+    struct AdmitAll;
+    impl crate::access::enrollment::book::EnrollmentHooks for AdmitAll {
+        fn admissible(
+            &mut self,
+            _: &crate::access::enrollment::EnrolleeKind,
+            _: &crate::access::enrollment::book::Joiner,
+        ) -> Result<bool, crate::access::enrollment::FailureReason> {
+            Ok(true)
+        }
+        fn commit(
+            &mut self,
+            _: &crate::access::enrollment::EnrolleeKind,
+            _: &crate::access::enrollment::book::Joiner,
+            _: u32,
+        ) -> Result<
+            crate::access::enrollment::EnrolledIdentity,
+            crate::access::enrollment::FailureReason,
+        > {
+            Err(crate::access::enrollment::FailureReason::Unavailable)
+        }
+    }
     #[test]
     fn enrollment_commands_are_closed_owner_only_and_forget_secrets_on_restart() {
         use crate::access::enrollment::{
@@ -981,6 +1003,29 @@ mod tests {
                 reason: HumanEnrollmentError::AwaitingPeer
             }
         ));
+        // Once a device joined, the owner still never sees the comparison
+        // code here: it is read on the device and typed into `approve`.
+        let (device, provider) = ("d".repeat(64), "e".repeat(64));
+        let attempt = crate::access::enrollment::joiner::JoinAttempt::companion(
+            crate::access::enrollment::joiner::InvitationCode::parse(&invitation.invitation_code)
+                .unwrap(),
+            &device,
+            &provider,
+            [6; 32],
+        )
+        .unwrap();
+        let reply = app.enrollment_companion_message(
+            &device,
+            &crate::access::enrollment::unhex32(&provider).unwrap(),
+            attempt.request(),
+            &mut AdmitAll,
+        );
+        let session = attempt.accept(&reply).unwrap();
+        let listed =
+            serde_json::to_string(&exchange(&root, HumanCommand::EnrollList {}).unwrap()).unwrap();
+        assert!(listed.contains("awaiting_approvals"), "{listed}");
+        assert!(!listed.contains(&session.comparison_code));
+        assert!(!listed.contains(&session.comparison_code.replace('-', "")));
         let HumanResponse::Enrollment { enrollment } = exchange(
             &root,
             HumanCommand::EnrollCancel {

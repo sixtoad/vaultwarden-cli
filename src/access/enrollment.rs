@@ -136,6 +136,13 @@ pub struct IssuedInvitation {
     pub expires_in_seconds: u64,
 }
 
+impl Drop for IssuedInvitation {
+    /// The code carries the invitation secret: wipe it, including clones.
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.invitation_code);
+    }
+}
+
 impl std::fmt::Debug for IssuedInvitation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IssuedInvitation")
@@ -214,8 +221,10 @@ impl EnrollmentState {
     }
 }
 
-/// Human-facing projection. The comparison code is not secret; the
-/// invitation secret is never part of it.
+/// Human-facing projection for the provider owner. It never carries the
+/// invitation secret, and never the comparison code either: the owner must
+/// read the code on the joining endpoint and type it into `approve`. A code
+/// the provider displayed could be copied without looking at the joiner.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct EnrollmentView {
@@ -225,8 +234,6 @@ pub struct EnrollmentView {
     pub expires_in_seconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joiner_fingerprint: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub comparison_code: Option<String>,
 }
 
 /// Closed failures for the provider's human.
@@ -276,6 +283,16 @@ pub enum EnrollmentRejection {
     Busy,
     #[error("unavailable")]
     Unavailable,
+}
+
+/// Kernel admission of an unpaired agent peer to the enrollment messages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EnrollmentAdmission {
+    /// A session names this OS identity and can still matter to it.
+    Admitted,
+    Refused,
+    /// The sessions are momentarily locked; the joiner retries.
+    Busy,
 }
 
 /// The joining human's reason when declining.

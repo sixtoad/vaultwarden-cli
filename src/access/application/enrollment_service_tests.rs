@@ -15,6 +15,11 @@ use crate::access::{
 use ed25519_dalek::SigningKey;
 use std::sync::atomic::Ordering;
 
+/// Whether the agent socket admits `uid` to the enrollment messages.
+fn admitted(f: &Fixture, uid: u32) -> bool {
+    f.app.enrollment_peer_eligible(uid, &[GID])
+        == crate::access::enrollment::EnrollmentAdmission::Admitted
+}
 const UID: u32 = 41059;
 const GID: u32 = 42059;
 
@@ -100,8 +105,7 @@ fn only_the_provider_owner_invites_lists_approves_or_cancels() {
         Some(HumanEnrollmentError::InvalidRequest)
     );
     assert!(
-        !f.app
-            .enrollment_peer_eligible(f.app.human_owner().uid(), &[GID])
+        !admitted(&f, f.app.human_owner().uid())
     );
 }
 
@@ -109,10 +113,10 @@ fn only_the_provider_owner_invites_lists_approves_or_cancels() {
 fn agent_enrollment_pairs_through_the_store_only_after_both_approvals() {
     let f = fixture();
     let owner = f.app.human_owner();
-    assert!(!f.app.enrollment_peer_eligible(UID, &[GID]));
+    assert!(!admitted(&f, UID));
     let issued = invite(&f, "ci");
-    assert!(f.app.enrollment_peer_eligible(UID, &[GID]));
-    assert!(!f.app.enrollment_peer_eligible(UID + 1, &[GID]));
+    assert!(admitted(&f, UID));
+    assert!(!admitted(&f, UID + 1));
     let key = SigningKey::from_bytes(&[59; 32]);
     let session = join(&f, &issued, &key).unwrap();
     assert!(matches!(
@@ -236,7 +240,7 @@ fn invitations_expire_on_the_provider_clock_and_shutdown_refuses_enrollment() {
         crate::access::enrollment::FINAL_RETENTION.as_secs(),
         Ordering::SeqCst,
     );
-    assert!(!f.app.enrollment_peer_eligible(UID, &[GID]));
+    assert!(!admitted(&f, UID));
     assert!(f.app.list_agents(owner).unwrap().is_empty());
     // Closed admission (shutdown) refuses every enrollment action.
     f.app.close_admission();

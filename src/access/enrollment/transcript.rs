@@ -7,7 +7,7 @@
 //! of band and every channel already authenticates its peer (kernel
 //! credentials or mTLS), so the secret only binds the two humans' intent.
 
-use super::{Channel, EnrolleeKind};
+use super::{Channel, EnrolleeKind, JoinerCancelReason};
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
@@ -19,7 +19,13 @@ pub(crate) const CONTROL: &str = "control";
 const CODE: &str = "comparison-code";
 pub(crate) const CONFIRM: &str = "confirm";
 pub(crate) const STATUS: &str = "status";
-pub(crate) const CANCEL: &str = "cancel";
+/// The cancel action names its reason, so the reason is covered by the MAC.
+pub(crate) fn cancel_action(reason: JoinerCancelReason) -> &'static str {
+    match reason {
+        JoinerCancelReason::Cancelled => "cancel/cancelled",
+        JoinerCancelReason::CodeMismatch => "cancel/code_mismatch",
+    }
+}
 /// Ed25519 proof that the agent holds the key it joined with.
 pub(crate) const POSSESSION: &str = "possession";
 

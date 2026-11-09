@@ -42,7 +42,8 @@ pub(crate) enum EnrollCommand {
         #[arg(long)]
         ttl_seconds: Option<u64>,
     },
-    /// Show invitations, their state and, once joined, the comparison code.
+    /// Show invitations and their state. The comparison code is shown only on
+    /// the joining endpoint: read it there and type it into `approve`.
     List,
     /// Approve after comparing: type the code the joining endpoint displays.
     /// A different code aborts the enrollment.
@@ -66,9 +67,10 @@ pub(crate) enum EnrollCommand {
         /// New agent-owned 0600 seed file; never replaces an existing file.
         #[arg(long)]
         key_file: PathBuf,
-        /// How long to wait for the provider's approval.
-        #[arg(long, default_value_t = 600, value_parser = super::parse_timeout_seconds)]
-        timeout_seconds: u64,
+        /// How long to wait for the provider's approval. Default: until the
+        /// invitation expires; never longer than that.
+        #[arg(long, value_parser = super::parse_timeout_seconds)]
+        timeout_seconds: Option<u64>,
     },
 }
 
@@ -128,7 +130,7 @@ impl JoinerPrompt for Terminal {
             EnrolleeKind::Companion { label } => format!("companion {label:?}"),
         };
         self.say(&format!(
-            "Enrolling as {role}.\nComparison code: {}\nRun `vw-access enroll list` on the provider and compare.\nDoes the provider show the same code? Type yes to confirm: ",
+            "Enrolling as {role}.\nComparison code: {}\nRead this code to the provider owner, who types it into `vw-access enroll approve`.\nThe provider never displays it. Type yes to enroll this account as shown: ",
             session.comparison_code
         ));
         let mut answer = String::new();
@@ -150,7 +152,7 @@ impl JoinerPrompt for Terminal {
 }
 
 /// `enroll join`: returns the process exit code.
-pub(crate) fn join(socket: &Path, key_file: &Path, timeout_seconds: u64) -> u8 {
+pub(crate) fn join(socket: &Path, key_file: &Path, timeout_seconds: Option<u64>) -> u8 {
     match run_join(socket, key_file, timeout_seconds) {
         Ok(json) => match super::output(&json) {
             Ok(()) => 0,
@@ -166,11 +168,14 @@ pub(crate) fn join(socket: &Path, key_file: &Path, timeout_seconds: u64) -> u8 {
 fn run_join(
     socket: &Path,
     key_file: &Path,
-    timeout_seconds: u64,
+    timeout_seconds: Option<u64>,
 ) -> Result<serde_json::Value, String> {
     let mut terminal = Terminal::open()?;
-    let code = rpassword::prompt_password("Invitation code (input hidden): ")
-        .map_err(|_error| "enrollment requires an interactive terminal".to_string())?;
+    // The typed code holds the invitation secret: wiped once parsed.
+    let code = zeroize::Zeroizing::new(
+        rpassword::prompt_password("Invitation code (input hidden): ")
+            .map_err(|_error| "enrollment requires an interactive terminal".to_string())?,
+    );
     let code = InvitationCode::parse(&code).map_err(|error| error.to_string())?;
     let key = enrollment_client::create_agent_key(key_file)
         .map_err(|_error| "cannot create a new key file (it must not exist)".to_string())?;
@@ -180,7 +185,8 @@ fn run_join(
         .map_err(|_error| JoinFailure::LocalKey);
     let result = runtime.and_then(|runtime| {
         runtime.block_on(async {
-            let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_seconds);
+            let deadline = timeout_seconds
+                .map(|seconds| tokio::time::Instant::now() + Duration::from_secs(seconds));
             enrollment_client::join_agent(
                 &mut SocketTransport { socket },
                 &mut terminal,
@@ -198,14 +204,13 @@ fn run_join(
         })),
         // The provider may have committed after the last reply we saw: keep
         // the key so a completed enrollment stays usable.
-        Err(JoinFailure::TimedOut) => Err(format!(
-            "{}; outcome unknown, key kept at {} (check `vw-access enroll list` on the provider)",
-            JoinFailure::TimedOut,
+        Err(error) if error.outcome_unknown() => Err(format!(
+            "{error}; key kept at {} (check `vw-access agent list` on the provider)",
             key_file.display()
         )),
         Err(error) => {
             // Definitively not enrolled: do not leave unused key material.
-            let _ignored = std::fs::remove_file(key_file);
+            enrollment_client::remove_agent_key(key_file);
             Err(error.to_string())
         }
     }

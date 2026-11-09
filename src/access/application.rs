@@ -76,7 +76,11 @@ pub struct ProviderApplication {
     agent_tokens: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
     reaped: Condvar,
     cleanup_uncertain: AtomicBool,
-    /// Guided enrollment sessions (#59). Lock order: enrollment, then gate.
+    /// Guided enrollment sessions (#59). Held across the commit hooks, so the
+    /// lock order is enrollment → gate (agents: `list_agents`, `pair_agent`)
+    /// and enrollment → companion `identity_commit` → companion `management`
+    /// (companions: `enroll_online`). Never take the enrollment lock while
+    /// holding any of those.
     enrollment: Mutex<super::enrollment::book::Book>,
 }
 struct ActiveExecution {

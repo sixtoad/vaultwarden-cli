@@ -413,6 +413,22 @@ fn biometric_audit(
 pub(crate) fn enrolled(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
     Ok(registry(path)?.identities)
 }
+/// The registry of a provider whose directory is private, where an absent
+/// file is a provider that never enrolled a companion: zero identities, which
+/// authorize nothing. Any other unreadable or invalid file stays an error.
+fn registry_or_empty(root: &Path) -> Result<Registry, SessionError> {
+    private_directory(root)?;
+    read_or_initial(root)
+}
+/// Like `enrolled`, but an absent registry in a private directory is zero
+/// companions (#59): the endpoint then admits only guided enrollment.
+pub(crate) fn enrolled_or_none(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
+    let root = path.parent().ok_or(SessionError::BackendUnavailable)?;
+    if path.file_name() != Some(std::ffi::OsStr::new(STORE_FILE)) {
+        return enrolled(path);
+    }
+    Ok(registry_or_empty(root)?.identities)
+}
 pub(crate) fn management_records(
     path: &Path,
 ) -> Result<Vec<(EnrolledCompanion, bool, bool)>, SessionError> {
@@ -651,7 +667,7 @@ pub fn enroll(
 }
 /// Whether a fingerprint was ever enrolled, including revoked ones.
 pub(crate) fn known(root: &Path, fingerprint: &str) -> Result<bool, SessionError> {
-    let registry = registry(&root.join(STORE_FILE))?;
+    let registry = registry_or_empty(root)?;
     Ok(registry
         .identities
         .iter()
@@ -670,7 +686,9 @@ pub(crate) fn enroll_online(
     if !valid_fingerprint(fingerprint) || !valid_label(label) {
         return Err(SessionError::InvalidRequest);
     }
-    let mut registry = registry(&root.join(STORE_FILE))?;
+    // The first guided commit creates the registry (0600, atomically, in
+    // the private provider directory) exactly as the offline enroll does.
+    let mut registry = registry_or_empty(root)?;
     if registry
         .identities
         .iter()

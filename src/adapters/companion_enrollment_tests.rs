@@ -115,3 +115,114 @@ fn guided_companion_enrollment_never_reactivates_a_revoked_device() {
     );
     assert_eq!(bad.status, 400);
 }
+#[test]
+fn the_first_companion_enrolls_through_the_guided_flow() {
+    use crate::access::enrollment::{
+        EnrollmentState,
+        joiner::{InvitationCode, JoinAttempt},
+        wire::EnrollmentReply,
+    };
+    use std::os::unix::fs::MetadataExt;
+    let f = fixture();
+    let root = f.dir.path().join("provider");
+    let server = write_private(
+        &root,
+        "server.pem",
+        include_bytes!("../../tests/fixtures/provider-tls/server.pem"),
+    );
+    let key = write_private(
+        &root,
+        "server-key.pem",
+        include_bytes!("../../tests/fixtures/provider-tls/server-key.pem"),
+    );
+    let ca = write_private(&root, "client-ca.pem", CLIENT_CA);
+    // A fresh provider: no companion was ever enrolled, so no registry.
+    let store = root.join(identity::STORE_FILE);
+    assert!(!store.exists());
+    let service = Companion::bind("127.0.0.1:0".parse().unwrap(), &server, &key, &ca, &store)
+        .expect("the companion endpoint starts with zero companions");
+    let device = "c".repeat(64);
+    let list = || Command::List { version: 1 };
+    // Zero identities: every ordinary command is refused, nothing is created.
+    assert_eq!(service.dispatch(&device, list(), &f.app).status, 403);
+    assert!(!store.exists());
+    // Without a live invitation the enrollment command admits nothing either.
+    let stale = companion_invite(&f, "Stale");
+    f.app
+        .enrollment_cancel(f.app.human_owner(), &stale.id)
+        .unwrap();
+    let stale = JoinAttempt::companion(
+        InvitationCode::parse(&stale.invitation_code).unwrap(),
+        &device,
+        &service.provider_fingerprint,
+        [3; 32],
+    )
+    .unwrap();
+    assert!(matches!(
+        enroll(&service, &f, &device, stale.request().clone()),
+        EnrollmentReply::Rejected { .. }
+    ));
+    assert!(!store.exists());
+    let issued = companion_invite(&f, "First Mac");
+    let attempt = JoinAttempt::companion(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        &device,
+        &service.provider_fingerprint,
+        [4; 32],
+    )
+    .unwrap();
+    let joined = enroll(&service, &f, &device, attempt.request().clone());
+    let session = attempt.accept(&joined).unwrap();
+    f.app
+        .enrollment_approve(f.app.human_owner(), &issued.id, &session.comparison_code)
+        .unwrap();
+    assert!(matches!(
+        enroll(&service, &f, &device, session.confirm(None)),
+        EnrollmentReply::State {
+            state: EnrollmentState::Enrolled { .. },
+            ..
+        }
+    ));
+    // Created on the first guided commit, private to the provider account.
+    let metadata = std::fs::symlink_metadata(&store).unwrap();
+    assert!(metadata.is_file());
+    assert_eq!(metadata.mode() & 0o7777, 0o600);
+    assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+    assert_eq!(identity::enrolled(&store).unwrap().len(), 1);
+    assert_eq!(service.dispatch(&device, list(), &f.app).status, 200);
+    assert!(!identity::administrator(&service.identity_store, &device));
+}
+#[test]
+fn an_unreadable_registry_is_unavailable_and_does_not_burn_the_invitation() {
+    use crate::access::enrollment::{
+        EnrollmentRejection, EnrollmentState,
+        joiner::{InvitationCode, JoinAttempt},
+        wire::EnrollmentReply,
+    };
+    let f = fixture();
+    let (service, _, _) = service(&f);
+    let saved = std::fs::read(&service.identity_store).unwrap();
+    std::fs::write(&service.identity_store, b"{").unwrap();
+    let device = "c".repeat(64);
+    let issued = companion_invite(&f, "Studio Mac");
+    let attempt = JoinAttempt::companion(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        &device,
+        &service.provider_fingerprint,
+        [4; 32],
+    )
+    .unwrap();
+    // A storage fault is not a verdict on the device: retryable, not burned.
+    assert_eq!(
+        enroll(&service, &f, &device, attempt.request().clone()),
+        EnrollmentReply::Rejected {
+            protocol_version: 1,
+            reason: EnrollmentRejection::Unavailable
+        }
+    );
+    let views = f.app.enrollment_list(f.app.human_owner()).unwrap();
+    assert_eq!(views[0].state, EnrollmentState::AwaitingJoin {});
+    std::fs::write(&service.identity_store, saved).unwrap();
+    let joined = enroll(&service, &f, &device, attempt.request().clone());
+    assert!(attempt.accept(&joined).is_ok());
+}
