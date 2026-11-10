@@ -5,6 +5,7 @@ use crate::access::{
     direct_request::{
         AuthenticatedHuman, DirectRequestError, DirectStatus, DirectSubmission, SubmissionReceipt,
     },
+    enrollment::{EnrollmentView, HumanEnrollmentError, InvitationRequest, IssuedInvitation},
     history::HistoryEvent,
     policy::{ImageRegistration, OperationMetadata, OperationPolicyDraft, OperationSummary},
     ports::DirectReviewLauncher,
@@ -60,6 +61,10 @@ pub enum HumanCommand {
     AgentPair { pairing: AgentPairing },
     AgentList {},
     AgentRevoke { id: String },
+    EnrollInvite { invitation: InvitationRequest },
+    EnrollList {},
+    EnrollApprove { id: String, code: String },
+    EnrollCancel { id: String },
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
@@ -108,6 +113,18 @@ pub enum HumanResponse {
     },
     Rejected {
         reason: DirectRequestError,
+    },
+    EnrollInvited {
+        invitation: IssuedInvitation,
+    },
+    Enrollments {
+        enrollments: Vec<EnrollmentView>,
+    },
+    Enrollment {
+        enrollment: EnrollmentView,
+    },
+    EnrollmentRejected {
+        reason: HumanEnrollmentError,
     },
     InvalidRequest,
     Unauthorized,
@@ -408,6 +425,17 @@ fn peer_uid(stream: &UnixStream) -> Result<u32, HumanTransportError> {
         Ok(uid)
     }
 }
+/// The root-owned record naming the installed native endpoints.
+#[cfg(target_os = "macos")]
+pub const INSTALLED_IDENTITIES_PATH: &str = super::native::identity::IDENTITIES_PATH;
+/// The installed native human endpoint directory from the root-owned identity
+/// record, used by `vw-access` when no `--state-root` is given on macOS.
+#[cfg(target_os = "macos")]
+pub fn installed_human_socket_dir() -> Option<std::path::PathBuf> {
+    super::native::identity::load()
+        .ok()
+        .map(|config| config.human_socket_dir)
+}
 #[cfg(target_os = "macos")]
 fn private_directory(root: &Path) -> Result<(), HumanTransportError> {
     let config = super::native::identity::load().map_err(|_error| HumanTransportError)?;
@@ -563,6 +591,26 @@ fn serve_one(
             HumanCommand::AgentRevoke { id } => match app.revoke_agent(owner, &id) {
                 Ok(agent) => HumanResponse::AgentRevoked { agent },
                 Err(reason) => HumanResponse::Rejected { reason },
+            },
+            HumanCommand::EnrollInvite { invitation } => {
+                match app.enrollment_invite(owner, invitation) {
+                    Ok(invitation) => HumanResponse::EnrollInvited { invitation },
+                    Err(reason) => HumanResponse::EnrollmentRejected { reason },
+                }
+            }
+            HumanCommand::EnrollList {} => match app.enrollment_list(owner) {
+                Ok(enrollments) => HumanResponse::Enrollments { enrollments },
+                Err(reason) => HumanResponse::EnrollmentRejected { reason },
+            },
+            HumanCommand::EnrollApprove { id, code } => {
+                match app.enrollment_approve(owner, &id, &code) {
+                    Ok(enrollment) => HumanResponse::Enrollment { enrollment },
+                    Err(reason) => HumanResponse::EnrollmentRejected { reason },
+                }
+            }
+            HumanCommand::EnrollCancel { id } => match app.enrollment_cancel(owner, &id) {
+                Ok(enrollment) => HumanResponse::Enrollment { enrollment },
+                Err(reason) => HumanResponse::EnrollmentRejected { reason },
             },
         },
         _ => HumanResponse::InvalidRequest,
@@ -868,6 +916,156 @@ mod tests {
                 .unwrap(),
             agents
         );
+    }
+    /// Admits every joiner and never commits: enough to reach the joined state.
+    struct AdmitAll;
+    impl crate::access::enrollment::book::EnrollmentHooks for AdmitAll {
+        fn admissible(
+            &mut self,
+            _: &crate::access::enrollment::EnrolleeKind,
+            _: &crate::access::enrollment::book::Joiner,
+        ) -> Result<bool, crate::access::enrollment::FailureReason> {
+            Ok(true)
+        }
+        fn commit(
+            &mut self,
+            _: &crate::access::enrollment::EnrolleeKind,
+            _: &crate::access::enrollment::book::Joiner,
+            _: u32,
+        ) -> Result<
+            crate::access::enrollment::EnrolledIdentity,
+            crate::access::enrollment::FailureReason,
+        > {
+            Err(crate::access::enrollment::FailureReason::Unavailable)
+        }
+    }
+    #[test]
+    fn enrollment_commands_are_closed_owner_only_and_forget_secrets_on_restart() {
+        use crate::access::enrollment::{
+            EnrolleeKind, EnrollmentState, HumanEnrollmentError, InvitationRequest, Party,
+        };
+        let directory = private_temp();
+        let root = directory.path().join("provider");
+        let app = Arc::new(
+            ProviderApplication::new(
+                Provider::start(&root).unwrap(),
+                Box::new(Backend),
+                Box::<MonotonicClock>::default(),
+            )
+            .unwrap(),
+        );
+        let socket = HumanSocket::bind(&root).unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let launcher = Arc::new(Launcher(AtomicUsize::new(0)));
+        let worker = {
+            let (app, stop, launcher) = (app.clone(), stop.clone(), launcher.clone());
+            std::thread::spawn(move || socket.serve(app, launcher, stop))
+        };
+        let before = fs::read(root.join("provider-state.json")).unwrap();
+        for input in [
+            serde_json::json!({"version":1,"command":{"kind":"enroll_list","id":"x"}}),
+            serde_json::json!({"version":1,"command":{"kind":"enroll_invite","invitation":{"kind":{"role":"companion","label":"x","administrator":true}}}}),
+            serde_json::json!({"version":1,"command":{"kind":"enroll_approve","id":"x"}}),
+        ] {
+            assert!(matches!(
+                raw_exchange(&root, &serde_json::to_vec(&input).unwrap()),
+                HumanResponse::InvalidRequest
+            ));
+        }
+        let invited = exchange(
+            &root,
+            HumanCommand::EnrollInvite {
+                invitation: InvitationRequest {
+                    kind: EnrolleeKind::Companion {
+                        label: "Studio Mac".into(),
+                    },
+                    ttl_seconds: Some(120),
+                },
+            },
+        )
+        .unwrap();
+        let HumanResponse::EnrollInvited { invitation } = invited else {
+            panic!("invite failed")
+        };
+        assert!(invitation.invitation_code.starts_with("vwe1."));
+        let secret = invitation
+            .invitation_code
+            .rsplit('.')
+            .next()
+            .unwrap()
+            .to_owned();
+        let listed = exchange(&root, HumanCommand::EnrollList {}).unwrap();
+        assert!(!serde_json::to_string(&listed).unwrap().contains(&secret));
+        let HumanResponse::Enrollments { enrollments } = listed else {
+            panic!("list failed")
+        };
+        assert_eq!(enrollments.len(), 1);
+        assert_eq!(enrollments[0].state, EnrollmentState::AwaitingJoin {});
+        assert!(matches!(
+            exchange(
+                &root,
+                HumanCommand::EnrollApprove {
+                    id: invitation.id.clone(),
+                    code: "1234-5678".into()
+                }
+            )
+            .unwrap(),
+            HumanResponse::EnrollmentRejected {
+                reason: HumanEnrollmentError::AwaitingPeer
+            }
+        ));
+        // Once a device joined, the owner still never sees the comparison
+        // code here: it is read on the device and typed into `approve`.
+        let (device, provider) = ("d".repeat(64), "e".repeat(64));
+        let attempt = crate::access::enrollment::joiner::JoinAttempt::companion(
+            crate::access::enrollment::joiner::InvitationCode::parse(&invitation.invitation_code)
+                .unwrap(),
+            &device,
+            &provider,
+            [6; 32],
+        )
+        .unwrap();
+        let reply = app.enrollment_companion_message(
+            &device,
+            &crate::access::enrollment::unhex32(&provider).unwrap(),
+            attempt.request(),
+            &mut AdmitAll,
+        );
+        let session = attempt.accept(&reply).unwrap();
+        let listed =
+            serde_json::to_string(&exchange(&root, HumanCommand::EnrollList {}).unwrap()).unwrap();
+        assert!(listed.contains("awaiting_approvals"), "{listed}");
+        assert!(!listed.contains(&session.comparison_code));
+        assert!(!listed.contains(&session.comparison_code.replace('-', "")));
+        let HumanResponse::Enrollment { enrollment } = exchange(
+            &root,
+            HumanCommand::EnrollCancel {
+                id: invitation.id.clone(),
+            },
+        )
+        .unwrap() else {
+            panic!("cancel failed")
+        };
+        assert_eq!(
+            enrollment.state,
+            EnrollmentState::Cancelled {
+                by: Party::Provider
+            }
+        );
+        // Enrollment state is memory-only: nothing durable changed.
+        assert_eq!(fs::read(root.join("provider-state.json")).unwrap(), before);
+        assert_eq!(launcher.0.load(Ordering::Relaxed), 0);
+        stop.store(true, Ordering::Release);
+        worker.join().unwrap().unwrap();
+        drop(app);
+        let restarted = ProviderApplication::new(
+            Provider::start(&root).unwrap(),
+            Box::new(Backend),
+            Box::<MonotonicClock>::default(),
+        )
+        .unwrap();
+        let owner = AuthenticatedHuman::from_peer_uid(unsafe { libc::geteuid() });
+        assert!(restarted.enrollment_list(owner).unwrap().is_empty());
     }
     #[test]
     fn actual_socket_authenticates_kernel_peer_rejects_input_and_cleans_up() {

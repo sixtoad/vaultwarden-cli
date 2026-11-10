@@ -21,6 +21,7 @@ pub mod approval_v2;
 pub mod direct_request;
 #[cfg(all(test, target_os = "linux"))]
 pub(crate) mod direct_request_tests;
+pub mod enrollment;
 pub mod history;
 #[cfg(all(test, target_os = "linux"))]
 mod history_tests;

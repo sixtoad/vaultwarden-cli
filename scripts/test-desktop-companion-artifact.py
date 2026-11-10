@@ -45,6 +45,29 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ARTIFACT.package(root, evidence, "linux", "revision", False, True)
 
+    def test_macos_archive_is_arm64_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "app"
+            root.mkdir()
+            (root / "synthetic").write_bytes(b"synthetic executable")
+            evidence = Path(temporary) / "evidence"
+            evidence.mkdir()
+            arm = ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="arm64")
+            self.assertEqual(arm.name, "companion-macos-arm64-development.tar.gz")
+            self.assertEqual((evidence / f"{arm.name}.sha256").read_text().split(), [ARTIFACT.digest(arm), arm.name])
+            self.assertEqual(json.loads((evidence / "artifact.json").read_text())["archive"], arm.name)
+            # Intel (x86_64) macOS is no longer supported or built: no archive is
+            # produced, and the arm64 evidence is left as it was.
+            with self.assertRaisesRegex(ValueError, r"Intel \(x86_64\) macOS is no longer supported"):
+                ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="x86_64")
+            self.assertFalse((evidence / "companion-macos-x86_64-development.tar.gz").exists())
+            self.assertEqual(json.loads((evidence / "artifact.json").read_text())["archive"], arm.name)
+            # Platforms published once keep their established names.
+            self.assertEqual(ARTIFACT.package(root, evidence, "linux", "revision", False).name,
+                             "companion-linux-development.tar.gz")
+            with self.assertRaises(ValueError):
+                ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="aarch64")
+
     def test_archive_preserves_executable_and_framework_link(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "app"

@@ -21,7 +21,8 @@ class BundleTests(unittest.TestCase):
             repo = Path(temporary)
             for platform, launcher in [('windows', 'flutter.bat'), ('linux', 'flutter'), ('macos', 'flutter')]:
                 resolved = str(repo / 'Flutter SDK' / 'bin' / launcher)
-                with patch.object(bundle.shutil, 'which', return_value=resolved) as which, patch.object(bundle.subprocess, 'run') as run, patch.object(bundle.host_platform, 'machine', return_value='x86_64'):
+                machine = 'arm64' if platform == 'macos' else 'x86_64'
+                with patch.object(bundle.shutil, 'which', return_value=resolved) as which, patch.object(bundle.subprocess, 'run') as run, patch.object(bundle.host_platform, 'machine', return_value=machine):
                     bundle.build_app(repo, platform, repo)
                 which.assert_called_once_with(launcher, path=os.environ.get('PATH'))
                 self.assertEqual(run.call_args.args[0], [resolved, 'build', platform, '--release', '--target', 'lib/main.dart'])
@@ -177,7 +178,7 @@ class BundleTests(unittest.TestCase):
                    'linux': ['companion_slice', 'lib/libcompanion_core.so']}[platform]
         for name in runtime:
             p = root / name; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b'runtime'); p.chmod(0o755)
-        lipo = {'arm64': 'arm64', 'x86_64': 'x86_64'}[machine] if platform == 'macos' else None
+        lipo = machine if platform == 'macos' else None
         def run(argv, *args, **kwargs):
             return subprocess.CompletedProcess(argv, 0, '', 'Signature=adhoc\n')
         source = {'revision': 'a' * 40, 'inputs_sha256': 'b' * 64}
@@ -207,17 +208,78 @@ class BundleTests(unittest.TestCase):
                 self.assertEqual(entry['sha256'], bundle.artifact.digest(helpers / name))
             signed = [call.args[0][-1] for call in run.call_args_list if call.args[0][:4] == ['/usr/bin/codesign', '--force', '--sign', '-'] and len(call.args[0]) == 5]
             self.assertEqual(sorted(Path(p).name for p in signed), ['companion-command', 'vaultwarden-accessd', 'vaultwarden-cli', 'vw-access'])
+            # A release job that promises arm64 accepts exactly this helper set,
+            # and the archive name says arm64.
+            bundle.check_expected_architecture(root, manifest, 'arm64')
+            bundle.check_expected_architecture(root, manifest, 'aarch64')
+            self.assertEqual(bundle.archive_architecture('macos', manifest['architecture']), 'arm64')
+            # Intel macOS is not built at all: a job promising it is refused.
+            with self.assertRaisesRegex(ValueError, 'Intel \\(x86_64\\) macOS is no longer supported'):
+                bundle.check_expected_architecture(root, manifest, 'x86_64')
+            (helpers / 'vaultwarden-accessd').unlink()
+            with self.assertRaisesRegex(ValueError, 'bundled commands'):
+                bundle.check_expected_architecture(root, manifest, 'arm64')
             (helpers / 'vaultwarden-accessd').write_bytes(b'replaced')
             with self.assertRaisesRegex(ValueError, 'damaged'):
                 bundle.verify(root, manifest)
 
-    def test_macos_intel_bundle_never_advertises_protected_commands(self):
+    def test_macos_intel_is_refused_at_every_stage(self):
+        # Owner decision 2026-11-10: Intel (x86_64) macOS is no longer supported
+        # or built. No stage may produce, name or accept an Intel macOS bundle.
+        refused = 'Intel \\(x86_64\\) macOS is no longer supported'
+        for machine in ['x86_64', 'i386']:
+            with tempfile.TemporaryDirectory() as temporary:
+                with self.assertRaisesRegex(ValueError, refused):
+                    self.synthetic_populate(temporary, 'macos', machine)
+                # Refused before anything was copied into the bundle.
+                self.assertFalse((Path(temporary) / 'bundle/Contents/Helpers/vaultwarden-cli').exists())
+            with tempfile.TemporaryDirectory() as temporary, patch.object(bundle.subprocess, 'run') as run, \
+                    patch.object(bundle.host_platform, 'machine', return_value=machine):
+                with self.assertRaisesRegex(ValueError, refused):
+                    bundle.build_commands(Path(temporary), 'macos')
+                run.assert_not_called()
+            with tempfile.TemporaryDirectory() as temporary, patch.object(bundle.subprocess, 'run') as run, \
+                    patch.object(bundle.shutil, 'which', return_value='/sdk/flutter'), \
+                    patch.object(bundle.host_platform, 'machine', return_value=machine):
+                with self.assertRaisesRegex(ValueError, refused):
+                    bundle.build_app(Path(temporary), 'macos', Path(temporary))
+                run.assert_not_called()
+        with self.assertRaisesRegex(ValueError, refused):
+            bundle.protected_commands('macos', 'x86_64')
+        with self.assertRaisesRegex(ValueError, refused):
+            bundle.archive_architecture('macos', 'x86_64')
         with tempfile.TemporaryDirectory() as temporary:
-            root, manifest, _ = self.synthetic_populate(temporary, 'macos', 'x86_64')
-            self.assertEqual(sorted(p.name for p in (root / 'Contents/Helpers').iterdir()), ['companion-command', 'vaultwarden-cli'])
-            self.assertEqual(manifest['architecture'], 'x86_64')
-            self.assertEqual(set(manifest['commands']), {'vaultwarden-cli'})
-            self.assertEqual(manifest['roles'], {'protected_requesting': False, 'desktop_approval': True, 'protected_provider': False, 'vault_cli': True})
+            root, manifest, _ = self.synthetic_populate(temporary, 'macos', 'arm64')
+            for expected in ['x86_64', 'AMD64']:
+                with self.assertRaisesRegex(ValueError, refused):
+                    bundle.check_expected_architecture(root, manifest, expected)
+            # A manifest claiming Intel macOS is refused even when the job expects it.
+            with self.assertRaisesRegex(ValueError, refused):
+                bundle.check_expected_architecture(root, dict(manifest, architecture='x86_64'), 'x86_64')
+        # Only Intel *Mac* is dropped: Linux and Windows x86_64 stay supported.
+        self.assertEqual(bundle.protected_commands('linux', 'x86_64'), ['vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec'])
+        self.assertEqual(bundle.protected_commands('windows', 'x86_64'), [])
+
+    def test_expected_architecture_is_optional_and_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest, _ = self.synthetic_populate(temporary, 'linux', 'x86_64')
+            # Optional for a local manual run, with a warning...
+            with patch.dict(os.environ, {'CI': '', 'GITHUB_ACTIONS': ''}), patch('sys.stderr') as stderr:
+                bundle.check_expected_architecture(root, manifest, '')
+            self.assertIn('DESKTOP_EXPECTED_ARCHITECTURE', ''.join(call.args[0] for call in stderr.write.call_args_list))
+            # ...but required in CI, so a job cannot drop the check by accident.
+            for key in ['CI', 'GITHUB_ACTIONS']:
+                with patch.dict(os.environ, {'CI': '', 'GITHUB_ACTIONS': '', key: 'true'}):
+                    with self.assertRaisesRegex(ValueError, 'DESKTOP_EXPECTED_ARCHITECTURE is required'):
+                        bundle.check_expected_architecture(root, manifest, '')
+            bundle.check_expected_architecture(root, manifest, 'x86_64')
+            self.assertIsNone(bundle.archive_architecture('linux', 'x86_64'))
+            self.assertIsNone(bundle.archive_architecture('windows', 'x86_64'))
+            with self.assertRaisesRegex(ValueError, 'unsupported expected architecture'):
+                bundle.check_expected_architecture(root, manifest, 'riscv64')
+            manifest = dict(manifest, commands={'vaultwarden-cli': 'commands/vaultwarden-cli'})
+            with self.assertRaisesRegex(ValueError, 'advertised protected commands'):
+                bundle.check_expected_architecture(root, manifest, 'x86_64')
 
     def test_linux_and_windows_protected_commands_are_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -235,7 +297,6 @@ class BundleTests(unittest.TestCase):
     def test_command_build_selects_protected_binaries_by_platform_and_architecture(self):
         cases = [('linux', 'x86_64', ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']),
                  ('macos', 'arm64', ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd']),
-                 ('macos', 'x86_64', ['vaultwarden-cli']),
                  ('windows', 'AMD64', ['vaultwarden-cli'])]
         for platform, machine, expected in cases:
             with tempfile.TemporaryDirectory() as temporary, patch.object(bundle.subprocess, 'run') as run, patch.object(bundle.host_platform, 'machine', return_value=machine):
