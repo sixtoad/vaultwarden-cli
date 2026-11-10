@@ -35,6 +35,7 @@ find src -type f -exec touch {} +
 # The same-PID exec SSH test re-signs and execs a fresh binary; where new
 # executables are assessed before launch it can exceed the mutant timeout even
 # unmutated, so generated campaigns skip it. It still runs in the library gate.
+cargo fetch --locked
 TMPDIR="$scratch" CARGO_NET_OFFLINE=true CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}" \
     cargo mutants --no-config -C --locked -C --lib -f "$file" \
     --timeout "${MUTANT_TIMEOUT:-300}" --build-timeout "${MUTANT_BUILD_TIMEOUT:-900}" \

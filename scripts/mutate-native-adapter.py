@@ -87,6 +87,7 @@ for name in filter(None, files):
     # Fresh mtimes: a shared target directory must never satisfy the build with an
     # artifact compiled from other (possibly mutated) bytes of the same package.
     shutil.copy(repository / name.decode(), target)
+subprocess.run(["cargo", "fetch", "--locked"], cwd=source, check=True)
 environment = dict(os.environ, TMPDIR=str(tmp), CARGO_NET_OFFLINE="true",
                    CARGO_PROFILE_DEV_DEBUG="0", CARGO_BUILD_JOBS="4")
 
