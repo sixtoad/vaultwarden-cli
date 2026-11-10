@@ -96,7 +96,7 @@ impl ProviderApplication {
     }
 
     /// Run `action` while the enrollment sessions are locked (contention seam).
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn enrollment_hold_for_test(&self, action: impl FnOnce()) {
         let _guard = self.enrollment.lock().unwrap();
         action();
