@@ -121,6 +121,12 @@ exercise the packaged policy that command-line Swift tests do not exercise.
 
 ## Trusted provisioning
 
+For the native macOS provider on the same Mac, `vw-access setup tls` generates
+all of the material below (two private CAs, the provider certificate with SAN
+`IP:127.0.0.1`, the client certificate and PKCS#12, the CA DER and the leaf pin)
+and [macOS setup](macos-setup.md) gives the complete installed sequence. The
+steps below describe the general process for a Linux provider.
+
 1. Provision a private CA, Linux server key/certificate, and a unique client
    key/certificate per Mac using your trusted certificate process. The server
    certificate must contain the exact DNS name or IP SAN used by the Mac. Include

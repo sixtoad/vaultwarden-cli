@@ -51,6 +51,8 @@ pub(crate) fn uuid(uid: u32) -> Result<String, ExecutionError> {
     }
     Ok(value.iter().map(|b| format!("{b:02x}")).collect())
 }
+/// The root-owned installed identity record.
+pub(crate) const IDENTITIES_PATH: &str = "/Library/VaultwardenAccess/native-identities.json";
 #[cfg(test)]
 thread_local! {pub(crate) static TEST_IDENTITIES: std::cell::RefCell<Option<Identities>>=const{std::cell::RefCell::new(None)};}
 pub(crate) fn load() -> Result<Identities, ExecutionError> {
@@ -58,10 +60,7 @@ pub(crate) fn load() -> Result<Identities, ExecutionError> {
     if let Some(value) = TEST_IDENTITIES.with(|value| value.borrow().clone()) {
         return Ok(value);
     }
-    let file = platform::open_no_writers(
-        Path::new("/Library/VaultwardenAccess/native-identities.json"),
-        true,
-    )?;
+    let file = platform::open_no_writers(Path::new(IDENTITIES_PATH), true)?;
     let m = file
         .metadata()
         .map_err(|_error| ExecutionError::UnsafePath)?;

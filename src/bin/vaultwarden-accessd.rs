@@ -84,6 +84,10 @@ struct Args {
     /// Exact original client certificate; required when no action receipt exists.
     #[arg(long, requires = "companion_reconcile_action")]
     companion_reconcile_actor: Option<String>,
+    /// Provision the API client secret from standard input (prompted without
+    /// echo on a terminal; never an argument) into the provider secret store.
+    #[arg(long, conflicts_with_all = ["companion_enroll_cert", "companion_revoke", "companion_list", "companion_grant_admin", "companion_reconcile_action", "backend_config", "agent_socket_dir"])]
+    store_bootstrap_secret: bool,
 }
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn main() -> ExitCode {
@@ -98,6 +102,22 @@ fn main() -> ExitCode {
 }
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn run(args: Args) -> Result<(), ()> {
+    // The installed native provider is a service account without a login
+    // Keychain: its bootstrap secret and revocable session live in provider-owned
+    // files under the state root (docs/macos-setup.md). Linux keeps Secret Service.
+    #[cfg(target_os = "macos")]
+    vaultwarden_cli::adapters::provider_secret_file::ProviderSecretFileStore::install_default(
+        &args.state_root,
+    )
+    .map_err(|error| {
+        eprintln!(
+            "vaultwarden-accessd: cannot use the provider secret store: {}",
+            vaultwarden_cli::adapters::session::keyring_error_class(&error)
+        );
+    })?;
+    if args.store_bootstrap_secret {
+        return store_bootstrap_secret();
+    }
     if let Some(action) = &args.companion_reconcile_action {
         let receipt = Companion::reconcile_management_action(
             &args.state_root,
@@ -275,6 +295,38 @@ fn run(args: Args) -> Result<(), ()> {
         .and(artifact_cleanup)
         .and(execution_cleanup)
         .and(agent_cleanup)
+}
+
+/// Read the client secret from a no-echo prompt on a terminal, else one line of stdin.
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
+fn store_bootstrap_secret() -> Result<(), ()> {
+    use std::io::{IsTerminal, Read};
+    let refuse =
+        |class: &str| eprintln!("vaultwarden-accessd: cannot store the bootstrap secret: {class}");
+    let secret = if std::io::stdin().is_terminal() {
+        zeroize::Zeroizing::new(
+            rpassword::prompt_password("API client secret: ")
+                .map_err(|_error| refuse("cannot read the secret from the terminal"))?,
+        )
+    } else {
+        let mut raw = zeroize::Zeroizing::new(Vec::new());
+        std::io::stdin()
+            .take(4097)
+            .read_to_end(&mut raw)
+            .map_err(|_error| refuse("cannot read the secret from standard input"))?;
+        let text = std::str::from_utf8(&raw).map_err(|_error| refuse("the secret is not UTF-8"))?;
+        zeroize::Zeroizing::new(text.strip_suffix('\n').unwrap_or(text).to_owned())
+    };
+    if secret.is_empty() || secret.contains(['\n', '\r']) {
+        eprintln!("vaultwarden-accessd: expected exactly one non-empty secret line");
+        return Err(());
+    }
+    vaultwarden_cli::adapters::session::store_bootstrap_secret(
+        &vaultwarden_cli::access::ports::SensitiveString::new(secret.to_string()),
+    )
+    .map_err(|class| refuse(&class))?;
+    eprintln!("vaultwarden-accessd: bootstrap client secret stored");
+    Ok(())
 }
 
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
