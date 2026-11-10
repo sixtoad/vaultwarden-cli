@@ -200,6 +200,55 @@ mod tests {
         assert!(frame(&framed(b"not json"), false).is_err());
     }
 
+    /// The reader itself flags one byte past the frame capacity (and stops reading);
+    /// frame validation alone must not be what rejects an over-long stream.
+    #[test]
+    fn reader_flags_the_first_byte_past_capacity_instead_of_buffering_more() {
+        for (total, invalid) in [
+            (CAPACITY, false),
+            (CAPACITY + 1, true),
+            (CAPACITY * 2, true),
+        ] {
+            let mut ends = [-1; 2];
+            assert_eq!(unsafe { libc::pipe(ends.as_mut_ptr()) }, 0);
+            let (read, write) =
+                unsafe { (OwnedFd::from_raw_fd(ends[0]), OwnedFd::from_raw_fd(ends[1])) };
+            let writer = std::thread::spawn(move || {
+                let mut file = std::fs::File::from(write);
+                // A reader that stops early closes the pipe; EPIPE is expected then.
+                let _ignored = std::io::Write::write_all(&mut file, &vec![b'x'; total]);
+            });
+            // A reader that never finishes fails here instead of hanging the suite.
+            let (done, finished) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                let received = drain(&read, &AtomicBool::new(false));
+                drop(read);
+                let _ignored = done.send(received);
+            });
+            let received = finished
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("reader did not finish at end of file");
+            writer.join().unwrap();
+            assert_eq!(received.invalid, invalid, "{total}");
+            assert_eq!(received.filled, total.min(CAPACITY + 1), "{total}");
+        }
+    }
+
+    /// Dropping the capability stops its reader and closes the read end even while
+    /// a writer (an abandoned launch or a detached descendant) keeps fd 3 open.
+    #[test]
+    fn dropping_the_output_closes_the_read_end_while_a_writer_remains() {
+        let (write, output) = open().unwrap();
+        drop(output);
+        let byte = [0u8; 1];
+        let written = unsafe { libc::write(write.as_raw_fd(), byte.as_ptr().cast(), 1) };
+        assert_eq!(written, -1);
+        assert_eq!(
+            std::io::Error::last_os_error().raw_os_error(),
+            Some(libc::EPIPE)
+        );
+    }
+
     #[test]
     fn debug_is_redacted() {
         let (write, output) = open().unwrap();

@@ -155,4 +155,59 @@ mod tests {
             Some(libc::ECHILD)
         );
     }
+    fn wait_for_capacity(reaper: &Reaper, within: Duration) -> bool {
+        let deadline = std::time::Instant::now() + within;
+        loop {
+            if let Ok(reservation) = reaper.reserve() {
+                drop(reservation);
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    #[test]
+    fn foreign_reaped_pid_is_released_but_live_child_keeps_capacity_until_natural_exit() {
+        let reaper = Reaper::create(1, start).unwrap();
+        // A PID this process already reaped is no owned child: ECHILD releases it.
+        let mut reaped = std::process::Command::new("/usr/bin/true")
+            .env_clear()
+            .spawn()
+            .unwrap();
+        let foreign = reaped.id() as libc::pid_t;
+        assert!(reaped.wait().unwrap().success());
+        reaper.reserve().unwrap().detach(foreign);
+        assert!(
+            wait_for_capacity(&reaper, Duration::from_secs(3)),
+            "an ECHILD PID must release its slot"
+        );
+        // The reaper thread's errno is now ECHILD. A live child polled as 0 must keep
+        // ownership and capacity across many polls, whatever errno says.
+        let child = std::process::Command::new("/bin/sleep")
+            .arg("0.4")
+            .env_clear()
+            .spawn()
+            .unwrap();
+        let pid = child.id() as libc::pid_t;
+        drop(child);
+        reaper.reserve().unwrap().detach(pid);
+        assert!(
+            !wait_for_capacity(&reaper, Duration::from_millis(200)),
+            "a live detached child lost its slot before exiting"
+        );
+        assert!(
+            wait_for_capacity(&reaper, Duration::from_secs(3)),
+            "natural exit was not reaped"
+        );
+        assert_eq!(
+            unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) },
+            -1
+        );
+        assert_eq!(
+            std::io::Error::last_os_error().raw_os_error(),
+            Some(libc::ECHILD)
+        );
+    }
 }

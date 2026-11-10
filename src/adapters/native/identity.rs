@@ -51,6 +51,9 @@ pub(crate) fn uuid(uid: u32) -> Result<String, ExecutionError> {
     }
     Ok(value.iter().map(|b| format!("{b:02x}")).collect())
 }
+const INSTALLED_IDENTITIES: &str = "/Library/VaultwardenAccess/native-identities.json";
+#[cfg(test)]
+thread_local! {pub(crate) static TEST_IDENTITY_FILE: std::cell::RefCell<Option<std::path::PathBuf>>=const{std::cell::RefCell::new(None)};}
 #[cfg(test)]
 thread_local! {pub(crate) static TEST_IDENTITIES: std::cell::RefCell<Option<Identities>>=const{std::cell::RefCell::new(None)};}
 pub(crate) fn load() -> Result<Identities, ExecutionError> {
@@ -58,10 +61,14 @@ pub(crate) fn load() -> Result<Identities, ExecutionError> {
     if let Some(value) = TEST_IDENTITIES.with(|value| value.borrow().clone()) {
         return Ok(value);
     }
-    let file = platform::open_no_writers(
-        Path::new("/Library/VaultwardenAccess/native-identities.json"),
-        true,
-    )?;
+    #[cfg(not(test))]
+    let file = platform::open_no_writers(Path::new(INSTALLED_IDENTITIES), true)?;
+    // Synthetic files cannot be root-owned; every later check still applies to them.
+    #[cfg(test)]
+    let file = match TEST_IDENTITY_FILE.with(|value| value.borrow().clone()) {
+        Some(path) => platform::open_no_writers(&path, false)?,
+        None => platform::open_no_writers(Path::new(INSTALLED_IDENTITIES), true)?,
+    };
     let m = file
         .metadata()
         .map_err(|_error| ExecutionError::UnsafePath)?;
