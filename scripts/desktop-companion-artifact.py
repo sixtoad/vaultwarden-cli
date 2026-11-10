@@ -90,12 +90,14 @@ def smoke(executable, evidence, use_file=False):
 def package(root, evidence, platform, revision, dirty, disposable_pilot=False, architecture=None):
     if disposable_pilot and platform != "macos":
         raise ValueError("disposable pilot artifacts require macOS")
-    if architecture is not None and architecture not in ("arm64", "x86_64"):
+    if platform == "macos" and architecture == "x86_64":
+        # Owner decision 2026-11-10: Intel Macs are not supported or built.
+        raise ValueError("Intel (x86_64) macOS is no longer supported or built")
+    if architecture is not None and architecture != "arm64":
         raise ValueError("unsupported archive architecture")
     expected = inventory(root)
     variant = "disposable-pilot" if disposable_pilot else "development"
-    # macOS publishes one archive per architecture (only arm64 carries the
-    # protected commands), so its name states which one it is.
+    # The macOS archive is Apple Silicon only; its name states arm64.
     qualifier = f"-{architecture}" if architecture else ""
     archive = evidence / f"companion-{platform}{qualifier}-{variant}.tar.gz"
     name = ("companion_disposable_pilot.app" if disposable_pilot else "companion_slice.app") if platform == "macos" else f"companion-{platform}"

@@ -39,9 +39,7 @@ jobs:
             os: ubuntu-latest
             archive: tar.gz
             cross: true
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            archive: tar.gz
+          # Intel (x86_64) macOS is no longer supported or built.
           - target: aarch64-apple-darwin
             os: macos-latest
             archive: tar.gz
@@ -122,15 +120,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS publishes two archives: arm64 (Apple Silicon) with the native
-        # protected commands, and x86_64 (Intel) with the vault CLI only.
+        # macOS publishes one archive, arm64 (Apple Silicon), with the native
+        # protected commands. Intel (x86_64) macOS is no longer supported or
+        # built (owner decision 2026-11-10).
         include:
           - os: ubuntu-24.04
             architecture: x86_64
           - os: macos-26
             architecture: arm64
-          - os: macos-26-intel
-            architecture: x86_64
           - os: windows-latest
             architecture: x86_64
     env:
@@ -149,9 +146,9 @@ jobs:
       - name: Install Linux desktop prerequisites
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
-      - name: Install Mac universal core targets
+      - name: Install Apple Silicon core target
         if: runner.os == 'macOS'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+        run: rustup target add aarch64-apple-darwin
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.7'

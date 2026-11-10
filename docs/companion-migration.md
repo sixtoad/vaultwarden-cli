@@ -371,7 +371,7 @@ the PR check history records the matching native runs.
 ## Coordinated check of the development artifact
 
 CI uploads an inner `companion-<platform>-development.tar.gz` (on macOS
-`companion-macos-<arm64|x86_64>-development.tar.gz`), its `.sha256`,
+`companion-macos-arm64-development.tar.gz`; Intel macOS is not built), its `.sha256`,
 `artifact.json` source/content inventory, and release smoke evidence. The tar
 preserves executable permissions and framework links; packaging verifies a fresh
 extraction against the complete original inventory. The smoke entrypoint uses

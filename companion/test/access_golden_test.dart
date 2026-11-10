@@ -46,9 +46,9 @@ String goldenHost() {
     throw StateError('Cannot identify the macOS golden renderer version');
   }
   final architecture = switch (Abi.current()) {
+    // Intel (x86_64) macOS is no longer supported or built.
     Abi.macosArm64 => 'arm64',
-    Abi.macosX64 => 'x64',
-    _ => throw StateError('Unrecognized macOS golden renderer ABI'),
+    _ => throw StateError('Unsupported macOS golden renderer ABI (Apple Silicon only)'),
   };
   return 'macos-${version.split('.').first}-$architecture';
 }
