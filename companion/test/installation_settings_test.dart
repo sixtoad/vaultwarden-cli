@@ -238,7 +238,7 @@ void main() {
       );
       expect(
         find.textContaining(
-          'Guided enrollment and notifications are not available.',
+          'Review notifications (macOS, while this window is open) are in Settings. Guided enrollment is not available.',
         ),
         findsOneWidget,
       );

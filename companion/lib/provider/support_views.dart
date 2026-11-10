@@ -168,7 +168,7 @@ class ProviderCapabilities extends StatelessWidget {
       ),
       SizedBox(height: 8),
       Text(
-        'Touch ID key enrollment for this Mac is in Settings. Guided enrollment and notifications are not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
+        'Touch ID key enrollment for this Mac is in Settings. Review notifications (macOS, while this window is open) are in Settings. Guided enrollment is not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
       ),
     ],
   );
