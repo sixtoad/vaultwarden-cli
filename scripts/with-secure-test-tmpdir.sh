@@ -6,9 +6,20 @@ if [[ $# -eq 0 ]]; then
     echo "usage: $0 command [arguments...]" >&2
     exit 2
 fi
-if [[ "$(uname -s)" != Linux ]]; then
-    exec "$@"
-fi
+# Linux and Apple Silicon macOS run the native provider's private-ancestry
+# checks; the default macOS TMPDIR (/var/folders, behind the /var symlink) fails
+# them. Other hosts run the command unchanged.
+case "$(uname -s)" in
+    Linux)
+        owner_of() { stat -c %u -- "$1"; }
+        mode_of() { echo $(( 8#$(stat -c %a -- "$1") )); }
+        ;;
+    Darwin)
+        owner_of() { /usr/bin/stat -f %u -- "$1"; }
+        mode_of() { echo $(( 8#$(/usr/bin/stat -f %p -- "$1") & 8#7777 )); }
+        ;;
+    *) exec "$@" ;;
+esac
 
 secure_home="${HOME:?HOME must name a safe, provider-owned directory}"
 case "$secure_home" in
@@ -28,16 +39,16 @@ while :; do
         echo "secure test setup requires directory ancestry without symlinks" >&2
         exit 2
     fi
-    owner="$(stat -c %u -- "$ancestor")"
-    mode="$(stat -c %a -- "$ancestor")"
-    if (( (owner != 0 && owner != test_uid) || (8#$mode & 8#7022) != 0 )); then
+    owner="$(owner_of "$ancestor")"
+    mode="$(mode_of "$ancestor")"
+    if (( (owner != 0 && owner != test_uid) || (mode & 8#7022) != 0 )); then
         echo "secure test setup requires root/provider-owned ancestry without unsafe modes" >&2
         exit 2
     fi
     [[ "$ancestor" != / ]] || break
     ancestor="$(dirname -- "$ancestor")"
 done
-if [[ "$(stat -c %u -- "$secure_home")" != "$test_uid" ]]; then
+if [[ "$(owner_of "$secure_home")" != "$test_uid" ]]; then
     echo "secure test setup requires provider-owned HOME" >&2
     exit 2
 fi
