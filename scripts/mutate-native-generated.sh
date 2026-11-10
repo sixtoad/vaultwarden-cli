@@ -16,6 +16,10 @@
 # otherwise satisfy the baseline with that campaign's last mutant build.
 set -euo pipefail
 [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || { echo 'requires Apple Silicon macOS' >&2; exit 2; }
+# An x86_64 cargo-mutants runs under Rosetta and makes the tests' universal tools
+# (clang) build x86_64 fixtures, which the arm64-only native spawn then rejects.
+mutants="$(command -v cargo-mutants)" || { echo 'cargo-mutants not found' >&2; exit 2; }
+[[ " $(lipo -archs "$mutants") " == *" arm64 "* ]] || { echo "cargo-mutants must be a native arm64 build: $mutants" >&2; exit 2; }
 file="${1:?usage: mutate-native-generated.sh FILE OUTPUT_DIR [TEST FILTER...]}"
 output="${2:?usage: mutate-native-generated.sh FILE OUTPUT_DIR [TEST FILTER...]}"
 shift 2

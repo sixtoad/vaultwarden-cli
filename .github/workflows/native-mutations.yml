@@ -21,8 +21,29 @@ env:
   CARGO_BUILD_JOBS: 2
 
 jobs:
+  tool:
+    # cargo-mutants publishes only an x86_64 macOS binary. Run under Rosetta, it makes
+    # every universal tool the tests launch (clang) prefer x86_64, so the arm64-only
+    # native spawn of a compiled fixture fails (EBADARCH) and the baseline goes red.
+    # Build it natively once and share it with the matrix.
+    name: build native cargo-mutants
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build cargo-mutants for arm64
+        run: |
+          cargo install --locked --root "$RUNNER_TEMP/cargo-mutants" cargo-mutants@27.1.0
+          lipo -archs "$RUNNER_TEMP/cargo-mutants/bin/cargo-mutants"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-mutants-arm64
+          path: ${{ runner.temp }}/cargo-mutants/bin/cargo-mutants
+          retention-days: 1
+
   generated:
     name: cargo-mutants ${{ matrix.file }}.rs (${{ matrix.source }} tests)
+    needs: tool
     runs-on: macos-26
     timeout-minutes: 300
     strategy:
@@ -53,9 +74,14 @@ jobs:
           git fetch --depth=1 origin main
           git checkout FETCH_HEAD -- src
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@v2
+      - uses: actions/download-artifact@v4
         with:
-          tool: cargo-mutants@27.1.0
+          name: cargo-mutants-arm64
+          path: ${{ runner.temp }}/cargo-mutants-bin
+      - name: Use the native cargo-mutants
+        run: |
+          chmod +x "$RUNNER_TEMP/cargo-mutants-bin/cargo-mutants"
+          echo "$RUNNER_TEMP/cargo-mutants-bin" >> "$GITHUB_PATH"
       - name: Run the generated campaign
         # cargo-mutants exits 2 for missed and 3 for timed-out mutants: those are
         # findings recorded in the artifact, not infrastructure failures.
