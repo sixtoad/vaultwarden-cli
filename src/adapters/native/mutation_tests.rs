@@ -448,6 +448,9 @@ struct Recording {
     started: std::cell::Cell<bool>,
     /// Report observation lost at the first liveness check.
     lose: bool,
+    /// Bounds a consumer that never exits under a mutant (for example an empty
+    /// argument vector): observation is reported lost instead of hanging the run.
+    created: std::time::Instant,
 }
 fn children() -> Vec<libc::pid_t> {
     let mut pids: Vec<libc::pid_t> = vec![0; 4096];
@@ -474,13 +477,14 @@ impl Recording {
             stolen: false.into(),
             started: false.into(),
             lose: false,
+            created: std::time::Instant::now(),
         }
     }
 }
 impl ExecutionControl for Recording {
     fn live(&self) -> bool {
         self.live_calls.set(self.live_calls.get() + 1);
-        if self.lose {
+        if self.lose || self.created.elapsed() > Duration::from_secs(20) {
             return false;
         }
         if self.steal && !self.stolen.get() {
@@ -727,10 +731,19 @@ fn native_supervision_detaches_only_a_live_consumer_to_the_reaper() {
     );
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port().to_string();
+    // Bounded: a consumer that never connects (a mutated argument vector) must not
+    // leave this thread waiting in accept.
+    listener.set_nonblocking(true).unwrap();
     let server = std::thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
-        std::thread::sleep(Duration::from_millis(300));
-        drop(stream);
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while std::time::Instant::now() < deadline {
+            if let Ok((stream, _)) = listener.accept() {
+                std::thread::sleep(Duration::from_millis(300));
+                drop(stream);
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
     });
     let mut control = Recording::new(false);
     control.lose = true;
