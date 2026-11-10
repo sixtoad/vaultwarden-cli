@@ -8,11 +8,12 @@ let package = Package(
     targets: [
         .target(name: "NativeContract", path: "macos/Runner",
                 // Flutter/Xcode owns these app sources and resources, including Base.lproj.
-                exclude: ["AppDelegate.swift", "ApprovalSigner.swift", "MainFlutterWindow.swift", "ProviderAdapter.swift", "ProviderSettings.swift", "ProductionSigner.swift",
+                exclude: ["AppDelegate.swift", "ApprovalSigner.swift", "MainFlutterWindow.swift", "ProviderAdapter.swift", "ReviewNotificationAdapter.swift", "ProviderSettings.swift", "ProductionSigner.swift",
                           "Assets.xcassets", "Base.lproj", "Configs", "Info.plist",
                           "DebugProfile.entitlements", "Release.entitlements"],
                 sources: ["ApprovalContract.swift", "NativeTestKey.swift",
-                          "ProductionApprovalContract.swift", "ProductionApprovalKey.swift"]),
+                          "ProductionApprovalContract.swift", "ProductionApprovalKey.swift",
+                          "ReviewNotificationContract.swift"]),
         .testTarget(name: "NativeContractTests", dependencies: ["NativeContract"], path: "native_tests")
     ]
 )

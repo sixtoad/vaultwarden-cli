@@ -22,6 +22,8 @@
 
 /* Begin PBXBuildFile section */
 		A20000000000000000000001 /* ProviderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011; };
+		A40000000000000000000002 /* ReviewNotificationAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000012 /* ReviewNotificationAdapter.swift */; };
+		A40000000000000000000001 /* ReviewNotificationContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000011 /* ReviewNotificationContract.swift */; };
 		A20000000000000000000002 /* ProviderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012; };
 		A20000000000000000000003 /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013; };
 		A20000000000000000000004 /* Trust.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014; };
@@ -72,6 +74,8 @@
 
 /* Begin PBXFileReference section */
 		A20000000000000000000011 /* ProviderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAdapter.swift; sourceTree = "<group>"; };
+		A40000000000000000000012 /* ReviewNotificationAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewNotificationAdapter.swift; sourceTree = "<group>"; };
+		A40000000000000000000011 /* ReviewNotificationContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewNotificationContract.swift; sourceTree = "<group>"; };
 		A20000000000000000000012 /* ProviderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSettings.swift; sourceTree = "<group>"; };
 		A20000000000000000000013 /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Protocol.swift; path = ../../macos/Sources/CompanionCore/Protocol.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000014 /* Trust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Trust.swift; path = ../../macos/Sources/CompanionCore/Trust.swift; sourceTree = SOURCE_ROOT; };
@@ -187,6 +191,8 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000011 /* ProviderAdapter.swift */,
+				A40000000000000000000012 /* ReviewNotificationAdapter.swift */,
+				A40000000000000000000011 /* ReviewNotificationContract.swift */,
 				A20000000000000000000012 /* ProviderSettings.swift */,
 				A20000000000000000000013 /* Protocol.swift */,
 				A20000000000000000000014 /* Trust.swift */,
@@ -397,6 +403,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A20000000000000000000001 /* ProviderAdapter.swift in Sources */,
+				A40000000000000000000002 /* ReviewNotificationAdapter.swift in Sources */,
+				A40000000000000000000001 /* ReviewNotificationContract.swift in Sources */,
 				A20000000000000000000002 /* ProviderSettings.swift in Sources */,
 				A20000000000000000000003 /* Protocol.swift in Sources */,
 				A20000000000000000000004 /* Trust.swift in Sources */,
