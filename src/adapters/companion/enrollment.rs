@@ -1,14 +1,17 @@
-//! Guided enrollment over mTLS (#59 phase 1). A CA-valid client leaf that is
-//! not (or no longer) enrolled may send only these joiner messages. The
-//! provider owner approves on the human transport; nothing here approves.
+//! Guided enrollment over mTLS (#59). A CA-valid client leaf that is not (or
+//! no longer) enrolled may send only the joiner messages (`dispatch`). An
+//! enrolled administrator companion may also act for the provider owner
+//! (`admin`, phase 2): invite, list, approve and cancel. Approval needs the
+//! code read on the joining endpoint and a fresh provider password; no reply
+//! ever carries a comparison code.
 
-use super::{Command, Companion, Error, Response, identity};
+use super::{Command, Companion, Error, Response, identity, valid_password};
 use crate::access::{
     application::ProviderApplication,
     enrollment::{
-        EnrolledIdentity, EnrolleeKind, FailureReason,
+        EnrolledIdentity, EnrolleeKind, FailureReason, HumanEnrollmentError, InvitationRequest,
         book::{EnrollmentHooks, Joiner},
-        unhex32,
+        decode_fixed, unhex32,
     },
     ports::SessionError,
 };
@@ -87,5 +90,103 @@ impl EnrollmentHooks for Hooks<'_> {
             Err(SessionError::InvalidRequest) => Err(FailureReason::IdentityRefused),
             Err(_) => Err(FailureReason::Unavailable),
         }
+    }
+}
+
+/// `Some` for the administrator enrollment commands (closed v1 shapes).
+pub(super) fn valid_admin(command: &Command) -> Option<bool> {
+    Some(match command {
+        Command::EnrollInvite { version, kind, .. } => *version == 1 && kind.valid(),
+        Command::EnrollList { version } => *version == 1,
+        Command::EnrollApprove {
+            version,
+            id,
+            code,
+            password,
+        } => {
+            // A malformed code is the book's input error (it never burns the
+            // session); only bound its size here.
+            *version == 1
+                && decode_fixed::<32>(id).is_some()
+                && !code.is_empty()
+                && code.len() <= 32
+                && valid_password(password)
+        }
+        Command::EnrollCancel { version, id } => *version == 1 && decode_fixed::<32>(id).is_some(),
+        _ => return None,
+    })
+}
+
+/// A refusal the owner can act on (`code_mismatch`, `awaiting_peer`, ...).
+fn refused(error: HumanEnrollmentError) -> Response {
+    match error {
+        HumanEnrollmentError::Unauthorized => Response::error(Error::Unauthorized),
+        HumanEnrollmentError::Unavailable => Response::error(Error::Unavailable),
+        reason => Response {
+            status: 409,
+            body: serde_json::json!({"version":1,"error":"enrollment_refused","reason":reason})
+                .to_string(),
+        },
+    }
+}
+
+/// The provider owner's enrollment actions, for an administrator companion.
+/// They run under the owner's authority, as identity revocation does; an
+/// agent binding created this way is paired by the owner (`pair_agent`).
+pub(super) fn admin(
+    service: &Companion,
+    actor: &str,
+    command: Command,
+    app: &ProviderApplication,
+) -> Response {
+    if service.management.lock().map_or(true, |state| state.failed) {
+        return Response::error(Error::Unavailable);
+    }
+    if !identity::administrator(&service.identity_store, actor) {
+        return Response::error(Error::Unauthorized);
+    }
+    let owner = app.human_owner();
+    let result = match command {
+        Command::EnrollInvite {
+            kind, ttl_seconds, ..
+        } => app
+            .enrollment_invite(owner, InvitationRequest { kind, ttl_seconds })
+            .map(|issued| serde_json::json!({"version":1,"invitation":issued})),
+        Command::EnrollList { .. } => app
+            .enrollment_list(owner)
+            .map(|views| serde_json::json!({"version":1,"enrollments":views})),
+        Command::EnrollApprove {
+            id, code, password, ..
+        } => {
+            // The same throttle and password check as a remote approval.
+            let Ok(_authentication) = service.authentication.try_lock() else {
+                return Response::error(Error::RateLimited);
+            };
+            if !service.attempt(actor, app.companion_now()) {
+                return Response::error(Error::RateLimited);
+            }
+            let Some(authenticator) = service.approval_authenticator.as_ref() else {
+                return Response::error(Error::Unavailable);
+            };
+            if authenticator.authenticate(password).is_err() {
+                return Response::error(Error::Authentication);
+            }
+            // Administration may have been revoked while authenticating.
+            if !service.authorized(actor)
+                || !identity::administrator(&service.identity_store, actor)
+            {
+                return Response::error(Error::Unauthorized);
+            }
+            app.enrollment_approve(owner, &id, &code)
+                .map(|view| serde_json::json!({"version":1,"enrollment":view}))
+        }
+        Command::EnrollCancel { id, .. } => app
+            .enrollment_cancel(owner, &id)
+            .map(|view| serde_json::json!({"version":1,"enrollment":view})),
+        _ => return Response::error(Error::Invalid),
+    };
+    match result {
+        Ok(value) => Response::ok(value),
+        Err(error) => refused(error),
     }
 }

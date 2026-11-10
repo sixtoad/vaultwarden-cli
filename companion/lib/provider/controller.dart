@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../platform/provider.dart';
 import '../src/rust/api/provider.dart' as core;
 import '../src/rust/api/management.dart' as manage;
+import '../src/rust/api/enrollment.dart' as enroll;
 import 'pilot_bundle.dart';
 
 /// Rust owns admission, review and reply validation. Dart schedules only reads;
@@ -187,7 +188,40 @@ class ProviderController extends ChangeNotifier {
     clearPasswords?.call();
     state = core.providerInvalidate();
     management = manage.managementInvalidate();
+    // A shown invitation code and the owner's session list are retired with
+    // every other authority. A joining session survives (see EnrollmentFlow).
+    enroll.enrollmentAdminInvalidate();
     _publish();
+  }
+
+  /// Guided enrollment (#59): one exclusive exchange on the pinned transport,
+  /// serialized with every other provider operation. Null when not allowed
+  /// now (busy, unconfigured, recovery pending) or on transport failure; the
+  /// body is wiped after sending.
+  bool get canEnroll =>
+      eligible &&
+      _ready &&
+      platform.available &&
+      configuration.configured &&
+      !busy &&
+      recoveryId.isEmpty &&
+      !managementPending;
+  Future<Uint8List?> exchange(Uint8List body) async {
+    if (!canEnroll) {
+      body.fillRange(0, body.length, 0);
+      return null;
+    }
+    _operation = true;
+    _publish();
+    try {
+      return await platform.send(body);
+    } catch (_) {
+      return Uint8List(0);
+    } finally {
+      body.fillRange(0, body.length, 0);
+      _operation = false;
+      _publish();
+    }
   }
 
   void suspend() {

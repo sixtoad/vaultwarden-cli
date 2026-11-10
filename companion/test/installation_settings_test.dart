@@ -238,7 +238,7 @@ void main() {
       );
       expect(
         find.textContaining(
-          'Guided enrollment and notifications are not available.',
+          'Guided enrollment: Devices & agents adds a device or agent',
         ),
         findsOneWidget,
       );

@@ -168,7 +168,7 @@ class ProviderCapabilities extends StatelessWidget {
       ),
       SizedBox(height: 8),
       Text(
-        'Guided enrollment and notifications are not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
+        'Guided enrollment: Devices & agents adds a device or agent (administrator approval clients) or joins this device to a provider, on macOS. Phones and QR invitations are not available yet. Notifications are not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
       ),
     ],
   );

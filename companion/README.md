@@ -36,7 +36,7 @@ the UI neither decodes wire data nor derives approval authority from these facts
 Originating device identity is explicitly unavailable in protocol v1; requester
 text is not a device identity. Approve requires a fresh password; deny carries
 none. Approved/running is not completed. Android/iOS native approval integration,
-mutual enrollment, remote device management/history, notifications and bundled CLI
+phone enrollment, remote device management/history, notifications and bundled CLI
 repair remain open dependencies; the shell does not claim them implemented.
 
 Golden fixtures use only synthetic requests and test-only licensed Roboto (also
@@ -68,3 +68,15 @@ This slice does not expand the frozen v1 schema. The root provider's optional
 are rejected in full, as are other unknown fields. They are never silently
 discarded to permit a partial-scope approval. New history, trust inventory and
 authoritative originating-device metadata require separately specified APIs.
+
+## Guided enrollment (issue #59, phase 2)
+
+Devices & agents offers **Add a device or agent** (an administrator approval
+client invites, lists, types the joining device's comparison code with the
+provider password, and cancels) and **Join this device to a provider** (paste a
+`vwe1.` invitation, compare the large code, confirm or decline). The joining
+protocol runs in `companion_core` (`provider/enrollment.rs`), pinned to the
+provider by `fixtures/enrollment-v1.json`; Dart holds no keys or secrets beyond
+the typed text it hands to Rust. Widget tests use an independent test-only
+provider oracle (`test/enrollment_support.dart`, dev dependency
+`package:crypto`). See [guided enrollment](../docs/guided-enrollment.md#phase-2-desktop-companion).

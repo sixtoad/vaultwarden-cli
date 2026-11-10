@@ -10,6 +10,7 @@ import 'request_review.dart';
 import 'support_views.dart';
 import 'installation_settings.dart';
 import 'devices_view.dart';
+import 'enrollment_flow.dart';
 import 'controller.dart';
 import 'pilot_bundle.dart';
 
@@ -34,6 +35,8 @@ class _ProviderPageState extends State<ProviderPage>
       unlockPassword = TextEditingController();
   final pilotBundle = TextEditingController();
   final managementPassword = TextEditingController();
+  final enrollmentPassword = TextEditingController();
+  late final EnrollmentFlow enrollment;
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
   bool detailOpen = false;
@@ -46,6 +49,7 @@ class _ProviderPageState extends State<ProviderPage>
     controller = ProviderController(widget.platform)
       ..clearPasswords = clearPasswords;
     controller.addListener(changed);
+    enrollment = EnrollmentFlow(controller)..addListener(changed);
     unawaited(controller.initialize());
   }
 
@@ -59,6 +63,7 @@ class _ProviderPageState extends State<ProviderPage>
     unlockPassword.clear();
     pilotBundle.clear();
     managementPassword.clear();
+    enrollmentPassword.clear();
   }
 
   @override
@@ -78,6 +83,9 @@ class _ProviderPageState extends State<ProviderPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     controller.removeListener(changed);
+    enrollment
+      ..removeListener(changed)
+      ..dispose();
     controller.dispose();
     contentScroll.dispose();
     for (final field in [
@@ -88,6 +96,7 @@ class _ProviderPageState extends State<ProviderPage>
       unlockPassword,
       pilotBundle,
       managementPassword,
+      enrollmentPassword,
     ]) {
       field.dispose();
     }
@@ -108,6 +117,7 @@ class _ProviderPageState extends State<ProviderPage>
   void navigate(AccessDestination next) {
     if (next == destination && !detailOpen) return;
     controller.invalidate(); // mutation: navigation retirement
+    enrollment.close();
     controller.devicesVisible = next == AccessDestination.devices;
     controller.setActivityCurrent(next == AccessDestination.activity);
     setState(() {
@@ -120,6 +130,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void backToRequests() {
     controller.invalidate(); // mutation: back retirement
+    enrollment.close();
     controller.devicesVisible = false;
     controller.setActivityCurrent(false);
     setState(() {
@@ -476,6 +487,9 @@ class _ProviderPageState extends State<ProviderPage>
             AccessDestination.devices => ProviderDevices(
               controller: controller,
               password: managementPassword, // secrets-ignore: UI controller
+              enrollment: enrollment,
+              enrollmentPassword:
+                  enrollmentPassword, // secrets-ignore: UI controller
             ),
             AccessDestination.activity => ProviderActivity(
               state: state,
