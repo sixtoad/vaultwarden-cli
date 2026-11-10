@@ -40,11 +40,11 @@ jobs:
           - file: identity
             filters: ''
           - file: producer
-            filters: adapters::native::producer:: adapters::native::tests::native_producer adapters::native::tests::native_create
+            filters: 'adapters::native::producer:: adapters::native::tests::native_producer adapters::native::tests::native_create'
           - file: reaper
-            filters: adapters::native::reaper:: adapters::native::tests::native_reaper adapters::native::tests::native_release adapters::native::mutation_tests::native_supervision
+            filters: 'adapters::native::reaper:: adapters::native::tests::native_reaper adapters::native::tests::native_release adapters::native::mutation_tests::native_supervision'
           - file: image
-            filters: adapters::native::image:: adapters::native::tests::native_preparer adapters::native::tests::native_approved adapters::ssh_agent::tests::native_ adapters::native::mutation_tests::native_image adapters::native::mutation_tests::native_preparer
+            filters: 'adapters::native::image:: adapters::native::tests::native_preparer adapters::native::tests::native_approved adapters::ssh_agent::tests::native_ adapters::native::mutation_tests::native_image adapters::native::mutation_tests::native_preparer'
     steps:
       - uses: actions/checkout@v7
       - name: Use origin/main sources
