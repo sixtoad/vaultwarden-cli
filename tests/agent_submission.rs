@@ -781,7 +781,22 @@ assert json.loads(data)['category']=='malformed'
         serde_json::from_slice::<serde_json::Value>(&wait.stderr).unwrap(),
         serde_json::json!({"event":"client_error","category":"wait_timeout","request_id":cli_id})
     );
-    let resumed = bounded_process::output(&mut cli("poll", &cli_id));
+    // `wait` stops at its deadline even with a status query in flight, and
+    // that query keeps running under the authority gate after the client
+    // exits. A poll admitted meanwhile is refused Busy before any input is
+    // read (retryable by contract, no state change), so retry exactly that.
+    let busy = format!(
+        "{}\n",
+        serde_json::to_string(&AgentResponse::rejected(AgentRejection::Busy)).unwrap()
+    );
+    let retry_until = std::time::Instant::now() + Duration::from_secs(10);
+    let resumed = loop {
+        let output = bounded_process::output(&mut cli("poll", &cli_id));
+        if output.stdout != busy.as_bytes() || std::time::Instant::now() >= retry_until {
+            break output;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
     assert!(resumed.status.success());
     assert_eq!(snapshot()["requests"], before["requests"]);
     assert_eq!(snapshot()["agent_audit"], before["agent_audit"]);
@@ -838,11 +853,16 @@ assert json.loads(data)['category']=='malformed'
 
     // Kernel send-queue consumption proves admitted reading of a harmless JSON
     // whitespace prefix. Pipe synchronization withholds the signed query until
-    // revocation completes; no competing waiter holds the authority gate.
+    // revocation completes.
+    //
+    // Admission is a non-blocking try-lock of the authority gate: a peer that
+    // connects while anything else holds the gate is answered Busy before its
+    // input is read. Busy is the server's explicit "not admitted yet" signal
+    // (`wait` retries on it too), and, as above, a query abandoned by the
+    // timed-out `submit --wait` just before can still hold the gate. So the
+    // held peer retries exactly on Busy, and the test forces that interleaving:
+    // an armed launch keeps the gate held until the peer reports Busy.
     use std::io::{BufRead, Read, Write};
-    // A competing authority holder, made deterministic: the armed launch of
-    // this submission blocks under the gate, as a status query abandoned by a
-    // timed-out `--wait` client keeps running under it after the client exits.
     let (entered_sender, entered) = mpsc::channel();
     let (release, release_receiver) = mpsc::channel();
     *launcher.1.lock().unwrap() = Some((entered_sender, release_receiver));
@@ -865,15 +885,28 @@ assert json.loads(data)['category']=='malformed'
     held.args([
         "-c",
         r#"import os,socket,sys,fcntl,struct,time
-s=socket.socket(socket.AF_UNIX);s.settimeout(8);s.connect(os.environ['SOCKET'])
-s.sendall(b' ')
-deadline=time.monotonic()+3
-while struct.unpack('i',fcntl.ioctl(s,0x5411,struct.pack('i',0)))[0]:
- assert time.monotonic()<deadline
-s.setblocking(False)
-try: s.recv(1,socket.MSG_PEEK)
-except BlockingIOError: pass
-else: raise AssertionError('preflight rejected before query: %r'%s.recv(4096))
+deadline=time.monotonic()+8
+reported=False
+while True:
+ s=socket.socket(socket.AF_UNIX);s.settimeout(8);s.connect(os.environ['SOCKET'])
+ s.sendall(b' ')
+ while struct.unpack('i',fcntl.ioctl(s,0x5411,struct.pack('i',0)))[0]:
+  assert time.monotonic()<deadline,'prefix never read'
+  time.sleep(.001)
+ s.setblocking(False)
+ try: early=s.recv(4096)
+ except BlockingIOError: break
+ s.settimeout(8)
+ while early and not early.endswith(b'\n'):
+  chunk=s.recv(4096)
+  if not chunk:break
+  early+=chunk
+ if early!=os.environ['BUSY'].encode(): raise AssertionError('preflight rejected before query: %r'%early)
+ s.close()
+ if not reported:
+  print('busy',flush=True);reported=True
+ assert time.monotonic()<deadline,'authority gate stayed busy'
+ time.sleep(.01)
 s.settimeout(8)
 print('admitted',flush=True)
 assert sys.stdin.readline()=='go\n'
@@ -887,6 +920,7 @@ sys.stdout.buffer.write(data)
 "#,
     ])
     .env("SOCKET", &path)
+    .env("BUSY", &busy)
     .env("PAYLOAD", wire(&query(49, &cli_id)));
     identity(&mut held, 8, 9, vec![7]);
     let mut held = BoundedChild::spawn(
@@ -894,24 +928,32 @@ sys.stdout.buffer.write(data)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
     );
-    let mut held_stdout = std::io::BufReader::new(held.stdout());
-    let (mut held_stdout, ready) = bounded_process::io(move || {
-        let mut ready = String::new();
-        held_stdout.read_line(&mut ready).unwrap();
-        (held_stdout, ready)
-    });
+    let next_line = |mut reader: std::io::BufReader<std::process::ChildStdout>| {
+        bounded_process::io(move || {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            (reader, line)
+        })
+    };
+    let (held_stdout, busy) = next_line(std::io::BufReader::new(held.stdout()));
+    release.send(()).unwrap();
+    if busy != "busy\n" {
+        panic!(
+            "held peer was not refused Busy while the gate was held: stdout={busy:?} stderr={}",
+            String::from_utf8_lossy(&held.wait_with_output().stderr)
+        );
+    }
+    assert!(matches!(
+        bounded_process::join(holder),
+        AgentResponse::Pending { .. }
+    ));
+    let (mut held_stdout, ready) = next_line(held_stdout);
     if ready != "admitted\n" {
-        release.send(()).unwrap();
         panic!(
             "held peer not admitted: stdout={ready:?} stderr={}",
             String::from_utf8_lossy(&held.wait_with_output().stderr)
         );
     }
-    release.send(()).unwrap();
-    assert!(matches!(
-        bounded_process::join(holder),
-        AgentResponse::Pending { .. }
-    ));
     let revoked = exchange(
         &root,
         HumanCommand::AgentRevoke {

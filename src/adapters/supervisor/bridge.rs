@@ -1647,21 +1647,38 @@ mod tests {
     #[cfg_attr(tarpaulin, ignore)]
     fn pre_exec_sigkill_with_empty_error_pipe_reports_failure_and_confirmed_cleanup() {
         for signal in [libc::SIGKILL, libc::SIGTRAP] {
-            let (sender, receiver) = pair();
+            // The EOF asserted below requires that only the runner ever holds the
+            // helper's end. Any fork-without-exec by another test thread inherits
+            // every descriptor the test process has open (CLOEXEC only acts on
+            // exec), so the bridge pair is created after fork, in the
+            // single-threaded runner, and only the provider end is handed back.
+            // The courier may leak to such forks: nothing waits for its EOF.
+            let (courier, runner_courier) = pair();
             // Keep reap_all's waitpid(-1) away from the multithreaded test runner's
             // other children. The isolated branch uses only syscalls and stack data.
             let runner = unsafe { libc::fork() };
             assert!(runner >= 0);
             if runner == 0 {
                 unsafe {
-                    libc::close(receiver.as_raw_fd());
-                    libc::_exit(pre_exec_signal_case(sender.as_raw_fd(), signal));
+                    libc::close(courier.as_raw_fd());
+                    libc::_exit(isolated_pre_exec_signal_case(
+                        runner_courier.as_raw_fd(),
+                        signal,
+                    ));
                 }
             }
-            // Reproduction: another test thread's fork lands here and keeps the
-            // descriptors it inherited, as other tests' fork-only runners do.
-            let bystander = Bystander::fork(&[sender.as_raw_fd(), receiver.as_raw_fd()]);
-            drop(sender);
+            drop(runner_courier);
+            let receiver = match receive_packet(courier.as_raw_fd(), Duration::from_secs(10)) {
+                Ok(Some(mut packet)) if packet.fds.len() == 1 => packet.fds.remove(0),
+                _ => {
+                    let mut status = 0;
+                    unsafe { libc::waitpid(runner, &mut status, 0) };
+                    panic!("runner did not hand over the bridge; status: {status}");
+                }
+            };
+            // Regression guard: a concurrent fork that keeps everything this test
+            // owns from here on must not delay the helper's EOF.
+            let bystander = Bystander::fork(&[courier.as_raw_fd(), receiver.as_raw_fd()]);
             let mut bridge = Bridge {
                 socket: receiver,
                 state: State::Released,
@@ -1695,6 +1712,29 @@ mod tests {
                 "the closed helper sent exactly Failed and Reaped"
             );
             drop(bystander);
+        }
+    }
+    unsafe fn isolated_pre_exec_signal_case(courier: RawFd, signal: i32) -> i32 {
+        unsafe {
+            let mut fds = [-1; 2];
+            if libc::socketpair(
+                libc::AF_UNIX,
+                libc::SOCK_SEQPACKET | libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
+                0,
+                fds.as_mut_ptr(),
+            ) != 0
+            {
+                return 97;
+            }
+            let mut handoff = [0u8; 6];
+            handoff[..5].copy_from_slice(MAGIC);
+            let sent = send_descriptors(courier, &handoff, &[fds[1]]).is_ok();
+            libc::close(fds[1]);
+            libc::close(courier);
+            if !sent {
+                return 98;
+            }
+            pre_exec_signal_case(fds[0], signal)
         }
     }
     unsafe fn pre_exec_signal_case(socket: RawFd, signal: i32) -> i32 {
