@@ -36,9 +36,7 @@ pub enum JoinFailure {
     Rejected(EnrollmentRejection),
     /// A confirmation's reply was lost, and the provider then no longer knew
     /// the session (restart, retention): it may have committed meanwhile.
-    #[error(
-        "a confirmation reply was lost and the provider now answers {0}; outcome unknown"
-    )]
+    #[error("a confirmation reply was lost and the provider now answers {0}; outcome unknown")]
     OutcomeUnknown(EnrollmentRejection),
     #[error("enrollment ended without enrolling: {0:?}")]
     Ended(EnrollmentState),
@@ -210,7 +208,9 @@ fn key_directory(path: &Path) -> Result<std::fs::File, JoinFailure> {
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(parent)
         .map_err(|_error| JoinFailure::LocalKey)?;
-    let metadata = directory.metadata().map_err(|_error| JoinFailure::LocalKey)?;
+    let metadata = directory
+        .metadata()
+        .map_err(|_error| JoinFailure::LocalKey)?;
     // SAFETY: geteuid has no preconditions and cannot fail.
     if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o022 != 0 {
         return Err(JoinFailure::LocalKey);

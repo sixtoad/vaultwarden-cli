@@ -104,9 +104,7 @@ fn only_the_provider_owner_invites_lists_approves_or_cancels() {
         f.app.enrollment_invite(f.app.human_owner(), own).err(),
         Some(HumanEnrollmentError::InvalidRequest)
     );
-    assert!(
-        !admitted(&f, f.app.human_owner().uid())
-    );
+    assert!(!admitted(&f, f.app.human_owner().uid()));
 }
 
 #[test]

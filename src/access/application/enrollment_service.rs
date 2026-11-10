@@ -8,8 +8,7 @@ use crate::access::{
     direct_request::{AuthenticatedHuman, DirectRequestError},
     enrollment::{
         EnrolledIdentity, EnrolleeKind, EnrollmentAdmission, EnrollmentRejection, EnrollmentView,
-        FailureReason,
-        HumanEnrollmentError, InvitationRequest, IssuedInvitation, Peer,
+        FailureReason, HumanEnrollmentError, InvitationRequest, IssuedInvitation, Peer,
         book::{Book, EnrollmentHooks, Joiner},
         wire::{EnrollmentReply, EnrollmentRequest},
     },
