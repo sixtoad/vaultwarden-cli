@@ -1151,8 +1151,10 @@ def next_steps(values, version, operator):
         f'Next manual steps ({DOCS_SETUP}; the installer never generates or copies credentials; summary: {DOCS_CREDENTIALS}):',
         f'  1. As the operator: {vdir}/vw-access setup tls --out-dir ~/vw-setup/tls --server-ip 127.0.0.1 --client-name "Mac operator"',
         '     (server identity with subjectAltName IP:127.0.0.1, a separate companion client CA, the companion PKCS#12).',
-        f'  2. As the operator: {vdir}/vw-access setup backend-json --from-cli-login --out ~/vw-setup/backend.json',
-        '     (fields server (HTTPS origin), client_id, email, encrypted_key and kdf_iterations; no secrets).',
+        f'  2. As the operator: {vdir}/vw-access setup backend-json --from-cli-login --kdf pbkdf2 '
+        "--kdf-iterations <your account's PBKDF2 iterations> --out ~/vw-setup/backend.json",
+        '     (the iteration count is in the web vault under Settings > Security > Keys; Argon2id accounts are refused;',
+        '     fields server (HTTPS origin), client_id, email, encrypted_key and kdf_iterations; no secrets).',
         '     Install each state file provider-owned, 0600, one link:',
     ]
     sources = {'backend.json': '~/vw-setup/backend.json'}

@@ -1250,7 +1250,9 @@ class OperatorGuidanceTests(InstallerTestCase):
 
     def test_next_steps_cover_enrollment_certificates_and_backend_fields(self):
         code, out, _ = self.assertOk(self.install())
-        for expected in ['docs/macos-setup.md', 'vw-access setup tls', 'vw-access setup backend-json', 'vw-access setup agent-key',
+        for expected in ['docs/macos-setup.md', 'vw-access setup tls', 'vw-access setup backend-json --from-cli-login --kdf pbkdf2 '
+                         "--kdf-iterations <your account's PBKDF2 iterations> --out ~/vw-setup/backend.json",
+                         'Settings > Security > Keys', 'vw-access setup agent-key',
                          'subjectAltName', 'IP:127.0.0.1', 'server (HTTPS origin), client_id, email, encrypted_key', 'kdf_iterations',
                          f'{ROOT}/state/secrets/vaultwarden-accessd.bootstrap-client-secret',
                          f'cd / && sudo -u _vwaccess {ROOT}/versions/0.5.4/vaultwarden-accessd --state-root {ROOT}/state --store-bootstrap-secret',

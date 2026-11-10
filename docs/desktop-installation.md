@@ -351,8 +351,10 @@ one link:
   the **client** CA that verifies companion client certificates, not the server
   CA. The companion app itself needs the server CA (DER), the server leaf pin and
   its own client PKCS#12.
-- `backend.json`: written by `vw-access setup backend-json` with the account
-  setup fields described in [access-mvp.md](access-mvp.md#human-setup-and-launch):
+- `backend.json`: written by `vw-access setup backend-json --from-cli-login --kdf
+  pbkdf2 --kdf-iterations N` (N is the account's PBKDF2 iteration count, shown in
+  the web vault under Settings > Security > Keys; both flags are required and
+  Argon2id accounts are refused) with the account setup fields described in [access-mvp.md](access-mvp.md#human-setup-and-launch):
   `server` (an HTTPS origin), `client_id`, `email`, `encrypted_key` and
   `kdf_iterations`, plus `encrypted_private_key` and `org_keys` for organization
   bindings. No secrets.
