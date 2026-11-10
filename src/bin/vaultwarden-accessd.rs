@@ -207,15 +207,26 @@ fn run(args: Args) -> Result<(), ()> {
     let companion = args
         .companion_listen
         .map(|address| {
-            Companion::bind(
+            let registry = args
+                .state_root
+                .join(vaultwarden_cli::adapters::companion_identity::STORE_FILE);
+            let server = Companion::bind(
                 address,
                 args.companion_tls_cert.as_deref().ok_or(())?,
                 args.companion_tls_key.as_deref().ok_or(())?,
                 args.companion_client_ca.as_deref().ok_or(())?,
-                &args.state_root.join("companion-identities.json"),
+                &registry,
             )
-            .map_err(|_error| ())
-            .map(|server| {
+            .map_err(|_error| ());
+            if server.is_ok()
+                && let Some(warning) =
+                    vaultwarden_cli::adapters::companion_identity::absent_registry_warning(
+                        &registry,
+                    )
+            {
+                eprintln!("vaultwarden-accessd: warning: {warning}");
+            }
+            server.map(|server| {
                 server
                     .with_approval_authenticator(approval_authenticator.clone())
                     .with_execution_dispatcher(execution_worker.dispatcher())

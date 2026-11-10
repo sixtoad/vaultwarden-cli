@@ -413,6 +413,37 @@ fn biometric_audit(
 pub(crate) fn enrolled(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
     Ok(registry(path)?.identities)
 }
+/// The registry of a provider whose directory is private, where an absent
+/// file is a provider that never enrolled a companion: zero identities, which
+/// authorize nothing. Any other unreadable or invalid file stays an error.
+fn registry_or_empty(root: &Path) -> Result<Registry, SessionError> {
+    private_directory(root)?;
+    read_or_initial(root)
+}
+/// Like `enrolled`, but an absent registry in a private directory is zero
+/// companions (#59): the endpoint then admits only guided enrollment.
+pub(crate) fn enrolled_or_none(path: &Path) -> Result<Vec<EnrolledCompanion>, SessionError> {
+    let root = path.parent().ok_or(SessionError::BackendUnavailable)?;
+    if path.file_name() != Some(std::ffi::OsStr::new(STORE_FILE)) {
+        return enrolled(path);
+    }
+    Ok(registry_or_empty(root)?.identities)
+}
+/// The startup warning for an absent registry. Starting without one is
+/// how the first companion is enrolled, but a registry that existed and was
+/// lost (deleted, not restored from backup) also drops the revoked list, so
+/// a revoked device would no longer be refused at enrollment.
+pub fn absent_registry_warning(path: &Path) -> Option<String> {
+    match std::fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(format!(
+            "companion registry {} is absent: starting with no companions and no revoked \
+             devices. Expected only before the first companion is enrolled; if a registry \
+             existed, restore it from backup, because its revoked list is gone too.",
+            path.display()
+        )),
+        _ => None,
+    }
+}
 pub(crate) fn management_records(
     path: &Path,
 ) -> Result<Vec<(EnrolledCompanion, bool, bool)>, SessionError> {
@@ -649,6 +680,45 @@ pub fn enroll(
     persist_registry(root, registry)?;
     Ok(fingerprint)
 }
+/// Whether a fingerprint was ever enrolled, including revoked ones.
+pub(crate) fn known(root: &Path, fingerprint: &str) -> Result<bool, SessionError> {
+    let registry = registry_or_empty(root)?;
+    Ok(registry
+        .identities
+        .iter()
+        .chain(&registry.revoked)
+        .any(|entry| entry.fingerprint == fingerprint))
+}
+/// Guided enrollment (#59). Caller holds the companion identity commit gate.
+/// A known fingerprint, enabled or revoked, is refused: revocation is
+/// permanent and a matching label never reactivates anything. The new
+/// approval client is never an administrator.
+pub(crate) fn enroll_online(
+    root: &Path,
+    fingerprint: &str,
+    label: &str,
+) -> Result<(), SessionError> {
+    if !valid_fingerprint(fingerprint) || !valid_label(label) {
+        return Err(SessionError::InvalidRequest);
+    }
+    // The first guided commit creates the registry (0600, atomically, in
+    // the private provider directory) exactly as the offline enroll does.
+    let mut registry = registry_or_empty(root)?;
+    if registry
+        .identities
+        .iter()
+        .chain(&registry.revoked)
+        .any(|entry| entry.fingerprint == fingerprint)
+        || registry.identities.len() + registry.revoked.len() >= MAX_IDENTITIES
+    {
+        return Err(SessionError::InvalidRequest);
+    }
+    registry.identities.push(EnrolledCompanion {
+        fingerprint: fingerprint.into(),
+        label: label.into(),
+    });
+    persist_registry(root, registry)
+}
 pub fn revoke(root: &Path, fingerprint: &str) -> Result<(), SessionError> {
     if !valid_fingerprint(fingerprint) {
         return Err(SessionError::InvalidRequest);
@@ -829,5 +899,18 @@ mod tests {
         });
         assert!(stopped_provider(root.path()).is_ok());
         release.join().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod absent_registry_tests {
+    #[test]
+    fn an_absent_registry_is_warned_about_and_a_present_one_is_not() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join(super::STORE_FILE);
+        let warning = super::absent_registry_warning(&path).unwrap();
+        assert!(warning.contains("revoked"), "{warning}");
+        std::fs::write(&path, b"{}").unwrap();
+        assert_eq!(super::absent_registry_warning(&path), None);
     }
 }

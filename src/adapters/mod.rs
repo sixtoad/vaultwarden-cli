@@ -3,6 +3,7 @@ pub mod approval_verifier;
 pub mod companion;
 pub mod companion_identity;
 pub mod desktop_launch;
+pub mod enrollment_client;
 // Descriptor preparation is shared by contained helper supervision.
 #[cfg_attr(not(test), allow(dead_code))]
 #[cfg(target_os = "linux")]

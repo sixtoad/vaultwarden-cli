@@ -20,6 +20,10 @@ use vaultwarden_cli::{
 };
 
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
+#[path = "vw_access_parts/enroll.rs"]
+mod enroll;
+
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Parser)]
 #[command(
     name = "vw-access",
@@ -122,6 +126,12 @@ enum Command {
     Agent {
         #[command(subcommand)]
         command: AgentCommand,
+    },
+    /// Guided enrollment of agents and companion devices with a comparison
+    /// code approved at both ends (no manual key or certificate copying).
+    Enroll {
+        #[command(subcommand)]
+        command: enroll::EnrollCommand,
     },
     /// Create local setup files (keys, certificates, backend.json); never contacts the provider.
     Setup {
@@ -296,6 +306,17 @@ fn main() -> ExitCode {
         Command::Submit { .. } | Command::Poll { .. } | Command::Wait { .. }
     ) {
         return ExitCode::from(run_agent(&args.command));
+    }
+    if let Command::Enroll {
+        command:
+            enroll::EnrollCommand::Join {
+                socket,
+                key_file,
+                timeout_seconds,
+            },
+    } = &args.command
+    {
+        return ExitCode::from(enroll::join(socket, key_file, *timeout_seconds));
     }
     let args = match args {
         Args {
@@ -599,6 +620,7 @@ fn run(args: Args) -> Result<(), String> {
             },
             false,
         ),
+        Command::Enroll { command } => (enroll::human_command(command)?, false),
     };
     let response = exchange(&state_root, command).map_err(|error| error.to_string())?;
     reject_error(&response)?;
@@ -747,6 +769,7 @@ fn reject_error(response: &HumanResponse) -> Result<(), String> {
     match response {
         HumanResponse::ProvisioningRejected { reason } => Err(reason.to_string()),
         HumanResponse::Rejected { reason } => Err(reason.to_string()),
+        HumanResponse::EnrollmentRejected { reason } => Err(reason.to_string()),
         HumanResponse::InvalidRequest => Err("invalid request".into()),
         HumanResponse::Unauthorized => Err("unauthorized human".into()),
         HumanResponse::Unavailable => Err("provider unavailable".into()),
@@ -973,6 +996,63 @@ mod tests {
                 state: DirectStatus::Pending
             }),
             Ok(())
+        );
+    }
+    #[test]
+    fn enroll_verbs_parse_and_the_invitation_secret_is_never_an_argument() {
+        use vaultwarden_cli::access::enrollment::{EnrolleeKind, HumanEnrollmentError};
+        let parse = |words: &[&str]| {
+            Args::try_parse_from(
+                ["vw-access", "--state-root", "/private", "enroll"]
+                    .iter()
+                    .chain(words),
+            )
+        };
+        let Command::Enroll { command } =
+            parse(&["invite-agent", "ci", "--uid", "4100", "--gid", "4200"])
+                .unwrap()
+                .command
+        else {
+            panic!("not enroll")
+        };
+        assert!(matches!(
+            enroll::human_command(command).unwrap(),
+            HumanCommand::EnrollInvite { invitation }
+                if invitation.kind == EnrolleeKind::Agent { label: "ci".into(), uid: 4100, gid: 4200 }
+                    && invitation.ttl_seconds.is_none()
+        ));
+        let Command::Enroll { command } = parse(&["approve", "-id", "--code", "1234-5678"])
+            .unwrap()
+            .command
+        else {
+            panic!("not enroll")
+        };
+        assert!(matches!(
+            enroll::human_command(command).unwrap(),
+            HumanCommand::EnrollApprove { id, code } if id == "-id" && code == "1234-5678"
+        ));
+        assert!(
+            parse(&["approve", "id"]).is_err(),
+            "approval requires the typed code"
+        );
+        assert!(parse(&["join", "--socket", "/s", "--key-file", "/k"]).is_ok());
+        assert!(
+            parse(&[
+                "join",
+                "--socket",
+                "/s",
+                "--key-file",
+                "/k",
+                "--invitation",
+                "vwe1.a.b"
+            ])
+            .is_err()
+        );
+        assert_eq!(
+            reject_error(&HumanResponse::EnrollmentRejected {
+                reason: HumanEnrollmentError::CodeMismatch
+            }),
+            Err("comparison code does not match; enrollment aborted".to_owned())
         );
     }
 }
