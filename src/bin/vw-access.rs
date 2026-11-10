@@ -672,6 +672,9 @@ fn run_setup(command: SetupCommand) -> Result<(), String> {
                 },
             )
             .map_err(|e| e.to_string())?;
+            // The provider reader opens backend.json by absolute path only.
+            let out = std::path::absolute(&out)
+                .map_err(|_error| "cannot resolve --out against the current directory")?;
             setup_tools::write_new_private(&out, &bytes).map_err(|e| e.to_string())?;
             if vaultwarden_cli::adapters::session::validate_setup(&out).is_err() {
                 let _ignored = std::fs::remove_file(&out);

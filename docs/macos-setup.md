@@ -51,8 +51,10 @@ $STATE/provider-key.pem --companion-client-ca $STATE/companion-ca.pem`.
 The provider refuses to serve the companion endpoint until at least one companion
 certificate is enrolled, so a service started too early exits and launchd restarts
 it every 30 s. The installer already keeps it stopped: with `--no-start`, or while
-`state/backend.json`, `provider-cert.pem`, `provider-key.pem` or `companion-ca.pem`
-is missing, it leaves the service **disabled** (`launchctl disable`). A raw
+`state/backend.json`, `provider-cert.pem`, `provider-key.pem` or `companion-ca.pem`,
+the stored client secret (`state/secrets/vaultwarden-accessd.bootstrap-client-secret`,
+step 3) or the enrollment record (`state/companion-identities.json`, step 4) is
+missing or unsafe, it leaves the service **disabled** (`launchctl disable`). A raw
 `launchctl bootstrap` of a disabled label is refused, so always stop, start and
 inspect the service through the installer's own verbs:
 
@@ -62,9 +64,12 @@ sudo /usr/bin/python3 -I $I start                            # verify version + 
 sudo /usr/bin/python3 -I $I status                           # launchd state, pid, last exit code, accounts, sockets, credential files
 ```
 
-`start` checks the four state files and the enrollment record
-(`companion-identities.json`) but cannot see the client secret (step 3):
-check that yourself before starting. `AbandonProcessGroup` is set: stopping the
+`start` checks the four state files, the client secret store (`state/secrets/`
+provider-owned `0700`, the bootstrap record provider-owned `0600`) and
+the enrollment record (`companion-identities.json`, provider-owned `0600`), and
+refuses to start while any of them is missing or unsafe. Run it with `sudo`: as
+another user the state directory is unreadable and the check reports it rather than
+passing. `AbandonProcessGroup` is set: stopping the
 provider never stops programs it already launched.
 
 ## 1. Certificates (as the operator, in your own account)

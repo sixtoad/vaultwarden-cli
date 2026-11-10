@@ -141,8 +141,19 @@ pub fn backend_json(
         Some("argon2id") => return Err(SetupError::Invalid(KDF_ARGON2.into())),
         _ => return Err(SetupError::Invalid(KDF_REQUIRED.into())),
     }
-    if source.get("kdf").is_some_and(|kdf| kdf != 0) {
-        return Err(SetupError::Invalid(KDF_ARGON2.into()));
+    // The login may record the KDF type (0 = PBKDF2, 1 = Argon2id); absent or
+    // null means it did not, and the operator's statement above stands.
+    match source.get("kdf") {
+        None | Some(serde_json::Value::Null) => {}
+        Some(kdf) if kdf.as_u64() == Some(0) => {}
+        Some(kdf) if kdf.as_u64() == Some(1) => {
+            return Err(SetupError::Invalid(KDF_ARGON2.into()));
+        }
+        Some(kdf) => {
+            return Err(SetupError::Invalid(format!(
+                "the vaultwarden-cli login records an unknown kdf {kdf} (expected 0 = PBKDF2)"
+            )));
+        }
     }
     let kdf_iterations = overrides
         .kdf_iterations
@@ -278,21 +289,36 @@ const CA_CONFIG: &str = "[req]\ndistinguished_name=dn\nx509_extensions=ext\nprom
 /// `p12_password` is passed to openssl on its stdin, never in argv or env.
 pub fn tls_bundle(request: &TlsRequest, p12_password: &str) -> Result<TlsSummary, SetupError> {
     validate_tls_request(request, p12_password)?;
-    create_private_parents(&request.out_dir)?;
-    std::fs::DirBuilder::new()
-        .mode(0o700)
-        .create(&request.out_dir)
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::AlreadyExists {
-                SetupError::Exists(request.out_dir.clone())
-            } else {
-                SetupError::Write(request.out_dir.clone())
+    let mut created = Vec::new();
+    let result = create_private_parents(&request.out_dir, &mut created)
+        .and_then(|()| {
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&request.out_dir)
+                .map_err(|error| {
+                    if error.kind() == std::io::ErrorKind::AlreadyExists {
+                        SetupError::Exists(request.out_dir.clone())
+                    } else {
+                        SetupError::Write(request.out_dir.clone())
+                    }
+                })
+        })
+        .and_then(|()| {
+            let result = tls_bundle_in(request, p12_password);
+            if result.is_err() {
+                // Never leave a partial set of keys behind.
+                let _ignored = std::fs::remove_dir_all(&request.out_dir);
             }
-        })?;
-    let result = tls_bundle_in(request, p12_password);
+            result
+        });
     if result.is_err() {
-        // Never leave a partial set of keys behind.
-        let _ignored = std::fs::remove_dir_all(&request.out_dir);
+        // Remove only the ancestors this run created, deepest first, and only
+        // while empty: an existing or meanwhile populated directory stays.
+        for directory in created.iter().rev() {
+            if std::fs::remove_dir(directory).is_err() {
+                break;
+            }
+        }
     }
     result
 }
@@ -300,8 +326,9 @@ pub fn tls_bundle(request: &TlsRequest, p12_password: &str) -> Result<TlsSummary
 /// Create the missing ancestors of `path` (for example `~/vw-setup`) one level
 /// at a time, each `0700`, without following a link at the new name, and check
 /// that each new directory is a private directory of the running user. Existing
-/// ancestors are used as they are.
-fn create_private_parents(path: &Path) -> Result<(), SetupError> {
+/// ancestors are used as they are. Each directory created is pushed to
+/// `created` (shallowest first), so a failed run can remove them again.
+fn create_private_parents(path: &Path, created: &mut Vec<PathBuf>) -> Result<(), SetupError> {
     use std::os::unix::fs::MetadataExt;
     let mut missing = Vec::new();
     let mut parent = path.parent();
@@ -321,6 +348,7 @@ fn create_private_parents(path: &Path) -> Result<(), SetupError> {
             .mode(0o700)
             .create(&directory)
             .map_err(|_error| SetupError::Write(directory.clone()))?;
+        created.push(directory.clone());
         let metadata = std::fs::symlink_metadata(&directory)
             .map_err(|_error| SetupError::Write(directory.clone()))?;
         if !metadata.is_dir() || metadata.uid() != euid || metadata.mode() & 0o077 != 0 {
@@ -780,6 +808,36 @@ mod tests {
             std::fs::write(&source, serde_json::to_vec(&config).unwrap()).unwrap();
             assert!(backend_json(Some(&source), &pbkdf2).is_err(), "{field}");
         }
+        // A login that records no KDF type (absent or null) defers to --kdf;
+        // a recorded Argon2id or an unknown value is named as such.
+        for (kdf, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!(0), None),
+            (serde_json::json!(1), Some(KDF_ARGON2.to_owned())),
+            (
+                serde_json::json!(7),
+                Some(
+                    "the vaultwarden-cli login records an unknown kdf 7 (expected 0 = PBKDF2)"
+                        .to_owned(),
+                ),
+            ),
+            (
+                serde_json::json!("pbkdf2"),
+                Some(
+                    "the vaultwarden-cli login records an unknown kdf \"pbkdf2\" (expected 0 = PBKDF2)"
+                        .to_owned(),
+                ),
+            ),
+        ] {
+            let mut config = cli_config();
+            config["kdf"] = kdf.clone();
+            std::fs::write(&source, serde_json::to_vec(&config).unwrap()).unwrap();
+            let result = backend_json(Some(&source), &pbkdf2);
+            match expected {
+                None => assert!(result.is_ok(), "{kdf}: {result:?}"),
+                Some(message) => assert_eq!(result, Err(SetupError::Invalid(message)), "{kdf}"),
+            }
+        }
         let fields = BackendFields {
             encrypted_key: Some("0.legacy".into()),
             ..explicit
@@ -797,6 +855,36 @@ mod tests {
         .into_iter()
         .map(PathBuf::from)
         .find(|path| path.exists())
+    }
+
+    #[test]
+    fn tls_bundle_failure_removes_only_the_parents_it_created() {
+        let dir = private_dir();
+        let existing = dir.path().join("existing");
+        std::fs::create_dir(&existing).unwrap();
+        let request = TlsRequest {
+            out_dir: existing.join("vw-setup").join("nested").join("tls"),
+            openssl: PathBuf::from("/nonexistent/openssl"),
+            server_ips: vec!["127.0.0.1".parse().unwrap()],
+            server_dns: vec![],
+            days: 30,
+            client_name: "Mac operator".into(),
+        };
+        assert!(matches!(
+            tls_bundle(&request, "synthetic-password"),
+            Err(SetupError::Openssl(_))
+        ));
+        // The pre-existing ancestor stays; nothing this run created survives.
+        assert!(existing.is_dir());
+        assert_eq!(std::fs::read_dir(&existing).unwrap().count(), 0);
+        // With vw-setup already present (and holding a file), only the levels
+        // this run created below it are removed.
+        let populated = existing.join("vw-setup");
+        std::fs::create_dir(&populated).unwrap();
+        std::fs::write(populated.join("keep"), b"x").unwrap();
+        assert!(tls_bundle(&request, "synthetic-password").is_err());
+        assert!(populated.join("keep").exists());
+        assert!(!populated.join("nested").exists());
     }
 
     #[test]

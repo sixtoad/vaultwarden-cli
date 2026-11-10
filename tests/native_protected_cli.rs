@@ -293,6 +293,35 @@ fn native_setup_commands_write_private_outputs_without_provider_state() {
     let value: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&backend).unwrap()).unwrap();
     assert_eq!(value["server"], "https://vault.example.test/");
+    // A relative --out resolves against the current directory.
+    let output = isolated(vw, root.path())
+        .args([
+            "setup",
+            "backend-json",
+            "--server",
+            "https://vault.example.test",
+            "--email",
+            "human@example.test",
+            "--client-id",
+            "user.0000",
+            "--encrypted-key",
+            "2.aXY=|ZGF0YQ==|bWFj",
+            "--kdf",
+            "pbkdf2",
+            "--kdf-iterations",
+            "600000",
+            "--out",
+            "relative.json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let relative = root.path().join("relative.json");
+    assert_eq!(std::fs::metadata(&relative).unwrap().mode() & 0o7777, 0o600);
     let rejected = root.path().join("rejected.json");
     let output = isolated(vw, root.path())
         .args([

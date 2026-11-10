@@ -692,6 +692,34 @@ mod tests {
     }
 
     #[test]
+    fn foreign_or_inaccessible_state_roots_name_the_provider_account_remedy() {
+        if euid() == 0 {
+            eprintln!("skipping: root owns and can open every directory");
+            return;
+        }
+        let message = |root: &Path| match entry(root, SESSION_ACCOUNT).get_password() {
+            Err(error @ Error::NoStorageAccess(_)) => error.to_string(),
+            other => panic!("{}: {other:?}", root.display()),
+        };
+        // A root-owned directory (as `sudo` without `-u _vwaccess` would meet).
+        let foreign = message(Path::new("/usr"));
+        assert!(
+            foreign.contains("not owned by the running user") && foreign.contains(RUN_AS_PROVIDER),
+            "{foreign}"
+        );
+        // A directory the running user cannot open at all.
+        let (_dir, root) = private_root();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let closed = message(&root);
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(
+            closed.contains("not accessible to the running user")
+                && closed.contains(RUN_AS_PROVIDER),
+            "{closed}"
+        );
+    }
+
+    #[test]
     fn crash_leftover_temporaries_are_swept_and_nothing_else() {
         let (dir, root) = private_root();
         let record = entry(&root, SESSION_ACCOUNT);
