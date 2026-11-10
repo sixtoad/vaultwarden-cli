@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'provider.dart';
 
-// These functions are ignored because they are not marked as `pub`: `admin`, `joiner`
+// These functions are ignored because they are not marked as `pub`: `admin`, `joiner`, `lock`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 JoinerSnapshot enrollmentJoinerSnapshot() =>
@@ -27,10 +27,15 @@ ProviderWork enrollmentJoin({
   providerPin: providerPin,
 );
 
-ProviderWork enrollmentJoinerBegin({required JoinerCommand command}) => RustLib
-    .instance
-    .api
-    .crateApiEnrollmentEnrollmentJoinerBegin(command: command);
+ProviderWork enrollmentJoinerBegin({
+  required JoinerCommand command,
+  required String deviceFingerprint,
+  required String providerPin,
+}) => RustLib.instance.api.crateApiEnrollmentEnrollmentJoinerBegin(
+  command: command,
+  deviceFingerprint: deviceFingerprint,
+  providerPin: providerPin,
+);
 
 JoinerSnapshot enrollmentJoinerFinish({
   required int token,
@@ -59,6 +64,10 @@ EnrollmentAdminSnapshot enrollmentAdminFinish({
   token: token,
   response: response,
 );
+
+/// The shown invitation's code, read once by the UI (never in a snapshot).
+String enrollmentAdminInvitationCode() =>
+    RustLib.instance.api.crateApiEnrollmentEnrollmentAdminInvitationCode();
 
 EnrollmentAdminSnapshot enrollmentAdminDismissInvitation() =>
     RustLib.instance.api.crateApiEnrollmentEnrollmentAdminDismissInvitation();
@@ -284,17 +293,16 @@ class EnrollmentAdminSnapshot {
           sessions == other.sessions;
 }
 
-/// Returned once; dismissing wipes it from Rust.
+/// Metadata of the invitation just issued. Its secret code is read separately
+/// (`enrollment_admin_invitation_code`); dismissing wipes it from Rust.
 class IssuedInvitationView {
   final String id;
-  final String invitationCode;
   final EnrolleeRole role;
   final String label;
   final BigInt expiresInSeconds;
 
   const IssuedInvitationView({
     required this.id,
-    required this.invitationCode,
     required this.role,
     required this.label,
     required this.expiresInSeconds,
@@ -302,11 +310,7 @@ class IssuedInvitationView {
 
   @override
   int get hashCode =>
-      id.hashCode ^
-      invitationCode.hashCode ^
-      role.hashCode ^
-      label.hashCode ^
-      expiresInSeconds.hashCode;
+      id.hashCode ^ role.hashCode ^ label.hashCode ^ expiresInSeconds.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -314,7 +318,6 @@ class IssuedInvitationView {
       other is IssuedInvitationView &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          invitationCode == other.invitationCode &&
           role == other.role &&
           label == other.label &&
           expiresInSeconds == other.expiresInSeconds;
@@ -356,7 +359,10 @@ enum JoinerEnd {
   malformed,
 
   /// A confirmation's reply was lost and the provider forgot the session.
-  outcomeUnknown;
+  outcomeUnknown,
+
+  /// The configured provider or client certificate changed mid-session.
+  providerChanged;
 
   static Future<JoinerEnd> default_() =>
       RustLib.instance.api.crateApiEnrollmentJoinerEndDefault();
@@ -391,6 +397,9 @@ class JoinerSnapshot {
   final BigInt secondsRemaining;
   final bool providerApproved;
   final bool confirmed;
+
+  /// A cancel or decline was sent but not acknowledged; it is resent.
+  final bool withdrawing;
   final JoinerEnd end;
 
   /// The last exchange failed transiently (offline, busy): retry is safe.
@@ -409,6 +418,7 @@ class JoinerSnapshot {
     required this.secondsRemaining,
     required this.providerApproved,
     required this.confirmed,
+    required this.withdrawing,
     required this.end,
     required this.retryable,
     required this.invitationId,
@@ -428,6 +438,7 @@ class JoinerSnapshot {
       secondsRemaining.hashCode ^
       providerApproved.hashCode ^
       confirmed.hashCode ^
+      withdrawing.hashCode ^
       end.hashCode ^
       retryable.hashCode ^
       invitationId.hashCode ^
@@ -446,6 +457,7 @@ class JoinerSnapshot {
           secondsRemaining == other.secondsRemaining &&
           providerApproved == other.providerApproved &&
           confirmed == other.confirmed &&
+          withdrawing == other.withdrawing &&
           end == other.end &&
           retryable == other.retryable &&
           invitationId == other.invitationId &&

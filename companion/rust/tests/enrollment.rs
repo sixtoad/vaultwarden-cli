@@ -9,6 +9,8 @@ use companion_core::provider::enrollment::JoinerSession;
 use companion_core::provider::enrollment_admin::AdminSession;
 use serde_json::{json, Value};
 
+const DEVICE: &str = "bb00000000000000000000000000000000000000000000000000000000000002";
+const PIN: &str = "aa00000000000000000000000000000000000000000000000000000000000001";
 fn vector() -> Value {
     serde_json::from_str(include_str!("../../fixtures/enrollment-v1.json")).unwrap()
 }
@@ -74,7 +76,7 @@ fn the_joiner_reproduces_the_provider_vector() {
         (JoinerCommand::Status, "status"),
         (JoinerCommand::Confirm, "confirm"),
     ] {
-        let work = s.begin(command).unwrap();
+        let work = s.begin(command, DEVICE, PIN).unwrap();
         assert_eq!(
             body(&work.body),
             json!({"command":"enroll","version":1,"message":v[key]})
@@ -82,10 +84,10 @@ fn the_joiner_reproduces_the_provider_vector() {
         s.finish(work.token, &[]);
     }
     let mut s = joined_session();
-    let work = s.begin(JoinerCommand::Cancel).unwrap();
+    let work = s.begin(JoinerCommand::Cancel, DEVICE, PIN).unwrap();
     assert_eq!(body(&work.body)["message"], v["cancel"]);
     let mut s = joined_session();
-    let work = s.begin(JoinerCommand::Decline).unwrap();
+    let work = s.begin(JoinerCommand::Decline, DEVICE, PIN).unwrap();
     assert_eq!(body(&work.body)["message"], v["decline"]);
 }
 
@@ -125,7 +127,7 @@ fn a_provider_without_the_secret_never_gets_a_code_shown() {
 #[test]
 fn mismatch_at_either_end_ends_without_enrolling() {
     let mut s = joined_session();
-    let work = s.begin(JoinerCommand::Decline).unwrap();
+    let work = s.begin(JoinerCommand::Decline, DEVICE, PIN).unwrap();
     s.finish(
         work.token,
         &state(json!({"state":"aborted","reason":"joiner_reported_mismatch"})),
@@ -136,10 +138,10 @@ fn mismatch_at_either_end_ends_without_enrolling() {
         (JoinerPhase::Ended, JoinerEnd::Declined)
     );
     assert!(snap.comparison_code.is_empty());
-    assert!(s.begin(JoinerCommand::Confirm).is_err());
+    assert!(s.begin(JoinerCommand::Confirm, DEVICE, PIN).is_err());
     // The owner typed a different code at the provider.
     let mut s = joined_session();
-    let work = s.begin(JoinerCommand::Confirm).unwrap();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
     s.finish(
         work.token,
         &state(
@@ -147,7 +149,7 @@ fn mismatch_at_either_end_ends_without_enrolling() {
         ),
     );
     assert_eq!(s.snapshot().phase, JoinerPhase::Waiting);
-    let work = s.begin(JoinerCommand::Confirm).unwrap();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
     s.finish(
         work.token,
         &state(json!({"state":"aborted","reason":"code_mismatch"})),
@@ -174,7 +176,7 @@ fn expiry_cancellation_and_revoked_identities_are_final() {
         (rejected("expired"), JoinerEnd::Expired),
     ] {
         let mut s = joined_session();
-        let work = s.begin(JoinerCommand::Status).unwrap();
+        let work = s.begin(JoinerCommand::Status, DEVICE, PIN).unwrap();
         s.finish(work.token, &answer);
         assert_eq!(
             (s.snapshot().phase, s.snapshot().end),
@@ -221,27 +223,27 @@ fn lost_replies_are_retried_identically_or_reported_unknown() {
     s.finish(first.token, &[]);
     assert!(s.snapshot().retryable);
     assert_eq!(s.snapshot().phase, JoinerPhase::Joining);
-    let retry = s.begin(JoinerCommand::Retry).unwrap();
+    let retry = s.begin(JoinerCommand::Retry, DEVICE, PIN).unwrap();
     assert_eq!(retry.body, sent);
     s.finish(retry.token, &rejected("busy"));
     assert!(s.snapshot().retryable);
     // A stale token is ignored; only one exchange at a time.
-    let retry = s.begin(JoinerCommand::Retry).unwrap();
-    assert!(s.begin(JoinerCommand::Retry).is_err());
+    let retry = s.begin(JoinerCommand::Retry, DEVICE, PIN).unwrap();
+    assert!(s.begin(JoinerCommand::Retry, DEVICE, PIN).is_err());
     s.finish(retry.token + 1, &reply(&v["joined"]));
     assert_eq!(s.snapshot().phase, JoinerPhase::Joining);
     s.finish(retry.token, &reply(&v["joined"]));
     assert_eq!(s.snapshot().phase, JoinerPhase::Compare);
     // A confirmation whose reply was lost may have committed.
-    let work = s.begin(JoinerCommand::Confirm).unwrap();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
     s.finish(work.token, &[]);
     assert_eq!(s.snapshot().phase, JoinerPhase::Waiting);
-    let work = s.begin(JoinerCommand::Confirm).unwrap();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
     s.finish(work.token, &rejected("invalid_invitation"));
     assert_eq!(s.snapshot().end, JoinerEnd::OutcomeUnknown);
     // Enrolled: the fingerprint is this device's.
     let mut s = joined_session();
-    let work = s.begin(JoinerCommand::Confirm).unwrap();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
     s.finish(
         work.token,
         &state(json!({"state":"enrolled","identity":{"role":"companion","fingerprint":v["device_fingerprint"]}})),
@@ -305,13 +307,12 @@ fn the_owner_invites_and_sees_the_invitation_once() {
     );
     let snap = s.snapshot();
     assert_eq!(snap.outcome, AdminOutcome::Invited);
-    let issued = snap.issued.unwrap();
-    assert_eq!(
-        issued.invitation_code,
-        v["invitation_code"].as_str().unwrap()
-    );
+    assert_eq!(snap.issued.unwrap().label, "Studio Mac");
+    // The secret is read separately, never part of a snapshot.
+    assert_eq!(s.invitation_code(), v["invitation_code"].as_str().unwrap());
     s.dismiss_invitation();
     assert!(s.snapshot().issued.is_none());
+    assert!(s.invitation_code().is_empty());
     let mut agent = admin(AdminCommand::Invite);
     agent.role = EnrolleeRole::Agent;
     agent.label = "ci runner".into();
@@ -439,4 +440,99 @@ fn authority_and_support_are_reported_for_the_manual_fallback() {
     assert_eq!(snap.sessions[0].state, AdminSessionState::Cancelled);
     s.invalidate();
     assert!(s.snapshot().sessions.is_empty());
+}
+
+#[test]
+fn a_withdrawal_is_resent_until_acknowledged_and_never_becomes_a_confirm() {
+    let v = vector();
+    let mut s = joined_session();
+    let work = s.begin(JoinerCommand::Decline, DEVICE, PIN).unwrap();
+    s.finish(work.token, &[]);
+    let snap = s.snapshot();
+    assert!(snap.withdrawing && snap.retryable);
+    // The background poll asks for a confirm or a status: the decline goes.
+    for command in [JoinerCommand::Confirm, JoinerCommand::Status] {
+        let work = s.begin(command, DEVICE, PIN).unwrap();
+        assert_eq!(body(&work.body)["message"], v["decline"]);
+        s.finish(work.token, &rejected("busy"));
+    }
+    // The session was forgotten meanwhile: still nothing this human enrolled.
+    let work = s.begin(JoinerCommand::Status, DEVICE, PIN).unwrap();
+    s.finish(work.token, &rejected("invalid_invitation"));
+    assert_eq!(s.snapshot().end, JoinerEnd::Declined);
+}
+
+#[test]
+fn provider_claims_never_replace_this_humans_consent_or_the_handshake() {
+    // "Confirmed" by the provider while this human has not confirmed.
+    let mut s = joined_session();
+    let work = s.begin(JoinerCommand::Status, DEVICE, PIN).unwrap();
+    s.finish(
+        work.token,
+        &state(
+            json!({"state":"awaiting_approvals","provider_approved":true,"joiner_confirmed":true}),
+        ),
+    );
+    assert_eq!(s.snapshot().end, JoinerEnd::Malformed);
+    // "Enrolled" as the answer to the join, before the provider's proof.
+    let v = vector();
+    let mut s = JoinerSession::default();
+    let work = s
+        .join(v["invitation_code"].as_str().unwrap(), DEVICE, PIN, nonce())
+        .unwrap();
+    s.finish(
+        work.token,
+        &state(json!({"state":"enrolled","identity":{"role":"companion","fingerprint":DEVICE}})),
+    );
+    assert_eq!(s.snapshot().end, JoinerEnd::Malformed);
+    // Another provider or certificate configured mid-session ends it.
+    let mut s = joined_session();
+    assert!(s
+        .begin(JoinerCommand::Confirm, DEVICE, &"c".repeat(64))
+        .is_err());
+    assert_eq!(s.snapshot().end, JoinerEnd::ProviderChanged);
+    assert!(s.snapshot().comparison_code.is_empty());
+}
+
+#[test]
+fn owner_replies_must_match_the_request() {
+    let v = vector();
+    let row = |id: &str, state: Value| json!({"version":1,"enrollment":{"id":id,"kind":{"role":"companion","label":"Studio Mac"},"state":state,"expires_in_seconds":0}});
+    let mut approve = admin(AdminCommand::Approve);
+    approve.id = ID.into();
+    approve.code = "12345678".into();
+    approve.password = "synthetic-password".into();
+    let other = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    for answer in [
+        // Another enrollment's row.
+        row(
+            other,
+            json!({"state":"awaiting_approvals","provider_approved":true,"joiner_confirmed":false}),
+        ),
+        // A 200 that did not approve anything.
+        row(ID, json!({"state":"aborted","reason":"code_mismatch"})),
+    ] {
+        let mut s = AdminSession::default();
+        let work = s.begin(approve.clone()).unwrap();
+        s.finish(work.token, &reply(&answer));
+        assert_eq!(s.snapshot().outcome, AdminOutcome::Invalid);
+    }
+    // An invitation for another kind than requested is not shown.
+    let mut s = AdminSession::default();
+    let mut request = admin(AdminCommand::Invite);
+    request.label = "Studio Mac".into();
+    let work = s.begin(request).unwrap();
+    s.finish(
+        work.token,
+        &reply(&json!({"version":1,"invitation":{"id":ID,"invitation_code":v["invitation_code"],"kind":{"role":"companion","label":"Other Mac"},"expires_in_seconds":600}})),
+    );
+    assert_eq!(s.snapshot().outcome, AdminOutcome::Invalid);
+    assert!(s.snapshot().issued.is_none() && s.invitation_code().is_empty());
+    // No extra member can ride along on a list.
+    let work = s.begin(admin(AdminCommand::List)).unwrap();
+    s.finish(
+        work.token,
+        &reply(&json!({"version":1,"enrollments":[],"comparison_code":"1234-5678"})),
+    );
+    assert_eq!(s.snapshot().outcome, AdminOutcome::Invalid);
 }

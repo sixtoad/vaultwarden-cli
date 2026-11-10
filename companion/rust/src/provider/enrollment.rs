@@ -162,6 +162,9 @@ struct Live {
     join_request: Vec<u8>,
     /// Set once the provider's half verified.
     hash: Option<[u8; 32]>,
+    /// The transport identities the join was bound to.
+    device: String,
+    pin: String,
 }
 impl Live {
     fn id_text(&self) -> String {
@@ -204,6 +207,9 @@ pub struct JoinerSession {
     provider_approved: bool,
     confirmed: bool,
     confirm_lost: bool,
+    /// A cancel or decline the provider has not acknowledged yet. While set,
+    /// every exchange resends it: a lost withdrawal never becomes a confirm.
+    withdrawing: Option<Sent>,
     retryable: bool,
     invitation_id: String,
     enrolled_fingerprint: String,
@@ -224,6 +230,7 @@ impl JoinerSession {
                 .map_or(0, |d| d.saturating_duration_since(Instant::now()).as_secs()),
             provider_approved: self.provider_approved,
             confirmed: self.confirmed,
+            withdrawing: self.withdrawing.is_some(),
             end: self.end,
             retryable: self.retryable,
             invitation_id: self.invitation_id.clone(),
@@ -300,41 +307,66 @@ impl JoinerSession {
             join_bytes,
             join_request: join_request.clone(),
             hash: None,
+            device: device_fingerprint.to_owned(),
+            pin: provider_pin.to_owned(),
         });
         self.phase = JoinerPhase::Joining;
         Ok(self.work(Sent::Join, join_request))
     }
 
-    pub fn begin(&mut self, command: JoinerCommand) -> Result<ProviderWork, &'static str> {
+    /// The next joiner message. `device_fingerprint`/`provider_pin` are the
+    /// transport identities now configured: a session bound to others ends.
+    pub fn begin(
+        &mut self,
+        command: JoinerCommand,
+        device_fingerprint: &str,
+        provider_pin: &str,
+    ) -> Result<ProviderWork, &'static str> {
         if self.pending.is_some() {
             return Err("Waiting for the provider.");
         }
         let live = self.live.as_ref().ok_or("No enrollment in progress.")?;
-        let (sent, body) = match (command, self.phase) {
-            (JoinerCommand::Retry, JoinerPhase::Joining) => (Sent::Join, live.join_request.clone()),
-            (JoinerCommand::Status, JoinerPhase::Compare | JoinerPhase::Waiting) => {
-                (Sent::Status, live.control("status", None))
-                    .1
-                    .map(|b| (Sent::Status, b))
-                    .ok_or("No enrollment in progress.")?
+        if live.device != device_fingerprint || live.pin != provider_pin {
+            self.end(JoinerEnd::ProviderChanged);
+            return Err("The provider connection changed; this enrollment ended.");
+        }
+        let joined = matches!(self.phase, JoinerPhase::Compare | JoinerPhase::Waiting);
+        let expired = self.deadline.is_some_and(|d| d <= Instant::now());
+        // A pending withdrawal is resent instead of anything else.
+        let command = match (self.withdrawing, command) {
+            (Some(Sent::Decline), JoinerCommand::Confirm | JoinerCommand::Status) => {
+                JoinerCommand::Decline
             }
-            (JoinerCommand::Confirm, JoinerPhase::Compare | JoinerPhase::Waiting) => live
-                .control("confirm", None)
-                .map(|b| (Sent::Confirm, b))
-                .ok_or("No enrollment in progress.")?,
-            (JoinerCommand::Decline, JoinerPhase::Compare | JoinerPhase::Waiting) => live
-                .control("cancel/code_mismatch", Some(("reason", "code_mismatch")))
-                .map(|b| (Sent::Decline, b))
-                .ok_or("No enrollment in progress.")?,
-            (JoinerCommand::Cancel, JoinerPhase::Compare | JoinerPhase::Waiting) => live
-                .control("cancel/cancelled", Some(("reason", "cancelled")))
-                .map(|b| (Sent::Cancel, b))
-                .ok_or("No enrollment in progress.")?,
+            (Some(_), JoinerCommand::Confirm | JoinerCommand::Status) => JoinerCommand::Cancel,
+            (_, command) => command,
+        };
+        let (sent, body) = match command {
+            JoinerCommand::Retry if self.phase == JoinerPhase::Joining => {
+                (Sent::Join, Some(live.join_request.clone()))
+            }
+            JoinerCommand::Status if joined => (Sent::Status, live.control("status", None)),
+            JoinerCommand::Confirm if joined && expired => {
+                return Err("The invitation expired.");
+            }
+            JoinerCommand::Confirm if joined => (Sent::Confirm, live.control("confirm", None)),
+            JoinerCommand::Decline if joined => (
+                Sent::Decline,
+                live.control("cancel/code_mismatch", Some(("reason", "code_mismatch"))),
+            ),
+            JoinerCommand::Cancel if joined => (
+                Sent::Cancel,
+                live.control("cancel/cancelled", Some(("reason", "cancelled"))),
+            ),
             _ => return Err("Not possible in this step."),
         };
-        if sent == Sent::Confirm {
-            self.confirmed = true;
-            self.phase = JoinerPhase::Waiting;
+        let body = body.ok_or("No enrollment in progress.")?;
+        match sent {
+            Sent::Confirm => {
+                self.confirmed = true;
+                self.phase = JoinerPhase::Waiting;
+            }
+            Sent::Decline | Sent::Cancel => self.withdrawing = Some(sent),
+            Sent::Join | Sent::Status => {}
         }
         Ok(self.work(sent, body))
     }
@@ -368,7 +400,7 @@ impl JoinerSession {
         match serde_json::from_slice::<ErrorResponse>(response) {
             Ok(ErrorResponse {
                 version: 1,
-                error: ErrorCode::Unavailable,
+                error: ErrorCode::Unavailable | ErrorCode::RateLimited | ErrorCode::Stale,
             }) => self.lost(sent),
             Ok(_) | Err(_) => self.end(JoinerEnd::Malformed),
         }
@@ -422,6 +454,14 @@ impl JoinerSession {
                     "identity_refused" => self.end(JoinerEnd::IdentityRefused),
                     // After a lost confirmation, a forgotten session may
                     // have committed first: the outcome is not known.
+                    // A forgotten session after an unacknowledged withdrawal:
+                    // nothing was enrolled through this device's consent.
+                    "invalid_invitation" if self.withdrawing == Some(Sent::Decline) => {
+                        self.end(JoinerEnd::Declined)
+                    }
+                    "invalid_invitation" if self.withdrawing.is_some() => {
+                        self.end(JoinerEnd::Cancelled)
+                    }
                     "invalid_invitation" if self.confirm_lost => {
                         self.end(JoinerEnd::OutcomeUnknown)
                     }
@@ -460,8 +500,11 @@ impl JoinerSession {
             return self.end(JoinerEnd::ProviderNotAuthenticated);
         }
         // Only after the provider proved the secret does the role matter.
-        if role != EnrolleeRole::Companion || !valid_label(label) || expires > 1800 {
+        if role != EnrolleeRole::Companion {
             return self.end(JoinerEnd::WrongRole);
+        }
+        if !valid_label(label) || expires > 1800 {
+            return self.end(JoinerEnd::Malformed);
         }
         let hash: [u8; 32] = Sha256::digest(&full).into();
         live.hash = Some(hash);
@@ -474,10 +517,14 @@ impl JoinerSession {
 
     fn state(&mut self, sent: Sent, state: State) {
         if sent == Sent::Join && self.live.as_ref().is_some_and(|l| l.hash.is_none()) {
-            // A state before our verified half: only a final one is usable.
-            if matches!(
+            // A state before our verified half: only an end where nothing
+            // was enrolled is usable; "enrolled" without the handshake is not.
+            if !matches!(
                 state,
-                State::AwaitingJoin {} | State::AwaitingApprovals { .. }
+                State::Expired {}
+                    | State::Cancelled { .. }
+                    | State::Aborted { .. }
+                    | State::Failed { .. }
             ) {
                 return self.end(JoinerEnd::Malformed);
             }
@@ -489,11 +536,12 @@ impl JoinerSession {
                 provider_approved,
                 joiner_confirmed,
             } => {
-                self.provider_approved = provider_approved;
-                if joiner_confirmed {
-                    self.confirmed = true;
-                    self.phase = JoinerPhase::Waiting;
+                // Consent comes only from this human's own Confirm; a
+                // provider claiming otherwise is not believed.
+                if joiner_confirmed && !self.confirmed {
+                    return self.end(JoinerEnd::Malformed);
                 }
+                self.provider_approved = provider_approved;
             }
             State::Enrolled {
                 identity: Identity::Companion { fingerprint },

@@ -76,7 +76,8 @@ client invites, lists, types the joining device's comparison code with the
 provider password, and cancels) and **Join this device to a provider** (paste a
 `vwe1.` invitation, compare the large code, confirm or decline). The joining
 protocol runs in `companion_core` (`provider/enrollment.rs`), pinned to the
-provider by `fixtures/enrollment-v1.json`; Dart holds no keys or secrets beyond
-the typed text it hands to Rust. Widget tests use an independent test-only
+provider by `fixtures/enrollment-v1.json`; Dart holds no keys, and only
+transiently the typed text and the request/response bytes it hands to Rust
+(zero-filled after use, best effort). Widget tests use an independent test-only
 provider oracle (`test/enrollment_support.dart`, dev dependency
 `package:crypto`). See [guided enrollment](../docs/guided-enrollment.md#phase-2-desktop-companion).

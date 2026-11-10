@@ -177,7 +177,7 @@ void main() {
         role: enroll.EnrolleeRole.companion,
         label: 'Studio Mac',
       );
-      await flow.join(flow.admin.issued!.invitationCode);
+      await flow.join(flow.invitationCode);
       flow.dismissInvitation();
       await flow.list();
       flow.select(flow.admin.sessions.single.id);

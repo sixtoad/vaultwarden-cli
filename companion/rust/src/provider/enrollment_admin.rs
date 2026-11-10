@@ -25,6 +25,13 @@ impl Kind {
             Self::Companion { label } => valid_label(label),
         }
     }
+    /// Role, the label as sent (not the display form), uid, gid.
+    fn raw(&self) -> (EnrolleeRole, &str, u32, u32) {
+        match self {
+            Self::Agent { label, uid, gid } => (EnrolleeRole::Agent, label, *uid, *gid),
+            Self::Companion { label } => (EnrolleeRole::Companion, label, 0, 0),
+        }
+    }
     fn parts(&self) -> (EnrolleeRole, String, u32, u32) {
         match self {
             Self::Agent { label, uid, gid } => {
@@ -165,12 +172,25 @@ impl Drop for Issued {
         self.invitation_code.zeroize();
     }
 }
+// One closed reply shape per command, each refusing unknown fields, so no
+// extra member (a code, say) can ride along unnoticed.
 #[derive(Deserialize)]
-#[serde(untagged)]
-enum Reply {
-    Invited { version: u8, invitation: Issued },
-    Listed { version: u8, enrollments: Vec<View> },
-    One { version: u8, enrollment: View },
+#[serde(deny_unknown_fields)]
+struct Invited {
+    version: u8,
+    invitation: Issued,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Listed {
+    version: u8,
+    enrollments: Vec<View>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct One {
+    version: u8,
+    enrollment: View,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -187,15 +207,35 @@ fn normalize_code(input: &str) -> Option<String> {
         .then(|| format!("{}-{}", &digits[..4], &digits[4..]))
 }
 
+/// Request bodies serialized from borrowed fields: the password is written
+/// once, into the returned buffer, never into an intermediate JSON value.
+#[derive(serde::Serialize)]
+struct Approve<'a> {
+    version: u8,
+    command: &'static str,
+    id: &'a str,
+    code: &'a str,
+    password: &'a str,
+}
+
+/// What an exchange asked for; its reply must match it.
+struct Pending {
+    token: u32,
+    command: AdminCommand,
+    id: String,
+    kind: Option<(EnrolleeRole, String, u32, u32)>,
+}
+
 #[derive(Default)]
 pub struct AdminSession {
     state: AdminState,
     outcome: AdminOutcome,
     refusal: AdminRefusal,
     issued: Option<IssuedInvitationView>,
+    issued_code: Zeroizing<String>,
     sessions: Vec<AdminSessionView>,
     token: u32,
-    pending: Option<(u32, AdminCommand)>,
+    pending: Option<Pending>,
 }
 
 impl AdminSession {
@@ -210,19 +250,23 @@ impl AdminSession {
         }
     }
 
+    /// The shown invitation's secret code, kept out of every snapshot so the
+    /// UI copies it once. Empty when none is shown.
+    pub fn invitation_code(&self) -> String {
+        self.issued_code.as_str().to_owned()
+    }
+
     pub fn dismiss_invitation(&mut self) {
-        if let Some(mut issued) = self.issued.take() {
-            issued.invitation_code.zeroize();
-        }
+        self.issued = None;
+        self.issued_code.zeroize();
     }
 
     /// Navigation, sleep or a provider change: forget everything shown.
     pub fn invalidate(&mut self) {
         self.dismiss_invitation();
-        *self = Self {
-            token: self.token,
-            ..Self::default()
-        };
+        let token = self.token;
+        *self = Self::default();
+        self.token = token;
     }
 
     pub fn begin(
@@ -230,12 +274,14 @@ impl AdminSession {
         mut request: EnrollmentAdminRequest,
     ) -> Result<ProviderWork, &'static str> {
         let password = Zeroizing::new(std::mem::take(&mut request.password));
+        let typed = Zeroizing::new(std::mem::take(&mut request.code));
         if self.pending.is_some() {
             return Err("Waiting for the provider.");
         }
+        let mut kind = None;
         let body = match request.command {
             AdminCommand::Invite => {
-                let kind = match request.role {
+                let value = match request.role {
                     EnrolleeRole::Companion if valid_label(&request.label) => {
                         serde_json::json!({"role":"companion","label":request.label})
                     }
@@ -251,58 +297,82 @@ impl AdminSession {
                         return Err("Enter an ASCII agent name and the agent account's numeric user and group IDs (not 0).")
                     }
                 };
-                serde_json::json!({"version":1,"command":"enroll_invite","kind":kind})
+                kind = Some(match request.role {
+                    EnrolleeRole::Companion => (request.role, request.label.clone(), 0, 0),
+                    EnrolleeRole::Agent => (
+                        request.role,
+                        request.label.clone(),
+                        request.agent_uid,
+                        request.agent_gid,
+                    ),
+                });
+                serde_json::to_vec(
+                    &serde_json::json!({"version":1,"command":"enroll_invite","kind":value}),
+                )
             }
-            AdminCommand::List => serde_json::json!({"version":1,"command":"enroll_list"}),
+            AdminCommand::List => {
+                serde_json::to_vec(&serde_json::json!({"version":1,"command":"enroll_list"}))
+            }
             AdminCommand::Approve => {
                 if !valid_id(&request.id) {
                     return Err("Select an enrollment first.");
                 }
-                let code = normalize_code(&request.code)
-                    .ok_or("Type the 8-digit code shown on the joining device.")?;
+                let code = Zeroizing::new(
+                    normalize_code(&typed)
+                        .ok_or("Type the 8-digit code shown on the joining device.")?,
+                );
                 if password.is_empty() || password.len() > 4096 {
                     return Err("Enter the provider password.");
                 }
-                serde_json::json!({"version":1,"command":"enroll_approve","id":request.id,"code":code,"password":password.as_str()})
+                serde_json::to_vec(&Approve {
+                    version: 1,
+                    command: "enroll_approve",
+                    id: &request.id,
+                    code: &code,
+                    password: &password,
+                })
             }
             AdminCommand::Cancel => {
                 if !valid_id(&request.id) {
                     return Err("Select an enrollment first.");
                 }
-                serde_json::json!({"version":1,"command":"enroll_cancel","id":request.id})
+                serde_json::to_vec(
+                    &serde_json::json!({"version":1,"command":"enroll_cancel","id":request.id}),
+                )
             }
-        };
-        let mut value = body;
-        let bytes = serde_json::to_vec(&value).expect("enrollment admin serialization");
-        if let Some(password) = value.get_mut("password") {
-            *password = serde_json::Value::Null;
         }
-        request.code.zeroize();
+        .map_err(|_| "Enrollment unavailable")?;
         self.token = self.token.wrapping_add(1);
-        self.pending = Some((self.token, request.command));
+        self.pending = Some(Pending {
+            token: self.token,
+            command: request.command,
+            id: request.id,
+            kind,
+        });
         self.outcome = AdminOutcome::None;
         self.refusal = AdminRefusal::None;
         Ok(ProviderWork {
             token: self.token,
-            body: bytes,
+            body,
         })
     }
 
     pub fn finish(&mut self, token: u32, response: &[u8]) {
-        let Some((pending, command)) = self.pending else {
-            return;
-        };
-        if pending != token {
+        if self.pending.as_ref().is_none_or(|p| p.token != token) {
             return;
         }
-        self.pending = None;
+        let Some(pending) = self.pending.take() else {
+            return;
+        };
+        let command = pending.command;
         if response.is_empty() || response.len() > RESPONSE_LIMIT {
             // No reply: an approval or cancel may still have applied.
             self.outcome = AdminOutcome::Unavailable;
             return;
         }
-        if let Ok(reply) = serde_json::from_slice::<Reply>(response) {
-            return self.reply(command, reply);
+        if self.reply(&pending, response) {
+            self.state = AdminState::Ready;
+            return;
         }
         if let Ok(refused) = serde_json::from_slice::<Refused>(response) {
             if refused.version == 1 && refused.error.0 == "enrollment_refused" {
@@ -351,8 +421,8 @@ impl AdminSession {
                 }
             },
             _ => {
-                // An unparseable list (for example one carrying a code) is
-                // refused whole: nothing previously shown stays current.
+                // An unparseable reply (for example a list carrying a code)
+                // is refused whole: nothing previously shown stays current.
                 self.outcome = AdminOutcome::Invalid;
                 if command == AdminCommand::List {
                     self.sessions.clear();
@@ -361,22 +431,22 @@ impl AdminSession {
         }
     }
 
-    fn reply(&mut self, command: AdminCommand, reply: Reply) {
-        let valid = match (command, reply) {
-            (
-                AdminCommand::Invite,
-                Reply::Invited {
-                    version: 1,
-                    invitation,
-                },
-            ) => self.invited(&invitation),
-            (
-                AdminCommand::List,
-                Reply::Listed {
+    /// True when `response` is the success shape for this exact request.
+    fn reply(&mut self, pending: &Pending, response: &[u8]) -> bool {
+        match pending.command {
+            AdminCommand::Invite => serde_json::from_slice::<Invited>(response)
+                .is_ok_and(|r| r.version == 1 && self.invited(&r.invitation, pending)),
+            AdminCommand::List => {
+                let Ok(Listed {
                     version: 1,
                     enrollments,
-                },
-            ) if enrollments.len() <= MAX_SESSIONS => {
+                }) = serde_json::from_slice::<Listed>(response)
+                else {
+                    return false;
+                };
+                if enrollments.len() > MAX_SESSIONS {
+                    return false;
+                }
                 let projected: Option<Vec<_>> =
                     enrollments.into_iter().map(View::project).collect();
                 projected.is_some_and(|rows| {
@@ -385,14 +455,28 @@ impl AdminSession {
                     true
                 })
             }
-            (
-                AdminCommand::Approve | AdminCommand::Cancel,
-                Reply::One {
+            AdminCommand::Approve | AdminCommand::Cancel => {
+                let Ok(One {
                     version: 1,
                     enrollment,
-                },
-            ) => enrollment.project().is_some_and(|row| {
-                self.outcome = if command == AdminCommand::Approve {
+                }) = serde_json::from_slice::<One>(response)
+                else {
+                    return false;
+                };
+                let Some(row) = enrollment.project().filter(|row| row.id == pending.id) else {
+                    return false;
+                };
+                // A 200 must show the effect asked for; anything else is not
+                // reported as success.
+                let applied = if pending.command == AdminCommand::Approve {
+                    row.provider_approved || row.state == AdminSessionState::Enrolled
+                } else {
+                    row.state == AdminSessionState::Cancelled
+                };
+                if !applied {
+                    return false;
+                }
+                self.outcome = if pending.command == AdminCommand::Approve {
                     AdminOutcome::Approved
                 } else {
                     AdminOutcome::Cancelled
@@ -402,20 +486,11 @@ impl AdminSession {
                     None => self.sessions.push(row),
                 }
                 true
-            }),
-            _ => false,
-        };
-        if valid {
-            self.state = AdminState::Ready;
-        } else {
-            self.outcome = AdminOutcome::Invalid;
-            if command == AdminCommand::List {
-                self.sessions.clear();
             }
         }
     }
 
-    fn invited(&mut self, issued: &Issued) -> bool {
+    fn invited(&mut self, issued: &Issued, pending: &Pending) -> bool {
         let code_ok = {
             let mut parts = issued.invitation_code.split('.');
             matches!(
@@ -424,14 +499,19 @@ impl AdminSession {
                     if id == issued.id && valid_id(id) && valid_id(secret)
             )
         };
-        if !code_ok || !issued.kind.valid() || issued.expires_in_seconds > 1800 {
+        let (role, raw_label, uid, gid) = issued.kind.raw();
+        let same_kind = pending
+            .kind
+            .as_ref()
+            .is_some_and(|(r, l, u, g)| (*r, l.as_str(), *u, *g) == (role, raw_label, uid, gid));
+        if !code_ok || !same_kind || !issued.kind.valid() || issued.expires_in_seconds > 1800 {
             return false;
         }
         self.dismiss_invitation();
         let (role, label, _, _) = issued.kind.parts();
+        self.issued_code = Zeroizing::new(issued.invitation_code.clone());
         self.issued = Some(IssuedInvitationView {
             id: issued.id.clone(),
-            invitation_code: issued.invitation_code.clone(),
             role,
             label,
             expires_in_seconds: issued.expires_in_seconds,

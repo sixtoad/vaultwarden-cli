@@ -124,6 +124,7 @@ String joinerEndText(enroll.JoinerEnd end) => switch (end) {
   enroll.JoinerEnd.wrongRole => 'This invitation is for an agent, not this app. Run "vw-access enroll join" in the agent account.',
   enroll.JoinerEnd.malformed =>
     'The provider sent an unexpected reply. Nothing was enrolled.',
+  enroll.JoinerEnd.providerChanged => 'The provider connection or this client certificate changed, so this enrollment ended. Nothing was enrolled through it.',
   enroll.JoinerEnd.outcomeUnknown => 'A confirmation reply was lost and the provider no longer knows this session. This device may or may not be enrolled: check Devices & agents.',
 };
 
@@ -137,13 +138,14 @@ class JoinerComparison extends StatelessWidget {
     required this.secondsRemaining,
     required this.waiting,
     required this.providerApproved,
+    this.withdrawing = false,
     this.onConfirm,
     this.onDecline,
     this.onCancel,
   });
   final String code, label;
   final int secondsRemaining;
-  final bool waiting, providerApproved;
+  final bool waiting, providerApproved, withdrawing;
   final VoidCallback? onConfirm, onDecline, onCancel;
   @override
   Widget build(BuildContext context) {
@@ -178,7 +180,12 @@ class JoinerComparison extends StatelessWidget {
           style: TextStyle(color: AccessTheme.of(context).secondary),
         ),
         const SizedBox(height: 16),
-        if (!waiting) ...[
+        if (withdrawing)
+          const StatusLabel(
+            'Your answer has not reached the provider yet. It is being sent again; this device will not be enrolled.',
+            icon: Icons.sync_problem,
+          )
+        else if (!waiting) ...[
           const Text(
             'Enroll only if you expected this invitation and the owner is reading this code from this screen.',
           ),
@@ -186,7 +193,8 @@ class JoinerComparison extends StatelessWidget {
           AccessActions(
             children: [
               FilledButton(
-                onPressed: onConfirm,
+                // An expired invitation cannot be confirmed any more.
+                onPressed: secondsRemaining > 0 ? onConfirm : null,
                 child: const Text('Yes, enroll this device'),
               ),
               OutlinedButton(
@@ -311,6 +319,7 @@ class _EnrollmentJoinPanelState extends State<EnrollmentJoinPanel> {
               secondsRemaining: s.secondsRemaining.toInt(),
               waiting: s.phase == enroll.JoinerPhase.waiting,
               providerApproved: s.providerApproved,
+              withdrawing: s.withdrawing,
               onConfirm: idle ? flow.confirm : null,
               onDecline: idle ? flow.decline : null,
               onCancel: idle ? flow.cancelJoin : null,
@@ -321,7 +330,6 @@ class _EnrollmentJoinPanelState extends State<EnrollmentJoinPanel> {
               icon: Icons.check_circle_outline,
             ),
             const SizedBox(height: 16),
-            FactRow('This client certificate · SHA-256', s.enrolledFingerprint),
             FilledButton(
               onPressed: () {
                 flow.reset();
@@ -351,6 +359,7 @@ class _EnrollmentJoinPanelState extends State<EnrollmentJoinPanel> {
           const SizedBox(height: 16),
           _Details([
             ('Invitation ID', s.invitationId),
+            ('Enrolled identity · SHA-256', s.enrolledFingerprint),
             (
               'This client certificate · SHA-256',
               flow.provider.configuration.fingerprint,
@@ -441,6 +450,8 @@ class _EnrollmentAddPanelState extends State<EnrollmentAddPanel> {
   Widget build(BuildContext context) {
     final flow = widget.flow, s = flow.admin;
     final idle = flow.ready && !s.busy;
+    // Owner actions only once the provider confirmed this client's authority.
+    final act = idle && s.state == enroll.AdminState.ready;
     final theme = Theme.of(context);
     final blocked = switch (s.state) {
       enroll.AdminState.unauthorized => 'This approval client is not a provider administrator. The provider owner can invite from the terminal, or grant administration explicitly from the trusted console.',
@@ -476,20 +487,23 @@ class _EnrollmentAddPanelState extends State<EnrollmentAddPanel> {
               ),
               const SizedBox(height: 8),
               SelectableText(
-                issued.invitationCode,
+                flow.invitationCode,
                 key: const Key('invitation-code'),
               ),
               const SizedBox(height: 8),
               Text(
-                'Shown once. Give it privately to the person at the joining ${issued.role == enroll.EnrolleeRole.agent ? 'agent account ("vw-access enroll join")' : 'device ("Join this device to a provider")'}. Anyone holding it can try to join until it is used, cancelled or expires (${_minutes(issued.expiresInSeconds.toInt())}).',
+                'Shown once. Give it privately to the person at the joining ${issued.role == enroll.EnrolleeRole.agent ? 'agent account ("vw-access enroll join")' : 'device ("Join this device to a provider")'}. Anyone holding it can try to join until it is used, cancelled or expires; a copy leaves the clipboard when you hide it (${_minutes(issued.expiresInSeconds.toInt())}).',
               ),
               const SizedBox(height: 8),
               AccessActions(
                 children: [
                   OutlinedButton.icon(
-                    onPressed: () => Clipboard.setData(
-                      ClipboardData(text: issued.invitationCode),
-                    ),
+                    onPressed: () {
+                      flow.copiedInvitation();
+                      Clipboard.setData(
+                        ClipboardData(text: flow.invitationCode),
+                      );
+                    },
                     icon: const Icon(Icons.copy),
                     label: const Text('Copy invitation'),
                   ),
@@ -557,13 +571,15 @@ class _EnrollmentAddPanelState extends State<EnrollmentAddPanel> {
                 ],
               ),
             const SizedBox(height: 16),
+            if (s.state == enroll.AdminState.unknown)
+              const StatusLabel('Checking this client\'s authority…'),
             FilledButton(
-              onPressed: idle
+              onPressed: act
                   ? () => flow.invite(
                       role: role,
                       label: label.text,
-                      uid: int.tryParse(uid.text) ?? 0,
-                      gid: int.tryParse(gid.text) ?? 0,
+                      uid: int.tryParse(uid.text),
+                      gid: int.tryParse(gid.text),
                     )
                   : null,
               child: const Text('Create invitation'),
@@ -610,13 +626,11 @@ class _EnrollmentAddPanelState extends State<EnrollmentAddPanel> {
                               !row.providerApproved &&
                               row.id != flow.selected)
                             FilledButton(
-                              onPressed: idle
-                                  ? () => flow.select(row.id)
-                                  : null,
+                              onPressed: act ? () => flow.select(row.id) : null,
                               child: const Text('Type code to approve'),
                             ),
                           TextButton(
-                            onPressed: idle
+                            onPressed: act
                                 ? () => flow.cancelInvitation(row.id)
                                 : null,
                             child: const Text('Cancel invitation'),
@@ -654,13 +668,21 @@ class _EnrollmentAddPanelState extends State<EnrollmentAddPanel> {
                       AccessActions(
                         children: [
                           FilledButton(
-                            onPressed: idle
-                                ? () {
+                            onPressed: act
+                                ? () async {
                                     final typed = code.text;
                                     final secret = widget.password.text;
-                                    code.clear();
                                     widget.password.clear();
-                                    flow.approve(row.id, typed, secret);
+                                    // Keep the typed code only when nothing
+                                    // reached the provider.
+                                    if (await flow.approve(
+                                          row.id,
+                                          typed,
+                                          secret,
+                                        ) &&
+                                        mounted) {
+                                      code.clear();
+                                    }
                                   }
                                 : null,
                             child: const Text('Approve enrollment'),

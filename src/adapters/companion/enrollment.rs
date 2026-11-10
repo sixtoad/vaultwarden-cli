@@ -142,7 +142,9 @@ pub(super) fn admin(
     if service.management.lock().map_or(true, |state| state.failed) {
         return Response::error(Error::Unavailable);
     }
-    if !identity::administrator(&service.identity_store, actor) {
+    // `dispatch` already required a current enrollment; re-checked here so
+    // this entry point never depends on its caller's order.
+    if !service.authorized(actor) || !identity::administrator(&service.identity_store, actor) {
         return Response::error(Error::Unauthorized);
     }
     let owner = app.human_owner();

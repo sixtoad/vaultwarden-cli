@@ -217,7 +217,7 @@ void main() {
     await h.start();
     await h.flow.open(EnrollmentMode.add);
     await h.flow.invite(role: enroll.EnrolleeRole.companion, label: 'Mac');
-    final code = h.flow.admin.issued!.invitationCode;
+    final code = h.flow.invitationCode;
     await h.flow.join(code);
     final shown = h.flow.joiner.comparisonCode;
     final wrong = shown == '0000-0000' ? '1111-1111' : '0000-0000';
@@ -300,7 +300,7 @@ void main() {
     await tester.pump();
     expect(find.text(joinerEndText(enroll.JoinerEnd.expired)), findsOneWidget);
     expect(find.byKey(const Key('comparison-code')), findsNothing);
-    // A forged provider never shows a code.
+    // An invitation with the wrong secret is unknown to the provider.
     h.flow.reset();
     h.platform.forcedState = null;
     final other = h.platform.issue({'role': 'companion', 'label': 'Mac'});
@@ -310,6 +310,24 @@ void main() {
       find.text(joinerEndText(enroll.JoinerEnd.invalidInvitation)),
       findsOneWidget,
     );
+    h.dispose();
+  });
+
+  testWidgets('a provider that cannot prove the invitation shows no code', (
+    tester,
+  ) async {
+    final h = Harness(EnrollmentPlatform()..tamperProviderMac = true);
+    await h.start();
+    final i = h.platform.issue({'role': 'companion', 'label': 'Mac'});
+    h.flow.open(EnrollmentMode.join);
+    await tester.pumpWidget(h.app(only: EnrollmentMode.join));
+    await h.flow.join(i.code);
+    await tester.pump();
+    expect(
+      find.text(joinerEndText(enroll.JoinerEnd.providerNotAuthenticated)),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('comparison-code')), findsNothing);
     h.dispose();
   });
 

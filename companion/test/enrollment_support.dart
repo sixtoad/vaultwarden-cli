@@ -137,6 +137,9 @@ class EnrollmentPlatform extends FixtureProviderPlatform {
     );
   }
   bool admin = true;
+
+  /// Answer the join with a proof the joiner must refuse.
+  bool tamperProviderMac = false;
   String? joinRejection;
   Map<String, dynamic>? forcedState;
   final List<FixtureInvitation> invitations = [];
@@ -228,7 +231,11 @@ class EnrollmentPlatform extends FixtureProviderPlatform {
     }
     switch (m['purpose']) {
       case 'enroll_join':
-        return i.joined(m, List.filled(32, 9)) ??
+        final joined = i.joined(m, List.filled(32, 9));
+        if (joined != null && tamperProviderMac) {
+          joined['provider_mac'] = b64(List.filled(32, 7));
+        }
+        return joined ??
             {
               'result': 'rejected',
               'protocol_version': 1,

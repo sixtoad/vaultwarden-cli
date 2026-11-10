@@ -59,3 +59,15 @@ trust test, forge CI, or alter a production identity namespace to obtain a green
 
 The parent issue's remaining enrollment, installation, history and native-client
 requirements are tracked in [the capability checklist](../../docs/implementation/issue-50-capabilities.md).
+
+## Guided enrollment UI (#59 phase 2) follow-ups — 2026-11-10
+
+- Adopt the enrollment golden references for linux, windows and macos-26-arm64
+  from reviewed CI captures once the stacked PR targets `main`.
+- The `macos-26-intel` CI jobs remain in `ci.yml` although Intel Macs are
+  unsupported; they will lack enrollment references. Removing them is a CI
+  decision outside this PR.
+- Companion enrollments are still not audited in the identity registry (needs a
+  registry format bump); admin-companion approvals are recorded as the provider
+  owner's, with no companion actor.
+- Phone/QR joining is phase 3 (#60).

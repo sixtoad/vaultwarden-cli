@@ -64,6 +64,8 @@ pub enum JoinerEnd {
     Malformed,
     /// A confirmation's reply was lost and the provider forgot the session.
     OutcomeUnknown,
+    /// The configured provider or client certificate changed mid-session.
+    ProviderChanged,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -77,6 +79,8 @@ pub struct JoinerSnapshot {
     pub seconds_remaining: u64,
     pub provider_approved: bool,
     pub confirmed: bool,
+    /// A cancel or decline was sent but not acknowledged; it is resent.
+    pub withdrawing: bool,
     pub end: JoinerEnd,
     /// The last exchange failed transiently (offline, busy): retry is safe.
     pub retryable: bool,
@@ -174,11 +178,11 @@ pub struct AdminSessionView {
     pub joiner_fingerprint: String,
 }
 
-/// Returned once; dismissing wipes it from Rust.
+/// Metadata of the invitation just issued. Its secret code is read separately
+/// (`enrollment_admin_invitation_code`); dismissing wipes it from Rust.
 #[derive(Clone, Debug)]
 pub struct IssuedInvitationView {
     pub id: String,
-    pub invitation_code: String,
     pub role: EnrolleeRole,
     pub label: String,
     pub expires_in_seconds: u64,
@@ -194,6 +198,11 @@ pub struct EnrollmentAdminSnapshot {
     pub sessions: Vec<AdminSessionView>,
 }
 
+/// A poisoned session lock is recovered, never a panic across the bridge:
+/// every method leaves the session consistent between statements.
+fn lock<T>(m: &'static Mutex<T>) -> std::sync::MutexGuard<'static, T> {
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 fn joiner() -> &'static Mutex<JoinerSession> {
     static SESSION: OnceLock<Mutex<JoinerSession>> = OnceLock::new();
     SESSION.get_or_init(|| Mutex::new(JoinerSession::default()))
@@ -205,7 +214,7 @@ fn admin() -> &'static Mutex<AdminSession> {
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_joiner_snapshot() -> JoinerSnapshot {
-    joiner().lock().expect("enrollment core").snapshot()
+    lock(joiner()).snapshot()
 }
 /// Start a join with the typed invitation. The fingerprints come from the
 /// configured pinned transport (this client leaf, the provider leaf).
@@ -230,54 +239,59 @@ pub fn enrollment_join(
     result.map_err(String::from)
 }
 #[flutter_rust_bridge::frb(sync)]
-pub fn enrollment_joiner_begin(command: JoinerCommand) -> Result<ProviderWork, String> {
-    joiner()
-        .lock()
-        .map_err(|_| "Enrollment unavailable")?
-        .begin(command)
+pub fn enrollment_joiner_begin(
+    command: JoinerCommand,
+    device_fingerprint: String,
+    provider_pin: String,
+) -> Result<ProviderWork, String> {
+    lock(joiner())
+        .begin(command, &device_fingerprint, &provider_pin)
         .map_err(String::from)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_joiner_finish(token: u32, response: Vec<u8>) -> JoinerSnapshot {
-    let mut s = joiner().lock().expect("enrollment core");
+    let response = zeroize::Zeroizing::new(response);
+    let mut s = lock(joiner());
     s.finish(token, &response);
     s.snapshot()
 }
 /// Forget the session and wipe its secret (also after a final state).
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_joiner_reset() -> JoinerSnapshot {
-    let mut s = joiner().lock().expect("enrollment core");
+    let mut s = lock(joiner());
     s.reset();
     s.snapshot()
 }
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_admin_snapshot() -> EnrollmentAdminSnapshot {
-    admin().lock().expect("enrollment core").snapshot()
+    lock(admin()).snapshot()
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_admin_begin(request: EnrollmentAdminRequest) -> Result<ProviderWork, String> {
-    admin()
-        .lock()
-        .map_err(|_| "Enrollment unavailable")?
-        .begin(request)
-        .map_err(String::from)
+    lock(admin()).begin(request).map_err(String::from)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_admin_finish(token: u32, response: Vec<u8>) -> EnrollmentAdminSnapshot {
-    let mut s = admin().lock().expect("enrollment core");
+    let response = zeroize::Zeroizing::new(response);
+    let mut s = lock(admin());
     s.finish(token, &response);
     s.snapshot()
 }
+/// The shown invitation's code, read once by the UI (never in a snapshot).
+#[flutter_rust_bridge::frb(sync)]
+pub fn enrollment_admin_invitation_code() -> String {
+    lock(admin()).invitation_code()
+}
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_admin_dismiss_invitation() -> EnrollmentAdminSnapshot {
-    let mut s = admin().lock().expect("enrollment core");
+    let mut s = lock(admin());
     s.dismiss_invitation();
     s.snapshot()
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn enrollment_admin_invalidate() -> EnrollmentAdminSnapshot {
-    let mut s = admin().lock().expect("enrollment core");
+    let mut s = lock(admin());
     s.invalidate();
     s.snapshot()
 }

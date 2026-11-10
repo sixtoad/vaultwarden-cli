@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../src/rust/api/enrollment.dart' as enroll;
 import 'controller.dart';
@@ -9,20 +10,24 @@ enum EnrollmentMode { none, add, join }
 
 typedef _Work = ({int token, Uint8List body});
 
+/// Largest OS user/group ID an agent invitation accepts (`u32::MAX` and 0
+/// are refused by the provider).
+const maxAgentId = 4294967294;
+
 /// Guided enrollment journeys (#59 phase 2). Rust owns the protocol, the
 /// invitation secret and every reply's validation; this class only schedules
 /// exchanges through [ProviderController.exchange] and keeps UI state.
 ///
 /// The joining session survives navigation and app inactivity (its code may
 /// be on screen while the human talks to the provider owner); only Cancel,
-/// Start over, a provider change or closing the app forget it. The owner's
-/// shown invitation and session list are retired with every other authority.
+/// Start over, a provider change (detected in Rust) or closing the app end
+/// it. The owner's shown invitation and session list are retired with every
+/// other authority.
 class EnrollmentFlow extends ChangeNotifier {
   EnrollmentFlow(this.provider, {this.tick = const Duration(seconds: 1)})
     : joiner = enroll.enrollmentJoinerSnapshot(),
       admin = enroll.enrollmentAdminSnapshot() {
     provider.addListener(_providerChanged);
-    _identity = _currentIdentity();
     if (joiner.phase != enroll.JoinerPhase.idle) mode = EnrollmentMode.join;
   }
   final ProviderController provider;
@@ -32,10 +37,13 @@ class EnrollmentFlow extends ChangeNotifier {
   EnrollmentMode mode = EnrollmentMode.none;
   String message = '';
   String selected = '';
+
+  /// The shown invitation's code, read once from Rust per invitation.
+  String invitationCode = '';
+  bool _copied = false;
   Timer? _timer;
   int _ticks = 0;
   bool _disposed = false, _sending = false;
-  String _identity = '';
 
   bool get sending => _sending;
   bool get ready => provider.canEnroll && !_sending;
@@ -45,19 +53,12 @@ class EnrollmentFlow extends ChangeNotifier {
     enroll.JoinerPhase.waiting,
   ].contains(joiner.phase);
 
-  String _currentIdentity() => provider.configuration.configured
-      ? '${provider.configuration.endpoint}|${provider.configuration.pin}|${provider.configuration.fingerprint}'
-      : '';
-
   void _providerChanged() {
-    final identity = _currentIdentity();
-    if (identity != _identity && provider.configuration.configured) {
-      // Another provider or client certificate: the session is not for it.
-      if (_identity.isNotEmpty) joiner = enroll.enrollmentJoinerReset();
-      _identity = identity;
-    }
     admin = enroll.enrollmentAdminSnapshot();
-    if (admin.issued == null && admin.sessions.isEmpty) selected = '';
+    // Retired with every other authority (navigation, sleep, provider
+    // change): forget the shown invitation, here and on the clipboard.
+    if (admin.issued == null && invitationCode.isNotEmpty) _forgetInvitation();
+    if (admin.sessions.isEmpty) selected = '';
     _publish();
   }
 
@@ -74,9 +75,7 @@ class EnrollmentFlow extends ChangeNotifier {
   }
 
   void close() {
-    if (mode == EnrollmentMode.add) {
-      admin = enroll.enrollmentAdminDismissInvitation();
-    }
+    if (mode == EnrollmentMode.add) dismissInvitation();
     mode = joinerLive ? EnrollmentMode.join : EnrollmentMode.none;
     if (mode == EnrollmentMode.none) _timer?.cancel();
     selected = '';
@@ -98,11 +97,12 @@ class EnrollmentFlow extends ChangeNotifier {
     if (_ticks % 3 == 0) await poll();
   }
 
-  /// One background exchange: re-send the confirmation until a final state,
-  /// or watch for the owner's cancel, expiry or a mismatch typed at the
-  /// provider; on the owner side, refresh live sessions.
+  /// One background exchange: re-send the confirmation (or an
+  /// unacknowledged cancel) until a final state, or watch for the owner's
+  /// cancel, expiry or a mismatch typed at the provider; on the owner side,
+  /// learn this client's authority again and refresh live sessions.
   Future<void> poll() async {
-    if (_disposed || _sending) return;
+    if (_disposed || _sending || !provider.canEnroll) return;
     if (mode == EnrollmentMode.join) {
       if (joiner.phase == enroll.JoinerPhase.waiting) {
         await _joinerSend(enroll.JoinerCommand.confirm, quiet: true);
@@ -110,8 +110,9 @@ class EnrollmentFlow extends ChangeNotifier {
         await _joinerSend(enroll.JoinerCommand.status, quiet: true);
       }
     } else if (mode == EnrollmentMode.add &&
-        admin.state == enroll.AdminState.ready &&
-        admin.sessions.any(_live)) {
+        (admin.state == enroll.AdminState.unknown ||
+            (admin.state == enroll.AdminState.ready &&
+                admin.sessions.any(_live)))) {
       await list(quiet: true);
     }
   }
@@ -120,20 +121,35 @@ class EnrollmentFlow extends ChangeNotifier {
       s.state == enroll.AdminSessionState.awaitingJoin ||
       s.state == enroll.AdminSessionState.awaitingApprovals;
 
-  Future<Uint8List?> _send(Uint8List body) async {
+  /// False (with a message) when another provider exchange is running.
+  bool _admit(bool quiet) {
+    if (ready) return true;
+    if (!quiet) {
+      message = 'The provider is busy or not connected. Try again.';
+      _publish();
+    }
+    return false;
+  }
+
+  Future<Uint8List> _send(Uint8List body) async {
     _sending = true;
     _publish();
     try {
-      return await provider.exchange(body);
+      final response = await provider.exchange(body);
+      if (response == null) {
+        message = 'The provider is busy or not connected. Try again.';
+      }
+      return response ?? Uint8List(0);
     } finally {
       _sending = false;
+      _publish();
     }
   }
 
   // Joining endpoint ---------------------------------------------------------
 
   Future<void> join(String invitation) async {
-    if (!ready) return;
+    if (!_admit(false)) return;
     message = '';
     final _Work work;
     try {
@@ -174,16 +190,22 @@ class EnrollmentFlow extends ChangeNotifier {
     enroll.JoinerCommand command, {
     bool quiet = false,
   }) async {
-    if (!ready) return;
+    if (!_admit(quiet)) return;
     final _Work work;
     try {
-      final w = enroll.enrollmentJoinerBegin(command: command);
+      final w = enroll.enrollmentJoinerBegin(
+        command: command,
+        deviceFingerprint: provider.configuration.fingerprint,
+        providerPin: provider.configuration.pin,
+      );
       work = (token: w.token, body: w.body);
     } catch (error) {
+      joiner = enroll.enrollmentJoinerSnapshot();
       if (!quiet) message = _plain(error);
       _publish();
       return;
     }
+    if (!quiet) message = '';
     await _finishJoiner(work);
   }
 
@@ -192,9 +214,9 @@ class EnrollmentFlow extends ChangeNotifier {
     final response = await _send(work.body);
     joiner = enroll.enrollmentJoinerFinish(
       token: work.token,
-      response: response ?? Uint8List(0),
+      response: response,
     );
-    if (response == null) message = 'The provider is busy. Try again.';
+    response.fillRange(0, response.length, 0);
     if (mode == EnrollmentMode.none && joinerLive) mode = EnrollmentMode.join;
     _schedule();
     _publish();
@@ -202,38 +224,97 @@ class EnrollmentFlow extends ChangeNotifier {
 
   // Provider owner -------------------------------------------------------------
 
-  Future<void> list({bool quiet = false}) =>
-      _admin(enroll.AdminCommand.list, quiet: quiet);
+  Future<void> list({bool quiet = false}) async {
+    await _admin(enroll.AdminCommand.list, quiet: quiet);
+  }
 
   Future<void> invite({
     required enroll.EnrolleeRole role,
     required String label,
-    int uid = 0,
-    int gid = 0,
+    int? uid,
+    int? gid,
   }) async {
+    final agent = role == enroll.EnrolleeRole.agent;
+    bool valid(int? id) => id != null && id >= 1 && id <= maxAgentId;
+    if (agent && (!valid(uid) || !valid(gid))) {
+      message =
+          'Enter the agent account\'s numeric user and group IDs (1 to $maxAgentId).';
+      _publish();
+      return;
+    }
     await _admin(
       enroll.AdminCommand.invite,
       role: role,
       label: label,
-      uid: uid,
-      gid: gid,
+      uid: agent ? uid! : 0,
+      gid: agent ? gid! : 0,
     );
-    if (admin.outcome == enroll.AdminOutcome.invited) await list(quiet: true);
+    if (admin.outcome == enroll.AdminOutcome.invited) {
+      _forgetInvitation();
+      invitationCode = enroll.enrollmentAdminInvitationCode();
+      await list(quiet: true);
+    }
   }
 
-  Future<void> approve(String id, String code, String password) => _admin(
-    enroll.AdminCommand.approve,
-    id: id,
-    code: code,
-    password: password,
-  );
+  /// True when the approval reached the provider (whatever it answered);
+  /// false when nothing was sent, so the typed code can be kept.
+  Future<bool> approve(String id, String code, String password) async {
+    final sent = await _admin(
+      enroll.AdminCommand.approve,
+      id: id,
+      code: code,
+      password: password,
+    );
+    if (!sent) return false;
+    switch (admin.outcome) {
+      // Retry with the same selection after a throttle or a wrong password.
+      case enroll.AdminOutcome.authenticationFailed:
+      case enroll.AdminOutcome.rateLimited:
+        break;
+      case enroll.AdminOutcome.unavailable:
+        // The outcome is unknown: read it back.
+        selected = '';
+        await list(quiet: true);
+      default:
+        selected = '';
+    }
+    _publish();
+    return true;
+  }
 
-  Future<void> cancelInvitation(String id) =>
-      _admin(enroll.AdminCommand.cancel, id: id);
+  Future<void> cancelInvitation(String id) async {
+    await _admin(enroll.AdminCommand.cancel, id: id);
+    if (admin.outcome == enroll.AdminOutcome.unavailable) {
+      await list(quiet: true);
+    }
+  }
+
+  /// The invitation was copied: it must leave the clipboard with it.
+  void copiedInvitation() => _copied = true;
 
   void dismissInvitation() {
     admin = enroll.enrollmentAdminDismissInvitation();
+    _forgetInvitation();
     _publish();
+  }
+
+  void _forgetInvitation() {
+    final code = invitationCode;
+    invitationCode = '';
+    if (!_copied || code.isEmpty) return;
+    _copied = false;
+    unawaited(_clearClipboard(code));
+  }
+
+  static Future<void> _clearClipboard(String code) async {
+    try {
+      final current = await Clipboard.getData(Clipboard.kTextPlain);
+      if (current?.text == code) {
+        await Clipboard.setData(const ClipboardData(text: ''));
+      }
+    } catch (_) {
+      // No clipboard on this platform: nothing was placed there either.
+    }
   }
 
   void select(String id) {
@@ -242,7 +323,7 @@ class EnrollmentFlow extends ChangeNotifier {
     _publish();
   }
 
-  Future<void> _admin(
+  Future<bool> _admin(
     enroll.AdminCommand command, {
     enroll.EnrolleeRole role = enroll.EnrolleeRole.companion,
     String label = '',
@@ -253,7 +334,7 @@ class EnrollmentFlow extends ChangeNotifier {
     String password = '',
     bool quiet = false,
   }) async {
-    if (!ready) return;
+    if (!_admit(quiet)) return false;
     if (!quiet) message = '';
     final _Work work;
     try {
@@ -273,20 +354,15 @@ class EnrollmentFlow extends ChangeNotifier {
     } catch (error) {
       message = _plain(error);
       _publish();
-      return;
+      return false;
     }
     admin = enroll.enrollmentAdminSnapshot();
     _publish();
     final response = await _send(work.body);
-    admin = enroll.enrollmentAdminFinish(
-      token: work.token,
-      response: response ?? Uint8List(0),
-    );
-    if (command == enroll.AdminCommand.approve &&
-        admin.outcome != enroll.AdminOutcome.authenticationFailed) {
-      selected = '';
-    }
+    admin = enroll.enrollmentAdminFinish(token: work.token, response: response);
+    response.fillRange(0, response.length, 0);
     _publish();
+    return true;
   }
 
   static String _plain(Object error) {
@@ -300,6 +376,7 @@ class EnrollmentFlow extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    _forgetInvitation();
     provider.removeListener(_providerChanged);
     super.dispose();
   }
