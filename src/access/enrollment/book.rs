@@ -200,8 +200,9 @@ impl Book {
             return Err(HumanEnrollmentError::Unavailable);
         }
         let id_text = b64(&id);
-        // The only plain copy of the secret is the returned code itself,
-        // which `IssuedInvitation` wipes on drop.
+        // The code is built in one allocation of its final size, and
+        // `IssuedInvitation` wipes it on drop. Copies made later, when it is
+        // serialized for the owner, are outside this type's control.
         let secret_text = Zeroizing::new(b64(&*secret));
         let mut code = String::with_capacity(INVITATION_PREFIX.len() + id_text.len() + 45);
         code.push_str(INVITATION_PREFIX);
@@ -302,21 +303,21 @@ impl Book {
         }
     }
 
-    /// Kernel admission for an unpaired agent: only the OS identity a live
-    /// invitation names may reach the enrollment messages. After a final
-    /// state only an enrollment that committed keeps admitting it (while
-    /// retained), because only there does a lost final reply matter: the
-    /// joiner must learn that its key is now bound. A cancelled, expired,
-    /// aborted or failed session admits nobody; the joiner then reads the
-    /// pre-parse refusal as `invalid_invitation`. Every message still needs
-    /// the MAC.
+    /// Kernel admission for an unpaired agent: only the OS identity an
+    /// invitation names may reach the enrollment messages, while the session
+    /// is live or, once final, while it is retained and was joined. A joined
+    /// session's end is the joiner's to learn whatever it is: `enrolled` (a
+    /// lost final reply), but also `code_mismatch` or `duplicate_join` (a
+    /// relay or a leaked secret), `cancelled` or `expired`. A final session
+    /// nobody joined has nothing to tell and admits nobody. Admission is no
+    /// authority: every message still needs the MAC.
     pub fn peer_eligible(&mut self, peer: &Peer, now: Duration) -> bool {
         self.tick(now);
         matches!(peer, Peer::Agent { .. })
-            && self.sessions.iter().any(|s| {
-                (s.live() || matches!(s.state(), EnrollmentState::Enrolled { .. }))
-                    && peer.matches(&s.kind)
-            })
+            && self
+                .sessions
+                .iter()
+                .any(|s| (s.live() || s.joined().is_some()) && peer.matches(&s.kind))
     }
 
     /// One joiner message. `provider_identity` is empty on the agent socket

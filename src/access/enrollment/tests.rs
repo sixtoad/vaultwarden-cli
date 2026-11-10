@@ -248,16 +248,27 @@ fn the_provider_never_displays_the_comparison_code() {
     assert!(!leaks(&book.list(now(4))), "provider approved");
 }
 
-/// Agent-socket admission after a final state: only a committed enrollment
-/// keeps admitting its joiner (a lost final reply matters there), and only
-/// while retained.
+/// Agent-socket admission after a final state: a joined session keeps
+/// admitting its joiner while retained, whatever its end, so the joiner
+/// learns that end (a lost final reply, a relay, a leaked secret). A final
+/// session nobody joined admits nobody.
 #[test]
-fn only_an_enrolled_session_keeps_admitting_its_joiner() {
+fn a_joined_session_keeps_admitting_its_joiner_while_retained() {
     let (mut book, mut hooks) = (Book::default(), Hooks::default());
-    let cancelled = invite(&mut book, agent_kind(), 2);
-    agent_join(&mut book, &cancelled, &mut hooks);
-    book.cancel(&cancelled.id, now(1)).unwrap();
+    let unjoined = invite(&mut book, agent_kind(), 3);
+    book.cancel(&unjoined.id, now(1)).unwrap();
     assert!(!book.peer_eligible(&agent_peer(), now(1)));
+    let cancelled = invite(&mut book, agent_kind(), 2);
+    let joined = agent_join(&mut book, &cancelled, &mut hooks);
+    book.cancel(&cancelled.id, now(1)).unwrap();
+    assert!(book.peer_eligible(&agent_peer(), now(1)));
+    let reply = send(&mut book, &agent_peer(), &joined.status(), 1, &mut hooks);
+    assert_eq!(
+        state_of(&reply),
+        EnrollmentState::Cancelled {
+            by: Party::Provider
+        }
+    );
     let issued = invite(&mut book, agent_kind(), 1);
     let joined = agent_join(&mut book, &issued, &mut hooks);
     book.approve(&issued.id, &joined.comparison_code, OWNER, now(2))
@@ -272,6 +283,62 @@ fn only_an_enrolled_session_keeps_admitting_its_joiner() {
     assert!(book.peer_eligible(&agent_peer(), now(4)));
     let forgotten = 3 + FINAL_RETENTION.as_secs();
     assert!(!book.peer_eligible(&agent_peer(), now(forgotten)));
+}
+
+/// A wrong code typed at the provider (e.g. a relay between the endpoints)
+/// is the joiner's MITM signal: it must reach the joiner, not be hidden
+/// behind a pre-parse refusal.
+#[test]
+fn a_code_mismatch_reaches_the_admitted_joiner() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(&mut book, agent_kind(), 1);
+    let joined = agent_join(&mut book, &issued, &mut hooks);
+    let wrong = if joined.comparison_code == "0000-0000" {
+        "0000-0001"
+    } else {
+        "0000-0000"
+    };
+    assert_eq!(
+        book.approve(&issued.id, wrong, OWNER, now(2)),
+        Err(HumanEnrollmentError::CodeMismatch)
+    );
+    assert!(book.peer_eligible(&agent_peer(), now(3)));
+    let reply = send(
+        &mut book,
+        &agent_peer(),
+        &joined.confirm(Some(&key(3))),
+        3,
+        &mut hooks,
+    );
+    assert_eq!(
+        state_of(&reply),
+        EnrollmentState::Aborted {
+            reason: AbortReason::CodeMismatch
+        }
+    );
+}
+
+/// A second join (the secret leaked) is the legitimate joiner's signal too.
+#[test]
+fn a_duplicate_join_reaches_the_admitted_joiner() {
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(&mut book, agent_kind(), 1);
+    let joined = agent_join(&mut book, &issued, &mut hooks);
+    let intruder = JoinAttempt::agent(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        &key(4),
+        [6; 32],
+    );
+    let refused = send(&mut book, &agent_peer(), intruder.request(), 2, &mut hooks);
+    assert_eq!(rejection(&refused), EnrollmentRejection::AlreadyUsed);
+    assert!(book.peer_eligible(&agent_peer(), now(3)));
+    let reply = send(&mut book, &agent_peer(), &joined.status(), 3, &mut hooks);
+    assert_eq!(
+        state_of(&reply),
+        EnrollmentState::Aborted {
+            reason: AbortReason::DuplicateJoin
+        }
+    );
 }
 
 #[test]
@@ -528,9 +595,9 @@ fn invitations_expire_and_expired_sessions_are_forgotten_later() {
         book.approve(&issued.id, &joined.comparison_code, OWNER, now(late)),
         Err(HumanEnrollmentError::Expired)
     );
-    // Nothing can be enrolled any more: the agent socket admits nobody for
-    // it (only a committed enrollment keeps admitting its joiner).
-    assert!(!book.peer_eligible(&agent_peer(), now(late)));
+    // The joined session still admits its joiner while retained, so it
+    // learns `expired` rather than an unexplained refusal.
+    assert!(book.peer_eligible(&agent_peer(), now(late)));
     let forgotten = late + FINAL_RETENTION.as_secs();
     assert!(book.list(now(forgotten)).is_empty());
     let reply = send(
