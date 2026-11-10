@@ -177,10 +177,9 @@ async fn a_code_mismatch_or_a_duplicate_join_reaches_the_agent_joiner() {
     let owner = f.app.human_owner();
     let key = SigningKey::from_bytes(&[76; 32]);
     let issued = invite(&f, "mismatch", UID);
-    let attempt = attempt(&issued, &key);
-    let session = attempt
-        .accept(&joiner_sees(&serve(&f, UID, attempt.request()).await))
-        .unwrap();
+    let join = attempt(&issued, &key);
+    let reply = joiner_sees(&serve(&f, UID, join.request()).await);
+    let session = join.accept(&reply).unwrap();
     let wrong = if session.comparison_code == "0000-0000" {
         "0000-0001"
     } else {
@@ -198,10 +197,9 @@ async fn a_code_mismatch_or_a_duplicate_join_reaches_the_agent_joiner() {
     ));
 
     let issued = invite(&f, "duplicate", OTHER_UID);
-    let attempt = attempt(&issued, &key);
-    let session = attempt
-        .accept(&joiner_sees(&serve(&f, OTHER_UID, attempt.request()).await))
-        .unwrap();
+    let join = attempt(&issued, &key);
+    let reply = joiner_sees(&serve(&f, OTHER_UID, join.request()).await);
+    let session = join.accept(&reply).unwrap();
     let intruder = JoinAttempt::agent(
         InvitationCode::parse(&issued.invitation_code).unwrap(),
         &SigningKey::from_bytes(&[77; 32]),
@@ -230,10 +228,9 @@ fn a_paired_agent_resending_its_confirmation_under_contention_hears_busy() {
     let f = fixture();
     let key = SigningKey::from_bytes(&[78; 32]);
     let issued = invite(&f, "paired busy", UID);
-    let attempt = attempt(&issued, &key);
-    let session = attempt
-        .accept(&joiner_sees(&serve_blocking(&f, UID, attempt.request())))
-        .unwrap();
+    let join = attempt(&issued, &key);
+    let reply = joiner_sees(&serve_blocking(&f, UID, join.request()));
+    let session = join.accept(&reply).unwrap();
     f.app
         .enrollment_approve(f.app.human_owner(), &issued.id, &session.comparison_code)
         .unwrap();
@@ -262,10 +259,10 @@ async fn a_poisoned_session_lock_is_unavailable_to_the_joiner() {
     let f = fixture();
     let key = SigningKey::from_bytes(&[79; 32]);
     let issued = invite(&f, "poisoned", UID);
-    let attempt = attempt(&issued, &key);
+    let join = attempt(&issued, &key);
     f.app.enrollment_poison_for_test();
     assert_eq!(
-        joiner_sees(&serve(&f, UID, attempt.request()).await),
+        joiner_sees(&serve(&f, UID, join.request()).await),
         EnrollmentReply::rejected(EnrollmentRejection::Unavailable)
     );
 }
