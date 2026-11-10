@@ -536,3 +536,32 @@ fn owner_replies_must_match_the_request() {
     );
     assert_eq!(s.snapshot().outcome, AdminOutcome::Invalid);
 }
+
+#[test]
+fn a_confirmation_in_doubt_is_never_reported_as_nothing_enrolled() {
+    // Confirm reply lost, then a cancel; the provider forgot the session.
+    let mut s = joined_session();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
+    s.finish(work.token, &[]);
+    let work = s.begin(JoinerCommand::Cancel, DEVICE, PIN).unwrap();
+    s.finish(work.token, &rejected("invalid_invitation"));
+    assert_eq!(s.snapshot().end, JoinerEnd::OutcomeUnknown);
+    // "Enrolled" for a human who never confirmed is not believed.
+    let mut s = joined_session();
+    let work = s.begin(JoinerCommand::Status, DEVICE, PIN).unwrap();
+    s.finish(
+        work.token,
+        &state(json!({"state":"enrolled","identity":{"role":"companion","fingerprint":DEVICE}})),
+    );
+    assert_eq!(s.snapshot().end, JoinerEnd::Malformed);
+    // A provider change after confirming keeps `confirmed` for the message.
+    let mut s = joined_session();
+    let work = s.begin(JoinerCommand::Confirm, DEVICE, PIN).unwrap();
+    s.finish(work.token, &[]);
+    assert!(s
+        .begin(JoinerCommand::Status, DEVICE, &"c".repeat(64))
+        .is_err());
+    let snap = s.snapshot();
+    assert_eq!(snap.end, JoinerEnd::ProviderChanged);
+    assert!(snap.confirmed);
+}

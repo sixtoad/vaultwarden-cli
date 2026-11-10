@@ -105,6 +105,15 @@ class _Details extends StatelessWidget {
   );
 }
 
+/// After this human confirmed, an end that is not a provider verdict cannot
+/// promise that nothing was enrolled: the owner may still approve.
+String joinerOutcomeText(enroll.JoinerSnapshot s) =>
+    s.confirmed &&
+        (s.end == enroll.JoinerEnd.providerChanged ||
+            s.end == enroll.JoinerEnd.malformed)
+    ? 'This enrollment ended after you confirmed, without a final answer from the provider. If the provider owner approves, this device may still be enrolled: ask them to cancel the invitation, and check Devices & agents.'
+    : joinerEndText(s.end);
+
 String joinerEndText(enroll.JoinerEnd end) => switch (end) {
   enroll.JoinerEnd.none => '',
   enroll.JoinerEnd.declined => 'You reported that the codes differ. Nothing was enrolled. Ask the provider owner for a new invitation.',
@@ -339,7 +348,7 @@ class _EnrollmentJoinPanelState extends State<EnrollmentJoinPanel> {
             ),
           ] else ...[
             StatusLabel(
-              joinerEndText(s.end),
+              joinerOutcomeText(s),
               key: const Key('joiner-end'),
               icon: Icons.error_outline,
             ),

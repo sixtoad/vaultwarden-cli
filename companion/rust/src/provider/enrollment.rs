@@ -345,6 +345,11 @@ impl JoinerSession {
                 (Sent::Join, Some(live.join_request.clone()))
             }
             JoinerCommand::Status if joined => (Sent::Status, live.control("status", None)),
+            // Past the local deadline a confirmation is never sent; the
+            // background resend asks for the final state instead.
+            JoinerCommand::Confirm if joined && expired && self.phase == JoinerPhase::Waiting => {
+                (Sent::Status, live.control("status", None))
+            }
             JoinerCommand::Confirm if joined && expired => {
                 return Err("The invitation expired.");
             }
@@ -365,7 +370,10 @@ impl JoinerSession {
                 self.confirmed = true;
                 self.phase = JoinerPhase::Waiting;
             }
-            Sent::Decline | Sent::Cancel => self.withdrawing = Some(sent),
+            // The first withdrawal is the one resent and reported.
+            Sent::Decline | Sent::Cancel => {
+                self.withdrawing.get_or_insert(sent);
+            }
             Sent::Join | Sent::Status => {}
         }
         Ok(self.work(sent, body))
@@ -454,16 +462,18 @@ impl JoinerSession {
                     "identity_refused" => self.end(JoinerEnd::IdentityRefused),
                     // After a lost confirmation, a forgotten session may
                     // have committed first: the outcome is not known.
-                    // A forgotten session after an unacknowledged withdrawal:
-                    // nothing was enrolled through this device's consent.
+                    // A lost confirmation may have committed before the
+                    // session was forgotten: that outranks a later withdrawal.
+                    "invalid_invitation" if self.confirm_lost => {
+                        self.end(JoinerEnd::OutcomeUnknown)
+                    }
+                    // A forgotten session after an unacknowledged withdrawal,
+                    // with no confirmation in doubt: nothing was enrolled.
                     "invalid_invitation" if self.withdrawing == Some(Sent::Decline) => {
                         self.end(JoinerEnd::Declined)
                     }
                     "invalid_invitation" if self.withdrawing.is_some() => {
                         self.end(JoinerEnd::Cancelled)
-                    }
-                    "invalid_invitation" if self.confirm_lost => {
-                        self.end(JoinerEnd::OutcomeUnknown)
                     }
                     "invalid_invitation" => self.end(JoinerEnd::InvalidInvitation),
                     _ => self.end(JoinerEnd::Malformed),
@@ -543,6 +553,8 @@ impl JoinerSession {
                 }
                 self.provider_approved = provider_approved;
             }
+            // Enrolled needs this human's confirmation first.
+            State::Enrolled { .. } if !self.confirmed => self.end(JoinerEnd::Malformed),
             State::Enrolled {
                 identity: Identity::Companion { fingerprint },
             } if valid_hex(&fingerprint) => {
