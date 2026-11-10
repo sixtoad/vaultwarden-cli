@@ -17,8 +17,9 @@ use std::{
     path::Path,
     process::{Command, Stdio},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc,
     },
     time::Duration,
 };
@@ -64,10 +65,19 @@ impl SecretBackend for Backend {
         panic!("submission must not resolve secrets")
     }
 }
-struct Launcher(AtomicUsize);
+type GateHold = (mpsc::Sender<()>, mpsc::Receiver<()>);
+/// `launch` runs under the provider's authority gate, so an armed hold makes
+/// the next launch a deterministic competing gate holder until released.
+struct Launcher(AtomicUsize, Mutex<Option<GateHold>>);
 impl DirectReviewLauncher for Launcher {
     fn launch(&self, _: &str) -> Result<(), DirectRequestError> {
         self.0.fetch_add(1, Ordering::SeqCst);
+        let hold = self.1.lock().unwrap().take();
+        if let Some((entered, release)) = hold {
+            entered.send(()).unwrap();
+            // Bounded: a failed assertion must not leave the gate held forever.
+            let _released = release.recv_timeout(Duration::from_secs(10));
+        }
         Ok(())
     }
 }
@@ -289,7 +299,7 @@ fn real_linux_peer_matrix_and_noninteractive_cli() {
     let socket = AgentSocket::bind(&socket_dir, 7).unwrap();
     let path = socket_dir.join("agent.sock");
     let stop = Arc::new(AtomicBool::new(false));
-    let launcher = Arc::new(Launcher(AtomicUsize::new(0)));
+    let launcher = Arc::new(Launcher(AtomicUsize::new(0), Mutex::default()));
     let human = HumanSocket::bind(&root).unwrap();
     let human_worker = {
         let (app, launcher, stop) = (app.clone(), launcher.clone(), stop.clone());
@@ -830,6 +840,27 @@ assert json.loads(data)['category']=='malformed'
     // whitespace prefix. Pipe synchronization withholds the signed query until
     // revocation completes; no competing waiter holds the authority gate.
     use std::io::{BufRead, Read, Write};
+    // A competing authority holder, made deterministic: the armed launch of
+    // this submission blocks under the gate, as a status query abandoned by a
+    // timed-out `--wait` client keeps running under it after the client exits.
+    let (entered_sender, entered) = mpsc::channel();
+    let (release, release_receiver) = mpsc::channel();
+    *launcher.1.lock().unwrap() = Some((entered_sender, release_receiver));
+    let holder = {
+        let line = format!(
+            "{}\n",
+            serde_json::to_string(&signed(
+                48,
+                &key,
+                revision.clone(),
+                vec!["staging".into(), "3".into()]
+            ))
+            .unwrap()
+        );
+        let path = path.clone();
+        std::thread::spawn(move || peer(&path, 8, 9, vec![7], &line, false))
+    };
+    entered.recv_timeout(Duration::from_secs(10)).unwrap();
     let mut held = Command::new("python3");
     held.args([
         "-c",
@@ -842,7 +873,7 @@ while struct.unpack('i',fcntl.ioctl(s,0x5411,struct.pack('i',0)))[0]:
 s.setblocking(False)
 try: s.recv(1,socket.MSG_PEEK)
 except BlockingIOError: pass
-else: raise AssertionError('preflight rejected before query')
+else: raise AssertionError('preflight rejected before query: %r'%s.recv(4096))
 s.settimeout(8)
 print('admitted',flush=True)
 assert sys.stdin.readline()=='go\n'
@@ -869,7 +900,18 @@ sys.stdout.buffer.write(data)
         held_stdout.read_line(&mut ready).unwrap();
         (held_stdout, ready)
     });
-    assert_eq!(ready, "admitted\n");
+    if ready != "admitted\n" {
+        release.send(()).unwrap();
+        panic!(
+            "held peer not admitted: stdout={ready:?} stderr={}",
+            String::from_utf8_lossy(&held.wait_with_output().stderr)
+        );
+    }
+    release.send(()).unwrap();
+    assert!(matches!(
+        bounded_process::join(holder),
+        AgentResponse::Pending { .. }
+    ));
     let revoked = exchange(
         &root,
         HumanCommand::AgentRevoke {
@@ -967,8 +1009,8 @@ sys.stdout.buffer.write(data)
         rejected
     );
     assert_eq!(snapshot(), before);
-    assert_eq!(count(&root), 5);
-    assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+    assert_eq!(count(&root), 6);
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
     assert_eq!(resolutions.load(Ordering::SeqCst), 0);
     let ssh_revision = app
         .activate_operation(ssh_policy::draft("test-image"))
@@ -1009,8 +1051,8 @@ sys.stdout.buffer.write(data)
         assert!(
             matches!(peer(&path,8,9,vec![7],&format!("{}\n", serde_json::to_string(&input).unwrap()),false),AgentResponse::Rejected{category,..} if category==expected)
         );
-        assert_eq!(count(&root), 5);
-        assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+        assert_eq!(count(&root), 6);
+        assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
     }
     let input = SignedSubmission::sign(
         ssh_agent.id,
@@ -1032,8 +1074,8 @@ sys.stdout.buffer.write(data)
         ),
         AgentResponse::Pending { .. }
     ));
-    assert_eq!(count(&root), 6);
-    assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
+    assert_eq!(count(&root), 7);
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 7);
     assert_eq!(resolutions.load(Ordering::SeqCst), 0);
     stop.store(true, Ordering::Release);
     runtime.block_on(worker).unwrap().unwrap();

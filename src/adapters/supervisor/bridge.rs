@@ -1053,6 +1053,60 @@ mod tests {
         );
         unsafe { (OwnedFd::from_raw_fd(fds[0]), OwnedFd::from_raw_fd(fds[1])) }
     }
+    /// Models a fork-without-exec by another test thread at this instant: the
+    /// child keeps exactly `keep` (closing everything else it inherited) until
+    /// dropped. CLOEXEC cannot help, because such a child never executes.
+    struct Bystander {
+        pid: libc::pid_t,
+        release: OwnedFd,
+    }
+    impl Bystander {
+        fn fork(keep: &[RawFd]) -> Self {
+            let mut gate = [-1; 2];
+            assert_eq!(
+                unsafe { libc::pipe2(gate.as_mut_ptr(), libc::O_CLOEXEC) },
+                0
+            );
+            let (wait, release) =
+                unsafe { (OwnedFd::from_raw_fd(gate[0]), OwnedFd::from_raw_fd(gate[1])) };
+            // Allocate before fork: the child of a multithreaded parent only
+            // makes async-signal-safe system calls.
+            let mut kept = keep.to_vec();
+            kept.push(wait.as_raw_fd());
+            kept.sort_unstable();
+            kept.dedup();
+            let pid = unsafe { libc::fork() };
+            assert!(pid >= 0);
+            if pid == 0 {
+                unsafe {
+                    libc::alarm(10);
+                    let mut low: libc::c_uint = 3;
+                    for fd in &kept {
+                        let fd = *fd as libc::c_uint;
+                        if fd > low {
+                            libc::syscall(libc::SYS_close_range, low, fd - 1, 0);
+                        }
+                        low = fd + 1;
+                    }
+                    libc::syscall(libc::SYS_close_range, low, libc::c_uint::MAX, 0);
+                    let mut byte = 0u8;
+                    libc::read(wait.as_raw_fd(), (&mut byte as *mut u8).cast(), 1);
+                    libc::_exit(0);
+                }
+            }
+            drop(wait);
+            Self { pid, release }
+        }
+    }
+    impl Drop for Bystander {
+        fn drop(&mut self) {
+            let mut status = 0;
+            unsafe {
+                libc::write(self.release.as_raw_fd(), [0u8].as_ptr().cast(), 1);
+                libc::waitpid(self.pid, &mut status, 0);
+            }
+        }
+    }
     fn sealed() -> OwnedFd {
         let fd = unsafe {
             libc::memfd_create(
@@ -1604,6 +1658,9 @@ mod tests {
                     libc::_exit(pre_exec_signal_case(sender.as_raw_fd(), signal));
                 }
             }
+            // Reproduction: another test thread's fork lands here and keeps the
+            // descriptors it inherited, as other tests' fork-only runners do.
+            let bystander = Bystander::fork(&[sender.as_raw_fd(), receiver.as_raw_fd()]);
             drop(sender);
             let mut bridge = Bridge {
                 socket: receiver,
@@ -1637,6 +1694,7 @@ mod tests {
                 0,
                 "the closed helper sent exactly Failed and Reaped"
             );
+            drop(bystander);
         }
     }
     unsafe fn pre_exec_signal_case(socket: RawFd, signal: i32) -> i32 {
