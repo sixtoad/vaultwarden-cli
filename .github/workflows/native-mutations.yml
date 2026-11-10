@@ -79,3 +79,18 @@ jobs:
             ${{ runner.temp }}/native-mutations/mutants.out/*.txt
             ${{ runner.temp }}/native-mutations/mutants.out/outcomes.json
             ${{ runner.temp }}/native-mutations/mutants.out/log
+
+  semantic:
+    name: semantic native faults
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Apply each fault to a private copy and require its named test to fail
+        run: python3 scripts/mutate-native-adapter.py "$RUNNER_TEMP/native-semantic"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-mutations-semantic
+          path: ${{ runner.temp }}/native-semantic
