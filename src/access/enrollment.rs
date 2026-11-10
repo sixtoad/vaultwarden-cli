@@ -293,6 +293,9 @@ pub enum EnrollmentAdmission {
     Refused,
     /// The sessions are momentarily locked; the joiner retries.
     Busy,
+    /// The sessions cannot be read (a poisoned lock): a provider fault,
+    /// answered `unavailable` like every other enrollment action then.
+    Unavailable,
 }
 
 /// The joining human's reason when declining.

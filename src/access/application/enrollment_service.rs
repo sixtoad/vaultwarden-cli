@@ -120,7 +120,8 @@ impl ProviderApplication {
         let mut book = match self.enrollment.try_lock() {
             Ok(book) => book,
             Err(std::sync::TryLockError::WouldBlock) => return EnrollmentAdmission::Busy,
-            Err(std::sync::TryLockError::Poisoned(_)) => return EnrollmentAdmission::Refused,
+            // As `enrollment_book`: a poisoned lock is a fault, not a verdict.
+            Err(std::sync::TryLockError::Poisoned(_)) => return EnrollmentAdmission::Unavailable,
         };
         if book.peer_eligible(
             &Peer::Agent {

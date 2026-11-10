@@ -448,19 +448,26 @@ async fn serve_one(
         } else {
             EnrollmentAdmission::Refused
         };
-        // Contention on the sessions is busy, never "not invited": still
-        // refused before parsing, but retryable for the joiner.
+        // Contention on the sessions is busy and a poisoned lock is
+        // unavailable, never "not invited": still refused before parsing,
+        // but in the joiner's retry vocabulary.
         let binding = match (binding, admission) {
             (Err(AgentRejection::Unauthorized), EnrollmentAdmission::Busy) => {
                 Err(AgentRejection::Busy)
             }
+            (Err(AgentRejection::Unauthorized), EnrollmentAdmission::Unavailable) => {
+                Err(AgentRejection::Unavailable)
+            }
             (binding, _) => binding,
         };
-        (binding, admission == EnrollmentAdmission::Admitted)
+        (binding, admission)
     })
     .await;
     let response: Result<Vec<u8>, AgentTransportError> = match eligibility {
-        Ok((binding, enrollment)) if binding.is_ok() || enrollment => {
+        Ok((binding, admission))
+            if binding.is_ok() || admission == EnrollmentAdmission::Admitted =>
+        {
+            let enrollment = admission == EnrollmentAdmission::Admitted;
             match read_frame(&mut stream, MAX_REQUEST_FRAME_BYTES, deadline).await {
                 Ok(bytes) => {
                     let agent = binding.and_then(|()| AgentEnvelope::parse(&bytes));
@@ -489,8 +496,21 @@ async fn serve_one(
                             }
                             Err(_) => encode_response(&AgentResponse::rejected(category)),
                         },
+                        // A paired agent's enrollment message (a confirmation
+                        // resent after a lost final reply) while the sessions
+                        // could not be checked: answered in the enrollment
+                        // vocabulary, retryable, never the agent `malformed`
+                        // its client would take as a definitive failure.
                         (Err(category), false) => {
-                            encode_response(&AgentResponse::rejected(category))
+                            match (admission, EnrollmentRequest::parse(&bytes)) {
+                                (EnrollmentAdmission::Busy, Ok(_)) => encode_response(
+                                    &EnrollmentReply::rejected(EnrollmentRejection::Busy),
+                                ),
+                                (EnrollmentAdmission::Unavailable, Ok(_)) => encode_response(
+                                    &EnrollmentReply::rejected(EnrollmentRejection::Unavailable),
+                                ),
+                                _ => encode_response(&AgentResponse::rejected(category)),
+                            }
                         }
                     }
                 }
@@ -716,10 +736,11 @@ pub async fn enrollment_exchange(
 ///
 /// Kernel admission refuses a peer before reading its frame, so that refusal
 /// is the agent socket's closed rejection, not an enrollment reply. It is
-/// mapped here, never left as a transport error: `unauthorized` means no live
-/// invitation names this OS identity (indistinguishable from an unknown
-/// invitation, e.g. after a provider restart or cancellation), `busy` is
-/// momentary contention and retryable.
+/// mapped here, never left as a transport error: `unauthorized` means neither
+/// a live invitation nor a retained session this OS identity joined names it
+/// (indistinguishable from an unknown invitation: e.g. cancelled or expired
+/// before joining, ended and forgotten, or a provider restart), `busy` is
+/// momentary contention and retryable, `unavailable` a provider fault.
 pub(crate) fn enrollment_reply(bytes: &[u8]) -> Result<EnrollmentReply, AgentTransportError> {
     if let Ok(reply) = EnrollmentReply::parse(bytes) {
         return Ok(reply);

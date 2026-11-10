@@ -247,3 +247,21 @@ fn invitations_expire_on_the_provider_clock_and_shutdown_refuses_enrollment() {
         Err(HumanEnrollmentError::Unavailable)
     );
 }
+
+/// A poisoned session lock is a provider fault for admission too, as for
+/// every enrollment action (`enrollment_book`): never "not invited".
+#[test]
+fn a_poisoned_session_lock_makes_admission_unavailable() {
+    let f = fixture();
+    let _issued = invite(&f, "poisoned");
+    assert!(admitted(&f, UID));
+    f.app.enrollment_poison_for_test();
+    assert_eq!(
+        f.app.enrollment_peer_eligible(UID, &[GID]),
+        crate::access::enrollment::EnrollmentAdmission::Unavailable
+    );
+    assert_eq!(
+        f.app.enrollment_list(f.app.human_owner()),
+        Err(HumanEnrollmentError::Unavailable)
+    );
+}
