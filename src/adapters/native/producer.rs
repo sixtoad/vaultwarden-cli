@@ -204,10 +204,12 @@ mod tests {
     /// frame validation alone must not be what rejects an over-long stream.
     #[test]
     fn reader_flags_the_first_byte_past_capacity_instead_of_buffering_more() {
+        // Spelled from the frame limit, not CAPACITY, so a wrong capacity is visible.
+        let capacity = MAX_IMPORT_BYTES + 4;
         for (total, invalid) in [
-            (CAPACITY, false),
-            (CAPACITY + 1, true),
-            (CAPACITY * 2, true),
+            (capacity, false),
+            (capacity + 1, true),
+            (capacity * 2, true),
         ] {
             let mut ends = [-1; 2];
             assert_eq!(unsafe { libc::pipe(ends.as_mut_ptr()) }, 0);
@@ -230,7 +232,7 @@ mod tests {
                 .expect("reader did not finish at end of file");
             writer.join().unwrap();
             assert_eq!(received.invalid, invalid, "{total}");
-            assert_eq!(received.filled, total.min(CAPACITY + 1), "{total}");
+            assert_eq!(received.filled, total.min(capacity + 1), "{total}");
         }
     }
 
@@ -239,7 +241,22 @@ mod tests {
     #[test]
     fn dropping_the_output_closes_the_read_end_while_a_writer_remains() {
         let (write, output) = open().unwrap();
-        drop(output);
+        // A blocking read end would never return while the writer is open: bound it,
+        // and release a blocked reader by closing the writer before failing.
+        let (done, finished) = std::sync::mpsc::channel();
+        let dropper = std::thread::spawn(move || {
+            drop(output);
+            let _ignored = done.send(());
+        });
+        if finished
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .is_err()
+        {
+            drop(write);
+            dropper.join().unwrap();
+            panic!("dropping the output blocked while a writer remained");
+        }
+        dropper.join().unwrap();
         let byte = [0u8; 1];
         let written = unsafe { libc::write(write.as_raw_fd(), byte.as_ptr().cast(), 1) };
         assert_eq!(written, -1);

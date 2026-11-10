@@ -446,6 +446,8 @@ struct Recording {
     live_calls: std::cell::Cell<usize>,
     stolen: std::cell::Cell<bool>,
     started: std::cell::Cell<bool>,
+    /// Report observation lost at the first liveness check.
+    lose: bool,
 }
 fn children() -> Vec<libc::pid_t> {
     let mut pids: Vec<libc::pid_t> = vec![0; 4096];
@@ -471,12 +473,16 @@ impl Recording {
             live_calls: 0.into(),
             stolen: false.into(),
             started: false.into(),
+            lose: false,
         }
     }
 }
 impl ExecutionControl for Recording {
     fn live(&self) -> bool {
         self.live_calls.set(self.live_calls.get() + 1);
+        if self.lose {
+            return false;
+        }
         if self.steal && !self.stolen.get() {
             let new: Vec<_> = children()
                 .into_iter()
@@ -610,4 +616,140 @@ fn native_execution_worker_runs_dispatched_requests_and_join_drains_the_queue() 
         app.direct_status(app.human_owner(), &id).unwrap(),
         crate::access::direct_request::DirectStatus::Completed { .. }
     ));
+}
+
+fn sha256_hex(path: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(std::fs::read(path).unwrap())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+fn validate(path: &Path) -> Result<(), ExecutionError> {
+    validate_file(&File::open(path).unwrap(), &sha256_hex(path))
+}
+
+/// Each executable-file property rejects on its own, before the image is parsed: a
+/// mutant that joins two of them accepts a file failing only one and reaches the
+/// digest and Mach-O checks instead (a different outcome).
+#[test]
+fn native_executable_file_properties_each_reject_before_the_image_is_read() {
+    assert_eq!(validate(Path::new("/usr/bin/ssh")), Ok(()));
+    let dir = tempfile::tempdir().unwrap();
+    let own = dir.path().join("ssh");
+    std::fs::copy("/usr/bin/ssh", &own).unwrap();
+    std::fs::set_permissions(&own, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    for (label, path) in [
+        ("not root-owned", own.as_path()),
+        // Root-owned, single-link, executable, but set-user-ID.
+        ("set-user-ID", Path::new("/usr/bin/login")),
+        // Root-owned, single-link, no special bits, but not executable.
+        ("not executable", Path::new("/private/etc/hosts")),
+    ] {
+        assert_eq!(validate(path), Err(ExecutionError::UnsafeSource), "{label}");
+    }
+}
+
+/// The caller's own process never counts as another process with the name, and a
+/// listing large enough for every root process succeeds.
+#[test]
+fn native_process_listing_skips_the_caller_and_holds_every_listed_process() {
+    let euid = unsafe { libc::geteuid() };
+    let own = std::env::current_exe().unwrap();
+    assert_eq!(
+        platform::other_process_named(euid, own.file_name().unwrap()),
+        Ok(false)
+    );
+    assert_eq!(
+        platform::other_process_named(0, std::ffi::OsStr::new("launchd")),
+        Ok(true)
+    );
+}
+
+/// A peer token is read only from a connected socket; a failed query never yields
+/// an all-zero token.
+#[test]
+fn native_peer_audit_fails_without_a_connected_peer() {
+    let stream = platform::socket().unwrap();
+    assert_eq!(platform::audit(&stream), Err(ExecutionError::Unavailable));
+}
+
+/// Opening a component never waits for a writer: a FIFO component opens at once.
+#[test]
+fn native_no_writer_open_never_blocks_on_a_fifo_component() {
+    use std::os::unix::ffi::OsStrExt;
+    let dir = tempfile::tempdir().unwrap();
+    let fifo = dir.path().join("fifo");
+    let name = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    let (done, finished) = std::sync::mpsc::channel();
+    let target = fifo.clone();
+    let opener = std::thread::spawn(move || {
+        let _ignored = done.send(platform::open_no_writers(&target, false).is_ok());
+    });
+    let opened = finished.recv_timeout(Duration::from_secs(5));
+    if opened.is_err() {
+        // Release a blocked open so the suite can continue, then fail.
+        let _writer = std::fs::OpenOptions::new().write(true).open(&fifo);
+    }
+    opener.join().unwrap();
+    assert_eq!(opened, Ok(true), "open_no_writers blocked on a FIFO");
+}
+
+/// A consumer still running when observation is lost is handed to the natural
+/// reaper (never left a zombie), and only that PID: other children of the process
+/// keep their own exit status.
+#[test]
+fn native_supervision_detaches_only_a_live_consumer_to_the_reaper() {
+    // An exited, not yet waited-for sibling: only its owner may collect its status.
+    let mut sibling = std::process::Command::new("/usr/bin/true")
+        .env_clear()
+        .spawn()
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    let completed = supervise(&["ssh", "-V"], &Recording::new(false));
+    assert_eq!(completed.cleanup, CleanupEvidence::Reaped);
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(
+        sibling.wait().unwrap().success(),
+        "a completed supervision must not hand the reaper a wildcard PID"
+    );
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port().to_string();
+    let server = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        drop(stream);
+    });
+    let mut control = Recording::new(false);
+    control.lose = true;
+    let lost = supervise(
+        &[
+            "ssh",
+            "-F",
+            "/dev/null",
+            "-oBatchMode=yes",
+            "-oConnectTimeout=5",
+            "-p",
+            &port,
+            "127.0.0.1",
+        ],
+        &control,
+    );
+    assert_eq!(lost.outcome, Err(ExecutionError::ObservationLost));
+    assert_eq!(lost.cleanup, CleanupEvidence::Detached);
+    let detached: Vec<_> = children()
+        .into_iter()
+        .filter(|pid| !control.before.contains(pid))
+        .collect();
+    assert_eq!(detached.len(), 1, "the live consumer is still a child");
+    server.join().unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while children().contains(&detached[0]) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the detached consumer was never reaped"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
 }
