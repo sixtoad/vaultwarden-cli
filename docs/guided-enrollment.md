@@ -169,10 +169,15 @@ AwaitingJoin ──join──▶ AwaitingApprovals{provider_approved, joiner_con
   (fail closed).
 - **Agent-socket admission.** An unpaired OS identity reaches the
   enrollment messages only while a live session names it, or while a
-  session that **enrolled** it is retained (so a lost final reply is
-  recoverable). A cancelled, expired, aborted or failed session admits
-  nobody: the frame is refused before parsing, and the joiner reports
-  `invalid_invitation`.
+  final session it **joined** is retained. The joiner then learns the real
+  end: `enrolled` (a lost final reply is recoverable), but also
+  `code_mismatch` or `duplicate_join` (a relay or a leaked secret),
+  `cancelled` or `expired`. A final session nobody joined admits nobody:
+  the frame is refused before parsing, and the joiner reports
+  `invalid_invitation`. Admission is no authority; every message still
+  needs the session's MAC. Momentary contention on the sessions is
+  `busy` and a poisoned session lock `unavailable`, never "not invited",
+  also for an already paired agent resending its confirmation.
 
 ### Limits
 
@@ -190,19 +195,20 @@ in the provider and transport tests listed below.
 
 | Case | Behaviour |
 |---|---|
-| Replay of a join | **Byte-identical retransmission:** the identical reply, so a lost reply is recoverable. **After completion:** `already_used`. **Against another invitation:** the MAC fails. |
+| Replay of a join | **Byte-identical retransmission:** the identical reply, so a lost reply is recoverable. **After completion:** `already_used` (on the agent socket too, while the joined session is retained; afterwards the UID is refused before parsing, `invalid_invitation`). **Against another invitation:** the MAC fails. |
 | Replay of a confirm, status or cancel | The MAC is bound to the transcript hash, so it is accepted only for its own session. It is idempotent there; a commit never repeats. |
-| Duplicate join (the secret leaked) | A second, different join aborts the session (`duplicate_join`). The legitimate human sees the failure. |
-| Wrong secret or unknown id | Both are indistinguishable (`invalid_invitation`). Three bad proofs burn a live invitation; after that the agent socket no longer admits the invited UID, which the joiner also reports as `invalid_invitation`. |
-| Mismatch at the provider | The owner types a code different from the provider's own derivation: `code_mismatch`, final, nothing enrolled. A malformed code (wrong length) is an input error and does not burn the session. The provider never prints the code, so it cannot be copied from the provider side. |
+| Duplicate join (the secret leaked) | A second, different join aborts the session (`duplicate_join`) and is itself answered `already_used`. The legitimate joiner's next message gets the state `aborted: duplicate_join`; on the agent socket its UID stays admitted while the session is retained. |
+| Wrong secret or unknown id | Both are indistinguishable (`invalid_invitation`). Three bad proofs burn a live invitation. If nobody had joined it, the agent socket then no longer admits the invited UID, which the joiner also reports as `invalid_invitation`; a joined session's joiner sees `aborted: too_many_failures`. |
+| Mismatch at the provider | The owner types a code different from the provider's own derivation: `code_mismatch`, final, nothing enrolled. The joiner's next message gets `aborted: code_mismatch` (a sign of a relay between the endpoints). A malformed code (wrong length) is an input error and does not burn the session. The provider never prints the code, so it cannot be copied from the provider side. |
 | Mismatch at the joiner | The joining human answers anything but `yes`: cancel with `code_mismatch`, final. |
-| Timeout or expiry | An approved but unconfirmed session expires without enrolling. **Companion:** an action after the deadline finds `expired` (while the session is retained). **Agent socket:** an expired session admits nobody, so the frame is refused before parsing and the joiner reports `invalid_invitation`. **Owner:** `approve`/`cancel` answer `expired`. `enroll join` waits until the session's own expiry (plus 5 s), or less with `--timeout-seconds`. |
-| Cancellation | The owner (`enroll cancel`) or the joiner can cancel any live session, including after both approvals but before the commit. Afterwards the companion's next message finds `cancelled`; an agent joiner is refused before parsing and reports `invalid_invitation`. Cancelling before the join is the same. |
+| Timeout or expiry | An approved but unconfirmed session expires without enrolling. **Companion:** an action after the deadline finds `expired` (while the session is retained). **Agent socket:** a joined session's joiner finds `expired` while it is retained; an expired session nobody joined admits nobody, so the frame is refused before parsing (`invalid_invitation`). **Owner:** `approve`/`cancel` answer `expired`. `enroll join` waits until the session's own expiry (plus 5 s), or less with `--timeout-seconds`. |
+| Cancellation | The owner (`enroll cancel`) or the joiner can cancel any live session, including after both approvals but before the commit. Afterwards the joiner's next message finds `cancelled` (an agent joiner too, while the session is retained). Cancelled before the join, the agent socket refuses the invited UID before parsing (`invalid_invitation`). |
 | Offline peer | **Owner approves before the join:** `awaiting_peer`, no state change. **Joiner cannot reach the provider:** the join is retried identically up to three times, after 250 ms and 500 ms. The confirm is re-sent (250 ms doubling to 2 s after a lost reply, every second while waiting) until the deadline. A client timeout keeps the key file, because the outcome is unknown. |
-| Busy provider | Momentary contention on the sessions is answered `busy` on the agent socket (before parsing, never "not invited"), and a busy provider gate does not refuse an invited joiner's enrollment message. The joiner resends the identical message after 250 ms doubling to 2 s, until the deadline; `busy` is never a definitive failure. |
-| Provider restart | Every session is forgotten. The joiner's next message is refused (agent socket: before parsing) and reported as `invalid_invitation`, and the key file is deleted, **unless** a confirmation's reply had been lost before: that confirmation may have committed, so the outcome is unknown and the key file is kept (check `vw-access agent list`). |
-| Storage fault at join | If the identity store cannot say whether the joining key or device is known, the join is answered `unavailable` and the invitation stays open; only a definite "known" refuses it (`identity_refused`). |
-| First companion | With no companion enrolled yet (no registry file), the companion endpoint still starts. Zero identities authorize no command; only `enroll` with a live invitation is processed. The first guided commit creates the registry (`0600`, atomic rename, in the private provider directory). A present but invalid registry still stops the endpoint. |
+| Busy provider | Momentary contention on the sessions is answered `busy` on the agent socket (before parsing, never "not invited"), and a busy provider gate does not refuse an invited joiner's enrollment message. The joiner resends the identical message after 250 ms doubling to 2 s, until the deadline; `busy` is never a definitive failure. If it is still busy at the deadline, `join` reports that nothing was enrolled. An already paired agent resending its confirmation (lost final reply) under contention also gets `busy`. |
+| Provider restart | Every session is forgotten. The joiner's next message is refused (agent socket: before parsing) as `invalid_invitation`; `join` explains the possible causes (mistyped, cancelled, expired or ended and forgotten, or a restart) and deletes the key file, **unless** a confirmation's reply had been lost and no non-final state was seen since: that confirmation may have committed, so the outcome is unknown and the key file is kept (check `vw-access agent list`). |
+| Storage fault at join | If the identity store cannot say whether the joining key or device is known, the join is answered `unavailable` and the invitation stays open; only a definite "known" refuses it (`identity_refused`). `join` resends the identical join up to three times in all (with the busy backoff) before reporting `unavailable`; the invitation can be joined again later. |
+| Storage fault at commit | `failed: unavailable`. A store fault while committing is ambiguous (the binding may be durable while a later step failed), so `join` reports an unknown outcome and keeps the key file (check `vw-access agent list`). `failed: identity_refused` is definite and deletes it. |
+| First companion | With no companion enrolled yet (no registry file), the companion endpoint still starts. Zero identities authorize no command; only `enroll` with a live invitation is processed. The first guided commit creates the registry (`0600`, atomic rename, in the private provider directory). A present but invalid registry still stops the endpoint. The provider logs a startup warning while the registry is absent: a lost registry also loses its revoked list, so restore it from backup. |
 | Duplicate invitation | A second live invitation for the same role and label, or for an enabled agent label, is refused (`duplicate`). |
 | Revoked identity | **Never reactivated.** A known agent key (enabled or revoked) is refused at join, before any code is shown. A known companion fingerprint (enabled or revoked) is refused the same way. A matching label only ever creates a **new** binding; the revoked one stays revoked. The store refuses again at commit. |
 | Wrong OS identity | Only the UID/GID an agent invitation names passes kernel admission to the enrollment messages. Everyone else is refused before parsing. An invited agent still cannot submit work. |
@@ -231,12 +237,16 @@ vw-access enroll join --socket /run/vaultwarden-access/agent.sock --key-file ~/.
 `join` does the following:
 
 - **Invitation code.** It reads the code from the terminal with echo off.
-  The secret is never in argv, and the typed copy is wiped once parsed.
+  The secret is never in argv, and the program's copy of the typed text
+  is wiped right after parsing (copies made inside the terminal library
+  are outside its control).
 - **Key file.** It creates a new 32-byte seed file, `0600`, and never
   replaces an existing one. This is the `vw-access submit --key-file`
-  format. The directory must be owned by the agent account and not
-  group- or world-writable (the file may later be removed by path); the
-  creation and any removal are made durable with a directory `fsync`.
+  format. The directory must be a real directory (not a symlink), owned
+  by the agent account and not group- or world-writable (the file may
+  later be removed by path); each refusal (file exists, directory refused,
+  directory missing) has its own message. The creation and any removal
+  are made durable with a directory `fsync`.
 - **Waiting.** It waits until the invitation expires (plus 5 s), or for
   `--timeout-seconds` if that is shorter.
 - **Confirmation.** It shows the role and the comparison code, asks the
@@ -245,8 +255,9 @@ vw-access enroll join --socket /run/vaultwarden-access/agent.sock --key-file ~/.
   terminal it refuses.
 - **Result.** It prints the binding id for `vw-access submit --binding-id`.
 - **Key cleanup.** The key file is deleted after a definitive failure. It is
-  kept when the outcome is unknown: a client timeout, or a provider that no
-  longer knows the session after a confirmation's reply was lost.
+  kept when the outcome is unknown: a client timeout, a provider that no
+  longer knows the session after a confirmation's reply was lost (and no
+  waiting state since), or `failed: unavailable` at commit.
 
 The companion side of the protocol is `access::enrollment::joiner`, using
 `JoinAttempt::companion`. It is sent as the mTLS command
