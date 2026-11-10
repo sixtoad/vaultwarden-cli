@@ -151,6 +151,38 @@ pub fn clear_persisted_session() -> Result<(), SessionError> {
     ProviderKeyring.clear()
 }
 
+/// Provision the API client secret into the provider's configured secret store
+/// (the native macOS provider's file store, or the OS keyring elsewhere). The
+/// error is a class the operator can act on; it never contains secret material.
+pub fn store_bootstrap_secret(secret: &SensitiveString) -> Result<(), String> {
+    if secret.expose().is_empty() || secret.expose().len() > 4096 {
+        return Err("the secret must be 1-4096 bytes".into());
+    }
+    ProviderKeyring::entry(BOOTSTRAP_ACCOUNT)
+        .map_err(|_error| "the provider secret store is unavailable".to_owned())?
+        .set_password(secret.expose())
+        .map_err(|error| keyring_error_class(&error))
+}
+
+/// Operator-facing class of a secret store failure. Only store-generated text
+/// (paths, the refused property, the OS error) is shown; values never are.
+pub fn keyring_error_class(error: &Error) -> String {
+    match error {
+        Error::NoStorageAccess(inner) | Error::PlatformFailure(inner) => inner.to_string(),
+        Error::NoEntry => "no stored record".into(),
+        Error::BadEncoding(_) => "the stored value is not UTF-8".into(),
+        Error::TooLong(attribute, limit) => format!("{attribute} is longer than {limit} bytes"),
+        Error::Invalid(attribute, reason) => format!("invalid {attribute}: {reason}"),
+        Error::Ambiguous(_) => "more than one matching record".into(),
+        _ => "secret store error".into(),
+    }
+}
+
+/// Validate a backend setup file exactly as the provider will read it.
+pub fn validate_setup(path: &Path) -> Result<(), SessionError> {
+    load_setup(path).map(drop)
+}
+
 /// Read setup only, not Config::load(), which also restores CLI authority.
 pub(crate) fn load_setup(path: &Path) -> Result<Config, SessionError> {
     #[cfg(target_os = "macos")]

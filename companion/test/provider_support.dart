@@ -64,9 +64,13 @@ class FixtureProviderPlatform implements ProviderPlatform {
     fingerprint: 'b' * 64,
   );
   bool loseDecision = false, wrongPassword = false;
+  String? decisionError;
   String status = 'pending';
   List<String> requestIds = [providerId];
   void Function()? invalidate;
+
+  /// The version 2 `approval_binding` for a review reply (null: none).
+  Map<String, dynamic>? Function(Map<String, dynamic> reply)? approvalBinding;
   @override
   Future<ProviderConfiguration> configuration() async {
     if (failConfiguration) throw StateError('Synthetic metadata failure');
@@ -108,9 +112,15 @@ class FixtureProviderPlatform implements ProviderPlatform {
               ),
             );
       case 'review':
-        return heldReview == null
-            ? encoded(reviewReply ?? providerReview())
-            : heldReview!.future;
+        if (heldReview != null) return heldReview!.future;
+        final reply = Map<String, dynamic>.of(reviewReply ?? providerReview());
+        // A pinned session asks for version 2 reviews (issue 49): answer
+        // with the same review and the configured Touch ID binding.
+        if (command['version'] == 2) {
+          reply['version'] = 2;
+          reply['approval_binding'] = approvalBinding?.call(reply);
+        }
+        return encoded(reply);
       case 'decision':
         savePending(command['request_id'] as String);
         if (heldDecision != null) return heldDecision!.future;
@@ -118,9 +128,12 @@ class FixtureProviderPlatform implements ProviderPlatform {
           return encoded({'version': 1, 'error': 'authentication_failed'});
         }
         if (loseDecision) throw StateError('Synthetic lost response');
+        if (decisionError != null) {
+          return encoded({'version': 1, 'error': decisionError});
+        }
         status = command['decision'] == 'deny' ? 'denied' : 'approved';
         return encoded({
-          'version': 1,
+          'version': command['version'] ?? 1,
           'status': {'status': status},
         });
       case 'status':

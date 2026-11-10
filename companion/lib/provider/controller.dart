@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../platform/provider.dart';
 import '../src/rust/api/provider.dart' as core;
 import '../src/rust/api/management.dart' as manage;
+import '../src/rust/api/biometric.dart' as bio;
 import 'pilot_bundle.dart';
 
 /// Rust owns admission, review and reply validation. Dart schedules only reads;
@@ -15,6 +16,7 @@ class ProviderController extends ChangeNotifier {
   final ProviderPlatform platform;
   core.ProviderSnapshot state;
   manage.ManagementSnapshot management = manage.managementSnapshot();
+  bio.BiometricKeySnapshot keys = bio.biometricKeySnapshot();
   bool devicesVisible = false;
   static ProviderConfiguration? _managementOwner;
   String _managementSettlement = '';
@@ -44,7 +46,12 @@ class ProviderController extends ChangeNotifier {
   VoidCallback? clearPasswords;
   bool get eligible => !_disposed && !suspended && _routeCurrent;
   bool get busy =>
-      state.busy || management.busy || settingUp || _reconciling || _operation;
+      state.busy ||
+      management.busy ||
+      keys.busy ||
+      settingUp ||
+      _reconciling ||
+      _operation;
   String get recoveryId =>
       _settlementId.isNotEmpty ? _settlementId : state.uncertainId;
   bool get canSetup =>
@@ -78,6 +85,7 @@ class ProviderController extends ChangeNotifier {
       final managementWasPrepared = management.canRevoke;
       state = core.providerSnapshot();
       management = manage.managementSnapshot();
+      keys = bio.biometricKeySnapshot();
       if (previous != state.reviewId ||
           (managementWasPrepared && !management.canRevoke)) {
         clearPasswords?.call();
@@ -157,6 +165,7 @@ class ProviderController extends ChangeNotifier {
       }
       _managementOwner = loaded;
       configuration = loaded;
+      _pinBiometric();
       _loaded = true;
       _ready = true;
       diagnostic = '';
@@ -168,6 +177,27 @@ class ProviderController extends ChangeNotifier {
       _reconciling = false;
       _publish();
     }
+  }
+
+  /// Pin the provider and client leaves for Touch ID (v2 reviews and the
+  /// key session). A failure only leaves password approval available.
+  void _pinBiometric() {
+    if (!configuration.configured) return;
+    try {
+      bio.providerBiometricPin(
+        providerIdentity: configuration.pin,
+        approvalClient: configuration.fingerprint,
+      );
+      if (!bio.biometricKeySnapshot().configured) {
+        bio.biometricKeyConfigure(
+          providerIdentity: configuration.pin,
+          approvalClient: configuration.fingerprint,
+        );
+      }
+    } catch (_) {
+      /* Password approval stays available. */
+    }
+    keys = bio.biometricKeySnapshot();
   }
 
   bool _sameAction(String a, String b) {
@@ -269,6 +299,7 @@ class ProviderController extends ChangeNotifier {
       }
       configuration = installed;
       state = core.providerConfigure(uncertainId: '');
+      _pinBiometric();
       _loaded = true;
       _ready = true;
       imported = true;
@@ -291,6 +322,7 @@ class ProviderController extends ChangeNotifier {
     core.ProviderCommand command, {
     String id = '',
     String password = '',
+    core.ProviderWork Function()? begin,
   }) async {
     if (!eligible ||
         !_ready ||
@@ -304,11 +336,13 @@ class ProviderController extends ChangeNotifier {
     }
     core.ProviderWork work;
     try {
-      work = core.providerBegin(
-        command: command,
-        requestId: id,
-        password: password,
-      );
+      work =
+          begin?.call() ??
+          core.providerBegin(
+            command: command,
+            requestId: id,
+            password: password,
+          );
     } catch (_) {
       diagnostic =
           'A fresh review, valid password and idle provider are required.';
@@ -470,6 +504,39 @@ class ProviderController extends ChangeNotifier {
   Future<void> unlock(String password) async {
     await perform(core.ProviderCommand.unlock, password: password);
     await refresh();
+  }
+
+  /// One own-device Touch ID key-management exchange. `begin` runs only after
+  /// admission; the response always reaches Rust, which never resends.
+  Future<bool> performKey(core.ProviderWork Function() begin) async {
+    if (!canManage || managementPending) return false;
+    core.ProviderWork work;
+    try {
+      work = begin();
+    } catch (_) {
+      keys = bio.biometricKeySnapshot();
+      _publish();
+      return false;
+    }
+    _operation = true;
+    keys = bio.biometricKeySnapshot();
+    _publish();
+    Uint8List response;
+    try {
+      response = await platform.send(work.body);
+    } catch (_) {
+      response = Uint8List(0);
+    } finally {
+      work.body.fillRange(0, work.body.length, 0);
+    }
+    try {
+      keys = bio.biometricKeyFinish(token: work.token, response: response);
+    } catch (_) {
+      keys = bio.biometricKeySnapshot();
+    }
+    _operation = false;
+    _publish();
+    return true;
   }
 
   Future<void> _settleManagement() async {
