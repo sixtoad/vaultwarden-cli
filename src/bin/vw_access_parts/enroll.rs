@@ -171,47 +171,44 @@ fn run_join(
     timeout_seconds: Option<u64>,
 ) -> Result<serde_json::Value, String> {
     let mut terminal = Terminal::open()?;
-    // The typed code holds the invitation secret: wiped once parsed.
-    let code = zeroize::Zeroizing::new(
-        rpassword::prompt_password("Invitation code (input hidden): ")
-            .map_err(|_error| "enrollment requires an interactive terminal".to_string())?,
-    );
-    let code = InvitationCode::parse(&code).map_err(|error| error.to_string())?;
-    let key = enrollment_client::create_agent_key(key_file)
-        .map_err(|_error| "cannot create a new key file (it must not exist)".to_string())?;
+    let code = {
+        // The typed code holds the invitation secret. This copy is wiped
+        // when the block ends, right after parsing; copies the terminal
+        // library or the decoder made on the way are not under our control.
+        let typed = zeroize::Zeroizing::new(
+            rpassword::prompt_password("Invitation code (input hidden): ")
+                .map_err(|_error| "enrollment requires an interactive terminal".to_string())?,
+        );
+        InvitationCode::parse(&typed).map_err(|error| error.to_string())?
+    };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|_error| JoinFailure::LocalKey);
-    let result = runtime.and_then(|runtime| {
-        runtime.block_on(async {
-            let deadline = timeout_seconds
-                .map(|seconds| tokio::time::Instant::now() + Duration::from_secs(seconds));
-            enrollment_client::join_agent(
-                &mut SocketTransport { socket },
-                &mut terminal,
-                code,
-                &key,
-                deadline,
-            )
-            .await
-        })
+        .map_err(|_error| JoinFailure::LocalKey.to_string())?;
+    let result = runtime.block_on(async {
+        let deadline = timeout_seconds
+            .map(|seconds| tokio::time::Instant::now() + Duration::from_secs(seconds));
+        enrollment_client::join_with_new_key(
+            &mut SocketTransport { socket },
+            &mut terminal,
+            code,
+            key_file,
+            deadline,
+        )
+        .await
     });
     match result {
         Ok(identity) => Ok(serde_json::json!({
             "enrolled": identity,
             "key_file": key_file.display().to_string(),
         })),
-        // The provider may have committed after the last reply we saw: keep
-        // the key so a completed enrollment stays usable.
+        // The provider may have committed after the last reply we saw: the
+        // key was kept so a completed enrollment stays usable.
         Err(error) if error.outcome_unknown() => Err(format!(
             "{error}; key kept at {} (check `vw-access agent list` on the provider)",
             key_file.display()
         )),
-        Err(error) => {
-            // Definitively not enrolled: do not leave unused key material.
-            enrollment_client::remove_agent_key(key_file);
-            Err(error.to_string())
-        }
+        // Definitively not enrolled: the key file this run created is gone.
+        Err(error) => Err(error.to_string()),
     }
 }

@@ -3,7 +3,7 @@
 //! I/O is injected so the whole journey is testable without a terminal.
 
 use crate::access::enrollment::{
-    EnrolledIdentity, EnrollmentRejection, EnrollmentState, JoinerCancelReason,
+    EnrolledIdentity, EnrollmentRejection, EnrollmentState, FailureReason, JoinerCancelReason,
     joiner::{InvitationCode, JoinAttempt, JoinedSession, JoinerError},
     wire::{EnrollmentReply, EnrollmentRequest},
 };
@@ -13,6 +13,11 @@ use zeroize::Zeroizing;
 
 /// Identical join retransmissions after a transport failure.
 const JOIN_ATTEMPTS: usize = 3;
+/// Identical joins answered `unavailable` before giving up. A join refused
+/// as `unavailable` changed nothing on the provider (the invitation stays
+/// open, nothing was recorded), so resending it is safe; the bound keeps a
+/// provider that is shutting down from holding the joiner until the deadline.
+const UNAVAILABLE_ATTEMPTS: usize = 3;
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 /// Delay before resending after a lost reply or a `busy` provider; doubles
 /// up to `BACKOFF_MAX`. Busy retries are bounded by the deadline.
@@ -34,23 +39,66 @@ pub enum JoinFailure {
     Declined,
     #[error("the provider rejected the request: {0}")]
     Rejected(EnrollmentRejection),
+    /// `invalid_invitation`, which is also the agent socket's answer once
+    /// nothing the provider retains names this account.
+    #[error(
+        "the provider does not recognise this invitation for this account (invalid_invitation): \
+         the code may be mistyped, or the invitation cancelled, expired or ended and since \
+         forgotten, or the provider restarted; ask the provider owner for a new invitation"
+    )]
+    InvitationUnknown,
     /// A confirmation's reply was lost, and the provider then no longer knew
     /// the session (restart, retention): it may have committed meanwhile.
     #[error("a confirmation reply was lost and the provider now answers {0}; outcome unknown")]
     OutcomeUnknown(EnrollmentRejection),
+    /// `Failed{unavailable}`: the provider's store failed while committing.
+    /// A store fault there is ambiguous (the binding may be durable while a
+    /// later step failed), so only `identity_refused` is a definite "no".
+    #[error(
+        "the provider could not confirm that the enrollment was stored (failed: unavailable); \
+         outcome unknown"
+    )]
+    CommitUncertain,
     #[error("enrollment ended without enrolling: {0:?}")]
     Ended(EnrollmentState),
     #[error("timed out waiting for the provider's approval")]
     TimedOut,
     #[error("local key file unavailable")]
     LocalKey,
+    #[error("{0}")]
+    KeyFile(KeyFileError),
+}
+
+/// Why the agent key file could not be created.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum KeyFileError {
+    #[error("the key file already exists; enrollment never replaces a key file")]
+    Exists,
+    #[error(
+        "the key file's directory is refused: it must be a real directory (not a symlink) owned \
+         by this account and not group- or world-writable"
+    )]
+    UnsafeDirectory,
+    #[error("the key file's directory does not exist")]
+    MissingDirectory,
+    #[error("cannot create the key file")]
+    Unavailable,
 }
 
 impl JoinFailure {
     /// Whether the provider may have enrolled the key despite this failure,
     /// so a key file must be kept rather than deleted.
     pub fn outcome_unknown(&self) -> bool {
-        matches!(self, Self::TimedOut | Self::OutcomeUnknown(_))
+        matches!(
+            self,
+            Self::TimedOut | Self::OutcomeUnknown(_) | Self::CommitUncertain
+        )
+    }
+    fn rejected(reason: EnrollmentRejection) -> Self {
+        match reason {
+            EnrollmentRejection::InvalidInvitation => Self::InvitationUnknown,
+            reason => Self::Rejected(reason),
+        }
     }
 }
 
@@ -111,7 +159,7 @@ pub async fn join_agent(
         + EXPIRY_GRACE;
     let join_deadline = deadline.map_or(join_deadline, |d| d.min(join_deadline));
     let mut backoff = Backoff::new();
-    let mut lost = 0;
+    let (mut lost, mut unavailable) = (0, 0);
     let reply = loop {
         match transport.send(attempt.request()).await {
             // Contention, not a refusal: the identical join is resent.
@@ -119,6 +167,19 @@ pub async fn join_agent(
                 reason: EnrollmentRejection::Busy,
                 ..
             }) => {}
+            // A provider fault that burned nothing: resent a few times.
+            Ok(EnrollmentReply::Rejected {
+                reason: EnrollmentRejection::Unavailable,
+                ..
+            }) => {
+                unavailable += 1;
+                if unavailable >= UNAVAILABLE_ATTEMPTS {
+                    return Err(JoinFailure::Rejected(EnrollmentRejection::Unavailable));
+                }
+            }
+            Ok(EnrollmentReply::Rejected { reason, .. }) => {
+                return Err(JoinFailure::rejected(reason));
+            }
             Ok(reply) => break reply,
             Err(()) => {
                 lost += 1;
@@ -130,6 +191,8 @@ pub async fn join_agent(
         if !pause(backoff.next(), join_deadline).await {
             return Err(if lost > 0 {
                 JoinFailure::ProviderOffline
+            } else if unavailable > 0 {
+                JoinFailure::Rejected(EnrollmentRejection::Unavailable)
             } else {
                 JoinFailure::ProviderBusy
             });
@@ -149,8 +212,10 @@ pub async fn join_agent(
     let confirm = session.confirm(Some(key));
     let mut last = None;
     let mut backoff = Backoff::new();
-    // Set once a confirmation's reply is lost: that confirmation may have
-    // committed, so a later "unknown session" is no proof of failure.
+    // Set while a confirmation's reply is lost: that confirmation may have
+    // committed, so a later "unknown session" is no proof of failure. A
+    // later non-final state proves nothing had committed by then, and
+    // clears it.
     let mut lost_reply = false;
     loop {
         let delay = match transport.send(&confirm).await {
@@ -158,10 +223,18 @@ pub async fn join_agent(
                 state: EnrollmentState::Enrolled { identity },
                 ..
             }) => return Ok(identity),
+            Ok(EnrollmentReply::State {
+                state:
+                    EnrollmentState::Failed {
+                        reason: FailureReason::Unavailable,
+                    },
+                ..
+            }) => return Err(JoinFailure::CommitUncertain),
             Ok(EnrollmentReply::State { state, .. }) if state.is_final() => {
                 return Err(JoinFailure::Ended(state));
             }
             Ok(EnrollmentReply::State { state, .. }) => {
+                lost_reply = false;
                 if last.as_ref() != Some(&state) {
                     prompt.waiting(&state);
                     last = Some(state);
@@ -177,7 +250,7 @@ pub async fn join_agent(
                 return Err(JoinFailure::OutcomeUnknown(reason));
             }
             Ok(EnrollmentReply::Rejected { reason, .. }) => {
-                return Err(JoinFailure::Rejected(reason));
+                return Err(JoinFailure::rejected(reason));
             }
             Ok(EnrollmentReply::Joined { .. }) => {
                 return Err(JoinFailure::Joiner(JoinerError::UnexpectedReply));
@@ -197,7 +270,7 @@ pub async fn join_agent(
 /// The directory holding the key file, which only its owner may change: the
 /// file is later removed by path after a definitive failure, and in a
 /// directory others can write (even sticky) that path could be replaced.
-fn key_directory(path: &Path) -> Result<std::fs::File, JoinFailure> {
+fn key_directory(path: &Path) -> Result<std::fs::File, KeyFileError> {
     use std::os::unix::fs::MetadataExt;
     let parent = match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
@@ -207,13 +280,18 @@ fn key_directory(path: &Path) -> Result<std::fs::File, JoinFailure> {
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(parent)
-        .map_err(|_error| JoinFailure::LocalKey)?;
+        .map_err(|error| match error.raw_os_error() {
+            // A symlinked or non-directory parent.
+            Some(libc::ELOOP | libc::ENOTDIR) => KeyFileError::UnsafeDirectory,
+            Some(libc::ENOENT) => KeyFileError::MissingDirectory,
+            _ => KeyFileError::Unavailable,
+        })?;
     let metadata = directory
         .metadata()
-        .map_err(|_error| JoinFailure::LocalKey)?;
+        .map_err(|_error| KeyFileError::Unavailable)?;
     // SAFETY: geteuid has no preconditions and cannot fail.
     if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o022 != 0 {
-        return Err(JoinFailure::LocalKey);
+        return Err(KeyFileError::UnsafeDirectory);
     }
     Ok(directory)
 }
@@ -221,17 +299,21 @@ fn key_directory(path: &Path) -> Result<std::fs::File, JoinFailure> {
 /// A fresh Ed25519 seed in a new agent-owned `0600` file (never replaced),
 /// in a directory only the agent account can change. This is the
 /// `vw-access submit --key-file` format: exactly 32 raw bytes.
-pub fn create_agent_key(path: &Path) -> Result<SigningKey, JoinFailure> {
+pub fn create_agent_key(path: &Path) -> Result<SigningKey, KeyFileError> {
     let directory = key_directory(path)?;
     let mut seed = Zeroizing::new([0u8; 32]);
-    getrandom::fill(seed.as_mut()).map_err(|_error| JoinFailure::LocalKey)?;
+    getrandom::fill(seed.as_mut()).map_err(|_error| KeyFileError::Unavailable)?;
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)
-        .map_err(|_error| JoinFailure::LocalKey)?;
+        .map_err(|error| match error.kind() {
+            // Also a dangling symlink at the path: never followed.
+            std::io::ErrorKind::AlreadyExists => KeyFileError::Exists,
+            _ => KeyFileError::Unavailable,
+        })?;
     if file
         .write_all(seed.as_ref())
         .and_then(|()| file.sync_all())
@@ -239,7 +321,7 @@ pub fn create_agent_key(path: &Path) -> Result<SigningKey, JoinFailure> {
         .is_err()
     {
         remove_agent_key(path);
-        return Err(JoinFailure::LocalKey);
+        return Err(KeyFileError::Unavailable);
     }
     Ok(SigningKey::from_bytes(&seed))
 }
@@ -253,6 +335,27 @@ pub fn remove_agent_key(path: &Path) {
     {
         let _ignored = directory.sync_all();
     }
+}
+
+/// `enroll join` after the code is read: create a new key file at
+/// `key_file`, run the protocol, and settle the file. It is kept when
+/// enrolled and when the outcome is unknown (the provider may have bound
+/// the key), and removed after a definitive failure.
+pub async fn join_with_new_key(
+    transport: &mut impl EnrollmentTransport,
+    prompt: &mut impl JoinerPrompt,
+    code: InvitationCode,
+    key_file: &Path,
+    deadline: Option<tokio::time::Instant>,
+) -> Result<EnrolledIdentity, JoinFailure> {
+    let key = create_agent_key(key_file).map_err(JoinFailure::KeyFile)?;
+    let result = join_agent(transport, prompt, code, &key, deadline).await;
+    if let Err(error) = &result
+        && !error.outcome_unknown()
+    {
+        remove_agent_key(key_file);
+    }
+    result
 }
 
 /// The agent socket as an enrollment transport.
@@ -277,7 +380,10 @@ mod tests {
     };
     use std::sync::{Arc, Mutex};
 
-    struct Commit;
+    /// The provider store; `fail` makes the commit fail with that reason.
+    struct Commit {
+        fail: Option<FailureReason>,
+    }
     impl EnrollmentHooks for Commit {
         fn admissible(&mut self, _: &EnrolleeKind, _: &Joiner) -> Result<bool, FailureReason> {
             Ok(true)
@@ -288,6 +394,9 @@ mod tests {
             joiner: &Joiner,
             _: u32,
         ) -> Result<EnrolledIdentity, FailureReason> {
+            if let Some(reason) = self.fail {
+                return Err(reason);
+            }
             Ok(EnrolledIdentity::Agent {
                 binding_id: "id".into(),
                 fingerprint: joiner.fingerprint.clone(),
@@ -306,8 +415,15 @@ mod tests {
         busy: usize,
         /// Messages answered normally before `busy` starts.
         busy_from: usize,
+        /// Joins answered `unavailable` (nothing changes on the provider).
+        unavailable: usize,
         lose_commit_reply: bool,
         on_confirm: Option<ProviderAction>,
+        /// Run before the n-th message (1-based) is handled.
+        before: std::collections::HashMap<usize, ProviderAction>,
+        /// Messages (1-based) that are handled but whose reply is lost.
+        lose_reply: Vec<usize>,
+        commit_fails: Option<FailureReason>,
         sent: Vec<EnrollmentRequest>,
         at: Vec<tokio::time::Instant>,
     }
@@ -323,7 +439,14 @@ mod tests {
                 self.busy -= 1;
                 return Ok(EnrollmentReply::rejected(EnrollmentRejection::Busy));
             }
+            if self.unavailable > 0 && matches!(request, EnrollmentRequest::EnrollJoin { .. }) {
+                self.unavailable -= 1;
+                return Ok(EnrollmentReply::rejected(EnrollmentRejection::Unavailable));
+            }
             let mut book = self.book.lock().unwrap();
+            if let Some(action) = self.before.remove(&self.sent.len()) {
+                action(&mut book);
+            }
             let confirm = matches!(request, EnrollmentRequest::EnrollConfirm { .. });
             if confirm && let Some(action) = self.on_confirm.take() {
                 action(&mut book);
@@ -338,11 +461,16 @@ mod tests {
                 request,
                 Duration::from_secs(5),
                 [3; 32],
-                &mut Commit,
+                &mut Commit {
+                    fail: self.commit_fails,
+                },
             );
             if confirm && self.lose_commit_reply {
                 self.lose_commit_reply = false;
                 *book = Book::default();
+                return Err(());
+            }
+            if self.lose_reply.contains(&self.sent.len()) {
                 return Err(());
             }
             Ok(reply)
@@ -387,8 +515,12 @@ mod tests {
                 offline,
                 busy: 0,
                 busy_from: 0,
+                unavailable: 0,
                 lose_commit_reply: false,
                 on_confirm: None,
+                before: Default::default(),
+                lose_reply: Vec::new(),
+                commit_fails: None,
                 sent: Vec::new(),
                 at: Vec::new(),
             },
@@ -606,7 +738,7 @@ mod tests {
         let metadata = std::fs::metadata(&path).unwrap();
         assert_eq!(metadata.mode() & 0o7777, 0o600);
         assert_eq!(std::fs::read(&path).unwrap(), key.to_bytes());
-        assert_eq!(create_agent_key(&path).err(), Some(JoinFailure::LocalKey));
+        assert_eq!(create_agent_key(&path).err(), Some(KeyFileError::Exists));
         assert_eq!(std::fs::read(&path).unwrap(), key.to_bytes());
     }
 
@@ -622,7 +754,7 @@ mod tests {
             let path = dir.path().join("agent.key");
             assert_eq!(
                 create_agent_key(&path).err(),
-                Some(JoinFailure::LocalKey),
+                Some(KeyFileError::UnsafeDirectory),
                 "{mode:o}"
             );
             assert!(!path.exists());
@@ -632,5 +764,241 @@ mod tests {
         create_agent_key(&path).unwrap();
         remove_agent_key(&path);
         assert!(!path.exists());
+    }
+
+    /// The key-file refusals the joiner can fix are told apart: an existing
+    /// file, a directory others can change or reached through a symlink,
+    /// and a missing directory.
+    #[test]
+    fn key_file_refusals_say_what_to_fix() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        assert_eq!(
+            create_agent_key(&link.join("agent.key")).err(),
+            Some(KeyFileError::UnsafeDirectory),
+            "a symlinked parent"
+        );
+        assert!(!real.join("agent.key").exists());
+        assert_eq!(
+            create_agent_key(&dir.path().join("missing/agent.key")).err(),
+            Some(KeyFileError::MissingDirectory)
+        );
+        std::os::unix::fs::symlink("/nonexistent", real.join("dangling.key")).unwrap();
+        assert_eq!(
+            create_agent_key(&real.join("dangling.key")).err(),
+            Some(KeyFileError::Exists),
+            "a dangling symlink is never followed"
+        );
+        let messages = [
+            KeyFileError::Exists,
+            KeyFileError::UnsafeDirectory,
+            KeyFileError::MissingDirectory,
+            KeyFileError::Unavailable,
+        ]
+        .map(|error| JoinFailure::KeyFile(error).to_string());
+        for (index, message) in messages.iter().enumerate() {
+            assert!(!messages[..index].contains(message), "{message}");
+        }
+    }
+
+    fn human() -> Human {
+        Human {
+            answer: true,
+            seen: Default::default(),
+        }
+    }
+    async fn join_keyed(
+        fake: &mut Fake,
+        human: &mut Human,
+        code: &str,
+        key_file: &Path,
+        deadline: Option<tokio::time::Instant>,
+    ) -> Result<EnrolledIdentity, JoinFailure> {
+        join_with_new_key(
+            fake,
+            human,
+            InvitationCode::parse(code).unwrap(),
+            key_file,
+            deadline,
+        )
+        .await
+    }
+    fn far() -> Option<tokio::time::Instant> {
+        Some(tokio::time::Instant::now() + Duration::from_secs(60))
+    }
+
+    /// A lost confirmation reply makes a later refusal ambiguous only until
+    /// the provider answers a non-final state again: that state proves no
+    /// commit had happened, so a later "unknown session" is definitive.
+    #[tokio::test(start_paused = true)]
+    async fn a_waiting_state_after_a_lost_reply_makes_a_later_refusal_definitive() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("agent.key");
+        let (mut fake, code, id) = setup(0);
+        // 1 join, 2 confirm (reply lost), 3 confirm (awaiting approvals),
+        // then the owner cancels and the provider restarts before 4.
+        fake.lose_reply = vec![2];
+        fake.before.insert(
+            4,
+            Box::new(move |book: &mut Book| {
+                book.cancel(&id, Duration::from_secs(5)).unwrap();
+                *book = Book::default();
+            }),
+        );
+        let result = join_keyed(&mut fake, &mut human(), &code, &key_file, far()).await;
+        assert_eq!(result, Err(JoinFailure::InvitationUnknown));
+        assert_eq!(fake.sent.len(), 4);
+        assert!(!key_file.exists(), "a definitive failure removes the key");
+    }
+
+    /// `run_join`'s key handling: kept when the outcome is unknown (here a
+    /// lost commit reply, then a restarted provider), removed otherwise.
+    #[tokio::test(start_paused = true)]
+    async fn the_key_file_is_kept_only_when_the_outcome_is_unknown() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("agent.key");
+        let (mut fake, code, id) = setup(0);
+        fake.lose_commit_reply = true;
+        let mut joiner = human();
+        approve_on_confirm(&mut fake, &joiner, id);
+        let error = join_keyed(&mut fake, &mut joiner, &code, &key_file, far())
+            .await
+            .unwrap_err();
+        assert!(error.outcome_unknown(), "{error}");
+        assert_eq!(std::fs::metadata(&key_file).unwrap().len(), 32);
+
+        let key_file = dir.path().join("declined.key");
+        let (mut fake, code, _) = setup(0);
+        let mut joiner = human();
+        joiner.answer = false;
+        let result = join_keyed(&mut fake, &mut joiner, &code, &key_file, far()).await;
+        assert_eq!(result, Err(JoinFailure::Declined));
+        assert!(!key_file.exists());
+
+        let key_file = dir.path().join("timeout.key");
+        let (mut fake, code, _) = setup(0);
+        let result = join_keyed(&mut fake, &mut human(), &code, &key_file, far()).await;
+        assert_eq!(result, Err(JoinFailure::TimedOut), "never approved");
+        assert!(key_file.exists());
+    }
+
+    /// `Failed{unavailable}` at commit is ambiguous (the store may hold the
+    /// binding), so the key is kept; `Failed{identity_refused}` is a
+    /// definite "no" and removes it.
+    #[tokio::test(start_paused = true)]
+    async fn a_commit_store_fault_is_an_unknown_outcome_but_a_refusal_is_not() {
+        let dir = tempfile::tempdir().unwrap();
+        for (reason, kept) in [
+            (FailureReason::Unavailable, true),
+            (FailureReason::IdentityRefused, false),
+        ] {
+            let key_file = dir.path().join(format!("{reason:?}.key"));
+            let (mut fake, code, id) = setup(0);
+            fake.commit_fails = Some(reason);
+            let mut joiner = human();
+            approve_on_confirm(&mut fake, &joiner, id);
+            let error = join_keyed(&mut fake, &mut joiner, &code, &key_file, far())
+                .await
+                .unwrap_err();
+            assert_eq!(error.outcome_unknown(), kept, "{error}");
+            assert_eq!(key_file.exists(), kept, "{reason:?}");
+        }
+    }
+
+    /// `unavailable` at join burned nothing, so the identical join is resent
+    /// a bounded number of times; the invitation stays open either way.
+    #[tokio::test(start_paused = true)]
+    async fn an_unavailable_join_is_retried_a_bounded_number_of_times() {
+        let key = SigningKey::from_bytes(&[4; 32]);
+        let (mut fake, code, id) = setup(0);
+        fake.unavailable = UNAVAILABLE_ATTEMPTS - 1;
+        let mut joiner = human();
+        approve_on_confirm(&mut fake, &joiner, id);
+        let identity = join_agent(
+            &mut fake,
+            &mut joiner,
+            InvitationCode::parse(&code).unwrap(),
+            &key,
+            far(),
+        )
+        .await;
+        assert!(matches!(identity, Ok(EnrolledIdentity::Agent { .. })));
+        assert!((0..UNAVAILABLE_ATTEMPTS).all(|i| fake.sent[i] == fake.sent[0]));
+
+        let (mut fake, code, _) = setup(0);
+        fake.unavailable = UNAVAILABLE_ATTEMPTS;
+        let result = join_agent(
+            &mut fake,
+            &mut human(),
+            InvitationCode::parse(&code).unwrap(),
+            &key,
+            far(),
+        )
+        .await;
+        assert_eq!(
+            result,
+            Err(JoinFailure::Rejected(EnrollmentRejection::Unavailable))
+        );
+        assert_eq!(fake.sent.len(), UNAVAILABLE_ATTEMPTS);
+        assert_eq!(
+            fake.book.lock().unwrap().list(Duration::from_secs(5))[0].state,
+            EnrollmentState::AwaitingJoin {}
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_provider_busy_until_the_deadline_is_provider_busy() {
+        let (mut fake, code, _) = setup(0);
+        fake.busy = usize::MAX;
+        let started = tokio::time::Instant::now();
+        let result = join_agent(
+            &mut fake,
+            &mut human(),
+            InvitationCode::parse(&code).unwrap(),
+            &SigningKey::from_bytes(&[4; 32]),
+            Some(started + Duration::from_secs(5)),
+        )
+        .await;
+        assert_eq!(result, Err(JoinFailure::ProviderBusy));
+        assert!(fake.sent.len() > 2);
+        assert!(started.elapsed() <= Duration::from_secs(5));
+    }
+
+    /// Without `--timeout-seconds` the joiner waits for the session's own
+    /// expiry plus the grace, not the longest possible invitation.
+    #[tokio::test(start_paused = true)]
+    async fn without_a_deadline_the_joiner_stops_at_the_session_expiry_and_grace() {
+        let (mut fake, code, _) = setup(0);
+        let started = tokio::time::Instant::now();
+        let result = join_agent(
+            &mut fake,
+            &mut human(),
+            InvitationCode::parse(&code).unwrap(),
+            &SigningKey::from_bytes(&[4; 32]),
+            None,
+        )
+        .await;
+        assert_eq!(result, Err(JoinFailure::TimedOut), "never approved");
+        // The fake provider answers at t=5 s for a 600 s invitation issued
+        // at t=1 s: 596 s left, plus the 5 s grace.
+        let limit = Duration::from_secs(596) + EXPIRY_GRACE;
+        let waited = started.elapsed();
+        assert!(
+            waited <= limit && waited + POLL_INTERVAL >= limit,
+            "{waited:?}"
+        );
+    }
+
+    #[test]
+    fn an_unknown_invitation_explains_the_possible_causes() {
+        let message = JoinFailure::rejected(EnrollmentRejection::InvalidInvitation).to_string();
+        for cause in ["cancelled", "expired", "restarted", "invalid_invitation"] {
+            assert!(message.contains(cause), "{message}");
+        }
     }
 }
