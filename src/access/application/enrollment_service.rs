@@ -102,6 +102,15 @@ impl ProviderApplication {
         action();
     }
 
+    /// Poison the enrollment lock, as a panic while holding it would.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn enrollment_poison_for_test(&self) {
+        let _ignored = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = self.enrollment.lock().unwrap();
+            panic!("poison the enrollment lock");
+        }));
+    }
+
     /// Kernel admission of an otherwise unpaired agent peer. Never waits:
     /// contention is reported as `Busy`, never as "not invited".
     pub fn enrollment_peer_eligible(&self, uid: u32, groups: &[u32]) -> EnrollmentAdmission {

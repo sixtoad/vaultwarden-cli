@@ -4,8 +4,8 @@ use super::*;
 use crate::access::{
     direct_request_tests::{Fixture, Launcher, fixture, input},
     enrollment::{
-        EnrolleeKind, EnrollmentRejection, EnrollmentState, InvitationRequest, IssuedInvitation,
-        Party,
+        AbortReason, EnrolleeKind, EnrollmentRejection, EnrollmentState, InvitationRequest,
+        IssuedInvitation, Party,
         joiner::{InvitationCode, JoinAttempt},
     },
 };
@@ -127,9 +127,8 @@ async fn only_an_invited_identity_reaches_enrollment_and_it_never_submits() {
 }
 
 #[tokio::test]
-async fn a_cancelled_session_no_longer_admits_the_invited_identity() {
+async fn a_cancelled_session_tells_its_joiner_it_was_cancelled() {
     let f = fixture();
-    let unauthorized = br#"{"status":"rejected","protocol_version":1,"category":"unauthorized"}"#;
     let key = SigningKey::from_bytes(&[73; 32]);
     let issued = invite(&f, "cancelled", OTHER_UID);
     let attempt = attempt(&issued, &key);
@@ -145,14 +144,129 @@ async fn a_cancelled_session_no_longer_admits_the_invited_identity() {
             by: Party::Provider
         }
     );
-    // Once nothing can be enrolled any more, the invited identity is an
-    // ordinary unpaired account again: refused before parsing, and the
-    // joiner reads that as an invalid invitation.
-    let refused = serve(&f, OTHER_UID, &session.status()).await;
-    assert_eq!(refused, unauthorized);
+    // The joined identity is still admitted while the session is retained,
+    // and learns the real end rather than an unexplained refusal.
     assert_eq!(
-        joiner_sees(&refused),
+        joiner_sees(&serve(&f, OTHER_UID, &session.status()).await),
+        EnrollmentReply::State {
+            protocol_version: crate::access::enrollment::ENROLLMENT_PROTOCOL_VERSION,
+            invitation_id: issued.id.clone(),
+            state: EnrollmentState::Cancelled {
+                by: Party::Provider
+            },
+        }
+    );
+    // Admission is no authority: a message for any other session is still
+    // refused, indistinguishably from an unknown invitation.
+    let stranger = JoinAttempt::agent(
+        InvitationCode::parse(&invite(&f, "other", UID).invitation_code).unwrap(),
+        &key,
+        [4; 32],
+    );
+    assert_eq!(
+        joiner_sees(&serve(&f, OTHER_UID, stranger.request()).await),
         EnrollmentReply::rejected(EnrollmentRejection::InvalidInvitation)
+    );
+}
+
+/// The end states that signal an attack (a relay typing the wrong code, a
+/// leaked secret joining twice) reach the legitimate agent joiner.
+#[tokio::test]
+async fn a_code_mismatch_or_a_duplicate_join_reaches_the_agent_joiner() {
+    let f = fixture();
+    let owner = f.app.human_owner();
+    let key = SigningKey::from_bytes(&[76; 32]);
+    let issued = invite(&f, "mismatch", UID);
+    let attempt = attempt(&issued, &key);
+    let session = attempt
+        .accept(&joiner_sees(&serve(&f, UID, attempt.request()).await))
+        .unwrap();
+    let wrong = if session.comparison_code == "0000-0000" {
+        "0000-0001"
+    } else {
+        "0000-0000"
+    };
+    assert!(f.app.enrollment_approve(owner, &issued.id, wrong).is_err());
+    assert!(matches!(
+        joiner_sees(&serve(&f, UID, &session.confirm(Some(&key))).await),
+        EnrollmentReply::State {
+            state: EnrollmentState::Aborted {
+                reason: AbortReason::CodeMismatch
+            },
+            ..
+        }
+    ));
+
+    let issued = invite(&f, "duplicate", OTHER_UID);
+    let attempt = attempt(&issued, &key);
+    let session = attempt
+        .accept(&joiner_sees(&serve(&f, OTHER_UID, attempt.request()).await))
+        .unwrap();
+    let intruder = JoinAttempt::agent(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        &SigningKey::from_bytes(&[77; 32]),
+        [5; 32],
+    );
+    assert_eq!(
+        joiner_sees(&serve(&f, OTHER_UID, intruder.request()).await),
+        EnrollmentReply::rejected(EnrollmentRejection::AlreadyUsed)
+    );
+    assert!(matches!(
+        joiner_sees(&serve(&f, OTHER_UID, &session.status()).await),
+        EnrollmentReply::State {
+            state: EnrollmentState::Aborted {
+                reason: AbortReason::DuplicateJoin
+            },
+            ..
+        }
+    ));
+}
+
+/// A now-paired agent resending its confirmation (lost final reply) while
+/// the sessions are locked hears `busy`, never the agent vocabulary's
+/// `malformed`, which its client would take as a definitive failure.
+#[test]
+fn a_paired_agent_resending_its_confirmation_under_contention_hears_busy() {
+    let f = fixture();
+    let key = SigningKey::from_bytes(&[78; 32]);
+    let issued = invite(&f, "paired busy", UID);
+    let attempt = attempt(&issued, &key);
+    let session = attempt
+        .accept(&joiner_sees(&serve_blocking(&f, UID, attempt.request())))
+        .unwrap();
+    f.app
+        .enrollment_approve(f.app.human_owner(), &issued.id, &session.comparison_code)
+        .unwrap();
+    assert!(matches!(
+        joiner_sees(&serve_blocking(&f, UID, &session.confirm(Some(&key)))),
+        EnrollmentReply::State {
+            state: EnrollmentState::Enrolled { .. },
+            ..
+        }
+    ));
+    assert!(f.app.agent_peer_eligible(UID, &[GID]).is_ok());
+    let mut held = Vec::new();
+    f.app.enrollment_hold_for_test(|| {
+        held = serve_blocking(&f, UID, &session.confirm(Some(&key)));
+    });
+    assert_eq!(
+        joiner_sees(&held),
+        EnrollmentReply::rejected(EnrollmentRejection::Busy)
+    );
+}
+
+/// A poisoned session lock is a provider fault, `unavailable`, as for every
+/// other enrollment action; never "not invited".
+#[tokio::test]
+async fn a_poisoned_session_lock_is_unavailable_to_the_joiner() {
+    let f = fixture();
+    let key = SigningKey::from_bytes(&[79; 32]);
+    let issued = invite(&f, "poisoned", UID);
+    let attempt = attempt(&issued, &key);
+    f.app.enrollment_poison_for_test();
+    assert_eq!(
+        joiner_sees(&serve(&f, UID, attempt.request()).await),
+        EnrollmentReply::rejected(EnrollmentRejection::Unavailable)
     );
 }
 
