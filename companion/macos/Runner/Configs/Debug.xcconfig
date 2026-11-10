@@ -1,2 +1,5 @@
 #include "../../Flutter/Flutter-Debug.xcconfig"
 #include "Warnings.xcconfig"
+// Apple Silicon only: Intel (x86_64) macOS is no longer supported or built
+// (owner decision 2026-11-10). Project-level, so every target inherits it.
+ARCHS = arm64
