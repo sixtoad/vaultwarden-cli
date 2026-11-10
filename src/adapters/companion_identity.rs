@@ -429,6 +429,21 @@ pub(crate) fn enrolled_or_none(path: &Path) -> Result<Vec<EnrolledCompanion>, Se
     }
     Ok(registry_or_empty(root)?.identities)
 }
+/// The startup warning for an absent registry. Starting without one is
+/// how the first companion is enrolled, but a registry that existed and was
+/// lost (deleted, not restored from backup) also drops the revoked list, so
+/// a revoked device would no longer be refused at enrollment.
+pub fn absent_registry_warning(path: &Path) -> Option<String> {
+    match std::fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(format!(
+            "companion registry {} is absent: starting with no companions and no revoked \
+             devices. Expected only before the first companion is enrolled; if a registry \
+             existed, restore it from backup, because its revoked list is gone too.",
+            path.display()
+        )),
+        _ => None,
+    }
+}
 pub(crate) fn management_records(
     path: &Path,
 ) -> Result<Vec<(EnrolledCompanion, bool, bool)>, SessionError> {
@@ -884,5 +899,18 @@ mod tests {
         });
         assert!(stopped_provider(root.path()).is_ok());
         release.join().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod absent_registry_tests {
+    #[test]
+    fn an_absent_registry_is_warned_about_and_a_present_one_is_not() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join(super::STORE_FILE);
+        let warning = super::absent_registry_warning(&path).unwrap();
+        assert!(warning.contains("revoked"), "{warning}");
+        std::fs::write(&path, b"{}").unwrap();
+        assert_eq!(super::absent_registry_warning(&path), None);
     }
 }
