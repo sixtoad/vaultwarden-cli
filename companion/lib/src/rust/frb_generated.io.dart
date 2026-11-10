@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api.dart';
+import 'api/biometric.dart';
 import 'api/installation.dart';
 import 'api/management.dart';
 import 'api/provider.dart';
@@ -28,7 +29,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  BiometricDecisionResult dco_decode_biometric_decision_result(dynamic raw);
+
+  @protected
+  BiometricEnrollRequest dco_decode_biometric_enroll_request(dynamic raw);
+
+  @protected
+  BiometricKeyCommand dco_decode_biometric_key_command(dynamic raw);
+
+  @protected
+  BiometricKeyOutcome dco_decode_biometric_key_outcome(dynamic raw);
+
+  @protected
+  BiometricKeySnapshot dco_decode_biometric_key_snapshot(dynamic raw);
+
+  @protected
+  BiometricKeyState dco_decode_biometric_key_state(dynamic raw);
+
+  @protected
+  BiometricRefusal dco_decode_biometric_refusal(dynamic raw);
+
+  @protected
+  BiometricSigningRequest dco_decode_biometric_signing_request(dynamic raw);
+
+  @protected
+  BiometricSupport dco_decode_biometric_support(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
+
+  @protected
+  BiometricRefusal dco_decode_box_autoadd_biometric_refusal(dynamic raw);
 
   @protected
   Completion dco_decode_box_autoadd_completion(dynamic raw);
@@ -107,6 +138,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Operation dco_decode_operation(dynamic raw);
 
   @protected
+  BiometricRefusal? dco_decode_opt_box_autoadd_biometric_refusal(dynamic raw);
+
+  @protected
   ManagedIdentity? dco_decode_opt_box_autoadd_managed_identity(dynamic raw);
 
   @protected
@@ -117,6 +151,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Outcome dco_decode_outcome(dynamic raw);
+
+  @protected
+  ProviderBiometricState dco_decode_provider_biometric_state(dynamic raw);
 
   @protected
   ProviderCommand dco_decode_provider_command(dynamic raw);
@@ -170,7 +207,53 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  BiometricDecisionResult sse_decode_biometric_decision_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricEnrollRequest sse_decode_biometric_enroll_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricKeyCommand sse_decode_biometric_key_command(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricKeyOutcome sse_decode_biometric_key_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricKeySnapshot sse_decode_biometric_key_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricKeyState sse_decode_biometric_key_state(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricRefusal sse_decode_biometric_refusal(SseDeserializer deserializer);
+
+  @protected
+  BiometricSigningRequest sse_decode_biometric_signing_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BiometricSupport sse_decode_biometric_support(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  BiometricRefusal sse_decode_box_autoadd_biometric_refusal(
+    SseDeserializer deserializer,
+  );
 
   @protected
   Completion sse_decode_box_autoadd_completion(SseDeserializer deserializer);
@@ -259,6 +342,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Operation sse_decode_operation(SseDeserializer deserializer);
 
   @protected
+  BiometricRefusal? sse_decode_opt_box_autoadd_biometric_refusal(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ManagedIdentity? sse_decode_opt_box_autoadd_managed_identity(
     SseDeserializer deserializer,
   );
@@ -273,6 +361,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Outcome sse_decode_outcome(SseDeserializer deserializer);
+
+  @protected
+  ProviderBiometricState sse_decode_provider_biometric_state(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProviderCommand sse_decode_provider_command(SseDeserializer deserializer);
@@ -336,7 +429,67 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_biometric_decision_result(
+    BiometricDecisionResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_enroll_request(
+    BiometricEnrollRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_key_command(
+    BiometricKeyCommand self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_key_outcome(
+    BiometricKeyOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_key_snapshot(
+    BiometricKeySnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_key_state(
+    BiometricKeyState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_refusal(
+    BiometricRefusal self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_signing_request(
+    BiometricSigningRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_support(
+    BiometricSupport self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_biometric_refusal(
+    BiometricRefusal self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_completion(
@@ -450,6 +603,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_operation(Operation self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_biometric_refusal(
+    BiometricRefusal? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_managed_identity(
     ManagedIdentity? self,
     SseSerializer serializer,
@@ -466,6 +625,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_outcome(Outcome self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_provider_biometric_state(
+    ProviderBiometricState self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_provider_command(

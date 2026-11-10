@@ -17,8 +17,8 @@ text/icon edges while panel geometry, wrapping, review facts and actions matched
 - `macos-26-arm64`: twelve individually reviewed ARM pilot actuals from CI macOS 26.6.2
   (25G83), image macos-26-arm64/20261013.0424. Their sparse glyph-edge differences
   from macOS 27 confirm that bundled fonts do not pin the OS rasterizer.
-- `macos-26-x64`: twelve reviewed Intel main-job actuals from the same CI run.
-  Every image differs in edge pixels from ARM, so CPU baselines remain separate.
+- Intel (`macos-26-x64`) references were removed on 2026-11-10: Intel (x86_64)
+  macOS is no longer supported or built, and no CI job renders them.
 - `windows`: twelve actual PNGs from the same run on windows-latest,
   visually inspected for complete review, layout and actions before adoption.
 - `linux`: the twelve actual PNGs from that run's Ubuntu 24.04 failure artifact,
@@ -56,7 +56,7 @@ byte-identical. The 200% capture scrolls the event action into view; widget test
 also check the complete list and exact-ID reopening. Other-host references must
 come from that host's reviewed CI captures; comparisons remain exact.
 
-Linux, Windows and macOS 26 x64 Activity references were individually visually
+Linux and Windows Activity references were individually visually
 reviewed and copied byte-for-byte from [CI run 40721598625](https://github.com/sixtoad/vaultwarden-cli/actions/runs/40721598625),
 source `55f10079469bc999dcf2a78c183e724a4a0df59d`. Labels, UTC timestamps, long
 request IDs, selected navigation and the fresh-review action remain readable in

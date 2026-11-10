@@ -6,7 +6,12 @@ separately supported Swift Approval Companion. Build one bundle with
 `scripts/build-desktop-bundle.sh /absolute/private/evidence` on the target OS.
 Flutter 3.47.7, the locked Rust toolchain dependencies and native build tools are
 required. The CI desktop matrix performs the full native gates before packaging.
-The release workflow publishes the same coherent **development** archives.
+The release workflow publishes the same coherent **development** archives:
+`companion-linux-development.tar.gz`, `companion-windows-development.tar.gz`,
+and `companion-macos-arm64-development.tar.gz` (Apple Silicon, with the protected
+commands), all listed in the release `SHA256SUMS.txt`. Intel (x86_64) macOS is no
+longer supported or built (owner decision 2026-11-10): there is no Intel macOS
+archive, and the packaging helper refuses an x86_64 macOS build.
 macOS distribution signing/notarization remains a publisher prerequisite;
 this helper refuses to replace a non-ad-hoc signature with development signing.
 Do not bypass Gatekeeper, remove quarantine or modify an installed application.
@@ -14,8 +19,8 @@ Do not bypass Gatekeeper, remove quarantine or modify an installed application.
 | Platform | Bundled tools | Request / approve / execute capability |
 | --- | --- | --- |
 | Linux | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, `vaultwarden-access-exec`, command launcher | `vw-access` requests protected work; provider/helper implement approved Linux delivery. Flutter provider transport/approval is unavailable. |
-| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. Installing the provider into `/Library/VaultwardenAccess` and its launchd service is a reviewed manual step: `scripts/macos-provider-plan.py` resolves the templates into files, and nothing installs them yet (see below). Development signing only. Flutter approves through the existing pinned-TLS Linux-provider connection; approving the native provider from the app is tracked in #49. Guided enrollment and notifications are not available (#59, #61). |
-| macOS, Intel (x86_64) | `vaultwarden-cli`, command launcher | Vault CLI works. Flutter approves through the existing pinned-TLS Linux-provider connection. The native provider rejects Intel and Rosetta, so an Intel bundle neither ships nor advertises `vw-access`/`vaultwarden-accessd`. |
+| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. Installing the provider into `/Library/VaultwardenAccess` and its launchd service is a reviewed manual step: `scripts/macos-provider-plan.py` resolves the templates into files, and nothing installs them yet (see below). Development signing only. The provider verifies production Touch ID approval v2; the companion's approval settings list the approval methods the installed app version offers. Guided enrollment and notifications are not available (#59, #61). |
+| macOS, Intel (x86_64) | none: not supported or built | Intel Macs are no longer supported. No Intel macOS bundle or CLI binary is published, and the packaging helper refuses to build one. The native provider also rejects Intel and Rosetta at runtime. |
 | Windows | `vaultwarden-cli.exe`, command launcher | Vault CLI works. Protected requesting/provider execution and Flutter approval transport are unavailable. |
 
 The manifest records the actual app, core and CLI versions separately: currently
@@ -23,9 +28,9 @@ The manifest records the actual app, core and CLI versions separately: currently
 Bundle schema 1, launcher ABI 1, the expected runtime platform/architecture and
 running app/core versions are checked. Old ABI-1 command launchers can select
 new compatible app/core versions. A bundle records its host command architecture;
-the normal macOS app is built for the same host architecture as its commands. The core may retain universal library slices, but the application is explicitly single-architecture. An Intel archive on Apple Silicon requires an already available Rosetta environment for the vault CLI; the package never installs Rosetta or claims a native ARM command, and macOS protected commands are only in arm64 bundles. The `vaultwarden-access-exec` helper is Linux's systemd helper and is not shipped on macOS: the native provider does not use it.
+the macOS app, its core library and its commands are all arm64: `companion/macos/Runner/Configs` sets `ARCHS = arm64` for every target, `scripts/build-companion-macos-core.sh` refuses an x86_64 slice, and the bundler checks every executable with `lipo`. The `vaultwarden-access-exec` helper is Linux's systemd helper and is not shipped on macOS: the native provider does not use it.
 
-The CI and release desktop matrices currently build the macOS bundle on an Intel runner, so published macOS archives do not yet contain the protected commands. Build on an Apple Silicon host with `scripts/build-desktop-bundle.sh` to obtain an arm64 bundle. A command folder enabled from an earlier macOS arm64 bundle (which listed only `vaultwarden-cli`) is reported as an incompatible command setup by the new bundle: enable commands in a new empty user folder, as for any command-set change.
+The CI and release desktop matrices build the macOS bundle once, on an Apple Silicon runner (`macos-26`), giving the arm64 archive with `Contents/Helpers/vw-access` and `Contents/Helpers/vaultwarden-accessd`. Each job sets `DESKTOP_EXPECTED_ARCHITECTURE`, and packaging fails if the bundle's architecture or its helper set differs from it, so a runner change cannot publish another architecture as the arm64 one; an expected or actual x86_64 macOS architecture is refused outright. The archive is development-signed (ad hoc); Developer ID signing and notarization are #62. A command folder enabled from an earlier macOS arm64 bundle (which listed only `vaultwarden-cli`) is reported as an incompatible command setup by the new bundle: enable commands in a new empty user folder, as for any command-set change.
 
 `bundle.json` (macOS: `Contents/Resources/bundle.json`) binds every regular
 payload, required runtime libraries, command paths, supported roles and internal

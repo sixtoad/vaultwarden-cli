@@ -3,6 +3,7 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var approvalSigner: ApprovalSigner?
+  private var productionSigner: ProductionSigner?
   private var providerAdapter: ProviderAdapter?
   private var installationChannel: FlutterMethodChannel?
   private var commandDirectory: URL?
@@ -14,6 +15,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     approvalSigner = ApprovalSigner(messenger: flutterViewController.engine.binaryMessenger)
+    productionSigner = ProductionSigner(messenger: flutterViewController.engine.binaryMessenger)
     providerAdapter = ProviderAdapter(messenger: flutterViewController.engine.binaryMessenger)
 
     installationChannel = FlutterMethodChannel(name: "dev.vaultwarden.companionSlice/installation", binaryMessenger: flutterViewController.engine.binaryMessenger)
