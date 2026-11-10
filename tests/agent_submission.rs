@@ -17,8 +17,9 @@ use std::{
     path::Path,
     process::{Command, Stdio},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc,
     },
     time::Duration,
 };
@@ -64,10 +65,19 @@ impl SecretBackend for Backend {
         panic!("submission must not resolve secrets")
     }
 }
-struct Launcher(AtomicUsize);
+type GateHold = (mpsc::Sender<()>, mpsc::Receiver<()>);
+/// `launch` runs under the provider's authority gate, so an armed hold makes
+/// the next launch a deterministic competing gate holder until released.
+struct Launcher(AtomicUsize, Mutex<Option<GateHold>>);
 impl DirectReviewLauncher for Launcher {
     fn launch(&self, _: &str) -> Result<(), DirectRequestError> {
         self.0.fetch_add(1, Ordering::SeqCst);
+        let hold = self.1.lock().unwrap().take();
+        if let Some((entered, release)) = hold {
+            entered.send(()).unwrap();
+            // Bounded: a failed assertion must not leave the gate held forever.
+            let _released = release.recv_timeout(Duration::from_secs(10));
+        }
         Ok(())
     }
 }
@@ -289,7 +299,7 @@ fn real_linux_peer_matrix_and_noninteractive_cli() {
     let socket = AgentSocket::bind(&socket_dir, 7).unwrap();
     let path = socket_dir.join("agent.sock");
     let stop = Arc::new(AtomicBool::new(false));
-    let launcher = Arc::new(Launcher(AtomicUsize::new(0)));
+    let launcher = Arc::new(Launcher(AtomicUsize::new(0), Mutex::default()));
     let human = HumanSocket::bind(&root).unwrap();
     let human_worker = {
         let (app, launcher, stop) = (app.clone(), launcher.clone(), stop.clone());
@@ -771,7 +781,22 @@ assert json.loads(data)['category']=='malformed'
         serde_json::from_slice::<serde_json::Value>(&wait.stderr).unwrap(),
         serde_json::json!({"event":"client_error","category":"wait_timeout","request_id":cli_id})
     );
-    let resumed = bounded_process::output(&mut cli("poll", &cli_id));
+    // `wait` stops at its deadline even with a status query in flight, and
+    // that query keeps running under the authority gate after the client
+    // exits. A poll admitted meanwhile is refused Busy before any input is
+    // read (retryable by contract, no state change), so retry exactly that.
+    let busy = format!(
+        "{}\n",
+        serde_json::to_string(&AgentResponse::rejected(AgentRejection::Busy)).unwrap()
+    );
+    let retry_until = std::time::Instant::now() + Duration::from_secs(10);
+    let resumed = loop {
+        let output = bounded_process::output(&mut cli("poll", &cli_id));
+        if output.stdout != busy.as_bytes() || std::time::Instant::now() >= retry_until {
+            break output;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
     assert!(resumed.status.success());
     assert_eq!(snapshot()["requests"], before["requests"]);
     assert_eq!(snapshot()["agent_audit"], before["agent_audit"]);
@@ -828,21 +853,60 @@ assert json.loads(data)['category']=='malformed'
 
     // Kernel send-queue consumption proves admitted reading of a harmless JSON
     // whitespace prefix. Pipe synchronization withholds the signed query until
-    // revocation completes; no competing waiter holds the authority gate.
+    // revocation completes.
+    //
+    // Admission is a non-blocking try-lock of the authority gate: a peer that
+    // connects while anything else holds the gate is answered Busy before its
+    // input is read. Busy is the server's explicit "not admitted yet" signal
+    // (`wait` retries on it too), and, as above, a query abandoned by the
+    // timed-out `submit --wait` just before can still hold the gate. So the
+    // held peer retries exactly on Busy, and the test forces that interleaving:
+    // an armed launch keeps the gate held until the peer reports Busy.
     use std::io::{BufRead, Read, Write};
+    let (entered_sender, entered) = mpsc::channel();
+    let (release, release_receiver) = mpsc::channel();
+    *launcher.1.lock().unwrap() = Some((entered_sender, release_receiver));
+    let holder = {
+        let line = format!(
+            "{}\n",
+            serde_json::to_string(&signed(
+                48,
+                &key,
+                revision.clone(),
+                vec!["staging".into(), "3".into()]
+            ))
+            .unwrap()
+        );
+        let path = path.clone();
+        std::thread::spawn(move || peer(&path, 8, 9, vec![7], &line, false))
+    };
+    entered.recv_timeout(Duration::from_secs(10)).unwrap();
     let mut held = Command::new("python3");
     held.args([
         "-c",
         r#"import os,socket,sys,fcntl,struct,time
-s=socket.socket(socket.AF_UNIX);s.settimeout(8);s.connect(os.environ['SOCKET'])
-s.sendall(b' ')
-deadline=time.monotonic()+3
-while struct.unpack('i',fcntl.ioctl(s,0x5411,struct.pack('i',0)))[0]:
- assert time.monotonic()<deadline
-s.setblocking(False)
-try: s.recv(1,socket.MSG_PEEK)
-except BlockingIOError: pass
-else: raise AssertionError('preflight rejected before query')
+deadline=time.monotonic()+8
+reported=False
+while True:
+ s=socket.socket(socket.AF_UNIX);s.settimeout(8);s.connect(os.environ['SOCKET'])
+ s.sendall(b' ')
+ while struct.unpack('i',fcntl.ioctl(s,0x5411,struct.pack('i',0)))[0]:
+  assert time.monotonic()<deadline,'prefix never read'
+  time.sleep(.001)
+ s.setblocking(False)
+ try: early=s.recv(4096)
+ except BlockingIOError: break
+ s.settimeout(8)
+ while early and not early.endswith(b'\n'):
+  chunk=s.recv(4096)
+  if not chunk:break
+  early+=chunk
+ if early!=os.environ['BUSY'].encode(): raise AssertionError('preflight rejected before query: %r'%early)
+ s.close()
+ if not reported:
+  print('busy',flush=True);reported=True
+ assert time.monotonic()<deadline,'authority gate stayed busy'
+ time.sleep(.01)
 s.settimeout(8)
 print('admitted',flush=True)
 assert sys.stdin.readline()=='go\n'
@@ -856,6 +920,7 @@ sys.stdout.buffer.write(data)
 "#,
     ])
     .env("SOCKET", &path)
+    .env("BUSY", &busy)
     .env("PAYLOAD", wire(&query(49, &cli_id)));
     identity(&mut held, 8, 9, vec![7]);
     let mut held = BoundedChild::spawn(
@@ -863,13 +928,32 @@ sys.stdout.buffer.write(data)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
     );
-    let mut held_stdout = std::io::BufReader::new(held.stdout());
-    let (mut held_stdout, ready) = bounded_process::io(move || {
-        let mut ready = String::new();
-        held_stdout.read_line(&mut ready).unwrap();
-        (held_stdout, ready)
-    });
-    assert_eq!(ready, "admitted\n");
+    let next_line = |mut reader: std::io::BufReader<std::process::ChildStdout>| {
+        bounded_process::io(move || {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            (reader, line)
+        })
+    };
+    let (held_stdout, busy) = next_line(std::io::BufReader::new(held.stdout()));
+    release.send(()).unwrap();
+    if busy != "busy\n" {
+        panic!(
+            "held peer was not refused Busy while the gate was held: stdout={busy:?} stderr={}",
+            String::from_utf8_lossy(&held.wait_with_output().stderr)
+        );
+    }
+    assert!(matches!(
+        bounded_process::join(holder),
+        AgentResponse::Pending { .. }
+    ));
+    let (mut held_stdout, ready) = next_line(held_stdout);
+    if ready != "admitted\n" {
+        panic!(
+            "held peer not admitted: stdout={ready:?} stderr={}",
+            String::from_utf8_lossy(&held.wait_with_output().stderr)
+        );
+    }
     let revoked = exchange(
         &root,
         HumanCommand::AgentRevoke {
@@ -967,8 +1051,8 @@ sys.stdout.buffer.write(data)
         rejected
     );
     assert_eq!(snapshot(), before);
-    assert_eq!(count(&root), 5);
-    assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+    assert_eq!(count(&root), 6);
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
     assert_eq!(resolutions.load(Ordering::SeqCst), 0);
     let ssh_revision = app
         .activate_operation(ssh_policy::draft("test-image"))
@@ -1009,8 +1093,8 @@ sys.stdout.buffer.write(data)
         assert!(
             matches!(peer(&path,8,9,vec![7],&format!("{}\n", serde_json::to_string(&input).unwrap()),false),AgentResponse::Rejected{category,..} if category==expected)
         );
-        assert_eq!(count(&root), 5);
-        assert_eq!(launcher.0.load(Ordering::SeqCst), 5);
+        assert_eq!(count(&root), 6);
+        assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
     }
     let input = SignedSubmission::sign(
         ssh_agent.id,
@@ -1032,8 +1116,8 @@ sys.stdout.buffer.write(data)
         ),
         AgentResponse::Pending { .. }
     ));
-    assert_eq!(count(&root), 6);
-    assert_eq!(launcher.0.load(Ordering::SeqCst), 6);
+    assert_eq!(count(&root), 7);
+    assert_eq!(launcher.0.load(Ordering::SeqCst), 7);
     assert_eq!(resolutions.load(Ordering::SeqCst), 0);
     stop.store(true, Ordering::Release);
     runtime.block_on(worker).unwrap().unwrap();
