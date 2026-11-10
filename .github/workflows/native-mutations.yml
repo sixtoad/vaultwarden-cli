@@ -8,6 +8,11 @@ on:
   workflow_dispatch:
   push:
     branches: ['test/native-*mutations*']
+    # Documentation-only pushes (the results write-up) need no new campaign.
+    paths:
+      - 'src/**'
+      - 'scripts/mutate-native-*'
+      - '.github/workflows/native-mutations.yml'
 
 permissions:
   contents: read

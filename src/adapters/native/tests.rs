@@ -544,6 +544,9 @@ fn native_release_denial_does_not_launch_and_withdrawal_does_not_signal_consumer
             Err(error) => panic!("consumer did not survive withdrawal: {error}"),
         }
     };
+    // Darwin's accept inherits the listener's O_NONBLOCK; wait for the banner instead
+    // of failing with EAGAIN when the consumer is slower than this read.
+    stream.set_nonblocking(false).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(3)))
         .unwrap();

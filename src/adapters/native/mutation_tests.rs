@@ -650,8 +650,8 @@ fn native_executable_file_properties_each_reject_before_the_image_is_read() {
     }
 }
 
-/// The caller's own process never counts as another process with the name, and a
-/// listing large enough for every root process succeeds.
+/// The caller's own process never counts as another process with the name, and the
+/// listing buffer holds every process of the account (here at least 48 extra ones).
 #[test]
 fn native_process_listing_skips_the_caller_and_holds_every_listed_process() {
     let euid = unsafe { libc::geteuid() };
@@ -660,10 +660,21 @@ fn native_process_listing_skips_the_caller_and_holds_every_listed_process() {
         platform::other_process_named(euid, own.file_name().unwrap()),
         Ok(false)
     );
-    assert_eq!(
-        platform::other_process_named(0, std::ffi::OsStr::new("launchd")),
-        Ok(true)
-    );
+    let mut sleepers: Vec<_> = (0..48)
+        .map(|_| {
+            std::process::Command::new("/bin/sleep")
+                .arg("30")
+                .env_clear()
+                .spawn()
+                .unwrap()
+        })
+        .collect();
+    let found = platform::other_process_named(euid, std::ffi::OsStr::new("sleep"));
+    for sleeper in &mut sleepers {
+        sleeper.kill().unwrap();
+        sleeper.wait().unwrap();
+    }
+    assert_eq!(found, Ok(true));
 }
 
 /// A peer token is read only from a connected socket; a failed query never yields
