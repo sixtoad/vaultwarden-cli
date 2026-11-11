@@ -154,8 +154,24 @@ jobs:
           flutter-version: '3.47.7'
           channel: stable
           cache: true
+      # Developer ID signing and notarization (#62). Secrets come only from the
+      # repository's Actions secrets; with none set (forks) the macOS archive
+      # stays the development build and the step says so.
+      - name: Developer ID signing material (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          MACOS_COMPANION_PROFILE_BASE64: ${{ secrets.MACOS_COMPANION_PROFILE_BASE64 }}
+          APPLE_NOTARY_API_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_P8_BASE64 }}
+          APPLE_NOTARY_API_KEY_ID: ${{ secrets.APPLE_NOTARY_API_KEY_ID }}
+          APPLE_NOTARY_API_ISSUER_ID: ${{ secrets.APPLE_NOTARY_API_ISSUER_ID }}
+        run: bash scripts/ci-macos-signing.sh setup
       - name: Build normal app, bundled tools and extracted-command verification
         run: bash scripts/build-desktop-bundle.sh "$RUNNER_TEMP/desktop-release"
+      - name: Remove signing material (macOS)
+        if: always() && runner.os == 'macOS'
+        run: bash scripts/ci-macos-signing.sh cleanup
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ runner.os }}-${{ matrix.architecture }}

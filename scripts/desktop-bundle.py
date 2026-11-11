@@ -18,6 +18,9 @@ sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location('artifact', Path(__file__).with_name('desktop-companion-artifact.py'))
 artifact = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(artifact)
+SIGNING_SPEC = importlib.util.spec_from_file_location('release_signing', Path(__file__).with_name('macos-release-signing.py'))
+release_signing = importlib.util.module_from_spec(SIGNING_SPEC)
+SIGNING_SPEC.loader.exec_module(release_signing)
 
 
 def git(repo, *args):
@@ -142,16 +145,24 @@ def populate(repo, root, platform, source):
         shutil.copy2(cargo_target / 'release' / (command + suffix), command_dir / (command + suffix))
     shutil.copy2(repo / 'companion/rust/target/command-launcher/release' / ('companion-command' + suffix), command_dir / ('companion-command' + suffix))
     if platform == 'macos':
-        signing = subprocess.run(['/usr/bin/codesign', '-dv', str(root)], capture_output=True, text=True, check=True)
-        if 'Signature=adhoc' not in signing.stderr:
+        built = subprocess.run(['/usr/bin/codesign', '-dv', str(root)], capture_output=True, text=True, check=True)
+        if 'Signature=adhoc' not in built.stderr:
             raise ValueError('Development bundler refuses to replace a distribution signature; use the publisher signing pipeline')
         expected_arch = 'arm64'
         for executable in [root / 'Contents/MacOS/companion_slice', *command_dir.iterdir()]:
             actual = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
             if actual != [expected_arch]:
                 raise ValueError(f'Application/command architecture mismatch: {executable}: {actual}; expected {expected_arch}')
-        for command in command_dir.iterdir():
-            subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(command)], check=True)
+        signing = release_signing.signing_from_env(os.environ)
+        if signing is None:
+            print('macOS development build: Developer ID signing is not configured; commands and app are signed ad hoc', file=sys.stderr)
+            for command in command_dir.iterdir():
+                subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(command)], check=True)
+        else:
+            # Developer ID (#62): every nested signature and the embedded profile
+            # exist before the manifest hashes the payloads.
+            release_entitlements = release_entitlements_for(repo, root, signing)
+            release_signing.sign_nested(root, signing)
     app = {'macos': 'Contents/MacOS/companion_slice', 'windows': 'companion_slice.exe', 'linux': 'companion_slice'}[platform]
     core = {'macos': 'Contents/Frameworks/libcompanion_core.dylib', 'windows': 'companion_core.dll', 'linux': 'lib/libcompanion_core.so'}[platform]
     # All regular app/runtime/resources are bound. Framework links are recorded
@@ -186,11 +197,41 @@ def populate(repo, root, platform, source):
     if platform == 'macos':
         # Preserve Flutter's sandbox and selected-file entitlements. Nested code
         # is signed before manifest hashing; only the outer app is resealed.
-        subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=identifier,entitlements,flags,runtime', str(root)], check=True)
-        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(root)], check=True)
+        if signing is None:
+            subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=identifier,entitlements,flags,runtime', str(root)], check=True)
+            subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(root)], check=True)
+        else:
+            release_signing.sign_app(root, signing, release_entitlements)
+            release_signing.verify(root, signing.team, release_entitlements)
         verify_macos_entitlements(root)
     verify(root, manifest)
     return manifest
+
+
+def release_entitlements_for(repo, root, signing):
+    """Checked profile embedded; the app's minimum entitlements: Release.entitlements
+    (exactly what Flutter's release build signed) plus the profile's identity."""
+    with (repo / 'companion/macos/Runner/Release.entitlements').open('rb') as stream:
+        declared = plistlib.load(stream)
+    built = release_signing.entitlements_of(root)
+    # Xcode adds get-task-allow to its ad hoc build; the Developer ID app never has it.
+    built.pop('com.apple.security.get-task-allow', None)
+    if built != declared:
+        raise ValueError(f'the built app entitlements {sorted(built)} differ from Release.entitlements {sorted(declared)}')
+    bundle_id = release_signing.bundle_identifier(root)
+    granted = release_signing.embed_profile(root, signing, bundle_id)
+    return release_signing.app_entitlements(declared, signing.team, bundle_id, granted)
+
+
+def signing_variant(platform):
+    """Archive variant and signing record: development, signed (not notarized) or notarized."""
+    if platform != 'macos':
+        return 'development', None, None
+    signing = release_signing.signing_from_env(os.environ)
+    if signing is None:
+        return 'development', None, None
+    notary = release_signing.notary_from_env(os.environ)
+    return ('notarized' if notary else 'signed'), signing, notary
 
 
 def archive_architecture(platform, architecture):
@@ -277,9 +318,18 @@ def main():
         root, _ = artifact.locate(repo, args.platform)
         manifest = populate(repo, root, args.platform, source)
         check_expected_architecture(root, manifest, os.environ.get('DESKTOP_EXPECTED_ARCHITECTURE', ''))
+        variant, signing, notary = signing_variant(args.platform)
+        if variant == 'notarized':
+            release_signing.notarize(root, notary, evidence / 'notarization')
+            release_signing.verify(root, signing.team)
+            verify(root, manifest)
+        elif variant == 'signed':
+            print('::warning::Developer ID signed but NOT notarized: no notary credentials are configured; Gatekeeper will refuse this download', file=sys.stderr)
         (evidence / 'bundle.json').write_text(json.dumps(manifest, indent=2) + '\n')
+        record = None if signing is None else {'kind': 'developer-id', 'team_id': signing.team, 'notarized': variant == 'notarized'}
         archive = artifact.package(root, evidence, args.platform, source['revision'], source['source_dirty'],
-                                   architecture=archive_architecture(args.platform, manifest['architecture']))
+                                   architecture=archive_architecture(args.platform, manifest['architecture']),
+                                   variant=variant, signing=record)
         # Exercise the production launcher against the freshly extracted archive,
         # not the build directory or a self-exiting GUI test entrypoint.
         import tarfile

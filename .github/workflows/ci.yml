@@ -552,6 +552,8 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/release.yml
+    # Developer ID signing and notarization secrets (#62); absent secrets skip both.
+    secrets: inherit
     with:
       release_tag: ${{ needs.detect-release-tag.outputs.tag }}
       release_sha: ${{ github.sha }}

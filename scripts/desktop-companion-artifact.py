@@ -87,7 +87,7 @@ def smoke(executable, evidence, use_file=False):
     print("Release AOT bridge, native contract and rendered fixture checks passed.")
 
 
-def package(root, evidence, platform, revision, dirty, disposable_pilot=False, architecture=None):
+def package(root, evidence, platform, revision, dirty, disposable_pilot=False, architecture=None, variant='development', signing=None):
     if disposable_pilot and platform != "macos":
         raise ValueError("disposable pilot artifacts require macOS")
     if platform == "macos" and architecture == "x86_64":
@@ -96,7 +96,11 @@ def package(root, evidence, platform, revision, dirty, disposable_pilot=False, a
     if architecture is not None and architecture != "arm64":
         raise ValueError("unsupported archive architecture")
     expected = inventory(root)
-    variant = "disposable-pilot" if disposable_pilot else "development"
+    if variant not in ("development", "signed", "notarized") or (variant != "development" and (platform != "macos" or disposable_pilot)):
+        raise ValueError("only the normal macOS archive is Developer ID signed")
+    if (signing is None) != (variant == "development"):
+        raise ValueError("a signed archive records its signing, a development archive none")
+    variant = "disposable-pilot" if disposable_pilot else variant
     # The macOS archive is Apple Silicon only; its name states arm64.
     qualifier = f"-{architecture}" if architecture else ""
     archive = evidence / f"companion-{platform}{qualifier}-{variant}.tar.gz"
@@ -121,6 +125,7 @@ def package(root, evidence, platform, revision, dirty, disposable_pilot=False, a
         "sha256": checksum,
         "extraction_verified": True,
         "members": expected,
+        **({"signing": signing} if signing else {}),
         **({"disposable_test_only": True,
             "requested_build_flags": {"dart_define": "COMPANION_DISPOSABLE_PILOT=true",
                                       "swift_condition": "COMPANION_DISPOSABLE_PILOT"}} if disposable_pilot else {}),
