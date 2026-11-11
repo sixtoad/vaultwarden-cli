@@ -2,7 +2,7 @@
 title: 'Developer ID signing and notarization of the macOS desktop bundle (#62)'
 type: 'feature'
 created: '2026-11-11'
-status: 'in-progress'
+status: 'done'
 context: ['{project-root}/docs/desktop-installation.md', '{project-root}/docs/native-macos-plan.md', '{project-root}/AGENTS.md']
 ---
 
@@ -54,13 +54,13 @@ context: ['{project-root}/docs/desktop-installation.md', '{project-root}/docs/na
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/adapters/native/image.rs` (+ `image/tests.rs`) -- `RELEASE_TEAM_ID`, Developer ID clause with intermediate, `Publisher` classification, one publisher across slices; tests for ad hoc / Apple / release fixture.
-- [ ] `scripts/macos-release-signing.py` + `scripts/test-macos-release-signing.py` -- signing library and CLI with fake-tool tests.
-- [ ] `scripts/desktop-bundle.py`, `scripts/desktop-companion-artifact.py`, `scripts/test-desktop-bundle.py` -- release path before manifest; notarize before archive.
-- [ ] `scripts/ci-macos-signing.sh`, `scripts/release-macos-desktop-bundle.sh` -- CI and local entry points.
-- [ ] workflows -- signing setup/cleanup on the macOS desktop release job, `secrets: inherit`.
-- [ ] `scripts/test-macos-provider-install.py` -- pin the installer requirement to the Rust clause.
-- [ ] docs -- secrets list, owner commands, rehearsal steps (not run), Windows out of scope.
+- [x] `src/adapters/native/image.rs` (+ `image/tests.rs`) -- `RELEASE_TEAM_ID`, Developer ID clause with intermediate, `Publisher` classification, one publisher across slices; tests for ad hoc / Apple / release fixture.
+- [x] `scripts/macos-release-signing.py` + `scripts/test-macos-release-signing.py` -- signing library and CLI with fake-tool tests.
+- [x] `scripts/desktop-bundle.py`, `scripts/desktop-companion-artifact.py`, `scripts/test-desktop-bundle.py` -- release path before manifest; notarize before archive.
+- [x] `scripts/ci-macos-signing.sh`, `scripts/release-macos-desktop-bundle.sh` -- CI and local entry points.
+- [x] workflows -- signing setup/cleanup on the macOS desktop release job, `secrets: inherit`.
+- [x] `scripts/test-macos-provider-install.py` -- pin the installer requirement to the Rust clause.
+- [x] docs -- secrets list, owner commands, rehearsal steps (not run), Windows out of scope.
 
 **Acceptance Criteria:**
 - Given no secrets, when the release workflow runs, then the macOS archive is the development archive and the log says signing was skipped.
