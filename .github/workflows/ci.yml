@@ -41,14 +41,14 @@ jobs:
 
   disposable-companion-pilot:
     name: Disposable Mac companion pilot (opt-in build)
-    # Match the working packaged GUI runner; still build both library slices.
+    # Apple Silicon only: Intel (x86_64) macOS is no longer supported or built.
     runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: aarch64-apple-darwin
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.7'
@@ -67,13 +67,26 @@ jobs:
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-26-intel' && 90 || 45 }}
+    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 90 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        # ARM capacity left the native/TLS gate unacquired; Intel runs the same
-        # universal-library checks. The disposable pilot retains ARM coverage.
-        os: [ubuntu-24.04, macos-26-intel, windows-latest]
+        # macOS is Apple Silicon only (owner decision 2026-11-10: Intel macOS
+        # is no longer supported or built). The arm64 bundle carries and
+        # advertises the native protected commands (vw-access,
+        # vaultwarden-accessd). DESKTOP_EXPECTED_ARCHITECTURE makes packaging
+        # fail if a runner label ever resolves to another architecture, and
+        # desktop-bundle.py refuses x86_64 macOS outright. Linux and Windows
+        # x86_64 are unchanged.
+        include:
+          - os: ubuntu-24.04
+            architecture: x86_64
+          - os: macos-26
+            architecture: arm64
+          - os: windows-latest
+            architecture: x86_64
+    env:
+      DESKTOP_EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
     defaults:
       run:
         shell: bash
@@ -88,9 +101,9 @@ jobs:
       - name: Install Linux desktop build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
-      - name: Install Mac universal library targets
+      - name: Install Apple Silicon library target
         if: runner.os == 'macOS'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+        run: rustup target add aarch64-apple-darwin
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.7'
@@ -102,7 +115,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: companion-slice-${{ runner.os }}-development
+          name: companion-slice-${{ runner.os }}-${{ matrix.architecture }}-development
           path: |
             ${{ runner.temp }}/desktop-evidence
             companion/test/failures
@@ -142,7 +155,8 @@ jobs:
 
   macos-companion:
     name: Native macOS approval companion
-    runs-on: macos-26-intel
+    # Apple Silicon: Intel (x86_64) macOS is no longer supported or built.
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -171,7 +185,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-24.04", "macos-26-intel"]
+        # macOS is Apple Silicon only; Intel (x86_64) macOS is no longer supported.
+        os: ["ubuntu-24.04", "macos-26"]
         rust: ["stable", "beta"]
         include:
           - os: ubuntu-24.04
@@ -363,10 +378,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             cross: true
-          - target: x86_64-apple-darwin
-            os: macos-26-intel
+          # Intel (x86_64) macOS is no longer supported or built.
           - target: aarch64-apple-darwin
-            os: macos-26-intel
+            os: macos-26
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-pc-windows-msvc

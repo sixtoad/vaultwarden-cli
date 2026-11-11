@@ -99,8 +99,11 @@ the `require_password` policy field, history attribution and a golden vector
 [companion-protocol.md](companion-protocol.md#production-touch-id-approval-v2-issue-49);
 owner decisions are recorded in
 [issue-49-native-provider.md](implementation/issue-49-native-provider.md#production-touch-id-approval-owner-decisions-2026-10-30).
-Companion bridge (PR B), Secure Enclave signer (PR C) and UI (PR D) are pending;
-no hardware biometric evidence exists yet.
+Companion bridge (PR B, #66) is merged. The Secure Enclave signer, own-device
+key enrollment and approval screens (PR C/D) are implemented and tested with
+fakes, golden vectors and the provider's verifier contract
+([companion-migration.md](companion-migration.md#secure-enclave-signer-and-approval-screens-issue-49-pr-cd));
+no hardware biometric evidence exists yet (no physical Touch ID run).
 
 One installation must deliver the Flutter app, `vw-access`, provider, execution components and required service definitions with a common version manifest. The existing archive/Swift DMG cannot serve as proof. A signed installation plan must disclose account creation, file destinations and service registration. Use stable signing identities for release; obtain Developer ID/notarization capability before claiming normal distribution support. Never disable Gatekeeper or SIP to install.
 

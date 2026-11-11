@@ -1,0 +1,171 @@
+import CryptoKit
+import Foundation
+
+/// Production Touch ID approval v2 (issue 49). The Secure Enclave key signs
+/// only transcripts that Rust built for the provider's v2 verifier, and only
+/// when the framed fields bind it to its own provider and approval client.
+/// This is a second line of defence: Rust and the provider remain the
+/// authorities. The synthetic demonstration contract
+/// (`dev.vaultwarden.companion.synthetic.v1`, `NativeTestKey`) never reaches
+/// this code and this key never signs its transcripts.
+enum ProductionDomain {
+    static let approval = Data("dev.vaultwarden.provider.approval.v2".utf8)
+    static let enroll = Data("dev.vaultwarden.provider.approval-enroll.v2".utf8)
+    static let synthetic = Data("dev.vaultwarden.companion.synthetic.v1".utf8)
+}
+
+enum ProductionPurpose: String { case approve, enroll }
+
+/// One Secure Enclave key per (provider identity, approval client): the two
+/// SHA-256 pins the companion uses for the provider TLS leaf and its own
+/// client mTLS leaf. A provider certificate rotation or a new client identity
+/// therefore selects another key, which has to be enrolled again.
+struct ProductionBinding: Equatable {
+    static let tagPrefix = "dev.vaultwarden.companion.approval-v2.key."
+    let providerIdentity: Data
+    let approvalClient: Data
+
+    init(providerIdentity: Data, approvalClient: Data) throws {
+        guard providerIdentity.count == 32, approvalClient.count == 32 else { throw ContractError.invalid }
+        self.providerIdentity = providerIdentity
+        self.approvalClient = approvalClient
+    }
+
+    init(providerHex: String, clientHex: String) throws {
+        guard let provider = Data(lowerHex: providerHex), let client = Data(lowerHex: clientHex) else {
+            throw ContractError.invalid
+        }
+        try self.init(providerIdentity: provider, approvalClient: client)
+    }
+
+    /// Keychain application tag. Disjoint from the synthetic test key tag.
+    var tag: Data {
+        let digest = SHA256.hash(data: providerIdentity + approvalClient)
+        return Data((Self.tagPrefix + digest.map { String(format: "%02x", $0) }.joined()).utf8)
+    }
+}
+
+enum ProductionTranscript {
+    /// Splits 4-byte big-endian length framing. Nil on any trailing or short bytes.
+    static func fields(_ data: Data) -> [Data]? {
+        var fields: [Data] = []
+        var index = data.startIndex
+        while index < data.endIndex {
+            guard data.endIndex - index >= 4 else { return nil }
+            let length = data[index..<index + 4].reduce(0) { ($0 << 8) | Int($1) }
+            index += 4
+            guard length <= data.endIndex - index else { return nil }
+            fields.append(Data(data[index..<index + length]))
+            index += length
+            guard fields.count <= 32 else { return nil }
+        }
+        return fields
+    }
+
+    /// Whether the production key bound to `binding`, whose public key is
+    /// `publicKey` (65-byte SEC1), may sign `transcript` for `purpose`.
+    static func admits(_ transcript: Data, purpose: ProductionPurpose,
+                       binding: ProductionBinding, publicKey: Data) -> Bool {
+        guard publicKey.count == 65, publicKey.first == 0x04, let f = fields(transcript) else { return false }
+        switch purpose {
+        case .approve:
+            let keyID = Data(SHA256.hash(data: publicKey))
+            let sizes = [32, 32, 32, 8, 8, 32, 8, 32] // record, policy, arguments, expiry, generation, ticket, deadline, review
+            return f.count == 14
+                && f[0] == ProductionDomain.approval && f[1] == Data("approve".utf8)
+                && f[2] == binding.providerIdentity && f[3] == binding.approvalClient
+                && f[4] == keyID && f[5].count == 43
+                && zip(f[6...], sizes).allSatisfy { $0.count == $1 }
+        case .enroll:
+            return f.count == 6
+                && f[0] == ProductionDomain.enroll
+                && f[1] == binding.providerIdentity && f[2] == binding.approvalClient
+                && f[3] == publicKey && f[4].count == 32 && f[5].count == 43
+        }
+    }
+}
+
+extension Data {
+    init?(lowerHex: String) {
+        guard lowerHex.count % 2 == 0,
+              lowerHex.allSatisfy({ ("0"..."9").contains($0) || ("a"..."f").contains($0) }) else { return nil }
+        var bytes = [UInt8]()
+        var index = lowerHex.startIndex
+        while index < lowerHex.endIndex {
+            let next = lowerHex.index(index, offsetBy: 2)
+            guard let byte = UInt8(lowerHex[index..<next], radix: 16) else { return nil }
+            bytes.append(byte)
+            index = next
+        }
+        self.init(bytes)
+    }
+}
+
+/// Admission state of the production signer channel, kept free of Flutter
+/// and LocalAuthentication so the Swift package tests it. At most one
+/// signature is open; read, create and delete wait for it. A signature is
+/// numbered by the Dart side, strictly increasing within one Dart session
+/// (a random nonce per channel client). A new session, such as after a Dart
+/// hot restart, starts its own numbering instead of being refused forever.
+/// Cancel acts only on the open signature of the same session and number.
+final class ProductionSignerGate {
+    private var session = ""
+    private var lastToken: UInt32 = 0
+    private var active: (session: String, token: UInt32, cancel: () -> Void)?
+
+    /// No signature is open.
+    var idle: Bool { active == nil }
+
+    /// A session is 32 lowercase hex characters (16 random bytes).
+    static func validSession(_ value: String) -> Bool {
+        value.utf8.count == 32 && value.utf8.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }
+    }
+
+    /// Opens the signature `token` of `session`, or refuses an overlapping,
+    /// replayed or malformed one. `cancel` aborts its native prompt.
+    func begin(session: String, token: UInt32, cancel: @escaping () -> Void) -> Bool {
+        guard active == nil, Self.validSession(session), token > 0 else { return false }
+        if session != self.session {
+            self.session = session
+            lastToken = 0
+        }
+        guard token > lastToken else { return false }
+        lastToken = token
+        active = (session, token, cancel)
+        return true
+    }
+
+    /// The signature ended (signed, refused or cancelled).
+    func finish(session: String, token: UInt32) {
+        if let open = active, open.session == session, open.token == token { active = nil }
+    }
+
+    /// Cancels the open signature only when it is exactly this one.
+    func cancel(session: String, token: UInt32) {
+        if let open = active, open.session == session, open.token == token { open.cancel() }
+    }
+
+    /// Sleep, screen lock, window close or quit: cancel whatever is open.
+    func cancelActive() { active?.cancel() }
+
+    /// The notifications on which `ProductionSigner` calls `cancelActive`,
+    /// by center and name (AppKit's names spelled out so the package tests
+    /// them without AppKit): sleep, display sleep, fast user switching
+    /// (session resigned), screen lock without display sleep (only the
+    /// distributed `com.apple.screenIsLocked` reports it), window close and
+    /// quit. An open prompt never outlives the unlocked session.
+    static let cancelTriggers: [ProductionCancelTrigger] = [
+        .workspace("NSWorkspaceWillSleepNotification"),
+        .workspace("NSWorkspaceScreensDidSleepNotification"),
+        .workspace("NSWorkspaceSessionDidResignActiveNotification"),
+        .distributed("com.apple.screenIsLocked"),
+        .local("NSWindowWillCloseNotification"),
+        .local("NSApplicationWillTerminateNotification"),
+    ]
+}
+
+/// A notification center (NSWorkspace's, the distributed one or the app's
+/// default) and the name observed on it.
+enum ProductionCancelTrigger: Hashable {
+    case workspace(String), distributed(String), local(String)
+}

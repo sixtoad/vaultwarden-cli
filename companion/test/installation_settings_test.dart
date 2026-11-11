@@ -230,7 +230,20 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('nothing installs them yet'), findsOneWidget);
+      expect(
+        find.textContaining('reviewed command-line installer'),
+        findsOneWidget,
+      );
+      // App users get the documentation, not a repository-only script path.
+      expect(
+        find.textContaining('see docs/desktop-installation.md'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('scripts/macos-provider-install.py'),
+        findsNothing,
+      );
+      expect(find.textContaining('this app does not install it'), findsOneWidget);
       expect(find.textContaining('Development signing only.'), findsOneWidget);
       expect(
         find.textContaining('Intel Macs and Rosetta are unsupported.'),
@@ -238,7 +251,7 @@ void main() {
       );
       expect(
         find.textContaining(
-          'Guided enrollment: Devices & agents adds a device or agent',
+          'Review notifications (macOS, while this window is open) are in Settings. Guided enrollment: Devices & agents adds a device or agent',
         ),
         findsOneWidget,
       );

@@ -45,6 +45,10 @@ https://github.com/haydonryan/vaultwarden-cli/releases
 
 Extract the archive and place `vaultwarden-cli` somewhere on your `PATH`.
 
+macOS builds are Apple Silicon (arm64, `aarch64-apple-darwin`) only. Intel
+(x86_64) macOS is no longer supported or built; Linux and Windows x86_64 are
+unaffected.
+
 ### From Source
 
 Requires Rust 1.88+.
