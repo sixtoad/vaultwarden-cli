@@ -307,7 +307,7 @@ def notarize(root, notary, work, run=subprocess.run):
     run(['/usr/bin/ditto', '-c', '-k', '--keepParent', str(root), str(archive)], check=True)
     print(f'notarizing {root.name} with the {notary.describe()} (waits for Apple)')
     try:
-        result = run(['/usr/bin/xcrun', 'notarytool', 'submit', str(archive), *notary.arguments(), '--wait',
+        result = run(['/usr/bin/xcrun', 'notarytool', 'submit', str(archive), *notary.arguments(), '--wait', '--timeout', '30m',
                       '--output-format', 'json'], capture_output=True, text=True, check=False)
     finally:
         archive.unlink(missing_ok=True)
