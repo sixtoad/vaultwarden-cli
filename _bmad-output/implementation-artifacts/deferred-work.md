@@ -66,8 +66,6 @@ requirements are tracked in [the capability checklist](../../docs/implementation
 
 ## Guided enrollment UI (#59 phase 2) follow-ups — 2026-11-10
 
-- Adopt the enrollment golden references for linux, windows and macos-26-arm64
-  from reviewed CI captures once the stacked PR targets `main`.
 - Companion enrollments are still not audited in the identity registry (needs a
   registry format bump); admin-companion approvals are recorded as the provider
   owner's, with no companion actor.
