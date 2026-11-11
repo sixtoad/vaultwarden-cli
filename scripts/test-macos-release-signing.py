@@ -164,8 +164,9 @@ class RequirementTests(unittest.TestCase):
         source = (HERE.parent / 'src/adapters/native/image.rs').read_text()
         self.assertEqual(re.search(r'pub\(crate\) const RELEASE_TEAM_ID: &str = "([A-Z0-9]{10})";', source).group(1), TEAM)
         self.assertEqual(re.search(r'const DEVELOPER_ID: &str = "([^"]+)";', source).group(1), signing.DEVELOPER_ID)
-        installer = load('installer', 'macos-provider-install.py')
-        self.assertEqual(installer.designated_requirement(TEAM), '=' + requirement)
+        if os.name != 'nt':  # the installer is POSIX-only (fcntl)
+            installer = load('installer', 'macos-provider-install.py')
+            self.assertEqual(installer.designated_requirement(TEAM), '=' + requirement)
         self.assertTrue(requirement.endswith(f'certificate leaf[subject.OU] = "{TEAM}"'))
         with self.assertRaises(signing.SigningError):
             signing.designated_requirement('9884bzy594')
@@ -199,7 +200,7 @@ class ProfileTests(unittest.TestCase):
             calls.append(argv)
             return subprocess.CompletedProcess(argv, 0, plistlib.dumps({'Platform': ['OSX']}), b'')
         self.assertEqual(signing.read_profile(Path('/p'), run), {'Platform': ['OSX']})
-        self.assertEqual(calls, [['/usr/bin/security', 'cms', '-D', '-i', '/p']])
+        self.assertEqual(calls, [['/usr/bin/security', 'cms', '-D', '-i', str(Path('/p'))]])
         with self.assertRaisesRegex(signing.SigningError, 'cannot decode'):
             signing.read_profile(Path('/p'), lambda argv, **kwargs: subprocess.CompletedProcess(argv, 1, b'', b''))
 
