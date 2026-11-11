@@ -196,19 +196,29 @@ The native provider recognizes the release publisher: its image trust
 (`RELEASE_TEAM_ID`, the same requirement as the installer's `--team-id
 9884BZY594`) and other teams' Developer ID images, all with the Developer ID
 intermediate; anything else (ad hoc, Apple Development, other chains) is
-rejected, and the native slices of one image must share one publisher. Install
+rejected, and the native slices of one image must share one publisher. Operator
+images signed by another team's Developer ID stay trusted, as before (the
+provider runs operator-registered images, not the bundle's helpers); the
+classification names the release publisher and enforces one publisher per image. Install
 a Developer ID bundle with `--team-id 9884BZY594`; the installer refuses it
 under `--allow-development-signature`, and refuses a development build under
 `--team-id`.
 
 ### Release workflow secrets (owner, one time)
 
-The release workflow (`.github/workflows/release.yml`, called with `secrets:
-inherit`) runs `scripts/ci-macos-signing.sh` on the macOS desktop job. It builds
-a temporary keychain under `$RUNNER_TEMP` and deletes it afterwards. With no
-secrets (forks, pull requests) the macOS archive stays the development build and
-the job prints a notice; a partial set fails the job. Set these repository
-Actions secrets:
+The release workflow (`.github/workflows/release.yml`, which receives exactly
+these six secrets from `ci.yml`) builds everything first, then runs
+`scripts/ci-macos-signing.sh setup` and only then the package step that signs,
+notarizes and archives, so no build script or dependency runs while the signing
+material exists. Setup imports the identity into a temporary keychain under
+`$RUNNER_TEMP` with a non-extractable private key; cleanup deletes the keychain,
+profile and API key in an `always()` step. With no secrets (forks, pull
+requests) the macOS archive stays the development build and the job prints a
+notice; a partial set fails the job. After setting the secrets, set the
+repository **variable** `MACOS_REQUIRE_DEVELOPER_ID` to `true`: from then on a
+release fails instead of publishing an unsigned or unnotarized macOS archive
+(`gh variable set MACOS_REQUIRE_DEVELOPER_ID --body true --repo
+sixtoad/vaultwarden-cli`). Set these repository Actions secrets:
 
 | Secret | Value |
 | --- | --- |

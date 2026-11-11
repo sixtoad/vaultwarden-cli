@@ -553,7 +553,13 @@ jobs:
       contents: write
     uses: ./.github/workflows/release.yml
     # Developer ID signing and notarization secrets (#62); absent secrets skip both.
-    secrets: inherit
+    secrets:
+      MACOS_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+      MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+      MACOS_COMPANION_PROFILE_BASE64: ${{ secrets.MACOS_COMPANION_PROFILE_BASE64 }}
+      APPLE_NOTARY_API_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_P8_BASE64 }}
+      APPLE_NOTARY_API_KEY_ID: ${{ secrets.APPLE_NOTARY_API_KEY_ID }}
+      APPLE_NOTARY_API_ISSUER_ID: ${{ secrets.APPLE_NOTARY_API_ISSUER_ID }}
     with:
       release_tag: ${{ needs.detect-release-tag.outputs.tag }}
       release_sha: ${{ github.sha }}

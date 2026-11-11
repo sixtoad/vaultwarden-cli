@@ -127,6 +127,17 @@ def notary_from_env(env):
     return Notary(key_path=Path(key[0]), key_id=key[1], issuer=key[2])
 
 
+def configured(env):
+    """(signing, notary) from env, checked before any build work. With
+    MACOS_REQUIRE_DEVELOPER_ID=true (the publisher's release) both are required."""
+    signing, notary = signing_from_env(env), notary_from_env(env)
+    if env.get('MACOS_REQUIRE_DEVELOPER_ID', '').strip().lower() == 'true':
+        require(signing is not None and notary is not None,
+                'MACOS_REQUIRE_DEVELOPER_ID is true: Developer ID signing and notarization must both be configured')
+    require(notary is None or signing is not None, 'notary credentials are configured without Developer ID signing')
+    return signing, notary
+
+
 def designated_requirement(team):
     """Developer ID Application of one team; the provider installer's --team-id requirement."""
     require(TEAM.fullmatch(team) is not None, 'team identifier must be 10 uppercase letters or digits')
@@ -185,7 +196,11 @@ def is_macho(path):
     if path.is_symlink() or not path.is_file():
         return False
     with path.open('rb') as stream:
-        return stream.read(4) in MACHO
+        header = stream.read(8)
+    if header[:4] not in MACHO:
+        return False
+    # 0xcafebabe is also a Java class file; a universal binary has few slices.
+    return header[:4] not in (b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf') or 0 < int.from_bytes(header[4:8], 'big') <= 16
 
 
 def walk(root):
@@ -212,6 +227,8 @@ def signing_order(root):
     """
     main = root / APP_EXECUTABLE
     paths = sorted(walk(root))
+    nested = [p for p in paths if p.suffix in ('.app', '.appex', '.bundle', '.xpc') and p.is_dir()]
+    require(not nested, f'nested bundles are not signed by this pipeline: {[str(p.relative_to(root)) for p in nested]}')
     frameworks = sorted((p for p in paths if p.suffix == '.framework' and p.is_dir()), key=lambda p: (-len(p.parts), str(p)))
     loose = []
     for path in paths:

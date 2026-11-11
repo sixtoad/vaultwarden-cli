@@ -153,7 +153,7 @@ def populate(repo, root, platform, source):
             actual = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
             if actual != [expected_arch]:
                 raise ValueError(f'Application/command architecture mismatch: {executable}: {actual}; expected {expected_arch}')
-        signing = release_signing.signing_from_env(os.environ)
+        signing, _ = release_signing.configured(os.environ)
         if signing is None:
             print('macOS development build: Developer ID signing is not configured; commands and app are signed ad hoc', file=sys.stderr)
             for command in command_dir.iterdir():
@@ -227,10 +227,9 @@ def signing_variant(platform):
     """Archive variant and signing record: development, signed (not notarized) or notarized."""
     if platform != 'macos':
         return 'development', None, None
-    signing = release_signing.signing_from_env(os.environ)
+    signing, notary = release_signing.configured(os.environ)
     if signing is None:
         return 'development', None, None
-    notary = release_signing.notary_from_env(os.environ)
     return ('notarized' if notary else 'signed'), signing, notary
 
 
@@ -303,6 +302,7 @@ def main():
     repo = Path(__file__).resolve().parents[1]
     evidence = args.evidence.resolve()
     if args.action == 'before':
+        signing_variant(args.platform)  # refuse a bad signing/notary configuration before building
         checkpoint(repo, evidence, 'before')
     elif args.action == 'app':
         build_app(repo, args.platform, evidence)
@@ -316,6 +316,7 @@ def main():
             (evidence / 'source-changed-paths.json').write_text(json.dumps(changed, indent=2) + '\n')
             raise RuntimeError('Build inputs changed during packaging: ' + ', '.join(changed))
         root, _ = artifact.locate(repo, args.platform)
+        signing_variant(args.platform)  # refuse a bad signing/notary configuration before any work
         manifest = populate(repo, root, args.platform, source)
         check_expected_architecture(root, manifest, os.environ.get('DESKTOP_EXPECTED_ARCHITECTURE', ''))
         variant, signing, notary = signing_variant(args.platform)

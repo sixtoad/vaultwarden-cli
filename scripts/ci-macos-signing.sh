@@ -11,6 +11,7 @@
 #   APPLE_NOTARY_API_KEY_P8_BASE64     App Store Connect API key (.p8, base64)
 #   APPLE_NOTARY_API_KEY_ID            its key id
 #   APPLE_NOTARY_API_ISSUER_ID         its issuer id
+# MACOS_REQUIRE_DEVELOPER_ID=true (repository variable) requires all six.
 # None set (forks, pull requests): the development build, with a notice. The
 # signing three must be all set or all unset; so must the notary three. Values
 # are never printed. Refuses to run outside GitHub Actions: it changes the
@@ -27,6 +28,10 @@ setup() {
   local signing notary password identities count
   signing=$(present MACOS_DEVELOPER_ID_P12_BASE64 MACOS_DEVELOPER_ID_P12_PASSWORD MACOS_COMPANION_PROFILE_BASE64)
   notary=$(present APPLE_NOTARY_API_KEY_P8_BASE64 APPLE_NOTARY_API_KEY_ID APPLE_NOTARY_API_ISSUER_ID)
+  if [[ "${MACOS_REQUIRE_DEVELOPER_ID:-}" == true && ( "$signing" -ne 3 || "$notary" -ne 3 ) ]]; then
+    echo '::error::MACOS_REQUIRE_DEVELOPER_ID is true: all six Developer ID signing and notary secrets are required'
+    exit 1
+  fi
   if [[ "$signing" -eq 0 ]]; then
     echo '::notice::Developer ID signing secrets are not set: building the development (ad hoc) macOS archive; signing and notarization skipped'
     [[ "$notary" -eq 0 ]] || echo '::warning::notary secrets are set but signing secrets are not; notarization skipped'
@@ -41,12 +46,17 @@ setup() {
   /usr/bin/security set-keychain-settings -lut 7200 "$keychain"
   /usr/bin/security unlock-keychain -p "$password" "$keychain"
   printf '%s' "$MACOS_DEVELOPER_ID_P12_BASE64" | /usr/bin/base64 --decode > "$material/identity.p12"
-  /usr/bin/security import "$material/identity.p12" -k "$keychain" -f pkcs12 -P "$MACOS_DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign >/dev/null
+  # -x: the private key is not extractable from the temporary keychain.
+  /usr/bin/security import "$material/identity.p12" -k "$keychain" -f pkcs12 -x -P "$MACOS_DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign >/dev/null
   rm -f "$material/identity.p12"
   /usr/bin/security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
   # Search list: the temporary keychain first, then the runner's own.
-  eval "set -- $(/usr/bin/security list-keychains -d user | /usr/bin/tr '\n' ' ')"
-  /usr/bin/security list-keychains -d user -s "$keychain" "$@"
+  local existing=() line
+  while IFS= read -r line; do
+    line=${line#"${line%%[![:space:]]*}"}; line=${line#\"}; line=${line%\"}
+    [[ -n "$line" ]] && existing+=("$line")
+  done < <(/usr/bin/security list-keychains -d user)
+  /usr/bin/security list-keychains -d user -s "$keychain" ${existing[@]+"${existing[@]}"}
   identities=$(/usr/bin/security find-identity -v -p codesigning "$keychain" \
     | /usr/bin/awk -v team="($team)\"" '/"Developer ID Application: / && index($0, team) {print $2}' | /usr/bin/sort -u)
   count=$(printf '%s' "$identities" | /usr/bin/grep -c . || true)

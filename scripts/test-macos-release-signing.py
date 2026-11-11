@@ -135,6 +135,18 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(signing.SigningError, 'not name a file'):
                 signing.notary_from_env({**env, 'MACOS_NOTARY_KEY_PATH': str(key) + '.missing'})
 
+    def test_release_can_require_signing_and_notarization(self):
+        signed = {'MACOS_SIGNING_IDENTITY': 'A' * 40, 'MACOS_PROVISIONING_PROFILE': '/p'}
+        full = {**signed, 'MACOS_NOTARY_KEYCHAIN_PROFILE': 'vw'}
+        self.assertEqual(signing.configured({}), (None, None))
+        self.assertIsNone(signing.configured(signed)[1])
+        self.assertEqual(signing.configured({**full, 'MACOS_REQUIRE_DEVELOPER_ID': 'true'})[1].keychain_profile, 'vw')
+        for env in [{}, signed]:
+            with self.assertRaisesRegex(signing.SigningError, 'must both be configured'):
+                signing.configured({**env, 'MACOS_REQUIRE_DEVELOPER_ID': 'true'})
+        with self.assertRaisesRegex(signing.SigningError, 'without Developer ID signing'):
+            signing.configured({'MACOS_NOTARY_KEYCHAIN_PROFILE': 'vw'})
+
     def test_status_never_prints_secret_values(self):
         env = {'MACOS_SIGNING_IDENTITY': 'B' * 40, 'MACOS_PROVISIONING_PROFILE': '/secret/dir/companion.provisionprofile',
                'MACOS_SIGNING_KEYCHAIN': '/secret/k.keychain-db', 'MACOS_NOTARY_KEYCHAIN_PROFILE': 'secret-profile-name'}
@@ -219,6 +231,18 @@ class SigningTests(unittest.TestCase):
                 'Contents/Helpers/vaultwarden-cli', 'Contents/Helpers/vw-access',
                 'Contents/Frameworks/App.framework', 'Contents/Frameworks/FlutterMacOS.framework',
             ])
+
+    def test_java_class_files_are_not_code_and_nested_bundles_are_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app = app_tree(Path(temporary))
+            write(app / 'Contents/Resources/Example.class', b'\xca\xfe\xba\xbe\x00\x00\x00\x34' + b'\0' * 32, 0o644)
+            write(app / 'Contents/Resources/fat', b'\xca\xfe\xba\xbe\x00\x00\x00\x02' + b'\0' * 32)
+            names = [p.name for p in signing.signing_order(app)]
+            self.assertNotIn('Example.class', names)
+            self.assertIn('fat', names)
+            write(app / 'Contents/Library/LoginItems/Helper.app/Contents/MacOS/Helper')
+            with self.assertRaisesRegex(signing.SigningError, 'nested bundles'):
+                signing.signing_order(app)
 
     def test_hardened_runtime_timestamp_and_no_entitlements_for_nested_code(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -369,6 +393,12 @@ class CiSetupTests(unittest.TestCase):
             self.assertEqual((exported, files), ('', ['github-env']))
             for value in secrets.values():
                 self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_required_developer_id_fails_without_every_secret(self):
+        result, exported, files = self.run_setup(MACOS_REQUIRE_DEVELOPER_ID='true')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('all six', result.stdout)
+        self.assertEqual((exported, files), ('', ['github-env']))
 
     def test_refuses_outside_github_actions(self):
         result = subprocess.run(['/bin/bash', str(HERE / 'ci-macos-signing.sh'), 'setup'], env={'PATH': '/usr/bin:/bin'}, capture_output=True, text=True, timeout=60)
