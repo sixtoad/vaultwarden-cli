@@ -98,12 +98,36 @@ impl Drop for Reservation {
     }
 }
 pub(super) fn reserve() -> Result<Reservation, ExecutionError> {
+    #[cfg(test)]
+    if let Some(reserved) = TEST_POOL.with(|pool| pool.borrow().as_ref().map(Reaper::reserve)) {
+        return reserved;
+    }
     static REAPER: OnceLock<Result<Reaper, ExecutionError>> = OnceLock::new();
     REAPER
         .get_or_init(|| Reaper::create(CAPACITY, start))
         .as_ref()
         .map_err(|_error| ExecutionError::Unavailable)?
         .reserve()
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_POOL: std::cell::RefCell<Option<Reaper>> = const { std::cell::RefCell::new(None) };
+}
+/// Test seam: until the guard drops, `reserve` on this thread draws from a private
+/// pool of `capacity` slots. Exhausting the process-wide pool instead would deny
+/// every concurrently running test's image preparation.
+#[cfg(test)]
+pub(super) fn private_test_pool(capacity: usize) -> impl Drop {
+    struct Guard;
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            TEST_POOL.with(|pool| pool.borrow_mut().take());
+        }
+    }
+    let reaper = Reaper::create(capacity, start).unwrap();
+    TEST_POOL.with(|pool| *pool.borrow_mut() = Some(reaper));
+    Guard
 }
 
 #[cfg(test)]

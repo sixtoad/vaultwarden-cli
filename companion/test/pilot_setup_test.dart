@@ -336,6 +336,8 @@ void main() {
         expect(find.text('Configure and unlock'), findsNothing);
       } else {
         expect(field, findsOneWidget);
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
         await tester.enterText(field, jsonEncode(fixtureBundle()));
         expect(native.imports, 0);
         tester.binding.handleAppLifecycleStateChanged(
@@ -348,6 +350,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         await tester.enterText(field, jsonEncode(fixtureBundle()));
+        // The settings page is taller than the test view on hosts with wider
+        // fonts (Linux, Windows): scroll the button in before tapping it.
+        await tester.ensureVisible(find.text('Configure and unlock'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Configure and unlock'));
         await tester.pumpAndSettle();
         expect(tester.widget<TextField>(field).controller!.text, isEmpty);
