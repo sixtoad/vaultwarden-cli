@@ -206,6 +206,7 @@ unsafe extern "C" {
     static kSecCodeInfoUnique: core_foundation::string::CFStringRef;
     static kSecCodeInfoFlags: core_foundation::string::CFStringRef;
     static kSecCodeInfoEntitlementsDict: core_foundation::string::CFStringRef;
+    static kSecCodeInfoTeamIdentifier: core_foundation::string::CFStringRef;
 }
 /// Pin every validated native slice's exact cdhash. Darwin may select arm64e.x1
 /// at spawn even when Security's default static object selects arm64e.
@@ -220,6 +221,7 @@ pub(crate) fn signature(path: &Path) -> Result<String, ExecutionError> {
     let offsets = macho(&bytes)?;
     let url = CFURL::from_path(path, false).ok_or(ExecutionError::UnsafePath)?;
     let mut requirements = std::collections::BTreeSet::new();
+    let mut publishers = std::collections::BTreeSet::new();
     for offset in offsets {
         let key = unsafe { CFString::wrap_under_get_rule(kSecCodeAttributeUniversalFileOffset) };
         let number = CFNumber::from(offset as i64);
@@ -238,30 +240,110 @@ pub(crate) fn signature(path: &Path) -> Result<String, ExecutionError> {
             return Err(ExecutionError::UnsupportedImage);
         }
         let code = unsafe { SecStaticCode::wrap_under_create_rule(raw.cast()) };
-        requirements.insert(slice_signature(&code)?);
+        let (requirement, publisher) = slice_signature(&code)?;
+        requirements.insert(requirement);
+        publishers.insert(publisher);
+    }
+    // Every native slice of one image comes from one publisher.
+    if publishers.len() != 1 {
+        return Err(ExecutionError::UnsupportedImage);
     }
     Ok(format!(
         "({})",
         requirements.into_iter().collect::<Vec<_>>().join(" or ")
     ))
 }
-fn slice_signature(code: &SecStaticCode) -> Result<String, ExecutionError> {
-    let trusted: SecRequirement="anchor apple or (anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists)".parse().map_err(invalid)?;
-    code.check_validity(Flags::STRICT_VALIDATE | Flags::NO_NETWORK_ACCESS, &trusted)
-        .map_err(invalid)?;
-    signature_policy(code)
+/// The release publisher: Developer ID Application certificates of this team
+/// sign the published macOS bundle (`docs/desktop-installation.md`).
+pub(crate) const RELEASE_TEAM_ID: &str = "9884BZY594";
+/// Apple's Developer ID chain: the Developer ID Certification Authority marker on
+/// the intermediate and a Developer ID Application leaf. The installer's
+/// `--team-id` requirement (`scripts/macos-provider-install.py`) uses this clause.
+const DEVELOPER_ID: &str = "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists";
+/// Who signed a trusted image. Nothing else (ad hoc, Apple Development, Mac App
+/// Store or any other chain) is trusted.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Publisher {
+    /// Apple's own signature (the operating system's binaries).
+    Apple,
+    /// Developer ID Application of [`RELEASE_TEAM_ID`]: this project's release.
+    Release,
+    /// Developer ID Application of another team (an operator-chosen image).
+    DeveloperId(String),
 }
-
-// Independently testable policy; production calls it only after strict trusted-chain validation.
-fn signature_policy(code: &SecStaticCode) -> Result<String, ExecutionError> {
+fn trusted_requirement() -> String {
+    format!("anchor apple or ({DEVELOPER_ID})")
+}
+/// The release signing identity as a code requirement.
+pub(crate) fn release_requirement() -> String {
+    format!("{DEVELOPER_ID} and certificate leaf[subject.OU] = \"{RELEASE_TEAM_ID}\"")
+}
+fn satisfies(code: &SecStaticCode, requirement: &str) -> Result<bool, ExecutionError> {
+    let requirement: SecRequirement = requirement.parse().map_err(invalid)?;
+    Ok(code
+        .check_validity(
+            Flags::STRICT_VALIDATE | Flags::NO_NETWORK_ACCESS,
+            &requirement,
+        )
+        .is_ok())
+}
+fn slice_signature(code: &SecStaticCode) -> Result<(String, Publisher), ExecutionError> {
+    if !satisfies(code, &trusted_requirement())? {
+        return Err(ExecutionError::UnsupportedImage);
+    }
+    let publisher = publisher(code)?;
+    Ok((signature_policy(code)?, publisher))
+}
+/// Classify a code object already validated against [`trusted_requirement`].
+fn publisher(code: &SecStaticCode) -> Result<Publisher, ExecutionError> {
+    if satisfies(code, "anchor apple")? {
+        return Ok(Publisher::Apple);
+    }
+    if satisfies(code, &release_requirement())? {
+        return Ok(Publisher::Release);
+    }
+    if !satisfies(code, DEVELOPER_ID)? {
+        return Err(ExecutionError::UnsupportedImage);
+    }
+    let team = team_identifier(code)?;
+    // Only the release requirement admits the release team.
+    if team == RELEASE_TEAM_ID {
+        return Err(ExecutionError::UnsupportedImage);
+    }
+    Ok(Publisher::DeveloperId(team))
+}
+fn team_identifier(code: &SecStaticCode) -> Result<String, ExecutionError> {
+    let info = signing_information(code)?;
+    let key = unsafe { CFString::wrap_under_get_rule(kSecCodeInfoTeamIdentifier) };
+    let team = info
+        .find(&key)
+        .and_then(|v| v.downcast::<CFString>())
+        .ok_or(ExecutionError::UnsupportedImage)?
+        .to_string();
+    if team.len() != 10
+        || !team
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+    {
+        return Err(ExecutionError::UnsupportedImage);
+    }
+    Ok(team)
+}
+fn signing_information(
+    code: &SecStaticCode,
+) -> Result<CFDictionary<CFString, CFType>, ExecutionError> {
     let mut info = std::ptr::null();
     if unsafe { SecCodeCopySigningInformation(code.as_CFTypeRef(), 2, &mut info) } != 0
         || info.is_null()
     {
         return Err(ExecutionError::UnsupportedImage);
     }
-    let info: CFDictionary<CFString, CFType> =
-        unsafe { CFDictionary::wrap_under_create_rule(info) };
+    Ok(unsafe { CFDictionary::wrap_under_create_rule(info) })
+}
+
+// Independently testable policy; production calls it only after strict trusted-chain validation.
+fn signature_policy(code: &SecStaticCode) -> Result<String, ExecutionError> {
+    let info = signing_information(code)?;
     let key = unsafe { CFString::wrap_under_get_rule(kSecCodeInfoFlags) };
     let flags = info
         .find(&key)

@@ -220,3 +220,139 @@ fn unsigned_adhoc_and_forbidden_entitlements_never_qualify_as_production_images(
         );
     }
 }
+
+/// A release-signed (Developer ID Application, team `RELEASE_TEAM_ID`, hardened
+/// runtime) thin arm64 binary supplied by the publisher; CI has no signing identity.
+/// `docs/desktop-installation.md` gives the commands that produce it.
+fn release_fixture() -> std::path::PathBuf {
+    std::env::var_os("VW_RELEASE_SIGNED_FIXTURE")
+        .map(std::path::PathBuf::from)
+        .expect("VW_RELEASE_SIGNED_FIXTURE names a release-signed arm64 binary")
+}
+#[test]
+#[ignore = "needs a release-signed fixture: VW_RELEASE_SIGNED_FIXTURE"]
+fn one_image_never_mixes_publishers_across_native_slices() {
+    let root = tempfile::tempdir().unwrap();
+    let apple = root.path().join("apple-arm64e");
+    let mixed = root.path().join("mixed");
+    let lipo = |args: &[&std::ffi::OsStr]| {
+        assert!(
+            std::process::Command::new("/usr/bin/lipo")
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        );
+    };
+    lipo(&[
+        "/usr/bin/ssh".as_ref(),
+        "-thin".as_ref(),
+        "arm64e".as_ref(),
+        "-output".as_ref(),
+        apple.as_os_str(),
+    ]);
+    let release = release_fixture();
+    assert!(signature(&apple).is_ok(), "an Apple slice alone is trusted");
+    assert!(
+        signature(&release).is_ok(),
+        "a release slice alone is trusted"
+    );
+    lipo(&[
+        "-create".as_ref(),
+        apple.as_os_str(),
+        release.as_os_str(),
+        "-output".as_ref(),
+        mixed.as_os_str(),
+    ]);
+    assert_eq!(macho(&std::fs::read(&mixed).unwrap()).unwrap().len(), 2);
+    assert!(
+        signature(&mixed).is_err(),
+        "slices of different publishers are one image only in name"
+    );
+}
+fn static_code(path: &std::path::Path) -> SecStaticCode {
+    let url = CFURL::from_path(path, false).unwrap();
+    SecStaticCode::from_path(&url, Flags::NONE).unwrap()
+}
+#[test]
+fn release_requirement_is_the_full_developer_id_chain_of_the_release_team() {
+    assert_eq!(RELEASE_TEAM_ID, "9884BZY594");
+    assert_eq!(
+        release_requirement(),
+        "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and \
+         certificate leaf[field.1.2.840.113635.100.6.1.13] exists and \
+         certificate leaf[subject.OU] = \"9884BZY594\""
+    );
+    // Image trust is Apple or a Developer ID chain with the Developer ID intermediate.
+    assert_eq!(
+        trusted_requirement(),
+        format!("anchor apple or ({DEVELOPER_ID})")
+    );
+    assert!(DEVELOPER_ID.contains("certificate 1[field.1.2.840.113635.100.6.2.6] exists"));
+    for requirement in [trusted_requirement(), release_requirement()] {
+        assert!(
+            requirement.parse::<SecRequirement>().is_ok(),
+            "{requirement}"
+        );
+    }
+}
+#[test]
+fn apple_system_image_is_trusted_but_never_the_release_publisher() {
+    let ssh = std::path::Path::new("/usr/bin/ssh");
+    assert!(signature(ssh).is_ok());
+    let code = static_code(ssh);
+    assert_eq!(publisher(&code).unwrap(), Publisher::Apple);
+    assert!(!satisfies(&code, &release_requirement()).unwrap());
+}
+#[test]
+fn development_signed_build_is_not_trusted_as_the_release_build() {
+    // The development bundle signs its commands ad hoc with a hardened runtime.
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("development.c");
+    let binary = root.path().join("vaultwarden-accessd");
+    std::fs::write(&source, b"int main(void) { return 0; }\n").unwrap();
+    assert!(
+        std::process::Command::new("/usr/bin/clang")
+            .args(["-arch", "arm64"])
+            .arg(&source)
+            .arg("-o")
+            .arg(&binary)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        std::process::Command::new("/usr/bin/codesign")
+            .args(["--force", "--sign", "-", "--options", "runtime"])
+            .args(["--identifier", "dev.vaultwarden.vaultwarden-accessd"])
+            .arg(&binary)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let code = static_code(&binary);
+    assert!(!satisfies(&code, &release_requirement()).unwrap());
+    assert!(!satisfies(&code, &trusted_requirement()).unwrap());
+    assert!(publisher(&code).is_err());
+    assert!(signature(&binary).is_err());
+}
+#[test]
+#[ignore = "needs a release-signed fixture: VW_RELEASE_SIGNED_FIXTURE"]
+fn release_signed_build_is_trusted_as_release_and_not_as_anything_else() {
+    let release = release_fixture();
+    let requirement = signature(&release).unwrap();
+    assert!(requirement.starts_with("(cdhash H\""), "{requirement}");
+    let code = static_code(&release);
+    assert_eq!(publisher(&code).unwrap(), Publisher::Release);
+    assert!(satisfies(&code, &release_requirement()).unwrap());
+    assert!(!satisfies(&code, "anchor apple").unwrap());
+    assert_eq!(team_identifier(&code).unwrap(), RELEASE_TEAM_ID);
+    // Another team's requirement never admits the release build.
+    assert!(
+        !satisfies(
+            &code,
+            &release_requirement().replace(RELEASE_TEAM_ID, "ABCDE12345")
+        )
+        .unwrap()
+    );
+}

@@ -9,17 +9,20 @@ required. The CI desktop matrix performs the full native gates before packaging.
 The release workflow publishes the same coherent **development** archives:
 `companion-linux-development.tar.gz`, `companion-windows-development.tar.gz`,
 and `companion-macos-arm64-development.tar.gz` (Apple Silicon, with the protected
-commands), all listed in the release `SHA256SUMS.txt`. Intel (x86_64) macOS is no
+commands), all listed in the release `SHA256SUMS.txt`. Once the owner sets the
+Developer ID secrets, the macOS archive is instead
+`companion-macos-arm64-notarized.tar.gz` (Developer ID signed, notarized and
+stapled; see [Developer ID signing and notarization](#developer-id-signing-and-notarization-macos-62)). Intel (x86_64) macOS is no
 longer supported or built (owner decision 2026-11-10): there is no Intel macOS
 archive, and the packaging helper refuses an x86_64 macOS build.
-macOS distribution signing/notarization remains a publisher prerequisite;
-this helper refuses to replace a non-ad-hoc signature with development signing.
+Without signing material the helper builds the development bundle and refuses
+to replace a non-ad-hoc signature with development signing.
 Do not bypass Gatekeeper, remove quarantine or modify an installed application.
 
 | Platform | Bundled tools | Request / approve / execute capability |
 | --- | --- | --- |
 | Linux | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, `vaultwarden-access-exec`, command launcher | `vw-access` requests protected work; provider/helper implement approved Linux delivery. Flutter provider transport/approval is unavailable. |
-| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. An administrator installs the provider into `/Library/VaultwardenAccess` and its launchd service with a root-owned copy of `scripts/macos-provider-install.py` run under sudo, from a plan reviewed with `scripts/macos-provider-plan.py` (see below); the app itself installs nothing. Development signing only. The provider verifies production Touch ID approval v2; the companion's approval settings list the approval methods the installed app version offers. Guided enrollment and notifications are not available (#59, #61). |
+| macOS, Apple Silicon (arm64) | `vaultwarden-cli`, `vw-access`, `vaultwarden-accessd`, command launcher | Vault CLI works. `vw-access` and the native provider are bundled in `Contents/Helpers` and advertised. An administrator installs the provider into `/Library/VaultwardenAccess` and its launchd service with a root-owned copy of `scripts/macos-provider-install.py` run under sudo, from a plan reviewed with `scripts/macos-provider-plan.py` (see below); the app itself installs nothing. Development (ad hoc) or Developer ID signed, team 9884BZY594 (#62). The provider verifies production Touch ID approval v2; the companion's approval settings list the approval methods the installed app version offers. Guided enrollment and notifications are not available (#59, #61). |
 | macOS, Intel (x86_64) | none: not supported or built | Intel Macs are no longer supported. No Intel macOS bundle or CLI binary is published, and the packaging helper refuses to build one. The native provider also rejects Intel and Rosetta at runtime. |
 | Windows | `vaultwarden-cli.exe`, command launcher | Vault CLI works. Protected requesting/provider execution and Flutter approval transport are unavailable. |
 
@@ -30,7 +33,7 @@ running app/core versions are checked. Old ABI-1 command launchers can select
 new compatible app/core versions. A bundle records its host command architecture;
 the macOS app, its core library and its commands are all arm64: `companion/macos/Runner/Configs` sets `ARCHS = arm64` for every target, `scripts/build-companion-macos-core.sh` refuses an x86_64 slice, and the bundler checks every executable with `lipo`. The `vaultwarden-access-exec` helper is Linux's systemd helper and is not shipped on macOS: the native provider does not use it.
 
-The CI and release desktop matrices build the macOS bundle once, on an Apple Silicon runner (`macos-26`), giving the arm64 archive with `Contents/Helpers/vw-access` and `Contents/Helpers/vaultwarden-accessd`. Each job sets `DESKTOP_EXPECTED_ARCHITECTURE`, and packaging fails if the bundle's architecture or its helper set differs from it, so a runner change cannot publish another architecture as the arm64 one; an expected or actual x86_64 macOS architecture is refused outright. The archive is development-signed (ad hoc); Developer ID signing and notarization are #62. A command folder enabled from an earlier macOS arm64 bundle (which listed only `vaultwarden-cli`) is reported as an incompatible command setup by the new bundle: enable commands in a new empty user folder, as for any command-set change.
+The CI and release desktop matrices build the macOS bundle once, on an Apple Silicon runner (`macos-26`), giving the arm64 archive with `Contents/Helpers/vw-access` and `Contents/Helpers/vaultwarden-accessd`. Each job sets `DESKTOP_EXPECTED_ARCHITECTURE`, and packaging fails if the bundle's architecture or its helper set differs from it, so a runner change cannot publish another architecture as the arm64 one; an expected or actual x86_64 macOS architecture is refused outright. Without the Developer ID secrets the archive is development-signed (ad hoc); with them it is Developer ID signed and notarized (#62, below). A command folder enabled from an earlier macOS arm64 bundle (which listed only `vaultwarden-cli`) is reported as an incompatible command setup by the new bundle: enable commands in a new empty user folder, as for any command-set change.
 
 `bundle.json` (macOS: `Contents/Resources/bundle.json`) binds every regular
 payload, required runtime libraries, command paths, supported roles and internal
@@ -133,6 +136,182 @@ trust store, installed app or service is touched.
 tracked diffs, all tracked/untracked input paths, file/link kinds, modes and hashes. Packaging refuses
 if any source input changes during build, recording `source-changed-paths.json`.
 The historic PR #52 Windows artifact did not retain changed paths. Instrumented Windows CI run **40867575316**, job **123426118530**, on this slice's first commit reproduced the report and refused packaging. Exactly seven Flutter-generated registrant/CMake files changed from checkout CRLF bytes to generator LF bytes. Each before hash equals the committed LF bytes converted to CRLF; each after hash equals the exact committed LF bytes. Those seven LF hashes also match PR #52 commit `93431e6460f5a73c1d0f2e8d8fd087bade4e2f54`, so the reproduction uses the exact historical inputs rather than inferring a cause from the old boolean alone. Git's normalized diff was empty despite seven modified status entries. The narrow `.gitattributes` rules fix checkout normalization for those exact seven files only. A regression checks `core.autocrlf=true` checkout and regeneration without source drift. Final matching Windows CI must still show clean provenance; no flag is forced false and no files are discarded or ignored.
+
+## Developer ID signing and notarization (macOS, #62)
+
+The release publisher is the Developer ID Application identity of team
+**9884BZY594**. When signing material is configured, `scripts/desktop-bundle.py`
+signs the arm64 bundle with it (`scripts/macos-release-signing.py`); otherwise it
+builds the development (ad hoc) bundle exactly as before and prints that it did.
+
+What a Developer ID bundle carries:
+
+| Component | Signature | Entitlements |
+| --- | --- | --- |
+| `Contents/Helpers/vw-access`, `vaultwarden-accessd`, `vaultwarden-cli`, `companion-command` | Developer ID, hardened runtime, secure timestamp, identifier `dev.vaultwarden.<name>` | none |
+| `Contents/Frameworks/libcompanion_core.dylib`, `FlutterMacOS.framework`, `App.framework` (and any other nested Mach-O) | Developer ID, hardened runtime, secure timestamp | none |
+| `companion_slice.app` | Developer ID, hardened runtime, secure timestamp | `companion/macos/Runner/Release.entitlements` (sandbox, network client, user-selected read/write and executable) plus `com.apple.application-identifier` = `9884BZY594.dev.vaultwarden.companionSlice`, `com.apple.developer.team-identifier` and `keychain-access-groups` = `[9884BZY594.dev.vaultwarden.companionSlice]` |
+
+`keychain-access-groups` is a restricted entitlement: the companion's Secure
+Enclave approval key lives in the data-protection Keychain, so the app embeds
+the Developer ID provisioning profile `Vaultwarden_companion.provisionprofile`
+(app id `9884BZY594.dev.vaultwarden.companionSlice`) as
+`Contents/embedded.provisionprofile`. Before signing, the profile is checked: a
+macOS profile of team 9884BZY594 that provisions all devices (Developer ID, not a
+development profile), unexpired, for exactly this app id, without
+`get-task-allow`, and granting the keychain group. Xcode's ad hoc build adds
+`get-task-allow`; it is dropped, and any other difference from
+`Release.entitlements` refuses the build. No component carries
+`get-task-allow`, JIT, unsigned memory, library-validation or DYLD exceptions.
+The second profile, `Approval_Companion_Provider_Developer_ID.provisionprofile`
+(`9884BZY594.dev.vaultwarden.ApprovalCompanion.ProviderBridge`), matches no
+artifact built today: the Swift Approval Companion is `dev.vaultwarden.ApprovalCompanion`
+and is not part of this bundle. It is not used.
+
+Every signature exists before `bundle.json` hashes the payloads (the embedded
+profile is a recorded payload); the app is sealed last. The bundle is then
+verified: `codesign --verify --deep --strict -R '=<Developer ID requirement of
+9884BZY594>'` on the app and the same requirement, the team identifier, the
+hardened-runtime flag, a timestamp and the entitlements for every component.
+
+With notary credentials, the app is submitted (`xcrun notarytool submit --wait
+--timeout 30m`), the ticket is stapled (`xcrun stapler staple`, `stapler
+validate`) and Gatekeeper must report `source=Notarized Developer ID`
+(`spctl --assess --type execute`). A rejected submission saves and prints the
+notary log and fails the build. The stapled ticket (`Contents/CodeResources`)
+is written after the final signature, so the manifest cannot list it; the
+companion's runtime inventory treats exactly that path as signature metadata on
+macOS, like `_CodeSignature`, and `codesign --verify --deep --strict` still
+covers the bundle. Archive names and `artifact.json` say which build
+you have:
+
+| Archive | Meaning |
+| --- | --- |
+| `companion-macos-arm64-notarized.tar.gz` | Developer ID signed, notarized and stapled; `artifact.json` `signing` = `{"kind": "developer-id", "team_id": "9884BZY594", "notarized": true}` |
+| `companion-macos-arm64-signed.tar.gz` | Developer ID signed, NOT notarized (no notary credentials); Gatekeeper refuses it after download |
+| `companion-macos-arm64-development.tar.gz` | ad hoc development build (no signing material) |
+
+The native provider recognizes the release publisher: its image trust
+(`src/adapters/native/image.rs`) admits Apple, the release team's Developer ID
+(`RELEASE_TEAM_ID`, the same requirement as the installer's `--team-id
+9884BZY594`) and other teams' Developer ID images, all with the Developer ID
+intermediate; anything else (ad hoc, Apple Development, other chains) is
+rejected, and the native slices of one image must share one publisher. Operator
+images signed by another team's Developer ID stay trusted, as before (the
+provider runs operator-registered images, not the bundle's helpers); the
+classification names the release publisher and enforces one publisher per image. Install
+a Developer ID bundle with `--team-id 9884BZY594`; the installer refuses it
+under `--allow-development-signature`, and refuses a development build under
+`--team-id`.
+
+### Release workflow secrets (owner, one time)
+
+The release workflow (`.github/workflows/release.yml`, which receives exactly
+these six secrets from `ci.yml`) builds everything first, then runs
+`scripts/ci-macos-signing.sh setup` and only then the package step that signs,
+notarizes and archives, so no build script or dependency runs while the signing
+material exists. Setup imports the identity into a temporary keychain under
+`$RUNNER_TEMP` with a non-extractable private key; cleanup deletes the keychain,
+profile and API key in an `always()` step. With no secrets (forks, pull
+requests) the macOS archive stays the development build and the job prints a
+notice; a partial set fails the job. After setting the secrets, set the
+repository **variable** `MACOS_REQUIRE_DEVELOPER_ID` to `true`: from then on a
+release fails instead of publishing an unsigned or unnotarized macOS archive
+(`gh variable set MACOS_REQUIRE_DEVELOPER_ID --body true --repo
+sixtoad/vaultwarden-cli`). Set these repository Actions secrets:
+
+| Secret | Value |
+| --- | --- |
+| `MACOS_DEVELOPER_ID_P12_BASE64` | base64 of a `.p12` holding only the "Developer ID Application: Sixto Cantolla (9884BZY594)" certificate and its private key |
+| `MACOS_DEVELOPER_ID_P12_PASSWORD` | the `.p12` export password |
+| `MACOS_COMPANION_PROFILE_BASE64` | base64 of `Vaultwarden_companion.provisionprofile` |
+| `APPLE_NOTARY_API_KEY_P8_BASE64` | base64 of the App Store Connect API key `AuthKey_<KEYID>.p8` (Developer role) |
+| `APPLE_NOTARY_API_KEY_ID` | its key id |
+| `APPLE_NOTARY_API_ISSUER_ID` | its issuer id |
+
+One-time commands (run by the owner; nothing here is automated):
+
+```bash
+# 1. Export the Developer ID identity: Keychain Access > login > My Certificates >
+#    "Developer ID Application: Sixto Cantolla (9884BZY594)" > Export... > .p12 with a
+#    strong password, saved as ~/developer-id.p12 (only that identity, not all of them).
+# 2. Store the secrets (gh reads each value from standard input; nothing in shell history):
+gh secret set MACOS_DEVELOPER_ID_P12_BASE64 --repo sixtoad/vaultwarden-cli < <(base64 -i ~/developer-id.p12)
+gh secret set MACOS_DEVELOPER_ID_P12_PASSWORD --repo sixtoad/vaultwarden-cli   # paste the password at the prompt
+gh secret set MACOS_COMPANION_PROFILE_BASE64 --repo sixtoad/vaultwarden-cli \
+  < <(base64 -i ~/Downloads/Vaultwarden_companion.provisionprofile)
+gh secret set APPLE_NOTARY_API_KEY_P8_BASE64 --repo sixtoad/vaultwarden-cli < <(base64 -i ~/AuthKey_<KEYID>.p8)
+gh secret set APPLE_NOTARY_API_KEY_ID --repo sixtoad/vaultwarden-cli       # paste the key id
+gh secret set APPLE_NOTARY_API_ISSUER_ID --repo sixtoad/vaultwarden-cli    # paste the issuer id
+# 3. Remove the exported files.
+rm -P ~/developer-id.p12
+```
+
+The API key is created in App Store Connect > Users and Access > Integrations >
+App Store Connect API (Team Keys, role Developer); the `.p8` downloads once.
+
+### Local signed build
+
+`scripts/release-macos-desktop-bundle.sh EVIDENCE-DIR` builds the same bundle on
+the owner's Apple Silicon Mac. It signs with the one valid "Developer ID
+Application: … (9884BZY594)" identity in the login Keychain (by SHA-1), embeds
+`.signing/Vaultwarden_companion.provisionprofile` (gitignored; copy the profile
+there, or pass `--profile FILE`) and notarizes with the notarytool keychain
+profile `vaultwarden-notary` (`--notary-profile NAME` to change, `--no-notarize`
+to skip). It installs nothing and changes no Keychain item. The keychain profile
+is created once by the owner:
+
+```bash
+xcrun notarytool store-credentials vaultwarden-notary \
+  --key ~/AuthKey_<KEYID>.p8 --key-id <KEYID> --issuer <ISSUER-ID>
+# or, with an app-specific password:
+xcrun notarytool store-credentials vaultwarden-notary --apple-id <apple id> --team-id 9884BZY594
+```
+
+`python3 scripts/macos-release-signing.py status` says what the environment
+configures (never a value); `verify APP` re-checks a built bundle and
+`notarize APP` notarizes an already signed one.
+
+The release-publisher acceptance tests of the provider need a release-signed
+binary, which CI cannot make. Run them on the owner's Mac:
+
+```bash
+mkdir -p ~/.vwtmp/release-fixture && cd ~/.vwtmp/release-fixture
+printf 'int main(void){return 0;}\n' > f.c && clang -arch arm64 f.c -o release-fixture
+codesign --sign "Developer ID Application: Sixto Cantolla (9884BZY594)" --options runtime --timestamp release-fixture
+cd <checkout> && TMPDIR=$HOME/.vwtmp VW_RELEASE_SIGNED_FIXTURE=$HOME/.vwtmp/release-fixture/release-fixture \
+  cargo test -j 4 --lib adapters::native::image -- --include-ignored
+```
+
+Windows code signing is out of scope (#62): Windows archives stay unsigned
+development builds.
+
+### Upgrade, rollback and uninstall rehearsal (with the owner, not yet run)
+
+On the owner's Apple Silicon Mac, from a notarized archive downloaded through a
+browser (so it carries quarantine):
+
+1. Verify the checksum against the release `SHA256SUMS.txt`, extract into a new
+   folder in your home, and confirm `spctl -a -vv -t exec companion_slice.app`
+   reports `source=Notarized Developer ID` and `xcrun stapler validate` passes.
+   Open the app: no Gatekeeper override is offered or needed.
+2. `codesign -dvv` on every `Contents/Helpers/*` shows team 9884BZY594 and
+   `flags=0x10000(runtime)`.
+3. Plan and install the provider with `--team-id 9884BZY594` (sections above);
+   confirm the installer refuses the same bundle with
+   `--allow-development-signature`.
+4. Upgrade to the next notarized version with `upgrade --team-id 9884BZY594`;
+   confirm `status`, the launchd service (`launchctl print
+   system/com.cantolla.vaultwarden-accessd`) and that the service-account
+   secret store and the companion's Keychain approval key survive.
+5. `rollback` to the previous version, then upgrade again.
+6. `uninstall` (keeps state and accounts), confirm the LaunchDaemon and versions
+   are gone and state is kept; then `uninstall --purge --remove-accounts` on the
+   disposable setup only, and confirm the companion's data-protection Keychain
+   item is removed with the app (`security` cannot list it; re-enrollment
+   creates a new key).
+
+Record each step's output as evidence before closing #62.
 
 ## macOS provider installer plan (review material, installs nothing)
 
