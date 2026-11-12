@@ -452,6 +452,32 @@ struct Recording {
     /// argument vector): observation is reported lost instead of hanging the run.
     created: std::time::Instant,
 }
+/// Held while a re-executed copy of this test binary runs: the process listing test
+/// requires that no other process carries this binary's name.
+static SELF_COPY: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// Runs `body` in a re-executed copy of this test binary that runs only `name`.
+/// The supervision tests inspect every direct child of the process; tests running
+/// in parallel in the same process would add their own children to that view.
+fn isolated(name: &str, body: impl FnOnce()) {
+    const KEY: &str = "VW_NATIVE_ISOLATED_TEST";
+    if std::env::var_os(KEY).is_some_and(|value| value == name) {
+        body();
+        return;
+    }
+    let _copy = SELF_COPY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            &format!("adapters::native::mutation_tests::{name}"),
+            "--exact",
+            "--test-threads=1",
+        ])
+        .env(KEY, name)
+        .status()
+        .unwrap();
+    assert!(status.success(), "isolated {name}: {status}");
+}
 fn children() -> Vec<libc::pid_t> {
     let mut pids: Vec<libc::pid_t> = vec![0; 4096];
     // <sys/proc_info.h> PROC_PPID_ONLY: direct children; the result is in bytes.
@@ -533,67 +559,77 @@ fn supervise(argv: &[&str], control: &Recording) -> Supervision {
 
 #[test]
 fn native_supervision_maps_natural_exit_status_and_reports_reaped_cleanup() {
-    for (argv, outcome) in [
-        (&["ssh", "-V"][..], ExecutionOutcome::ExitedZero),
-        (&["ssh", "-Z"][..], ExecutionOutcome::ExitedNonZero),
-    ] {
-        let control = Recording::new(false);
-        let result = supervise(argv, &control);
-        assert_eq!(result.outcome, Ok(outcome), "{argv:?}");
-        assert_eq!(result.cleanup, CleanupEvidence::Reaped, "{argv:?}");
-        assert!(!result.helper_reaped);
-        assert!(control.started.get());
-        assert!(control.live_calls.get() >= 1);
-        // The supervisor, not a later caller, reaped the child.
-        assert!(
-            children().iter().all(|pid| control.before.contains(pid)),
-            "{argv:?}"
-        );
-    }
-    // A consumer that is still running at the first polls must be waited for, not
-    // reported lost: the fixture server closes the connection after 300 ms.
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port().to_string();
-    let server = std::thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
-        std::thread::sleep(Duration::from_millis(300));
-        drop(stream);
-    });
-    let control = Recording::new(false);
-    let result = supervise(
-        &[
-            "ssh",
-            "-F",
-            "/dev/null",
-            "-oBatchMode=yes",
-            "-oConnectTimeout=5",
-            "-p",
-            &port,
-            "127.0.0.1",
-        ],
-        &control,
-    );
-    server.join().unwrap();
-    assert_eq!(result.outcome, Ok(ExecutionOutcome::ExitedNonZero));
-    assert_eq!(result.cleanup, CleanupEvidence::Reaped);
-    assert!(
-        control.live_calls.get() > 5,
-        "the supervisor polled while it ran"
+    isolated(
+        "native_supervision_maps_natural_exit_status_and_reports_reaped_cleanup",
+        || {
+            for (argv, outcome) in [
+                (&["ssh", "-V"][..], ExecutionOutcome::ExitedZero),
+                (&["ssh", "-Z"][..], ExecutionOutcome::ExitedNonZero),
+            ] {
+                let control = Recording::new(false);
+                let result = supervise(argv, &control);
+                assert_eq!(result.outcome, Ok(outcome), "{argv:?}");
+                assert_eq!(result.cleanup, CleanupEvidence::Reaped, "{argv:?}");
+                assert!(!result.helper_reaped);
+                assert!(control.started.get());
+                assert!(control.live_calls.get() >= 1);
+                // The supervisor, not a later caller, reaped the child.
+                assert!(
+                    children().iter().all(|pid| control.before.contains(pid)),
+                    "{argv:?}"
+                );
+            }
+            // A consumer that is still running at the first polls must be waited for, not
+            // reported lost: the fixture server closes the connection after 300 ms.
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let port = listener.local_addr().unwrap().port().to_string();
+            let server = std::thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                std::thread::sleep(Duration::from_millis(300));
+                drop(stream);
+            });
+            let control = Recording::new(false);
+            let result = supervise(
+                &[
+                    "ssh",
+                    "-F",
+                    "/dev/null",
+                    "-oBatchMode=yes",
+                    "-oConnectTimeout=5",
+                    "-p",
+                    &port,
+                    "127.0.0.1",
+                ],
+                &control,
+            );
+            server.join().unwrap();
+            assert_eq!(result.outcome, Ok(ExecutionOutcome::ExitedNonZero));
+            assert_eq!(result.cleanup, CleanupEvidence::Reaped);
+            assert!(
+                control.live_calls.get() > 5,
+                "the supervisor polled while it ran"
+            );
+        },
     );
 }
 
 #[test]
 fn native_supervision_treats_a_child_reaped_elsewhere_as_lost_observation_at_once() {
-    let control = Recording::new(true);
-    let result = supervise(&["ssh", "-V"], &control);
-    assert!(control.stolen.get());
-    assert_eq!(result.outcome, Err(ExecutionError::ObservationLost));
-    // The PID is no longer provably reaped by the supervisor: ownership is detached.
-    assert_eq!(result.cleanup, CleanupEvidence::Detached);
-    assert_eq!(
-        control.live_calls.get(),
-        1,
-        "waitpid failure must end supervision without polling again"
+    isolated(
+        "native_supervision_treats_a_child_reaped_elsewhere_as_lost_observation_at_once",
+        || {
+            let control = Recording::new(true);
+            let result = supervise(&["ssh", "-V"], &control);
+            assert!(control.stolen.get());
+            assert_eq!(result.outcome, Err(ExecutionError::ObservationLost));
+            // The PID is no longer provably reaped by the supervisor: ownership is detached.
+            assert_eq!(result.cleanup, CleanupEvidence::Detached);
+            assert_eq!(
+                control.live_calls.get(),
+                1,
+                "waitpid failure must end supervision without polling again"
+            );
+        },
     );
 }
 
@@ -658,27 +694,48 @@ fn native_executable_file_properties_each_reject_before_the_image_is_read() {
 /// listing buffer holds every process of the account (here at least 48 extra ones).
 #[test]
 fn native_process_listing_skips_the_caller_and_holds_every_listed_process() {
+    let _copy = SELF_COPY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let euid = unsafe { libc::geteuid() };
     let own = std::env::current_exe().unwrap();
     assert_eq!(
         platform::other_process_named(euid, own.file_name().unwrap()),
         Ok(false)
     );
-    let mut sleepers: Vec<_> = (0..48)
-        .map(|_| {
-            std::process::Command::new("/bin/sleep")
-                .arg("30")
-                .env_clear()
-                .spawn()
-                .unwrap()
-        })
-        .collect();
-    let found = platform::other_process_named(euid, std::ffi::OsStr::new("sleep"));
-    for sleeper in &mut sleepers {
-        sleeper.kill().unwrap();
-        sleeper.wait().unwrap();
+    // A uniquely named probe, then enough newer children that a listing buffer
+    // holding only a quarter of the account's processes misses the probe whether
+    // the kernel lists newest or oldest first: with O older processes and K newer
+    // ones the probe sits at about K or O, both beyond (O + K) / 4 + 17 entries.
+    let dir = tempfile::tempdir().unwrap();
+    let probe_name = format!("vw-listing-probe-{}", std::process::id());
+    let probe_path = dir.path().join(&probe_name);
+    std::fs::copy("/bin/sleep", &probe_path).unwrap();
+    let older = unsafe { libc::proc_listpids(4, euid, std::ptr::null_mut(), 0) } as usize
+        / std::mem::size_of::<libc::pid_t>();
+    let newer = (older / 3 + 64).max(48);
+    let mut children = vec![
+        std::process::Command::new(&probe_path)
+            .arg("60")
+            .env_clear()
+            .spawn()
+            .unwrap(),
+    ];
+    children.extend((0..newer).map(|_| {
+        std::process::Command::new("/bin/sleep")
+            .arg("60")
+            .env_clear()
+            .spawn()
+            .unwrap()
+    }));
+    let probe = platform::other_process_named(euid, std::ffi::OsStr::new(&probe_name));
+    let sleeper = platform::other_process_named(euid, std::ffi::OsStr::new("sleep"));
+    for child in &mut children {
+        child.kill().unwrap();
+        child.wait().unwrap();
     }
-    assert_eq!(found, Ok(true));
+    assert_eq!(sleeper, Ok(true));
+    assert_eq!(probe, Ok(true), "{older} older and {newer} newer processes");
 }
 
 /// A peer token is read only from a connected socket; a failed query never yields
@@ -716,64 +773,69 @@ fn native_no_writer_open_never_blocks_on_a_fifo_component() {
 /// keep their own exit status.
 #[test]
 fn native_supervision_detaches_only_a_live_consumer_to_the_reaper() {
-    // An exited, not yet waited-for sibling: only its owner may collect its status.
-    let mut sibling = std::process::Command::new("/usr/bin/true")
-        .env_clear()
-        .spawn()
-        .unwrap();
-    std::thread::sleep(Duration::from_millis(200));
-    let completed = supervise(&["ssh", "-V"], &Recording::new(false));
-    assert_eq!(completed.cleanup, CleanupEvidence::Reaped);
-    std::thread::sleep(Duration::from_millis(300));
-    assert!(
-        sibling.wait().unwrap().success(),
-        "a completed supervision must not hand the reaper a wildcard PID"
-    );
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port().to_string();
-    // Bounded: a consumer that never connects (a mutated argument vector) must not
-    // leave this thread waiting in accept.
-    listener.set_nonblocking(true).unwrap();
-    let server = std::thread::spawn(move || {
-        let deadline = std::time::Instant::now() + Duration::from_secs(10);
-        while std::time::Instant::now() < deadline {
-            if let Ok((stream, _)) = listener.accept() {
-                std::thread::sleep(Duration::from_millis(300));
-                drop(stream);
-                return;
+    isolated(
+        "native_supervision_detaches_only_a_live_consumer_to_the_reaper",
+        || {
+            // An exited, not yet waited-for sibling: only its owner may collect its status.
+            let mut sibling = std::process::Command::new("/usr/bin/true")
+                .env_clear()
+                .spawn()
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+            let completed = supervise(&["ssh", "-V"], &Recording::new(false));
+            assert_eq!(completed.cleanup, CleanupEvidence::Reaped);
+            std::thread::sleep(Duration::from_millis(300));
+            assert!(
+                sibling.wait().unwrap().success(),
+                "a completed supervision must not hand the reaper a wildcard PID"
+            );
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let port = listener.local_addr().unwrap().port().to_string();
+            // Bounded: a consumer that never connects (a mutated argument vector) must not
+            // leave this thread waiting in accept.
+            listener.set_nonblocking(true).unwrap();
+            let server = std::thread::spawn(move || {
+                let deadline = std::time::Instant::now() + Duration::from_secs(10);
+                while std::time::Instant::now() < deadline {
+                    if let Ok((stream, _)) = listener.accept() {
+                        std::thread::sleep(Duration::from_millis(300));
+                        drop(stream);
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            });
+            let mut control = Recording::new(false);
+            control.lose = true;
+            let lost = supervise(
+                &[
+                    "ssh",
+                    "-F",
+                    "/dev/null",
+                    "-oBatchMode=yes",
+                    "-oConnectTimeout=5",
+                    "-p",
+                    &port,
+                    "127.0.0.1",
+                ],
+                &control,
+            );
+            assert_eq!(lost.outcome, Err(ExecutionError::ObservationLost));
+            assert_eq!(lost.cleanup, CleanupEvidence::Detached);
+            let detached: Vec<_> = children()
+                .into_iter()
+                .filter(|pid| !control.before.contains(pid))
+                .collect();
+            assert_eq!(detached.len(), 1, "the live consumer is still a child");
+            server.join().unwrap();
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            while children().contains(&detached[0]) {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "the detached consumer was never reaped"
+                );
+                std::thread::sleep(Duration::from_millis(20));
             }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    });
-    let mut control = Recording::new(false);
-    control.lose = true;
-    let lost = supervise(
-        &[
-            "ssh",
-            "-F",
-            "/dev/null",
-            "-oBatchMode=yes",
-            "-oConnectTimeout=5",
-            "-p",
-            &port,
-            "127.0.0.1",
-        ],
-        &control,
+        },
     );
-    assert_eq!(lost.outcome, Err(ExecutionError::ObservationLost));
-    assert_eq!(lost.cleanup, CleanupEvidence::Detached);
-    let detached: Vec<_> = children()
-        .into_iter()
-        .filter(|pid| !control.before.contains(pid))
-        .collect();
-    assert_eq!(detached.len(), 1, "the live consumer is still a child");
-    server.join().unwrap();
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    while children().contains(&detached[0]) {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "the detached consumer was never reaped"
-        );
-        std::thread::sleep(Duration::from_millis(20));
-    }
 }
