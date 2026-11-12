@@ -1,0 +1,56 @@
+src/adapters/native/platform.rs:14:5: replace available -> bool with false
+src/adapters/native/platform.rs:14:8: delete ! in available
+src/adapters/native/platform.rs:29:9: replace || with && in available
+src/adapters/native/platform.rs:28:13: replace == with != in available
+src/adapters/native/platform.rs:28:26: replace == with != in available
+src/adapters/native/platform.rs:28:78: replace == with != in available
+src/adapters/native/platform.rs:35:5: replace descriptor_path -> Result<PathBuf, ExecutionError> with Ok(Default::default())
+src/adapters/native/platform.rs:36:86: replace != with == in descriptor_path
+src/adapters/native/platform.rs:45:37: replace != with == in descriptor_path
+src/adapters/native/platform.rs:62:5: replace other_process_named -> Result<bool, ExecutionError> with Ok(true)
+src/adapters/native/platform.rs:62:5: replace other_process_named -> Result<bool, ExecutionError> with Ok(false)
+src/adapters/native/platform.rs:65:20: replace == with != in other_process_named
+src/adapters/native/platform.rs:65:34: replace == with != in other_process_named
+src/adapters/native/platform.rs:71:23: replace <= with > in other_process_named
+src/adapters/native/platform.rs:78:33: replace == with != in other_process_named
+src/adapters/native/platform.rs:86:5: replace pids -> Result<Vec<libc::pid_t>, ExecutionError> with Ok(vec![])
+src/adapters/native/platform.rs:86:5: replace pids -> Result<Vec<libc::pid_t>, ExecutionError> with Ok(vec![Default::default()])
+src/adapters/native/platform.rs:88:17: replace <= with > in pids
+src/adapters/native/platform.rs:93:32: replace * with / in pids
+src/adapters/native/platform.rs:95:16: replace < with == in pids
+src/adapters/native/platform.rs:95:16: replace < with > in pids
+src/adapters/native/platform.rs:95:16: replace < with <= in pids
+src/adapters/native/platform.rs:95:31: replace >= with < in pids
+src/adapters/native/platform.rs:98:36: replace / with % in pids
+src/adapters/native/platform.rs:114:5: replace no_acl -> Result<(), ExecutionError> with Ok(())
+src/adapters/native/platform.rs:116:66: replace == with != in no_acl
+src/adapters/native/platform.rs:125:91: replace != with == in no_acl
+src/adapters/native/platform.rs:125:53: replace == with != in no_acl
+src/adapters/native/platform.rs:126:74: replace == with != in no_acl
+src/adapters/native/platform.rs:133:66: replace || with && in no_acl
+src/adapters/native/platform.rs:133:61: replace != with == in no_acl
+src/adapters/native/platform.rs:133:73: replace != with == in no_acl
+src/adapters/native/platform.rs:146:8: delete ! in open_no_writers
+src/adapters/native/platform.rs:151:24: replace == with != in open_no_writers
+src/adapters/native/platform.rs:151:37: replace == with != in open_no_writers
+src/adapters/native/platform.rs:161:12: replace < with > in open_no_writers
+src/adapters/native/platform.rs:173:55: replace | with & in open_no_writers
+src/adapters/native/platform.rs:173:36: replace | with & in open_no_writers
+src/adapters/native/platform.rs:176:20: replace < with == in open_no_writers
+src/adapters/native/platform.rs:176:20: replace < with > in open_no_writers
+src/adapters/native/platform.rs:180:29: replace != with == in open_no_writers
+src/adapters/native/platform.rs:187:13: replace || with && in open_no_writers
+src/adapters/native/platform.rs:186:36: replace != with == in open_no_writers
+src/adapters/native/platform.rs:186:28: replace & with | in open_no_writers
+src/adapters/native/platform.rs:186:28: replace & with ^ in open_no_writers
+src/adapters/native/platform.rs:188:17: replace && with || in open_no_writers
+src/adapters/native/platform.rs:187:32: replace != with == in open_no_writers
+src/adapters/native/platform.rs:190:25: replace && with || in open_no_writers
+src/adapters/native/platform.rs:189:39: replace != with == in open_no_writers
+src/adapters/native/platform.rs:201:12: replace < with > in socket
+src/adapters/native/platform.rs:205:69: replace < with == in socket
+src/adapters/native/platform.rs:205:69: replace < with <= in socket
+src/adapters/native/platform.rs:213:5: replace audit -> Result<[u32; 8], ExecutionError> with Ok([0; 8])
+src/adapters/native/platform.rs:213:5: replace audit -> Result<[u32; 8], ExecutionError> with Ok([1; 8])
+src/adapters/native/platform.rs:223:7: replace != with == in audit
+src/adapters/native/platform.rs:224:26: replace != with == in audit

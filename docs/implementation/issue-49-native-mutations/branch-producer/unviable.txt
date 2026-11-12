@@ -1,0 +1,5 @@
+src/adapters/native/producer.rs:49:5: replace open -> Result<(OwnedFd, NativeProducerOutput), ExecutionError> with Ok((Default::default(), Default::default()))
+src/adapters/native/producer.rs:90:5: replace drain -> Received with Default::default()
+src/adapters/native/producer.rs:136:9: replace NativeProducerOutput::finish -> Option<Received> with Some(Default::default())
+src/adapters/native/producer.rs:148:9: replace <impl ProducerOutput for NativeProducerOutput>::read -> Result<SecretImport, ExecutionError> with Ok(Default::default())
+src/adapters/native/producer.rs:162:5: replace frame -> Result<SecretImport, ExecutionError> with Ok(Default::default())

@@ -1,0 +1,5 @@
+src/adapters/native/reaper.rs:43:5: replace start -> std::io::Result<()> with Ok(())
+src/adapters/native/reaper.rs:58:33: replace || with && in start
+src/adapters/native/reaper.rs:83:9: replace Reservation::detach with ()
+src/adapters/native/reaper.rs:93:9: replace <impl Drop for Reservation>::drop with ()
+src/adapters/native/reaper.rs:93:12: delete ! in <impl Drop for Reservation>::drop

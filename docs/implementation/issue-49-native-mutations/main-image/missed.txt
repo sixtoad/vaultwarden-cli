@@ -1,0 +1,42 @@
+src/adapters/native/image.rs:49:20: replace > with == in macho
+src/adapters/native/image.rs:49:20: replace > with >= in macho
+src/adapters/native/image.rs:61:19: replace || with && in macho
+src/adapters/native/image.rs:61:28: replace > with == in macho
+src/adapters/native/image.rs:61:28: replace > with >= in macho
+src/adapters/native/image.rs:82:35: replace * with + in macho
+src/adapters/native/image.rs:82:35: replace * with / in macho
+src/adapters/native/image.rs:84:62: replace > with >= in macho
+src/adapters/native/image.rs:104:71: replace || with && in slice
+src/adapters/native/image.rs:104:38: replace || with && in slice
+src/adapters/native/image.rs:111:35: replace || with && in slice
+src/adapters/native/image.rs:111:19: replace || with && in slice
+src/adapters/native/image.rs:111:28: replace > with == in slice
+src/adapters/native/image.rs:111:28: replace > with >= in slice
+src/adapters/native/image.rs:111:42: replace > with == in slice
+src/adapters/native/image.rs:111:42: replace > with >= in slice
+src/adapters/native/image.rs:120:21: replace || with && in slice
+src/adapters/native/image.rs:120:17: replace < with == in slice
+src/adapters/native/image.rs:120:17: replace < with <= in slice
+src/adapters/native/image.rs:176:13: delete match arm 0x8000001c | 0x27 | 0x10 | 0x20 | 0xf in slice
+src/adapters/native/image.rs:126:32: replace || with && in slice
+src/adapters/native/image.rs:126:27: replace < with > in slice
+src/adapters/native/image.rs:137:21: replace || with && in slice
+src/adapters/native/image.rs:149:37: replace < with > in slice
+src/adapters/native/image.rs:165:21: replace || with && in slice
+src/adapters/native/image.rs:165:38: replace + with - in slice
+src/adapters/native/image.rs:218:32: replace + with - in signature
+src/adapters/native/image.rs:218:32: replace + with * in signature
+src/adapters/native/image.rs:238:13: replace || with && in signature
+src/adapters/native/image.rs:285:36: replace | with & in satisfies
+src/adapters/native/image.rs:285:36: replace | with ^ in satisfies
+src/adapters/native/image.rs:305:8: delete ! in publisher
+src/adapters/native/image.rs:310:13: replace == with != in publisher
+src/adapters/native/image.rs:316:5: replace team_identifier -> Result<String, ExecutionError> with Ok(String::new())
+src/adapters/native/image.rs:316:5: replace team_identifier -> Result<String, ExecutionError> with Ok("xyzzy".into())
+src/adapters/native/image.rs:324:9: replace || with && in team_identifier
+src/adapters/native/image.rs:323:19: replace != with == in team_identifier
+src/adapters/native/image.rs:324:12: delete ! in team_identifier
+src/adapters/native/image.rs:326:45: replace || with && in team_identifier
+src/adapters/native/image.rs:337:9: replace || with && in signing_information
+src/adapters/native/image.rs:353:29: replace || with && in signature_policy
+src/adapters/native/image.rs:353:14: replace & with | in signature_policy

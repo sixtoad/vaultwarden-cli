@@ -1,0 +1,32 @@
+src/adapters/native/identity.rs:24:5: replace uuid -> Result<String, ExecutionError> with Ok(String::new())
+src/adapters/native/identity.rs:24:5: replace uuid -> Result<String, ExecutionError> with Ok("xyzzy".into())
+src/adapters/native/identity.rs:27:31: replace == with != in uuid
+src/adapters/native/identity.rs:42:7: replace != with == in uuid
+src/adapters/native/identity.rs:44:27: replace != with == in uuid
+src/adapters/native/identity.rs:49:60: replace != with == in uuid
+src/adapters/native/identity.rs:76:39: replace || with && in load
+src/adapters/native/identity.rs:76:21: replace || with && in load
+src/adapters/native/identity.rs:76:8: delete ! in load
+src/adapters/native/identity.rs:76:34: replace != with == in load
+src/adapters/native/identity.rs:76:50: replace > with == in load
+src/adapters/native/identity.rs:76:50: replace > with < in load
+src/adapters/native/identity.rs:76:50: replace > with >= in load
+src/adapters/native/identity.rs:94:9: replace || with && in load
+src/adapters/native/identity.rs:93:9: replace || with && in load
+src/adapters/native/identity.rs:92:9: replace || with && in load
+src/adapters/native/identity.rs:91:9: replace || with && in load
+src/adapters/native/identity.rs:90:9: replace || with && in load
+src/adapters/native/identity.rs:89:9: replace || with && in load
+src/adapters/native/identity.rs:88:9: replace || with && in load
+src/adapters/native/identity.rs:87:9: replace || with && in load
+src/adapters/native/identity.rs:86:9: replace || with && in load
+src/adapters/native/identity.rs:85:27: replace == with != in load
+src/adapters/native/identity.rs:86:31: replace == with != in load
+src/adapters/native/identity.rs:87:31: replace == with != in load
+src/adapters/native/identity.rs:88:28: replace == with != in load
+src/adapters/native/identity.rs:89:28: replace == with != in load
+src/adapters/native/identity.rs:90:28: replace == with != in load
+src/adapters/native/identity.rs:91:38: replace != with == in load
+src/adapters/native/identity.rs:92:38: replace != with == in load
+src/adapters/native/identity.rs:93:12: delete ! in load
+src/adapters/native/identity.rs:94:12: delete ! in load

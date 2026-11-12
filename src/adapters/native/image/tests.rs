@@ -220,6 +220,172 @@ fn unsigned_adhoc_and_forbidden_entitlements_never_qualify_as_production_images(
         );
     }
 }
+/// Boundaries and isolated header faults added by the #49 native mutation campaign.
+#[test]
+fn native_image_size_slice_count_and_alignment_boundaries_are_inclusive() {
+    let valid = thin(&signed_commands());
+    let mut largest = valid.clone();
+    largest.resize(64 * 1024 * 1024, 0);
+    assert!(macho(&largest).is_ok(), "exactly 64 MiB is permitted");
+    largest.push(0);
+    assert!(macho(&largest).is_err());
+    let sixteen = fat(&vec![valid.clone(); 16], false);
+    assert_eq!(macho(&sixteen).unwrap().len(), 16);
+    // 2^3 alignment: the first slice starts at 8 + 20 = 28 bytes, which is not a
+    // multiple of 8; move it to 32 (aligned) and declare the alignment.
+    let mut aligned = vec![0u8; 32];
+    aligned[..4].copy_from_slice(&0xcafebabeu32.to_be_bytes());
+    aligned[4..8].copy_from_slice(&1u32.to_be_bytes());
+    aligned[8..12].copy_from_slice(&0x0100000cu32.to_be_bytes());
+    aligned[16..20].copy_from_slice(&32u32.to_be_bytes());
+    aligned[20..24].copy_from_slice(&(valid.len() as u32).to_be_bytes());
+    aligned[24..28].copy_from_slice(&3u32.to_be_bytes());
+    aligned.extend_from_slice(&valid);
+    assert_eq!(macho(&aligned).unwrap(), vec![32]);
+    let mut misaligned = aligned.clone();
+    misaligned[24..28].copy_from_slice(&6u32.to_be_bytes());
+    assert!(macho(&misaligned).is_err(), "32 is not 64-aligned");
+    let mut foreign = fat(std::slice::from_ref(&valid), false);
+    foreign[8..12].copy_from_slice(&0x01000007u32.to_be_bytes());
+    assert!(macho(&foreign).is_err(), "no arm64 slice");
+}
+#[test]
+fn native_image_header_fields_are_each_required() {
+    let valid = thin(&signed_commands());
+    for (label, offset, value) in [
+        ("x86_64 cpu type", 4, 0x01000007),
+        ("dylib file type", 12, 6),
+        ("zero commands", 16, 0),
+    ] {
+        let mut bytes = valid.clone();
+        put(&mut bytes, offset, value);
+        assert!(macho(&bytes).is_err(), "{label}");
+    }
+    let mut slice = valid.clone();
+    put(&mut slice, 0, 0xfeedface);
+    assert!(macho(&fat(&[slice], false)).is_err(), "32-bit slice magic");
+}
+#[test]
+fn native_loader_command_bounds_are_inclusive_and_isolated() {
+    let mut commands = signed_commands();
+    // Recognized 8-byte metadata command (minimum size) and the 4096-command limit.
+    let mut minimal = vec![0; 8];
+    put(&mut minimal, 0, 0x2a);
+    put(&mut minimal, 4, 8);
+    commands.push(minimal.clone());
+    assert!(macho(&thin(&commands)).is_ok(), "8-byte command");
+    let mut many = signed_commands();
+    many.extend(std::iter::repeat_n(minimal.clone(), 4094));
+    assert!(macho(&thin(&many)).is_ok(), "4096 commands");
+    many.push(minimal);
+    assert!(macho(&thin(&many)).is_err(), "4097 commands");
+    // Names may start after padding beyond the fixed command fields.
+    let mut padded = signed_commands();
+    padded[0] = command(0xe, 16, b"/usr/lib/dyld");
+    padded.push(command(0xc, 32, b"/usr/lib/libSystem.B.dylib"));
+    assert!(
+        macho(&thin(&padded)).is_ok(),
+        "padded loader and dylib names"
+    );
+    let mut cases: Vec<(&str, Vec<Vec<u8>>)> = Vec::new();
+    let mut private = signed_commands();
+    private.push(command(
+        0xc,
+        24,
+        b"/System/Library/PrivateFrameworks/CoreSymbolication.framework/Versions/A/CoreSymbolication",
+    ));
+    cases.push(("shared-cache private framework", private));
+    let mut wide = signed_commands();
+    wide[1] = vec![0; 24];
+    put(&mut wide[1], 0, 0x1d);
+    put(&mut wide[1], 4, 24);
+    put(&mut wide[1], 12, 16);
+    cases.push(("24-byte signature command", wide));
+    let mut empty = signed_commands();
+    put(&mut empty[1], 12, 0);
+    cases.push(("empty signature", empty));
+    for (label, commands) in cases {
+        assert!(macho(&thin(&commands)).is_err(), "{label}");
+    }
+}
+/// Fat-header and load-command edges that the CI generated run left alive (#49).
+#[test]
+fn native_fat_table_limits_header_overlap_and_adjacent_out_of_order_slices() {
+    let valid = thin(&signed_commands());
+    let length = valid.len();
+    // Seventeen well-formed arm64 slices exceed the 16-slice limit on their own.
+    assert!(macho(&fat(&vec![valid.clone(); 17], false)).is_err());
+    // A non-native slice may not lie inside the fat table (here inside its own entry).
+    let mut inside = fat(&[valid.clone(), valid.clone()], false);
+    inside[28..32].copy_from_slice(&0x01000007u32.to_be_bytes());
+    inside[36..40].copy_from_slice(&32u32.to_be_bytes());
+    inside[40..44].copy_from_slice(&8u32.to_be_bytes());
+    assert!(macho(&inside).is_err(), "slice inside the fat table");
+    // Slices listed out of file order may be adjacent: touching is not overlapping.
+    let mut swapped = fat(&[valid.clone(), valid], false);
+    let (first, second) = (48u32, (48 + length) as u32);
+    swapped[16..20].copy_from_slice(&second.to_be_bytes());
+    swapped[36..40].copy_from_slice(&first.to_be_bytes());
+    assert_eq!(macho(&swapped).unwrap(), vec![48 + length, 48]);
+}
+#[test]
+fn native_load_commands_must_fit_the_file_and_have_their_minimum_shape() {
+    let valid = signed_commands();
+    // Commands claimed past the end of the file are rejected before any is read.
+    let mut beyond = vec![command(0xc, 24, b"/usr/lib/libSystem.B.dylib")];
+    beyond.extend(valid.iter().cloned());
+    let mut bytes = thin(&beyond);
+    put(&mut bytes, 36, 4096);
+    put(
+        &mut bytes,
+        20,
+        (4096 + valid[0].len() + valid[1].len()) as u32,
+    );
+    assert!(macho(&bytes).is_err(), "commands beyond the file");
+    // A zero-size command (here the last one, read from the signature data) never
+    // advances and is rejected even when every other count would balance.
+    let mut zero = thin(&valid);
+    let end = 32 + valid[0].len() + valid[1].len();
+    put(&mut zero, 16, 3);
+    put(&mut zero, end, 0x2a);
+    put(&mut zero, end + 4, 0);
+    assert!(macho(&zero).is_err(), "zero-size command");
+    // A dylib name may not start inside the fixed dylib command fields.
+    let mut dylib = valid.clone();
+    dylib.push(command(0xc, 16, b"/usr/lib/libSystem.B.dylib"));
+    assert!(
+        macho(&thin(&dylib)).is_err(),
+        "dylib name inside its fields"
+    );
+}
+#[test]
+fn native_signature_policy_requires_the_hardened_runtime() {
+    let root = tempfile::tempdir().unwrap();
+    // The policy requires the hardened runtime flag, not only acceptable entitlements.
+    let source = root.path().join("synthetic.c");
+    let binary = root.path().join("synthetic");
+    std::fs::write(&source, b"int main(void) { return 0; }\n").unwrap();
+    assert!(
+        std::process::Command::new("/usr/bin/clang")
+            .arg(&source)
+            .arg("-o")
+            .arg(&binary)
+            .status()
+            .unwrap()
+            .success()
+    );
+    for (options, runtime) in [(None, false), (Some("runtime"), true)] {
+        let mut sign = std::process::Command::new("/usr/bin/codesign");
+        sign.args(["--force", "--sign", "-"]);
+        if let Some(options) = options {
+            sign.args(["--options", options]);
+        }
+        assert!(sign.arg(&binary).status().unwrap().success());
+        let url = CFURL::from_path(&binary, false).unwrap();
+        let code = SecStaticCode::from_path(&url, Flags::NONE).unwrap();
+        assert_eq!(signature_policy(&code).is_ok(), runtime, "{options:?}");
+    }
+}
 
 /// A release-signed (Developer ID Application, team `RELEASE_TEAM_ID`, hardened
 /// runtime) thin arm64 binary supplied by the publisher; CI has no signing identity.

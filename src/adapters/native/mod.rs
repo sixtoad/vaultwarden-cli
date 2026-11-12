@@ -516,6 +516,8 @@ impl ExecutionWorker {
 }
 
 #[cfg(test)]
+mod mutation_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 
 #[cfg(test)]

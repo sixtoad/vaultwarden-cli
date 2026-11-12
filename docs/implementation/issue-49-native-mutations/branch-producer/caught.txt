@@ -1,0 +1,33 @@
+src/adapters/native/producer.rs:21:42: replace + with -
+src/adapters/native/producer.rs:21:42: replace + with *
+src/adapters/native/producer.rs:36:9: replace <impl fmt::Debug for NativeProducerOutput>::fmt -> fmt::Result with Ok(Default::default())
+src/adapters/native/producer.rs:50:49: replace != with == in open
+src/adapters/native/producer.rs:58:16: replace < with > in open
+src/adapters/native/producer.rs:68:9: replace || with && in open
+src/adapters/native/producer.rs:67:14: replace < with == in open
+src/adapters/native/producer.rs:67:14: replace < with <= in open
+src/adapters/native/producer.rs:68:94: replace < with == in open
+src/adapters/native/producer.rs:68:94: replace < with <= in open
+src/adapters/native/producer.rs:68:72: replace | with & in open
+src/adapters/native/producer.rs:98:32: replace > with == in drain
+src/adapters/native/producer.rs:98:32: replace > with < in drain
+src/adapters/native/producer.rs:98:32: replace > with >= in drain
+src/adapters/native/producer.rs:105:22: replace > with < in drain
+src/adapters/native/producer.rs:106:33: replace += with -= in drain
+src/adapters/native/producer.rs:106:33: replace += with *= in drain
+src/adapters/native/producer.rs:109:22: replace == with != in drain
+src/adapters/native/producer.rs:114:17: delete match arm Some(libc::EAGAIN) in drain
+src/adapters/native/producer.rs:136:9: replace NativeProducerOutput::finish -> Option<Received> with None
+src/adapters/native/producer.rs:142:9: replace <impl Drop for NativeProducerOutput>::drop with ()
+src/adapters/native/producer.rs:149:21: replace != with == in <impl ProducerOutput for NativeProducerOutput>::read
+src/adapters/native/producer.rs:162:16: replace || with && in frame
+src/adapters/native/producer.rs:162:31: replace < with == in frame
+src/adapters/native/producer.rs:162:31: replace < with > in frame
+src/adapters/native/producer.rs:166:43: replace || with && in frame
+src/adapters/native/producer.rs:166:12: replace == with != in frame
+src/adapters/native/producer.rs:166:24: replace > with == in frame
+src/adapters/native/producer.rs:166:24: replace > with < in frame
+src/adapters/native/producer.rs:166:24: replace > with >= in frame
+src/adapters/native/producer.rs:166:58: replace != with == in frame
+src/adapters/native/producer.rs:166:63: replace + with - in frame
+src/adapters/native/producer.rs:166:63: replace + with * in frame

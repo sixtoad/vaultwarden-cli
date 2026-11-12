@@ -1,0 +1,214 @@
+{
+  "repository_head": "ed52aaccdb7dd568dcf6fa9e970cf82628200de1",
+  "faults": {
+    "release-race": {
+      "file": "src/adapters/native/mod.rs",
+      "test": "adapters::native::tests::native_release_denial_does_not_launch_and_withdrawal_does_not_signal_consumer",
+      "source_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "restored_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 51.0,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 10.7,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "implicit-termination": {
+      "file": "src/adapters/native/mod.rs",
+      "test": "adapters::native::tests::native_release_denial_does_not_launch_and_withdrawal_does_not_signal_consumer",
+      "source_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "restored_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 9.0,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 10.6,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "peer-token-pid": {
+      "file": "src/adapters/native/mod.rs",
+      "test": "adapters::ssh_agent::tests::same_uid_wrong_process_is_rejected_without_poisoning_next_peer",
+      "source_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "restored_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 11.4,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 10.9,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "peer-cdhash": {
+      "file": "src/adapters/native/mod.rs",
+      "test": "adapters::ssh_agent::tests::native_correct_peer_pid_with_wrong_cdhash_denies_acceptance_and_final_release",
+      "source_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "restored_sha256": "0eea7b98b033f243a0d223ef84312b96bf4b295b79eb81e0cdde2ab066ae896d",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 11.4,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 10.5,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "loader-path": {
+      "file": "src/adapters/native/image.rs",
+      "test": "adapters::native::image::tests::native_loader_profile_rejects_forbidden_unknown_and_malformed_commands",
+      "source_sha256": "8a06fa34a766fa3a55d64855475727af50b7bd6313322ba2f5749ffc69119fa2",
+      "restored_sha256": "8a06fa34a766fa3a55d64855475727af50b7bd6313322ba2f5749ffc69119fa2",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 9.9,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 9.6,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "shared-cache-dependency": {
+      "file": "src/adapters/native/image.rs",
+      "test": "adapters::native::image::tests::native_loader_profile_rejects_forbidden_unknown_and_malformed_commands",
+      "source_sha256": "8a06fa34a766fa3a55d64855475727af50b7bd6313322ba2f5749ffc69119fa2",
+      "restored_sha256": "8a06fa34a766fa3a55d64855475727af50b7bd6313322ba2f5749ffc69119fa2",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 9.8,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 9.3,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "reaper-live-child": {
+      "file": "src/adapters/native/reaper.rs",
+      "test": "adapters::native::reaper::tests::foreign_reaped_pid_is_released_but_live_child_keeps_capacity_until_natural_exit",
+      "source_sha256": "fd56f02949beba17bed0ae5d27ed0b8da50d15b90d23359803608bac0c360150",
+      "restored_sha256": "fd56f02949beba17bed0ae5d27ed0b8da50d15b90d23359803608bac0c360150",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 9.7,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 10.3,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "producer-before-reaping": {
+      "file": "src/adapters/native/producer.rs",
+      "test": "adapters::native::tests::native_producer_output_requires_confirmed_reaping",
+      "source_sha256": "6fe60963ea37a2f95dde447ed09337416fa4007d37b3e82ae712f12ae2005a54",
+      "restored_sha256": "6fe60963ea37a2f95dde447ed09337416fa4007d37b3e82ae712f12ae2005a54",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 10.1,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 9.3,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "producer-overflow-truncates": {
+      "file": "src/adapters/native/producer.rs",
+      "test": "adapters::native::tests::native_producer_rejects_overflow_and_malformed_frames",
+      "source_sha256": "6fe60963ea37a2f95dde447ed09337416fa4007d37b3e82ae712f12ae2005a54",
+      "restored_sha256": "6fe60963ea37a2f95dde447ed09337416fa4007d37b3e82ae712f12ae2005a54",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 9.2,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 9.8,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "identity-root-provider": {
+      "file": "src/adapters/native/identity.rs",
+      "test": "adapters::native::mutation_tests::native_installed_identities_reject_root_shared_or_unbound_accounts_and_relative_paths",
+      "source_sha256": "6ffbb07b18e36ce8094ad57e49349d23b6f095c3f4ebe0756ab7aa5c21b07e1a",
+      "restored_sha256": "6ffbb07b18e36ce8094ad57e49349d23b6f095c3f4ebe0756ab7aa5c21b07e1a",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 9.3,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 9.3,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    },
+    "no-writer-group-mode": {
+      "file": "src/adapters/native/platform.rs",
+      "test": "adapters::native::mutation_tests::native_no_writer_open_enforces_ownership_and_write_modes_per_component",
+      "source_sha256": "1e5ca7590ff9eefc032ab16e232150bb445788bd5f58188bf923fc7bce8d3ef6",
+      "restored_sha256": "1e5ca7590ff9eefc032ab16e232150bb445788bd5f58188bf923fc7bce8d3ef6",
+      "baseline": {
+        "exit_code": 0,
+        "seconds": 10.1,
+        "failed": false,
+        "passed": true
+      },
+      "mutant": {
+        "exit_code": 101,
+        "seconds": 12.0,
+        "failed": true,
+        "passed": false
+      },
+      "caught": true
+    }
+  }
+}

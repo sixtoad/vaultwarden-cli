@@ -1,0 +1,6 @@
+src/adapters/native/reaper.rs:57:39: replace == with != in start
+src/adapters/native/reaper.rs:59:37: replace && with || in start
+src/adapters/native/reaper.rs:58:44: replace < with == in start
+src/adapters/native/reaper.rs:58:44: replace < with > in start
+src/adapters/native/reaper.rs:58:44: replace < with <= in start
+src/adapters/native/reaper.rs:60:41: replace == with != in start

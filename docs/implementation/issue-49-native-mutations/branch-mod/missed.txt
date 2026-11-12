@@ -1,0 +1,5 @@
+src/adapters/native/mod.rs:129:20: replace > with == in validate_file
+src/adapters/native/mod.rs:235:9: replace <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::available -> bool with true
+src/adapters/native/mod.rs:448:13: replace || with && in Spawn::start
+src/adapters/native/mod.rs:457:9: replace <impl Drop for Spawn>::drop with ()
+src/adapters/native/mod.rs:504:9: replace ExecutionWorker::is_finished -> bool with false

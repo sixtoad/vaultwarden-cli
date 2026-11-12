@@ -1,0 +1,8 @@
+src/adapters/native/mod.rs:56:9: replace <impl ProtectedExecution for NativeExecutablePreparer>::prepare -> Result<PreparedExecutable, ExecutionError> with Ok(Default::default())
+src/adapters/native/mod.rs:84:9: replace <impl ProtectedExecution for NativeExecutablePreparer>::prepare_ssh -> Result<Box<dyn crate::access::ports::SshMaterial>, ExecutionError> with Ok(Box::new(Default::default()))
+src/adapters/native/mod.rs:98:9: replace <impl ProtectedExecution for NativeExecutablePreparer>::prepare_producer -> Result<Box<dyn crate::access::ports::ProducerOutput>, ExecutionError> with Ok(Box::new(Default::default()))
+src/adapters/native/mod.rs:169:9: replace NativeProcessSupervisor::installed -> Result<Self, ExecutionError> with Ok(Default::default())
+src/adapters/native/mod.rs:232:9: replace <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::ssh_material_root -> Option<&Path> with Some(Box::leak(Box::new(Default::default())))
+src/adapters/native/mod.rs:251:9: replace <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled -> Supervision with Default::default()
+src/adapters/native/mod.rs:481:9: replace ExecutionWorker::start -> Result<Self, SessionError> with Ok(Default::default())
+src/adapters/native/mod.rs:501:9: replace ExecutionWorker::dispatcher -> Arc<dyn ExecutionDispatcher> with Arc::new(Default::default())
