@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../design/components.dart';
@@ -15,15 +17,27 @@ class RequestReview extends StatelessWidget {
     required this.onApprove,
     required this.onDeny,
     required this.onCancel,
+    this.touchIdOffered = false,
+    this.onTouchId,
+    this.touchIdNote = '',
+    this.touchIdMessage = '',
   });
   final core.ProviderSnapshot state;
   final String endpoint, origin;
   final TextEditingController password;
   final VoidCallback onApprove, onDeny, onCancel;
+
+  /// Whether this Mac has Touch ID. Without it only the password path shows.
+  final bool touchIdOffered;
+
+  /// Null when Touch ID cannot approve this review; `touchIdNote` says why.
+  final VoidCallback? onTouchId;
+  final String touchIdNote, touchIdMessage;
   @override
   Widget build(BuildContext context) {
     final review = state.review;
     if (review == null) return const SizedBox.shrink();
+    if (isFinal(review.status)) return _finalView(review);
     return AccessPanel(
       child: Column(
         key: const Key('provider-review'),
@@ -95,6 +109,27 @@ class RequestReview extends StatelessWidget {
           const Text(
             'Review expires within 55 seconds and at the request deadline. Every attempt consumes its ticket.',
           ),
+          if (touchIdMessage.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(touchIdMessage, key: const Key('touch-id-message')),
+          ],
+          if (touchIdOffered) ...[
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              key: const Key('approve-touch-id'),
+              onPressed: state.canDecide ? onTouchId : null,
+              icon: const Icon(Icons.fingerprint),
+              label: const Text('Approve once with Touch ID'),
+            ),
+            if (touchIdNote.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(touchIdNote, key: const Key('touch-id-note')),
+            ],
+            const SizedBox(height: 16),
+            const Text(
+              'Touch ID signs this exact review after fetching it again. If it is unavailable, cancelled or refused, nothing is sent and you can approve with your password instead.',
+            ),
+          ],
           const SizedBox(height: 24),
           accessPassword(password, 'Fresh approval password'),
           const SizedBox(height: 16),
@@ -122,6 +157,52 @@ class RequestReview extends StatelessWidget {
       ),
     );
   }
+
+  /// Whether the provider's status is final (anything but `pending`). An
+  /// unreadable status counts as final: no approval controls for it.
+  static bool isFinal(String status) {
+    try {
+      return (jsonDecode(status) as Map<String, dynamic>)['status'] !=
+          'pending';
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Expired, decided, running, completed or failed requests (#61): the
+  /// state only, no password field, no approval or denial controls.
+  Widget _finalView(core.ProviderReview review) => AccessPanel(
+    child: Column(
+      key: const Key('provider-review'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AccessHeading(
+          'Request is final',
+          'This request can no longer be approved or denied.',
+        ),
+        FactRow('Request ID', review.id, key: const Key('review-id')),
+        FactRow('Provider endpoint', endpoint),
+        FactRow(
+          'Operation',
+          review.operation,
+          key: const Key('review-operation'),
+        ),
+        FactRow('Target', review.target, key: const Key('review-target')),
+        FactRow('Status', review.status, key: const Key('review-status')),
+        const SizedBox(height: 16),
+        const Text(
+          'Expired, cancelled and already decided requests are final; nothing can be approved from this review.',
+          key: Key('review-final'),
+        ),
+        if (touchIdMessage.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(touchIdMessage, key: const Key('touch-id-message')),
+        ],
+        const SizedBox(height: 16),
+        TextButton(onPressed: onCancel, child: const Text('Back to requests')),
+      ],
+    ),
+  );
 
   Widget _argument(core.ProviderReview review, int i) => FactRow(
     'Argument [$i]',

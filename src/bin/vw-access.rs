@@ -20,6 +20,10 @@ use vaultwarden_cli::{
 };
 
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
+#[path = "vw_access_parts/enroll.rs"]
+mod enroll;
+
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 #[derive(Parser)]
 #[command(
     name = "vw-access",
@@ -122,6 +126,74 @@ enum Command {
     Agent {
         #[command(subcommand)]
         command: AgentCommand,
+    },
+    /// Guided enrollment of agents and companion devices with a comparison
+    /// code approved at both ends (no manual key or certificate copying).
+    Enroll {
+        #[command(subcommand)]
+        command: enroll::EnrollCommand,
+    },
+    /// Create local setup files (keys, certificates, backend.json); never contacts the provider.
+    Setup {
+        #[command(subcommand)]
+        command: SetupCommand,
+    },
+}
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
+#[derive(Subcommand)]
+enum SetupCommand {
+    /// Write a new agent Ed25519 seed (raw 32 bytes, 0600) and print its public key for `agent pair`.
+    AgentKey {
+        /// New file, owned by the agent account; never replaced.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Write the provider backend.json (0600) from a vaultwarden-cli login and/or explicit fields.
+    BackendJson {
+        /// New output file; install it as the provider's state/backend.json.
+        #[arg(long)]
+        out: PathBuf,
+        /// Read server/email/client_id/encrypted_key/kdf_iterations from this vaultwarden-cli config.json.
+        #[arg(long, conflicts_with = "from_cli_login")]
+        cli_config: Option<PathBuf>,
+        /// Read them from the current user's `vaultwarden-cli login` config.json.
+        #[arg(long)]
+        from_cli_login: bool,
+        #[arg(long)]
+        server: Option<String>,
+        #[arg(long)]
+        email: Option<String>,
+        /// API key client_id (its client secret is provisioned separately, never here).
+        #[arg(long)]
+        client_id: Option<String>,
+        #[arg(long)]
+        encrypted_key: Option<String>,
+        /// The account's KDF: only `pbkdf2` is supported (required; a CLI login does not record it).
+        #[arg(long, value_parser = ["pbkdf2", "argon2id"])]
+        kdf: Option<String>,
+        #[arg(long)]
+        kdf_iterations: Option<u32>,
+    },
+    /// Create the companion mTLS bundle: server CA, provider certificate, client CA, client PKCS#12 and leaf pin.
+    Tls {
+        /// New directory (0700) for every generated file; never replaced.
+        #[arg(long)]
+        out_dir: PathBuf,
+        /// IP subjectAltName of the provider certificate (repeatable).
+        #[arg(long, default_value = "127.0.0.1")]
+        server_ip: Vec<std::net::IpAddr>,
+        /// DNS subjectAltName of the provider certificate (repeatable).
+        #[arg(long)]
+        server_dns: Vec<String>,
+        /// Leaf certificate validity in days (1-825).
+        #[arg(long, default_value_t = 397)]
+        days: u32,
+        /// Client certificate common name and PKCS#12 friendly name.
+        #[arg(long, default_value = "Mac operator")]
+        client_name: String,
+        /// Absolute path of openssl/LibreSSL (the PKCS#12 password goes to its stdin).
+        #[arg(long, default_value = "/usr/bin/openssl")]
+        openssl: PathBuf,
     },
 }
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
@@ -235,6 +307,49 @@ fn main() -> ExitCode {
     ) {
         return ExitCode::from(run_agent(&args.command));
     }
+    if let Command::Enroll {
+        command:
+            enroll::EnrollCommand::Join {
+                socket,
+                key_file,
+                timeout_seconds,
+            },
+    } = &args.command
+    {
+        return ExitCode::from(enroll::join(socket, key_file, *timeout_seconds));
+    }
+    let args = match args {
+        Args {
+            command: Command::Setup { command },
+            ..
+        } => {
+            return match run_setup(command) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("vw-access: {error}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        args => args,
+    };
+    // macOS: default to the installed human endpoint named by the root-owned
+    // native identity record (/Library/VaultwardenAccess/run/human).
+    #[cfg(target_os = "macos")]
+    let args = {
+        let mut args = args;
+        if args.state_root.is_none() {
+            args.state_root = vaultwarden_cli::adapters::human_socket::installed_human_socket_dir();
+            if args.state_root.is_none() {
+                eprintln!(
+                    "vw-access: no installed endpoint found at {}; pass --state-root",
+                    vaultwarden_cli::adapters::human_socket::INSTALLED_IDENTITIES_PATH
+                );
+                return ExitCode::from(2);
+            }
+        }
+        args
+    };
     if args.state_root.is_none() {
         eprintln!("vw-access: invalid command; use --help");
         return ExitCode::from(2);
@@ -452,7 +567,10 @@ fn run(args: Args) -> Result<(), String> {
             },
             false,
         ),
-        Command::Submit { .. } | Command::Poll { .. } | Command::Wait { .. } => {
+        Command::Submit { .. }
+        | Command::Poll { .. }
+        | Command::Wait { .. }
+        | Command::Setup { .. } => {
             return Err("invalid command".into());
         }
         Command::Request {
@@ -502,6 +620,7 @@ fn run(args: Args) -> Result<(), String> {
             },
             false,
         ),
+        Command::Enroll { command } => (enroll::human_command(command)?, false),
     };
     let response = exchange(&state_root, command).map_err(|error| error.to_string())?;
     reject_error(&response)?;
@@ -536,10 +655,121 @@ fn run(args: Args) -> Result<(), String> {
     Ok(())
 }
 #[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
+fn run_setup(command: SetupCommand) -> Result<(), String> {
+    use vaultwarden_cli::adapters::setup_tools;
+    match command {
+        SetupCommand::AgentKey { out } => {
+            let public_key = setup_tools::agent_key(&out).map_err(|e| e.to_string())?;
+            eprintln!("wrote agent seed {}", out.display());
+            println!("{public_key}");
+        }
+        SetupCommand::BackendJson {
+            out,
+            cli_config,
+            from_cli_login,
+            server,
+            email,
+            client_id,
+            encrypted_key,
+            kdf,
+            kdf_iterations,
+        } => {
+            let source = if from_cli_login {
+                Some(
+                    vaultwarden_cli::config::Config::config_path()
+                        .map_err(|_error| "cannot locate the vaultwarden-cli config")?,
+                )
+            } else {
+                cli_config
+            };
+            let bytes = setup_tools::backend_json(
+                source.as_deref(),
+                &setup_tools::BackendFields {
+                    server,
+                    email,
+                    client_id,
+                    encrypted_key,
+                    kdf,
+                    kdf_iterations,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            // The provider reader opens backend.json by absolute path only.
+            let out = std::path::absolute(&out)
+                .map_err(|_error| "cannot resolve --out against the current directory")?;
+            setup_tools::write_new_private(&out, &bytes).map_err(|e| e.to_string())?;
+            if vaultwarden_cli::adapters::session::validate_setup(&out).is_err() {
+                let _ignored = std::fs::remove_file(&out);
+                return Err("the provider would reject this backend.json".into());
+            }
+            eprintln!(
+                "wrote {} (no token, password or client secret)",
+                out.display()
+            );
+        }
+        SetupCommand::Tls {
+            out_dir,
+            server_ip,
+            server_dns,
+            days,
+            client_name,
+            openssl,
+        } => {
+            let password = read_new_password()?;
+            let summary = setup_tools::tls_bundle(
+                &setup_tools::TlsRequest {
+                    out_dir: out_dir.clone(),
+                    openssl,
+                    server_ips: server_ip,
+                    server_dns,
+                    days,
+                    client_name,
+                },
+                &password,
+            )
+            .map_err(|e| e.to_string())?;
+            for (name, purpose) in setup_tools::TLS_FILES {
+                eprintln!("  {name:<22} {purpose}");
+            }
+            eprintln!("wrote {}", out_dir.display());
+            println!("server_leaf_sha256={}", summary.server_leaf_sha256);
+            println!("client_leaf_sha256={}", summary.client_leaf_sha256);
+        }
+    }
+    Ok(())
+}
+/// PKCS#12 password: twice without echo on a terminal, else one line of stdin.
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
+fn read_new_password() -> Result<zeroize::Zeroizing<String>, String> {
+    use std::io::{BufRead, IsTerminal, Read};
+    if io::stdin().is_terminal() {
+        let first = zeroize::Zeroizing::new(
+            rpassword::prompt_password("PKCS#12 password: ").map_err(|_error| "no password")?,
+        );
+        let second = zeroize::Zeroizing::new(
+            rpassword::prompt_password("Repeat PKCS#12 password: ")
+                .map_err(|_error| "no password")?,
+        );
+        if first != second {
+            return Err("passwords differ".into());
+        }
+        return Ok(first);
+    }
+    let mut line = zeroize::Zeroizing::new(String::new());
+    io::stdin()
+        .lock()
+        .take(4097)
+        .read_line(&mut line)
+        .map_err(|_error| "cannot read the password from stdin")?;
+    let trimmed = line.trim_end_matches(['\n', '\r']).to_owned();
+    Ok(zeroize::Zeroizing::new(trimmed))
+}
+#[cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "aarch64")))]
 fn reject_error(response: &HumanResponse) -> Result<(), String> {
     match response {
         HumanResponse::ProvisioningRejected { reason } => Err(reason.to_string()),
         HumanResponse::Rejected { reason } => Err(reason.to_string()),
+        HumanResponse::EnrollmentRejected { reason } => Err(reason.to_string()),
         HumanResponse::InvalidRequest => Err("invalid request".into()),
         HumanResponse::Unauthorized => Err("unauthorized human".into()),
         HumanResponse::Unavailable => Err("provider unavailable".into()),
@@ -766,6 +996,63 @@ mod tests {
                 state: DirectStatus::Pending
             }),
             Ok(())
+        );
+    }
+    #[test]
+    fn enroll_verbs_parse_and_the_invitation_secret_is_never_an_argument() {
+        use vaultwarden_cli::access::enrollment::{EnrolleeKind, HumanEnrollmentError};
+        let parse = |words: &[&str]| {
+            Args::try_parse_from(
+                ["vw-access", "--state-root", "/private", "enroll"]
+                    .iter()
+                    .chain(words),
+            )
+        };
+        let Command::Enroll { command } =
+            parse(&["invite-agent", "ci", "--uid", "4100", "--gid", "4200"])
+                .unwrap()
+                .command
+        else {
+            panic!("not enroll")
+        };
+        assert!(matches!(
+            enroll::human_command(command).unwrap(),
+            HumanCommand::EnrollInvite { invitation }
+                if invitation.kind == EnrolleeKind::Agent { label: "ci".into(), uid: 4100, gid: 4200 }
+                    && invitation.ttl_seconds.is_none()
+        ));
+        let Command::Enroll { command } = parse(&["approve", "-id", "--code", "1234-5678"])
+            .unwrap()
+            .command
+        else {
+            panic!("not enroll")
+        };
+        assert!(matches!(
+            enroll::human_command(command).unwrap(),
+            HumanCommand::EnrollApprove { id, code } if id == "-id" && code == "1234-5678"
+        ));
+        assert!(
+            parse(&["approve", "id"]).is_err(),
+            "approval requires the typed code"
+        );
+        assert!(parse(&["join", "--socket", "/s", "--key-file", "/k"]).is_ok());
+        assert!(
+            parse(&[
+                "join",
+                "--socket",
+                "/s",
+                "--key-file",
+                "/k",
+                "--invitation",
+                "vwe1.a.b"
+            ])
+            .is_err()
+        );
+        assert_eq!(
+            reject_error(&HumanResponse::EnrollmentRejected {
+                reason: HumanEnrollmentError::CodeMismatch
+            }),
+            Err("comparison code does not match; enrollment aborted".to_owned())
         );
     }
 }

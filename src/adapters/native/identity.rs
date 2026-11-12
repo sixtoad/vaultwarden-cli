@@ -51,7 +51,8 @@ pub(crate) fn uuid(uid: u32) -> Result<String, ExecutionError> {
     }
     Ok(value.iter().map(|b| format!("{b:02x}")).collect())
 }
-const INSTALLED_IDENTITIES: &str = "/Library/VaultwardenAccess/native-identities.json";
+/// The root-owned installed identity record.
+pub(crate) const IDENTITIES_PATH: &str = "/Library/VaultwardenAccess/native-identities.json";
 #[cfg(test)]
 thread_local! {pub(crate) static TEST_IDENTITY_FILE: std::cell::RefCell<Option<std::path::PathBuf>>=const{std::cell::RefCell::new(None)};}
 #[cfg(test)]
@@ -62,12 +63,12 @@ pub(crate) fn load() -> Result<Identities, ExecutionError> {
         return Ok(value);
     }
     #[cfg(not(test))]
-    let file = platform::open_no_writers(Path::new(INSTALLED_IDENTITIES), true)?;
+    let file = platform::open_no_writers(Path::new(IDENTITIES_PATH), true)?;
     // Synthetic files cannot be root-owned; every later check still applies to them.
     #[cfg(test)]
     let file = match TEST_IDENTITY_FILE.with(|value| value.borrow().clone()) {
         Some(path) => platform::open_no_writers(&path, false)?,
-        None => platform::open_no_writers(Path::new(INSTALLED_IDENTITIES), true)?,
+        None => platform::open_no_writers(Path::new(IDENTITIES_PATH), true)?,
     };
     let m = file
         .metadata()

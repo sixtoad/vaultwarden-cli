@@ -3,6 +3,7 @@ pub mod approval_verifier;
 pub mod companion;
 pub mod companion_identity;
 pub mod desktop_launch;
+pub mod enrollment_client;
 // Descriptor preparation is shared by contained helper supervision.
 #[cfg_attr(not(test), allow(dead_code))]
 #[cfg(target_os = "linux")]
@@ -11,7 +12,11 @@ pub mod human_socket;
 pub mod loopback_ui;
 #[cfg(target_os = "macos")]
 pub mod native;
+// The native macOS provider only: Linux keeps the Secret Service keyring.
+#[cfg(target_os = "macos")]
+pub mod provider_secret_file;
 pub mod session;
+pub mod setup_tools;
 pub(crate) mod ssh_agent;
 pub mod ssh_material;
 #[cfg(target_os = "linux")]

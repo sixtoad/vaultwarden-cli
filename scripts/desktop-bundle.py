@@ -18,6 +18,9 @@ sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location('artifact', Path(__file__).with_name('desktop-companion-artifact.py'))
 artifact = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(artifact)
+SIGNING_SPEC = importlib.util.spec_from_file_location('release_signing', Path(__file__).with_name('macos-release-signing.py'))
+release_signing = importlib.util.module_from_spec(SIGNING_SPEC)
+SIGNING_SPEC.loader.exec_module(release_signing)
 
 
 def git(repo, *args):
@@ -62,17 +65,30 @@ def host_architecture():
     return {'arm64': 'aarch64', 'AMD64': 'x86_64'}.get(machine, machine)
 
 
+UNSUPPORTED_INTEL_MAC = 'Intel (x86_64) macOS is no longer supported or built; build the macOS bundle on Apple Silicon (arm64)'
+
+
+def require_supported(platform, architecture):
+    """Refuse Intel macOS (owner decision 2026-11-10): only Apple Silicon is built.
+
+    Linux and Windows x86_64 are unaffected; only Intel *Mac* is dropped.
+    """
+    if platform == 'macos' and architecture != 'aarch64':
+        raise ValueError(f'{UNSUPPORTED_INTEL_MAC} (architecture: {architecture})')
+
+
 def protected_commands(platform, architecture):
     """Protected request/provider binaries the bundle ships, by platform.
 
     Linux ships the systemd helper `vaultwarden-access-exec`. The native macOS
-    provider does not use it (the helper exits 1 off Linux), and the provider
-    rejects Intel/Rosetta at runtime, so only an arm64 macOS bundle carries the
-    protected commands. Windows has none.
+    provider does not use it (the helper exits 1 off Linux). macOS bundles are
+    Apple Silicon only and always carry the protected commands; an Intel macOS
+    architecture is refused. Windows has none.
     """
+    require_supported(platform, architecture)
     if platform == 'linux':
         return ['vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']
-    if platform == 'macos' and architecture == 'aarch64':
+    if platform == 'macos':
         return ['vw-access', 'vaultwarden-accessd']
     return []
 
@@ -98,11 +114,10 @@ def build_app(repo, platform, evidence):
     if flutter is None:
         raise FileNotFoundError(f'Flutter launcher not found on PATH: {launcher}')
     if platform == 'macos':
-        # Flutter defaults to a universal app. Its commands are host-native, so
-        # make the app's launch architecture coherent with the whole package.
-        architecture = {'aarch64': 'arm64', 'x86_64': 'x86_64'}.get(host_platform.machine(), host_platform.machine())
-        if architecture not in ('arm64', 'x86_64'):
-            raise ValueError('unsupported macOS architecture')
+        # The macOS app is Apple Silicon only (companion/macos/Runner/Configs
+        # sets ARCHS = arm64); pin it here too so the package and its
+        # host-native commands always agree. Intel hosts are refused.
+        require_supported(platform, host_architecture())
         lines = []
         previous = environment.get('XCODE_XCCONFIG_FILE')
         if previous:
@@ -110,7 +125,7 @@ def build_app(repo, platform, evidence):
             if any(c in previous for c in '\n\r"'):
                 raise ValueError('unsafe Xcode configuration path')
             lines.append(f'#include "{previous}"')
-        lines += [f'ARCHS = {architecture}', 'ONLY_ACTIVE_ARCH = YES']
+        lines += ['ARCHS = arm64', 'ONLY_ACTIVE_ARCH = YES']
         config = evidence / 'desktop-architecture.xcconfig'
         config.write_text('\n'.join(lines) + '\n')
         environment['XCODE_XCCONFIG_FILE'] = str(config)
@@ -119,26 +134,35 @@ def build_app(repo, platform, evidence):
 
 def populate(repo, root, platform, source):
     suffix = '.exe' if platform == 'windows' else ''
+    architecture = host_architecture()
+    # Refuse an unsupported platform before anything is written into the bundle.
+    protected = protected_commands(platform, architecture)
     command_dir = root / ('Contents/Helpers' if platform == 'macos' else 'commands')
     command_dir.mkdir(parents=True, exist_ok=True)
-    architecture = host_architecture()
-    protected = protected_commands(platform, architecture)
     commands = ['vaultwarden-cli', *protected]
     cargo_target = Path(os.environ.get('CARGO_TARGET_DIR', str(repo / 'target')))
     for command in commands:
         shutil.copy2(cargo_target / 'release' / (command + suffix), command_dir / (command + suffix))
     shutil.copy2(repo / 'companion/rust/target/command-launcher/release' / ('companion-command' + suffix), command_dir / ('companion-command' + suffix))
     if platform == 'macos':
-        signing = subprocess.run(['/usr/bin/codesign', '-dv', str(root)], capture_output=True, text=True, check=True)
-        if 'Signature=adhoc' not in signing.stderr:
+        built = subprocess.run(['/usr/bin/codesign', '-dv', str(root)], capture_output=True, text=True, check=True)
+        if 'Signature=adhoc' not in built.stderr:
             raise ValueError('Development bundler refuses to replace a distribution signature; use the publisher signing pipeline')
-        expected_arch = {'aarch64': 'arm64'}.get(host_platform.machine(), host_platform.machine())
+        expected_arch = 'arm64'
         for executable in [root / 'Contents/MacOS/companion_slice', *command_dir.iterdir()]:
             actual = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
             if actual != [expected_arch]:
                 raise ValueError(f'Application/command architecture mismatch: {executable}: {actual}; expected {expected_arch}')
-        for command in command_dir.iterdir():
-            subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(command)], check=True)
+        signing, _ = release_signing.configured(os.environ)
+        if signing is None:
+            print('macOS development build: Developer ID signing is not configured; commands and app are signed ad hoc', file=sys.stderr)
+            for command in command_dir.iterdir():
+                subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(command)], check=True)
+        else:
+            # Developer ID (#62): every nested signature and the embedded profile
+            # exist before the manifest hashes the payloads.
+            release_entitlements = release_entitlements_for(repo, root, signing)
+            release_signing.sign_nested(root, signing)
     app = {'macos': 'Contents/MacOS/companion_slice', 'windows': 'companion_slice.exe', 'linux': 'companion_slice'}[platform]
     core = {'macos': 'Contents/Frameworks/libcompanion_core.dylib', 'windows': 'companion_core.dll', 'linux': 'lib/libcompanion_core.so'}[platform]
     # All regular app/runtime/resources are bound. Framework links are recorded
@@ -173,11 +197,79 @@ def populate(repo, root, platform, source):
     if platform == 'macos':
         # Preserve Flutter's sandbox and selected-file entitlements. Nested code
         # is signed before manifest hashing; only the outer app is resealed.
-        subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=identifier,entitlements,flags,runtime', str(root)], check=True)
-        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(root)], check=True)
+        if signing is None:
+            subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=identifier,entitlements,flags,runtime', str(root)], check=True)
+            subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(root)], check=True)
+        else:
+            release_signing.sign_app(root, signing, release_entitlements)
+            release_signing.verify(root, signing.team, release_entitlements)
         verify_macos_entitlements(root)
     verify(root, manifest)
     return manifest
+
+
+def release_entitlements_for(repo, root, signing):
+    """Checked profile embedded; the app's minimum entitlements: Release.entitlements
+    (exactly what Flutter's release build signed) plus the profile's identity."""
+    with (repo / 'companion/macos/Runner/Release.entitlements').open('rb') as stream:
+        declared = plistlib.load(stream)
+    built = release_signing.entitlements_of(root)
+    # Xcode adds get-task-allow to its ad hoc build; the Developer ID app never has it.
+    built.pop('com.apple.security.get-task-allow', None)
+    if built != declared:
+        raise ValueError(f'the built app entitlements {sorted(built)} differ from Release.entitlements {sorted(declared)}')
+    bundle_id = release_signing.bundle_identifier(root)
+    granted = release_signing.embed_profile(root, signing, bundle_id)
+    return release_signing.app_entitlements(declared, signing.team, bundle_id, granted)
+
+
+def signing_variant(platform):
+    """Archive variant and signing record: development, signed (not notarized) or notarized."""
+    if platform != 'macos':
+        return 'development', None, None
+    signing, notary = release_signing.configured(os.environ)
+    if signing is None:
+        return 'development', None, None
+    return ('notarized' if notary else 'signed'), signing, notary
+
+
+def archive_architecture(platform, architecture):
+    """Archive-name qualifier: the macOS archive states arm64 (the only one built)."""
+    if platform != 'macos':
+        return None
+    require_supported(platform, architecture)
+    return 'arm64'
+
+
+def check_expected_architecture(root, manifest, expected):
+    """Fail a build whose host or helper set is not the one the job promises.
+
+    A release job that publishes the arm64 macOS archive must not silently ship
+    another architecture if its runner changes. Intel (x86_64) macOS is not
+    supported, so a job or manifest naming it is refused outright.
+    """
+    if not expected:
+        if any(os.environ.get(key, '').lower() == 'true' for key in ('CI', 'GITHUB_ACTIONS')):
+            raise ValueError('DESKTOP_EXPECTED_ARCHITECTURE is required in CI (arm64 or x86_64)')
+        print('warning: DESKTOP_EXPECTED_ARCHITECTURE is not set; the bundle architecture is not checked', file=sys.stderr)
+        return
+    expected = {'arm64': 'aarch64', 'AMD64': 'x86_64'}.get(expected, expected)
+    if expected not in ('aarch64', 'x86_64'):
+        raise ValueError(f'unsupported expected architecture: {expected}')
+    require_supported(manifest['platform'], expected)
+    require_supported(manifest['platform'], manifest['architecture'])
+    if manifest['architecture'] != expected:
+        raise ValueError(f"bundle architecture {manifest['architecture']} is not the expected {expected}")
+    platform = manifest['platform']
+    suffix = '.exe' if platform == 'windows' else ''
+    command_dir = root / ('Contents/Helpers' if platform == 'macos' else 'commands')
+    protected = protected_commands(platform, expected)
+    shipped = sorted(p.name for p in command_dir.iterdir())
+    wanted = sorted(name + suffix for name in ['companion-command', 'vaultwarden-cli', *protected])
+    if shipped != wanted:
+        raise ValueError(f'bundled commands {shipped} are not the expected {wanted}')
+    if ('vw-access' in manifest['commands']) != bool(protected) or manifest['roles']['protected_provider'] != bool(protected):
+        raise ValueError('advertised protected commands do not match the expected architecture')
 
 
 def verify_macos_entitlements(root):
@@ -210,6 +302,7 @@ def main():
     repo = Path(__file__).resolve().parents[1]
     evidence = args.evidence.resolve()
     if args.action == 'before':
+        signing_variant(args.platform)  # refuse a bad signing/notary configuration before building
         checkpoint(repo, evidence, 'before')
     elif args.action == 'app':
         build_app(repo, args.platform, evidence)
@@ -223,9 +316,21 @@ def main():
             (evidence / 'source-changed-paths.json').write_text(json.dumps(changed, indent=2) + '\n')
             raise RuntimeError('Build inputs changed during packaging: ' + ', '.join(changed))
         root, _ = artifact.locate(repo, args.platform)
+        signing_variant(args.platform)  # refuse a bad signing/notary configuration before any work
         manifest = populate(repo, root, args.platform, source)
+        check_expected_architecture(root, manifest, os.environ.get('DESKTOP_EXPECTED_ARCHITECTURE', ''))
+        variant, signing, notary = signing_variant(args.platform)
+        if variant == 'notarized':
+            release_signing.notarize(root, notary, evidence / 'notarization')
+            release_signing.verify(root, signing.team)
+            verify(root, manifest)
+        elif variant == 'signed':
+            print('::warning::Developer ID signed but NOT notarized: no notary credentials are configured; Gatekeeper will refuse this download', file=sys.stderr)
         (evidence / 'bundle.json').write_text(json.dumps(manifest, indent=2) + '\n')
-        archive = artifact.package(root, evidence, args.platform, source['revision'], source['source_dirty'])
+        record = None if signing is None else {'kind': 'developer-id', 'team_id': signing.team, 'notarized': variant == 'notarized'}
+        archive = artifact.package(root, evidence, args.platform, source['revision'], source['source_dirty'],
+                                   architecture=archive_architecture(args.platform, manifest['architecture']),
+                                   variant=variant, signing=record)
         # Exercise the production launcher against the freshly extracted archive,
         # not the build directory or a self-exiting GUI test entrypoint.
         import tarfile

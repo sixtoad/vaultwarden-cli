@@ -125,6 +125,9 @@ Neither template is installable until placeholders are resolved;
 `scripts/macos-provider-plan.py` resolves both from validated explicit inputs
 into a caller-chosen directory and installs nothing (see
 [desktop installation](../desktop-installation.md#macos-provider-installer-plan-review-material-installs-nothing)).
+Its `plan.json` lists every account, membership, directory and file below.
+`scripts/macos-provider-install.py` executes exactly that reviewed plan
+([procedure](../desktop-installation.md#macos-provider-installation-upgrade-and-removal)).
 UUIDs are
 lowercase hexadecimal without separators; UID/GID placeholders must become JSON
 integers. Obtain the actual account GeneratedUID values and confirm they agree
@@ -194,6 +197,79 @@ safe lifetime is established. Preserve audit/state and Keychain by default;
 credential deletion and account removal require their own explicit inventory and
 approval. Retain uncertain resources and report incomplete removal. Reusing an
 account UID must never revive old enrollment.
+
+### Installer (`scripts/macos-provider-install.py`)
+
+The installer implements the sequences above for a reviewed plan directory and
+the same arm64 bundle; it is source-tested with fake system tools and a
+temporary root prefix only. A real privileged installation has not been
+performed.
+
+- **Review binding:** mutating runs require `--expect-plan-sha256` (the digest of
+  the reviewed `plan.json`, which carries the plist, identity and binary
+  hashes), a signature policy (`--team-id TEAMID`, checked with the full
+  Developer ID designated requirement ending in `certificate leaf[subject.OU] = "TEAMID"`,
+  or `--allow-development-signature` for ad-hoc builds only), and a root-owned
+  copy of the installer: the script, the plan module, the templates and every
+  ancestor directory must be root-owned and not group/other-writable. Every
+  binary must be arm64-only (`lipo -archs`), whatever `bundle.json` says.
+- **Install:** refuses unless arm64 macOS and root; creates the provider group,
+  human/agent socket groups, the hidden provider account and the optional
+  restricted agent account (primary group: the agent group; no login shell;
+  hidden; never in the human, provider or `admin` groups) with the plan's fixed
+  IDs and GeneratedUIDs, refusing every collision and any matching account it did
+  not create unless `--adopt-existing-accounts` (never a group below GID 500 or a
+  well-known name). Group membership must be exactly the plan's and is verified
+  with `dsmemberutil`. It creates the empty layout with the owners and modes
+  above; stages, verifies (reviewed SHA-256, one link, architecture, signature)
+  and renames a new `versions/<version>/` that also holds the resolved plist;
+  writes `native-identities.json`, its receipt and the LaunchDaemon. The receipt
+  is written before each mutation (an account is recorded `creating`, then
+  `created`), so a re-run after a crash at any step converges. Credentials are
+  never generated or copied: the service stays disabled until the four state
+  files verify; start waits for launchd's `state = running` and reports the last
+  exit code otherwise. Standard streams stay `/dev/null` as required above.
+- **Upgrade:** verify the complete new version, record it in the receipt,
+  close admission (`launchctl disable`), `bootout`, switch the versioned plist,
+  `enable`, `bootstrap`; the provider restarts locked. Requires
+  `--acknowledge-active-work`; failed verification leaves the current version
+  active; never overwrites a version.
+- **Rollback:** only to a recorded, re-verified version and only with
+  `--confirm-state-compatible`, in the same order. No state is restored.
+  Installed versions are verified against their stored plist copy and the
+  receipt's hashes, never against the checkout's current templates. The
+  receipt's `switching` marker (from, to, by) stays until the target runs, so a
+  re-run of an interrupted rollback resumes towards its target and a re-run of a
+  completed one is a no-op (`--to-version` switches again).
+- **Stop/start:** `stop --acknowledge-active-work` closes admission and boots the
+  service out (for offline companion enrollment); `start` verifies the active
+  version and credentials and starts it.
+- **Uninstall:** closes admission and boots out first, removes only unchanged
+  installer-owned files, clears the label's `launchctl disable` override once
+  the plist is gone, preserves state (including the provider's `state/secrets/`
+  file store, PR #71) and accounts by default and reports retained resources
+  (exit 3). `--purge` removes `state/`, secrets included, without following
+  links. `--purge --remove-accounts` removes the accounts it created only when
+  nothing provider-owned was retained, after writing their GeneratedUIDs to the
+  root-owned `account-tombstones.json`; a later install refuses a tombstoned
+  GeneratedUID, so a recreated account cannot revive old enrollment. (Review
+  round 2: `--confirm-secrets-removed` is gone; it asserted Keychain removal,
+  and the provider no longer keeps its secrets in a Keychain.)
+- **Start gate:** the service starts only when the four state files, the
+  stored API client secret (`state/secrets/` `0700`,
+  `vaultwarden-accessd.bootstrap-client-secret` `0600`, provider-owned, one link)
+  and the enrolled companion registry `state/companion-identities.json`
+  (provider-owned `0600`, one link; PR #71 `identity::enrolled()` refuses to bind
+  the companion listener without it) verify (review round 2, decision R2-8;
+  review round 3). `status` names each missing item. Order: store the secret,
+  enroll the companion with the service stopped, then `start`.
+- **Code trust (review round 3):** besides owner and mode bits, every code file
+  and ancestor directory must carry no access control list (`/bin/ls -led`).
+- **Directory service (review round 3):** only `dscl` exit 56
+  (eDSRecordNotFound) reads as an absent record; any other failure refuses.
+- **Rollback after an interrupted upgrade (review round 3):** without
+  `--to-version`, `rollback` targets the pending upgrade's `from` version, never
+  an older `previous_version`.
 
 ## Production Touch ID approval: owner decisions (2026-10-30)
 

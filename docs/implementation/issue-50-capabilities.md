@@ -77,10 +77,11 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   The Windows line-ending cause is diagnosed and fixed; matching platform CI remains an evidence gate;
   implementation alone does not establish completed platform acceptance.
 
-- [ ] **Notifications:** the Swift app has generic notifications
-  (`macos/Sources/ApprovalCompanion/App.swift:155`); Flutter has no equivalent
-  notification/background API. Exact-request navigation needs a native entrypoint,
-  fresh loading and review; never notification-level approval.
+- [ ] **Notifications:** macOS desktop is implemented (#61, see
+  [companion migration](../companion-migration.md#review-request-notifications-issue-61)):
+  generic copy, opaque token, exact-request fresh review, final-state view, no
+  notification actions, off by default. Open: hardware/owner checks, delivery
+  after the window is closed (no menu-bar lifetime yet), Windows/Linux, mobile (#60).
 
 ## Screen and state mapping
 
@@ -89,7 +90,7 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
 | Requests | Inbox IDs, complete validated scope, provider endpoint, password approval/denial, expiry and original-ID recovery | Typed facts and signed-admission origin (legacy origin explicitly unavailable) |
 | Devices & agents | Provider-backed identities, granted roles/trust, exact-target permanent revocation and status-only recovery (management slice) | Genuine mutual enrollment remains separate; runtime evidence is recorded in PR #57 |
 | Activity | Bounded durable redacted history; exact-ID fresh review; explicit unavailable/locked/recovery states | Matching-platform and hardware evidence as recorded below |
-| Settings | Advanced setup, theme, actual capabilities, bundle/version integrity and user command repair, separate synthetic diagnostics | Matching platform verification; native notification settings |
+| Settings | Advanced setup, theme, actual capabilities, bundle/version integrity and user command repair, separate synthetic diagnostics, macOS review-notification toggle | Matching platform verification; notification settings on Windows/Linux |
 
 
 Desktop uses sidebar/master-detail; compact uses bottom navigation/list-to-detail,

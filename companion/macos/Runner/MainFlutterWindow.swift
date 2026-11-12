@@ -3,6 +3,7 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var approvalSigner: ApprovalSigner?
+  private var productionSigner: ProductionSigner?
   private var providerAdapter: ProviderAdapter?
   private var installationChannel: FlutterMethodChannel?
   private var commandDirectory: URL?
@@ -14,7 +15,12 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     approvalSigner = ApprovalSigner(messenger: flutterViewController.engine.binaryMessenger)
+    productionSigner = ProductionSigner(messenger: flutterViewController.engine.binaryMessenger)
     providerAdapter = ProviderAdapter(messenger: flutterViewController.engine.binaryMessenger)
+    // The window loads from the main nib, before launch finishes, so a click
+    // that launched the app reaches the delegate.
+    ReviewNotificationAdapter.shared.install()
+    ReviewNotificationAdapter.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
 
     installationChannel = FlutterMethodChannel(name: "dev.vaultwarden.companionSlice/installation", binaryMessenger: flutterViewController.engine.binaryMessenger)
     installationChannel?.setMethodCallHandler { [weak self] call, result in

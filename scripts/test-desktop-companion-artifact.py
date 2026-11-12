@@ -45,6 +45,52 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ARTIFACT.package(root, evidence, "linux", "revision", False, True)
 
+    def test_macos_archive_is_arm64_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "app"
+            root.mkdir()
+            (root / "synthetic").write_bytes(b"synthetic executable")
+            evidence = Path(temporary) / "evidence"
+            evidence.mkdir()
+            arm = ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="arm64")
+            self.assertEqual(arm.name, "companion-macos-arm64-development.tar.gz")
+            self.assertEqual((evidence / f"{arm.name}.sha256").read_text().split(), [ARTIFACT.digest(arm), arm.name])
+            self.assertEqual(json.loads((evidence / "artifact.json").read_text())["archive"], arm.name)
+            # Intel (x86_64) macOS is no longer supported or built: no archive is
+            # produced, and the arm64 evidence is left as it was.
+            with self.assertRaisesRegex(ValueError, r"Intel \(x86_64\) macOS is no longer supported"):
+                ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="x86_64")
+            self.assertFalse((evidence / "companion-macos-x86_64-development.tar.gz").exists())
+            self.assertEqual(json.loads((evidence / "artifact.json").read_text())["archive"], arm.name)
+            # Platforms published once keep their established names.
+            self.assertEqual(ARTIFACT.package(root, evidence, "linux", "revision", False).name,
+                             "companion-linux-development.tar.gz")
+            with self.assertRaises(ValueError):
+                ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="aarch64")
+
+    def test_developer_id_archives_are_named_and_record_their_signing(self):
+        record = {"kind": "developer-id", "team_id": "9884BZY594", "notarized": True}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "app"
+            root.mkdir()
+            (root / "synthetic").write_bytes(b"synthetic executable")
+            evidence = Path(temporary) / "evidence"
+            evidence.mkdir()
+            archive = ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="arm64", variant="notarized", signing=record)
+            self.assertEqual(archive.name, "companion-macos-arm64-notarized.tar.gz")
+            self.assertEqual(json.loads((evidence / "artifact.json").read_text())["signing"], record)
+            signed = ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="arm64", variant="signed", signing={**record, "notarized": False})
+            self.assertEqual(signed.name, "companion-macos-arm64-signed.tar.gz")
+            development = ARTIFACT.package(root, evidence, "macos", "revision", False, architecture="arm64")
+            self.assertNotIn("signing", json.loads((evidence / "artifact.json").read_text()))
+            self.assertEqual(development.name, "companion-macos-arm64-development.tar.gz")
+            for kwargs in [dict(platform="linux", variant="signed", signing=record), dict(platform="macos", variant="signed", signing=None),
+                           dict(platform="macos", variant="development", signing=record), dict(platform="macos", variant="release", signing=record)]:
+                with self.assertRaises(ValueError, msg=kwargs):
+                    ARTIFACT.package(root, evidence, kwargs["platform"], "revision", False, variant=kwargs["variant"], signing=kwargs["signing"])
+            with self.assertRaises(ValueError):
+                ARTIFACT.package(root, evidence, "macos", "revision", False, True, variant="notarized", signing=record)
+
     def test_archive_preserves_executable_and_framework_link(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "app"

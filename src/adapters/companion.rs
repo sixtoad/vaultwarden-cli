@@ -24,6 +24,7 @@ use std::{
 use zeroize::{Zeroize, Zeroizing};
 #[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
 mod biometric_tests;
+mod enrollment;
 mod management;
 const MAX_BODY: usize = 16384;
 const MAX_TICKETS: usize = 256;
@@ -121,6 +122,12 @@ enum Command {
         #[serde(deserialize_with = "password")]
         password: SensitiveString,
     },
+    /// Guided enrollment (#59): the only command an unenrolled, CA-valid
+    /// client leaf may send. It never reaches inventory, review or approval.
+    Enroll {
+        version: u8,
+        message: crate::access::enrollment::wire::EnrollmentRequest,
+    },
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -182,6 +189,9 @@ impl Command {
             | Self::BiometricEnroll { .. }
             | Self::BiometricRevoke { .. }
             | Self::RequestOrigin { .. } => return false,
+            Self::Enroll { version, message } => {
+                return *version == 1 && message.validate().is_ok();
+            }
             Self::Session { version } | Self::List { version } => (*version, None),
             Self::History { version, limit } => {
                 if crate::access::history::limit(*limit).is_err() {
@@ -331,6 +341,7 @@ impl FixtureTraffic {
             Command::Status { .. } => "status",
             Command::Decision { .. } => "decision",
             Command::Unlock { .. } => "unlock",
+            Command::Enroll { .. } => "enroll",
         };
         let mut state = self.0.lock().unwrap();
         let count = state.counts.entry(name).or_default();
@@ -406,7 +417,11 @@ impl Companion {
         client_ca: &Path,
         identity_store: &Path,
     ) -> Result<Self, SessionError> {
-        identity::enrolled(identity_store)?;
+        // An absent registry in the private provider directory is zero
+        // companions: every command except guided enrollment is refused
+        // (`authorized` finds no identity), so the first companion can be
+        // enrolled online (#59). A present but invalid registry still fails.
+        identity::enrolled_or_none(identity_store)?;
         crate::install_rustls_crypto_provider();
         let certificates = identity::private_file(certificate)?;
         let key = identity::private_file(private_key)?;
@@ -479,6 +494,9 @@ impl Companion {
         }
     }
     fn dispatch(&self, device: &str, command: Command, app: &ProviderApplication) -> Response {
+        if let Command::Enroll { .. } = &command {
+            return enrollment::dispatch(self, device, &command, app);
+        }
         if !self.authorized(device) && !management::receipt_authorized(self, device, &command) {
             return Response::error(Error::Unauthorized);
         }
@@ -501,7 +519,8 @@ impl Companion {
             | Command::BiometricPrepare { .. }
             | Command::BiometricEnroll { .. }
             | Command::BiometricRevoke { .. }
-            | Command::RequestOrigin { .. } => Response::error(Error::Invalid),
+            | Command::RequestOrigin { .. }
+            | Command::Enroll { .. } => Response::error(Error::Invalid),
             Command::Session { .. } => Self::session(app),
             Command::List { .. } => match app.companion_pending() {
                 Ok(requests) => Response::ok(serde_json::json!({"version":1,"requests":requests})),
@@ -1078,6 +1097,7 @@ mod tests {
     use crate::access::direct_request_tests::{Fixture, fixture, input};
     use std::{os::unix::fs::PermissionsExt, sync::atomic::AtomicUsize};
     include!("companion_history_tests.rs");
+    include!("companion_enrollment_tests.rs");
     const CLIENT: &[u8] = include_bytes!("../../tests/companion-tls/client.pem");
     const CLIENT_KEY: &[u8] = include_bytes!("../../tests/companion-tls/client-key.pem");
     const CLIENT_CA: &[u8] = include_bytes!("../../tests/companion-tls/ca.pem");

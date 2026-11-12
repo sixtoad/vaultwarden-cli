@@ -99,10 +99,31 @@ the `require_password` policy field, history attribution and a golden vector
 [companion-protocol.md](companion-protocol.md#production-touch-id-approval-v2-issue-49);
 owner decisions are recorded in
 [issue-49-native-provider.md](implementation/issue-49-native-provider.md#production-touch-id-approval-owner-decisions-2026-10-30).
-Companion bridge (PR B), Secure Enclave signer (PR C) and UI (PR D) are pending;
-no hardware biometric evidence exists yet.
+Companion bridge (PR B, #66) is merged. The Secure Enclave signer, own-device
+key enrollment and approval screens (PR C/D) are implemented and tested with
+fakes, golden vectors and the provider's verifier contract
+([companion-migration.md](companion-migration.md#secure-enclave-signer-and-approval-screens-issue-49-pr-cd));
+no hardware biometric evidence exists yet (no physical Touch ID run).
 
 One installation must deliver the Flutter app, `vw-access`, provider, execution components and required service definitions with a common version manifest. The existing archive/Swift DMG cannot serve as proof. A signed installation plan must disclose account creation, file destinations and service registration. Use stable signing identities for release; obtain Developer ID/notarization capability before claiming normal distribution support. Never disable Gatekeeper or SIP to install.
+
+Status (2026-11-11, #62): Developer ID signing and notarization are implemented.
+The release publisher is the Developer ID Application identity of team
+9884BZY594; `scripts/desktop-bundle.py` signs every component of the arm64 bundle
+with a hardened runtime, a secure timestamp and minimum entitlements (the app
+embeds its Developer ID provisioning profile for `keychain-access-groups`), and
+notarizes and staples it when notary credentials exist. The release workflow
+takes the material only from Actions secrets and builds the development archive
+with a notice when they are absent. The native provider's image trust names the
+release publisher (`RELEASE_TEAM_ID` in `src/adapters/native/image.rs`, the same
+requirement as the installer's `--team-id`), requires the Developer ID
+intermediate and one publisher per image. One local end-to-end notarization of
+the bundle was accepted and stapled (submission
+`386e51d7-96bd-4166-b825-ddb587902eff`, `spctl`: `source=Notarized Developer ID`).
+The CI secrets the owner sets, the one-time commands and the
+upgrade/rollback/uninstall rehearsal (not yet run; done with the owner) are in
+[desktop-installation.md](desktop-installation.md#developer-id-signing-and-notarization-macos-62).
+Windows code signing is out of scope.
 
 Upgrade sequence: verify the new payload before activation, close admission, coordinate resource release with the execution owner or defer activation, preserve configuration/Keychain, migrate only supported state schemas, atomically switch a complete version and restart locked. Retain the old resources or defer activation when their safe lifetime cannot be established. Failed verification leaves the current version intact. Rollback must not reactivate consumed approvals or incompatible state. Do not replace unrelated binaries, accounts or settings.
 
@@ -116,7 +137,7 @@ Uninstall sequence: revoke admission, disclose active work, coordinate resource 
 | 1. Separate responsibilities and platform code | `src/lib.rs`, `src/access/{application,ports}.rs`, `src/adapters/{mod,session,supervisor,human_socket}.rs`, new `src/adapters/platform/` | Access authority separated from legacy consumer supervision; Linux authorization/delivery guarantees retained with migration tests |
 | 2. Native provider | Native recipient verification, authenticated handoff/transport/storage adapters, `src/access/policy.rs`, protected binaries | Qualified recipient/channel binding, one-time delivery and fail-closed access recovery; no consumer execution control |
 | 3. Local approval | Flutter controller/page, native provider settings/adapter, new production approval signer and transcript | Local enrollment, explicit password and supported Touch ID, noninteractive agent, one-time execution and status recovery |
-| 4. Single install | New `packaging/macos/`, installer/build scripts, Flutter build configuration, explicit release payload | Authorized disposable install/upgrade/failure/removal rehearsal; signatures and component versions agree |
+| 4. Single install | New `packaging/macos/`, installer/build scripts, Flutter build configuration, explicit release payload, Developer ID signing/notarization (`scripts/macos-release-signing.py`, #62) | Authorized disposable install/upgrade/failure/removal rehearsal; signatures and component versions agree |
 | 5. Acceptance | New `tests/macos_protected_execution.rs`, native fixtures/mutations, `.github/workflows/ci.yml`, `docs/access-mvp.md`, companion docs | Complete synthetic M1 flow, all security cases, declared support matrix and Linux regressions |
 
 Stages 1–5 are a roadmap, not ready-for-development stories. Specify their exact APIs, file changes and tests after stage 0 determines the mechanism. No stage can waive an earlier security gate.

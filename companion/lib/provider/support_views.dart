@@ -152,11 +152,11 @@ class ProviderCapabilities extends StatelessWidget {
       Text('Native capabilities'),
       SizedBox(height: 8),
       Text(
-        'macOS: native pinned-TLS provider transport and explicit password approval. Touch ID remains a separate synthetic signing demonstration.',
+        'macOS: native pinned-TLS provider transport, explicit password approval and Touch ID approval (provider protocol v2). Touch ID signs with a Secure Enclave key enrolled for this provider in Settings; Macs without Touch ID approve with the password. The synthetic signing demonstration is separate and never approves provider requests.',
       ),
       SizedBox(height: 8),
       Text(
-        'macOS on Apple Silicon (arm64): the desktop bundle includes vw-access and the native vaultwarden-accessd provider. Installing the provider into /Library and its launchd service is a reviewed manual step; a plan generator produces the files, but nothing installs them yet. Development signing only. Intel Macs and Rosetta are unsupported.',
+        'macOS on Apple Silicon (arm64): the desktop bundle includes vw-access and the native vaultwarden-accessd provider. An administrator installs the provider into /Library and its launchd service with the reviewed command-line installer (see docs/desktop-installation.md in the source distribution); this app does not install it. Development signing only. Intel Macs and Rosetta are unsupported.',
       ),
       SizedBox(height: 8),
       Text(
@@ -168,7 +168,7 @@ class ProviderCapabilities extends StatelessWidget {
       ),
       SizedBox(height: 8),
       Text(
-        'Guided enrollment and notifications are not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
+        'Touch ID key enrollment for this Mac is in Settings. Review notifications (macOS, while this window is open) are in Settings. Guided enrollment is not available. Desktop installation is inspected separately above. This development application does not replace the installed companion.',
       ),
     ],
   );

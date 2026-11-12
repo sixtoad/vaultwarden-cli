@@ -798,11 +798,14 @@ fn native_reaper_capacity_denies_execution_before_backend_resolution() {
     let f = Fixture::new();
     let id = f.request();
     f.approve(&id);
+    // A private pool: draining the process-wide one denies every concurrently
+    // running native test's image preparation with `Unavailable`.
+    let _pool = super::reaper::private_test_pool(2);
     let mut reservations = Vec::new();
     while let Ok(reservation) = super::reaper::reserve() {
         reservations.push(reservation);
     }
-    assert!(!reservations.is_empty());
+    assert_eq!(reservations.len(), 2);
     assert!(f.execute(&id).is_err());
     assert_eq!(f.resolved.load(Ordering::SeqCst), 0);
     drop(reservations);

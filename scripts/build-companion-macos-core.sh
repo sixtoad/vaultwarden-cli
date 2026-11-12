@@ -6,7 +6,8 @@ libraries=()
 for arch in $ARCHS; do
   case "$arch" in
     arm64) target=aarch64-apple-darwin ;;
-    x86_64) target=x86_64-apple-darwin ;;
+    # Owner decision 2026-11-10: the macOS app is Apple Silicon only.
+    x86_64) echo 'Intel (x86_64) macOS is no longer supported or built; build on Apple Silicon (ARCHS = arm64)' >&2; exit 1 ;;
     *) echo 'Unsupported companion architecture' >&2; exit 1 ;;
   esac
   cargo build --release --locked --manifest-path "$companion/rust/Cargo.toml" --target-dir "$companion/rust/target" --target "$target"

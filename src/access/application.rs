@@ -1,5 +1,7 @@
 //! Serialized session authority. No adapter or caller can obtain resolved values.
 use super::provisioning::{ProvisioningError, bounded};
+
+mod enrollment_service;
 use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider::Provider};
 use std::{
     sync::{
@@ -74,6 +76,12 @@ pub struct ProviderApplication {
     agent_tokens: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
     reaped: Condvar,
     cleanup_uncertain: AtomicBool,
+    /// Guided enrollment sessions (#59). Held across the commit hooks, so the
+    /// lock order is enrollment → gate (agents: `list_agents`, `pair_agent`)
+    /// and enrollment → companion `identity_commit` → companion `management`
+    /// (companions: `enroll_online`). Never take the enrollment lock while
+    /// holding any of those.
+    enrollment: Mutex<super::enrollment::book::Book>,
 }
 struct ActiveExecution {
     cancel: Arc<AtomicBool>,
@@ -213,6 +221,7 @@ impl ProviderApplication {
             agent_tokens: Mutex::new(agent_tokens),
             reaped: Condvar::new(),
             cleanup_uncertain: AtomicBool::new(false),
+            enrollment: Mutex::new(super::enrollment::book::Book::default()),
         };
         app.lock()?;
         Ok(app)
