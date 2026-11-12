@@ -28,40 +28,167 @@ Two layers, as in earlier campaigns (`1-9-mutation-classifications.md`):
   `test result: FAILED`; build failures are not catches. Sources are restored and
   their hashes recorded in `results.json`.
 
-`initial-*` runs use the unmodified `origin/main` sources (`7bc3753`); `final-*`
-runs use this branch, including the new tests. Evidence lists are in
-[`issue-49-native-mutations/`](issue-49-native-mutations/).
+Both layers run in the opt-in workflow
+[`native-mutations.yml`](../../.github/workflows/native-mutations.yml) on GitHub's
+`macos-26` (Apple Silicon) runners, not on a development Mac. Each generated file runs
+twice: **main** mutates and tests `origin/main`'s sources (the tests that existed
+before this campaign) and **branch** uses this branch, so every survivor and every new
+kill is compared on the same runner image. Evidence lists from the final run are in
+[`issue-49-native-mutations/`](issue-49-native-mutations/) (`main-<file>/`,
+`branch-<file>/`: cargo-mutants' `caught`, `missed`, `timeout`, `unviable` lists and
+`outcomes.json.gz`; `semantic/results.json`).
+
+### cargo-mutants must run natively
+
+cargo-mutants 27.1.0 publishes only an `x86_64-apple-darwin` binary, which the
+installer action ran under Rosetta. Its children then preferred the x86_64 slice of
+universal tools, so the fixtures the tests compile with `/usr/bin/clang` were x86_64
+and the arm64-only native spawn (`posix_spawnattr_setbinpref_np`, `count == 1`)
+refused them: seven producer/spawn tests failed the unmutated baseline with
+`ExecutionFailed` and `mod`, `platform`, `identity` and `producer` never ran (run
+42730674659). It also hid kills: with x86_64 fixtures `image::signature` failed at
+`macho()` before reaching the code signature checks. The workflow now builds
+cargo-mutants once natively (`cargo install --locked`, `lipo -archs` printed) and the
+wrapper refuses a cargo-mutants binary without an `arm64` slice.
 
 <!-- RESULTS -->
+## Results
 
-## Classification of initial survivors
+Final run: workflow run **RUNID** on `HEADSHA` (all jobs green). Score =
+caught / (caught + missed + timeout); unviable mutants are excluded. *Adjusted*
+also excludes the survivors classified **equivalent** below.
+
+| File | main (pre-campaign tests) | branch | branch adjusted |
+| --- | --- | --- | --- |
+| `reaper.rs` | 5 / 11 (45.5%) | 11 / 11 (100%) | 100% |
+| `identity.rs` | 6 / 34 (17.6%) | 32 / 34 (94.1%) | 32 / 32 (100%) |
+| `image.rs` | 165 / 199 (82.9%) | 191 / 199 (96.0%) | 191 / 194 (98.5%) |
+| `mod.rs` | 46 / 89 (51.7%) | MODB | MODA |
+| `platform.rs` | 55 / 88 (62.5%) | 66 / 88 (75.0%) | 66 / 74 (89.2%) |
+| `producer.rs` | 31 / 44 (70.5%) | 33 / 44 (75.0%) | 33 / 39 (84.6%) |
+| **total** | 308 / 465 (66.2%) | TOTB | TOTA |
+
+Semantic faults (11): every fault caught on the branch (baseline passed, mutant
+`test result: FAILED`): release race, implicit termination, peer-token PID, peer
+cdhash, loader path, shared-cache dependency, reaper live child, producer before
+reaping, producer overflow, identity root provider, no-writer group mode.
+
+No survivor exposed a production bug. Each killing test below was shown to fail
+against its exact mutant (applied by hand, targeted test run) and to pass unmutated.
+
+## Survivors and kills by file
 
 ### reaper.rs
 
-Local initial run (pre-existing tests): 14 mutants, 5 caught, 6 missed, 3 unviable.
-All six survivors are in the natural reaper's `waitpid` decision (`result == pid`,
-`result < 0`, `== ECHILD`, and the `&&`/`||` joining them). The existing test let a
-`/usr/bin/true` child exit before the first poll, so a reaper that freed a slot on
-`0` (still running) or on any stale errno passed.
+All six pre-campaign survivors sit in the natural reaper's `waitpid` decision.
 `foreign_reaped_pid_is_released_but_live_child_keeps_capacity_until_natural_exit`
-first releases a PID this process already reaped (real `ECHILD`), which also leaves
-`ECHILD` in the reaper thread's errno, then detaches a live `/bin/sleep 0.4` child and
-requires its slot to stay owned across ~20 polls and to be freed only after the
-natural exit, with the PID then gone (`ECHILD`). It never signals. It kills all six.
+(a live `/bin/sleep` child keeps its slot across ~20 polls and is freed only after
+its natural exit) kills `57:39 == with !=`, `58:44 < with ==`/`< with >` and
+`60:41 == with !=`. It did not kill `58:44 < with <=` and `59:37 && with ||`: those
+free a slot whose `waitpid` returned 0 when errno is `ECHILD`, but on Darwin the
+reaper's `nanosleep` leaves `ETIMEDOUT` in errno between passes. They are killed by
+`live_child_polled_after_an_echild_slot_in_the_same_pass_keeps_its_slot`: slot 0
+holds an already-reaped PID and slot 1 a live child, so within one pass the slot-0
+`ECHILD` is still errno when slot 1's `waitpid` returns 0.
 
-### producer.rs
+### identity.rs
 
-Local initial run: 49 mutants, 31 caught, 11 missed, 2 timeouts, 5 unviable.
+The `cfg(test)` identity-file seam (`TEST_IDENTITY_FILE`) lets the tests load
+synthetic installed-identity files through every validation step except the
+root-owner requirement, which synthetic files cannot meet; non-test builds compile
+only the root-owned path. The `mutation_tests.rs` identity tests kill 26 of the 28
+pre-campaign survivors. Remaining:
 
 | Survivor | Classification |
 | --- | --- |
-| `21:42 + with *` (capacity ×4) | Killed: `reader_flags_the_first_byte_past_capacity_instead_of_buffering_more` drives `drain` with exactly `CAPACITY`, `CAPACITY + 1` and `2 × CAPACITY` bytes and requires the reader itself to stop and flag at `CAPACITY + 1`. |
-| `105:22 > with ==`, `> with >=` (timeouts) | Killed instead of timing out: the same test runs the reader on a thread with a 10 s bound, so a reader spinning at end of file fails the test. |
-| `142:9 Drop → ()` | Killed: `dropping_the_output_closes_the_read_end_while_a_writer_remains` requires `EPIPE` on the retained write end after the capability is dropped. |
+| `43:9 \|\| with &&` (`rc != 0 && result.is_null() \|\| pw_uid != uid`) | Equivalent: when `getpwuid_r` finds no entry the zeroed `passwd` keeps `pw_uid == 0`, so the last clause rejects every unknown non-root UID, and UID 0 always exists. |
+| `44:9 \|\| with &&` (`result.is_null() && pw_uid != uid`) | Equivalent: a found entry always has `pw_uid == uid`; a null result leaves `pw_uid == 0`, so the joined clause is true for every unknown non-root UID. |
+
+### image.rs
+
+Pre-campaign: 34 survivors; the boundary/header tests kill 26. Added for the CI run:
+`native_fat_table_limits_header_overlap_and_adjacent_out_of_order_slices` (17 valid
+slices; a non-native slice inside the fat table; adjacent slices listed out of file
+order) kills `61:19`, `82:35 * with +`/`* with /`, `84:62 > with >=`;
+`native_load_commands_must_fit_the_file_and_have_their_minimum_shape` (commands
+claimed past the end of the file, which the `> with ==` mutant slices out of bounds and
+panics on; a zero-size command; a dylib name inside its fixed fields) kills
+`111:42 > with ==`, `120:21`, `126:32`;
+`native_signature_policy_requires_the_hardened_runtime` (ad-hoc signature without
+`--options runtime`) kills `271:29 \|\| with &&` and `271:14 & with \|`.
+`249:5 slice_signature -> Ok(..)` (two mutants) survived only under Rosetta and is
+killed natively by the existing ad-hoc signature test.
+
+| Survivor | Classification |
+| --- | --- |
+| `111:42 > with >=` | Equivalent: a signed slice needs signature data after its load commands (`dataoff >= end`, `datasize > 0`, within the file), so `end == len` is rejected later in every case. |
+| `176:13 delete forbidden-command arm` | Equivalent: those commands then reach the fail-closed `_` arm, same `UnsupportedImage`. |
+| `236:13 \|\| with &&`, `259:9 \|\| with &&` | Equivalent under the Security API contract: the out pointer is set exactly when the call returns `errSecSuccess`. |
+| `250:48 \| with ^` | Equivalent: `STRICT_VALIDATE` and `NO_NETWORK_ACCESS` are disjoint bits. |
+| `250:48 \| with &` (no flags) | Not killed: needs an Apple-anchored slice that only strict validation rejects. A byte appended to `/usr/bin/ssh` (after, or inside, its last slice) fails `codesign --strict` but per-slice `SecStaticCodeCheckValidity` accepted it with and without the strict flag, so no fixture distinguishes them. |
+| `217:32 + with -`, `+ with *` (read bound 64 MiB + 1) | Not killed: distinguishing needs an Apple-anchored executable of 64 MiB or more; `macho()`'s own 64 MiB limit (killed) rejects any larger image. |
+
+### mod.rs
+
+Pre-campaign: 43 survivors. New kills:
+`native_executable_file_properties_each_reject_before_the_image_is_read` (an own
+copy of `/usr/bin/ssh`, set-user-ID `/usr/bin/login`, non-executable
+`/private/etc/hosts`: each must fail with `UnsafeSource` before the digest/Mach-O
+checks) kills `125:9`, `126:9`, `127:9`, `128:9`, `129:9` (`\|\| with &&`) and
+`128:21 & with \|`/`& with ^`; `native_supervision_detaches_only_a_live_consumer_to_the_reaper`
+kills `316:16 > with ==`/`> with <` (the lost consumer must be reaped, not left a
+zombie) and `> with >=` (a completed supervision must not detach PID 0, which makes
+the reaper `waitpid(0)` and steal an exited sibling's status). The supervision
+fixtures are bounded (liveness ends after 20 s, the fixture server after 10 s) so
+that the argument-vector mutants `107:5 -> Ok(vec![])`/`Ok(vec![Default::default()])`
+end as caught instead of timeouts.
+
+| Survivor | Classification |
+| --- | --- |
+| `235:9 available -> true` | Equivalent on every qualified host: `platform::available()` is true on native Apple Silicon (see platform.rs). |
+| `448:13 \|\| with &&` (`posix_spawn != 0 && pid <= 0`) | Equivalent under the `posix_spawn` contract: it writes a positive PID exactly on success and leaves the zero-initialised PID on failure. |
+| `457:9 Drop for Spawn -> ()` | Not killed: only leaks the spawn attribute and file-action objects (no descriptor is held by them). |
+| `504:9 is_finished -> false` | Not killed: the worker owns its sender until `join`, so the thread can finish only by panicking in `run_execution`; no seam induces that. |
+| `129:20 > with ==`, `> with >=` | Not killed: needs a root-owned executable of 64 MiB or more; `macho()` rejects anything larger independently. |
+
+### platform.rs
+
+Pre-campaign: 33 survivors. New kills:
+`native_process_listing_skips_the_caller_and_holds_every_listed_process` (the
+test binary is not "another process" with its own name; with 48 extra children the
+listing buffer must still hold every process of the account) kills `65:27` and
+`93:32 * with +`; `native_peer_audit_fails_without_a_connected_peer` kills
+`224:9`; `native_no_writer_open_never_blocks_on_a_fifo_component` kills
+`173:74 \| with &` (dropping `O_NONBLOCK` blocks on a FIFO; the test is bounded).
+
+| Survivor | Classification |
+| --- | --- |
+| `14:5 available -> true`; `28:18`, `28:64`, `29:25 && with \|\|`; `29:20 != with ==`; `29:75 == with !=` | Equivalent on every host the tests can run on: the binary is aarch64 and `sysctl.proc_translated` returns 0, so the first clause is true; the mutants differ only under translation or a failing `sysctlbyname`. |
+| `98:36 / with *` | Equivalent through the only caller: the vector keeps its zero padding, and `other_process_named` skips PID 0. |
+| `158:28 \| with ^`, `158:48 \| with ^`, `173:36`, `173:55`, `173:74 \| with ^` | Equivalent: the open flags are disjoint bits (`O_RDONLY` is 0). |
+| `158:28 \| with &` | Equivalent: drops `O_DIRECTORY` when opening `/`, which is a directory. |
+| `161:12 < with ==` | Equivalent: `-1` then reaches `openat`/`fstat` on an invalid descriptor and fails with `UnsafePath` anyway. |
+| `158:48 \| with &` | Not killed: drops `O_CLOEXEC` on the transient `/` descriptor; observable only by a concurrent `exec` while it is open. |
+| `161:12`, `176:20`, `201:12 < with <=` | Not killed: differ only when the call returns descriptor 0, i.e. when standard input is closed. |
+| `201:12 < with ==`, `205:69 < with >` | Not killed, failure path only: `socket()`/`F_SETFD` on a fresh descriptor do not fail without descriptor exhaustion. |
+| `72:67 == with !=` | Not killed: `ESRCH` occurs only when a listed process exits between listing and `proc_pidpath`. |
+| `95:20 \|\| with &&` | Not killed: a full buffer needs more than 64 processes started between the two `proc_listpids` calls. |
+
+### producer.rs
+
+Pre-campaign: 11 survivors, 2 timeouts.
+`reader_flags_the_first_byte_past_capacity_instead_of_buffering_more` now spells the
+capacity from `MAX_IMPORT_BYTES + 4` (it used `CAPACITY` and so followed the mutant)
+and kills `21:42 + with *`. `dropping_the_output_closes_the_read_end_while_a_writer_remains`
+kills `142:9 Drop -> ()` and is bounded, so `68:9 \|\| with &&` and `68:72 \| with &`
+(a blocking read end) fail it instead of hanging the run.
+
+| Survivor | Classification |
+| --- | --- |
 | `49:21 delete -` (`[-1; 2]` → `[1; 2]`) | Equivalent: `pipe()` overwrites both slots on success and the value is unused on failure. |
 | `68:72 \| with ^` | Equivalent: a new pipe's read end never has `O_NONBLOCK`, so `flags ^ O_NONBLOCK == flags \| O_NONBLOCK`. |
 | `113:17 delete EINTR arm` | Equivalent: the read end is non-blocking, so `read` never sleeps and cannot return `EINTR`. |
 | `162:31 < with <=` | Equivalent: a 4-byte input has length 0 or a length that cannot match, so both forms reject it. |
 | `166:17 \|\| with &&` | Equivalent: a zero length (empty JSON) or a length above `MAX_IMPORT_BYTES` is independently rejected by `SecretImport::parse`, which also bounds input at `MAX_IMPORT_BYTES`. |
-| `58:16 < with ==`, `< with <=`; `67:14 < with >`; `68:94 < with >` | Not killed, failure path only: `F_DUPFD_CLOEXEC` returns a descriptor ≥ 4 and `F_GETFL`/`F_SETFL` return 0 on a fresh pipe, so these differ only when the system call fails (descriptor exhaustion). Forcing that would need a process-wide `RLIMIT_NOFILE` change inside the shared test process; not attempted. |
-
+| `58:16 < with ==`, `< with <=`; `67:14 < with >`; `68:94 < with >` | Not killed, failure path only: `F_DUPFD_CLOEXEC` returns a descriptor ≥ 4 and `F_GETFL`/`F_SETFL` return 0 on a fresh pipe; forcing a failure needs a process-wide `RLIMIT_NOFILE` change in the shared test process. |
+| `105:22 > with ==`, `> with >=` | Timeout (not counted as caught): the reader spins at end of file, so the first test that drops an output (`debug_is_redacted`) joins it forever. `reader_flags_the_first_byte_past_capacity_instead_of_buffering_more` bounds its own reader at 10 s, but every other producer consumer joins the spinning thread in the same process. |
