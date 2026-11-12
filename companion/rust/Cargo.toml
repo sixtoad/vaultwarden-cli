@@ -13,6 +13,10 @@ flutter_rust_bridge = "=2.13.0"
 p256 = { version = "=0.13.2", features = ["ecdsa"] }
 sha2 = "=0.10.9"
 getrandom = "=0.3.4"
+# Guided enrollment joiner (#59): the same HKDF/HMAC-SHA256 construction as the
+# provider, pinned by companion/fixtures/enrollment-v1.json.
+hkdf = "=0.12.4"
+hmac = "=0.12.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 zeroize = "1"

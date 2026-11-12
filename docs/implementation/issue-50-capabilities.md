@@ -52,6 +52,10 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   provisioned CA/PKCS#12 (`companion/macos/Runner/ProviderAdapter.swift:47`). No
   nearby invitation, matching-code, QR or dual-human-authorization protocol exists
   in these surfaces. Advanced setup cannot satisfy guided enrollment acceptance.
+  **Update (#59):** phase 1 (PR #72) adds the invitation/comparison-code protocol
+  and `vw-access enroll`; phase 2 adds the desktop journeys in Devices & agents
+  (see [guided enrollment](../guided-enrollment.md#phase-2-desktop-companion)).
+  The phone/QR journey (phase 3) remains open, so this item stays unchecked.
 - [x] **Trusted-device management (implementation):** provider-backed inventory/detail, explicit
   owner-granted remote administration, permanent revocation and action-bound
   reconciliation are implemented in the device-management slice. Linux/native

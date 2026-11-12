@@ -251,7 +251,7 @@ void main() {
       );
       expect(
         find.textContaining(
-          'Review notifications (macOS, while this window is open) are in Settings. Guided enrollment is not available.',
+          'Review notifications (macOS, while this window is open) are in Settings. Guided enrollment: Devices & agents adds a device or agent',
         ),
         findsOneWidget,
       );

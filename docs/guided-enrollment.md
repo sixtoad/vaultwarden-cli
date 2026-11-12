@@ -1,7 +1,8 @@
-# Guided mutual enrollment (issue 59, phase 1)
+# Guided mutual enrollment (issue 59)
 
-Phase 1 is the provider/Rust protocol and a terminal client. It has no
-graphical UI. Phase 2 (desktop UI) and phase 3 (phone with QR) build on it.
+Phase 1 is the provider/Rust protocol and a terminal client. Phase 2 adds the
+desktop companion journeys ([below](#phase-2-desktop-companion)). Phase 3
+(phone with QR) builds on both.
 
 Today a device or agent is added in one of two manual ways:
 
@@ -263,6 +264,87 @@ The companion side of the protocol is `access::enrollment::joiner`, using
 `JoinAttempt::companion`. It is sent as the mTLS command
 `{"command":"enroll","version":1,"message":{…}}`. In phase 2 the Flutter
 companion calls it through the Rust bridge.
+
+## Phase 2: desktop companion
+
+The Flutter companion (`companion/`) offers both ends in **Devices & agents**,
+behind two plain actions; manual and diagnostic material stays collapsed.
+
+**Add a device or agent (provider owner, from an administrator companion).**
+New mTLS commands, accepted only from an enrolled companion that holds the
+administrator role, run the owner's use cases under the provider owner's
+authority (as remote identity revocation already does):
+
+| Command | Body | Reply |
+|---|---|---|
+| `enroll_invite` | `{"version":1,"kind":{"role":"companion","label":…}}` or an agent kind with `uid`/`gid` | `{"version":1,"invitation":{id, invitation_code, kind, expires_in_seconds}}` |
+| `enroll_list` | `{"version":1}` | `{"version":1,"enrollments":[EnrollmentView…]}` (no code) |
+| `enroll_approve` | `{"version":1,"id":…,"code":"1234-5678","password":…}` | `{"version":1,"enrollment":EnrollmentView}` |
+| `enroll_cancel` | `{"version":1,"id":…}` | `{"version":1,"enrollment":EnrollmentView}` |
+
+- A non-administrator gets `403 unauthorized`; the UI then shows the terminal
+  commands. A provider without these commands answers `400`, shown as
+  "does not offer guided enrollment".
+- An owner refusal is `409 {"error":"enrollment_refused","reason":…}` with the
+  `HumanEnrollmentError` word (`code_mismatch`, `awaiting_peer`, `expired`, …).
+- `enroll_approve` also needs the provider password (`422
+  authentication_failed`) and shares the per-device attempt throttle (`429`)
+  with remote approvals. Approval is the authorizing decision, so it is
+  re-authenticated; invite, list and cancel grant nothing by themselves.
+- No reply carries a comparison code, and the companion core refuses a list
+  that contains one. The owner types the code read on the joining device.
+- The invitation is shown once in the owner's window (copy, then hide). It is
+  never part of a snapshot (read once through a separate call), wiped from
+  the companion core on hide, navigation, sleep and app close, and a copy is
+  removed from the clipboard then if the clipboard still holds it.
+- A 200 reply must match the request: the same enrollment id, the requested
+  kind for an invitation, and the effect asked for (approved or cancelled);
+  each reply shape refuses unknown fields.
+
+**Join this device to a provider (joining companion).** The companion core
+(`companion/rust/src/provider/enrollment.rs`) is the joining half for the
+`companion-mtls` channel. It is a second implementation of the same
+construction, pinned byte for byte to the provider by
+`companion/fixtures/enrollment-v1.json` (checked by both crates' tests).
+It uses the configured pinned transport: the client leaf fingerprint is the
+joiner identity and the provider leaf pin the provider identity, so a device
+needs a CA-valid leaf (advanced setup in Settings, or #71's `setup tls`).
+
+1. The human pastes the `vwe1.` invitation (masked field). The parsed secret
+   lives in the Rust session and is wiped when it ends. Dart briefly holds the
+   typed text and the request/response bytes, which are zero-filled after use;
+   Dart strings cannot be wiped, so this is best effort, as for passwords.
+2. The provider's half is verified before anything is shown; a provider
+   without the secret, an agent invitation, or a different pin end the
+   session with no code.
+3. The code is shown large (spoken digit by digit to assistive technology)
+   with the remaining time. The human chooses **Yes, enroll this device**,
+   **No, something is wrong** (cancel with `code_mismatch`) or **Cancel**.
+4. Consent comes only from this human: a provider claiming the joiner
+   confirmed, or "enrolled" before its proof, ends the session. A cancel or
+   decline whose reply is lost is resent instead of any later confirmation,
+   until the provider acknowledges it. Confirm is disabled once the local
+   countdown reaches zero.
+5. After confirming, the app re-sends the confirmation every few seconds until
+   a final state; while comparing, it polls status, so the owner's cancel, a
+   mismatch typed at the provider, or expiry end the screen promptly.
+6. Every final state has its own message: enrolled (never an administrator),
+   declined, cancelled (by whom), code mismatch, duplicate join, too many
+   failures, expired, identity refused (known or revoked: never reactivated),
+   invalid or used invitation, unauthenticated provider, and the two
+   unknown outcomes (a lost confirmation reply, a commit store fault).
+
+The joining session survives navigation and app inactivity (the human may be
+talking to the owner), but not a change of provider or client certificate.
+
+**Journeys covered.** Device to device (owner companion invites, new companion
+joins); owner companion invites an agent, the agent joins with
+`vw-access enroll join` (GUI to CLI); `vw-access enroll invite-companion`
+invites, the companion joins (CLI to GUI). The terminal commands remain the
+manual fallback and are listed in the app.
+
+**Not in phase 2.** Phones and QR (phase 3), discovery, companion enrollment
+audit entries (needs a registry format bump), and agent-side GUI joining.
 
 ## Integration points and phase 2 needs
 

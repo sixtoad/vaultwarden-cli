@@ -3,21 +3,49 @@ import 'package:flutter/material.dart';
 import '../design/components.dart';
 import '../src/rust/api/management.dart' as manage;
 import 'controller.dart';
+import 'enrollment_flow.dart';
+import 'enrollment_view.dart';
 
 class ProviderDevices extends StatelessWidget {
   const ProviderDevices({
     super.key,
     required this.controller,
     required this.password,
+    this.enrollment,
+    this.enrollmentPassword,
   });
   final ProviderController controller;
   final TextEditingController password;
+  final EnrollmentFlow? enrollment;
+  final TextEditingController? enrollmentPassword;
   String kind(manage.IdentityKind value) =>
       value == manage.IdentityKind.approvalClient
       ? 'Approval client certificate'
       : 'Requester-agent binding';
   @override
   Widget build(BuildContext context) {
+    final flow = enrollment;
+    if (flow != null && flow.mode == EnrollmentMode.add) {
+      return EnrollmentAddPanel(
+        flow: flow,
+        password: enrollmentPassword ?? password,
+      );
+    }
+    if (flow != null && flow.mode == EnrollmentMode.join) {
+      return EnrollmentJoinPanel(flow: flow);
+    }
+    final inventory = _inventory(context);
+    if (flow == null) return inventory;
+    return Column(
+      children: [
+        EnrollmentEntry(flow: flow),
+        const SizedBox(height: 16),
+        inventory,
+      ],
+    );
+  }
+
+  Widget _inventory(BuildContext context) {
     final state = controller.management, detail = controller.management.detail;
     final idle = controller.canManage && !controller.managementPending;
     return AccessPanel(

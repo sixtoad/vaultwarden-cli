@@ -1131,3 +1131,52 @@ fn eviction_keeps_enrolled_sessions_over_other_finished_ones() {
             .any(|v| v.id == issued.id && matches!(v.state, EnrollmentState::Enrolled { .. }))
     );
 }
+
+/// The companion app (`companion/rust`, a separate crate) reimplements the
+/// joiner half. This frozen vector pins both implementations to the same
+/// bytes: the join, the provider's half, the comparison code and every
+/// control message. Regenerate only for a deliberate protocol version bump.
+#[test]
+fn companion_joiner_vector_is_frozen() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/companion/fixtures/enrollment-v1.json"
+    );
+    let (mut book, mut hooks) = (Book::default(), Hooks::default());
+    let issued = invite(
+        &mut book,
+        EnrolleeKind::Companion {
+            label: "Studio Mac".into(),
+        },
+        11,
+    );
+    let attempt = JoinAttempt::companion(
+        InvitationCode::parse(&issued.invitation_code).unwrap(),
+        DEVICE_FP,
+        PROVIDER_FP,
+        [5u8; 32],
+    )
+    .unwrap();
+    let join = attempt.request().clone();
+    let joined_reply = send(&mut book, &companion_peer(DEVICE_FP), &join, 1, &mut hooks);
+    let joined = attempt.accept(&joined_reply).unwrap();
+    let actual = serde_json::json!({
+        "invitation_code": issued.invitation_code,
+        "device_fingerprint": DEVICE_FP,
+        "provider_fingerprint": PROVIDER_FP,
+        "joiner_nonce": b64(&[5u8; 32]),
+        "join": join,
+        "joined": joined_reply,
+        "comparison_code": joined.comparison_code,
+        "confirm": joined.confirm(None),
+        "status": joined.status(),
+        "cancel": joined.cancel(JoinerCancelReason::Cancelled),
+        "decline": joined.cancel(JoinerCancelReason::CodeMismatch),
+    });
+    let text = format!("{}\n", serde_json::to_string_pretty(&actual).unwrap());
+    if std::env::var_os("VW_WRITE_ENROLLMENT_VECTOR").is_some() {
+        std::fs::write(path, &text).unwrap();
+    }
+    let frozen = std::fs::read_to_string(path).expect("frozen enrollment vector");
+    assert_eq!(frozen, text, "enrollment v1 vector changed");
+}

@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 98180100;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1639414828;
 
 // Section: executor
 
@@ -47,6 +47,102 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire__crate__api__enrollment__admin_outcome_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "admin_outcome_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::AdminOutcome::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__admin_refusal_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "admin_refusal_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::AdminRefusal::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__admin_state_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "admin_state_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::AdminState::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__begin_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -467,6 +563,419 @@ fn wire__crate__api__installation__enable_commands_impl(
         },
     )
 }
+fn wire__crate__api__enrollment__enrollee_role_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollee_role_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::EnrolleeRole::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_begin_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_begin",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::enrollment::EnrollmentAdminRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, String>((move || {
+                let output_ok = crate::api::enrollment::enrollment_admin_begin(api_request)?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_dismiss_invitation_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_dismiss_invitation",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Ok::<_, ()>(crate::api::enrollment::enrollment_admin_dismiss_invitation())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_finish_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_finish",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <u32>::sse_decode(&mut deserializer);
+            let api_response = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::enrollment::enrollment_admin_finish(
+                    api_token,
+                    api_response,
+                ))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_invalidate_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_invalidate",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::enrollment::enrollment_admin_invalidate())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_invitation_code_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_invitation_code",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Ok::<_, ()>(crate::api::enrollment::enrollment_admin_invitation_code())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_snapshot_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_snapshot",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::enrollment::enrollment_admin_snapshot())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_admin_snapshot_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_admin_snapshot_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Ok::<_, ()>(crate::api::enrollment::EnrollmentAdminSnapshot::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_join_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_join",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_invitation = <String>::sse_decode(&mut deserializer);
+            let api_device_fingerprint = <String>::sse_decode(&mut deserializer);
+            let api_provider_pin = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, String>((move || {
+                let output_ok = crate::api::enrollment::enrollment_join(
+                    api_invitation,
+                    api_device_fingerprint,
+                    api_provider_pin,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_joiner_begin_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_joiner_begin",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_command =
+                <crate::api::enrollment::JoinerCommand>::sse_decode(&mut deserializer);
+            let api_device_fingerprint = <String>::sse_decode(&mut deserializer);
+            let api_provider_pin = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, String>((move || {
+                let output_ok = crate::api::enrollment::enrollment_joiner_begin(
+                    api_command,
+                    api_device_fingerprint,
+                    api_provider_pin,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_joiner_finish_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_joiner_finish",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <u32>::sse_decode(&mut deserializer);
+            let api_response = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::enrollment::enrollment_joiner_finish(
+                    api_token,
+                    api_response,
+                ))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_joiner_reset_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_joiner_reset",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::enrollment::enrollment_joiner_reset())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__enrollment__enrollment_joiner_snapshot_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrollment_joiner_snapshot",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::enrollment::enrollment_joiner_snapshot())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__finish_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -591,6 +1100,102 @@ fn wire__crate__api__management__inventory_state_default_impl(
             move |context| {
                 transform_result_sse::<_, ()>((move || {
                     let output_ok = Ok::<_, ()>(crate::api::management::InventoryState::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__joiner_end_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "joiner_end_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::JoinerEnd::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__joiner_phase_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "joiner_phase_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::JoinerPhase::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__enrollment__joiner_snapshot_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "joiner_snapshot_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::enrollment::JoinerSnapshot::default())?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1246,6 +1851,121 @@ impl SseDecode for String {
     }
 }
 
+impl SseDecode for crate::api::enrollment::AdminCommand {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::AdminCommand::Invite,
+            1 => crate::api::enrollment::AdminCommand::List,
+            2 => crate::api::enrollment::AdminCommand::Approve,
+            3 => crate::api::enrollment::AdminCommand::Cancel,
+            _ => unreachable!("Invalid variant for AdminCommand: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::AdminOutcome {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::AdminOutcome::None,
+            1 => crate::api::enrollment::AdminOutcome::Listed,
+            2 => crate::api::enrollment::AdminOutcome::Invited,
+            3 => crate::api::enrollment::AdminOutcome::Approved,
+            4 => crate::api::enrollment::AdminOutcome::Cancelled,
+            5 => crate::api::enrollment::AdminOutcome::Refused,
+            6 => crate::api::enrollment::AdminOutcome::AuthenticationFailed,
+            7 => crate::api::enrollment::AdminOutcome::RateLimited,
+            8 => crate::api::enrollment::AdminOutcome::Unavailable,
+            9 => crate::api::enrollment::AdminOutcome::Invalid,
+            _ => unreachable!("Invalid variant for AdminOutcome: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::AdminRefusal {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::AdminRefusal::None,
+            1 => crate::api::enrollment::AdminRefusal::InvalidRequest,
+            2 => crate::api::enrollment::AdminRefusal::Duplicate,
+            3 => crate::api::enrollment::AdminRefusal::LimitReached,
+            4 => crate::api::enrollment::AdminRefusal::NotFound,
+            5 => crate::api::enrollment::AdminRefusal::Expired,
+            6 => crate::api::enrollment::AdminRefusal::Final,
+            7 => crate::api::enrollment::AdminRefusal::AwaitingPeer,
+            8 => crate::api::enrollment::AdminRefusal::CodeMismatch,
+            _ => unreachable!("Invalid variant for AdminRefusal: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::AdminSessionState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::AdminSessionState::AwaitingJoin,
+            1 => crate::api::enrollment::AdminSessionState::AwaitingApprovals,
+            2 => crate::api::enrollment::AdminSessionState::Enrolled,
+            3 => crate::api::enrollment::AdminSessionState::Cancelled,
+            4 => crate::api::enrollment::AdminSessionState::Expired,
+            5 => crate::api::enrollment::AdminSessionState::Aborted,
+            6 => crate::api::enrollment::AdminSessionState::Failed,
+            _ => unreachable!("Invalid variant for AdminSessionState: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::AdminSessionView {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_role = <crate::api::enrollment::EnrolleeRole>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_agentUid = <u32>::sse_decode(deserializer);
+        let mut var_agentGid = <u32>::sse_decode(deserializer);
+        let mut var_state = <crate::api::enrollment::AdminSessionState>::sse_decode(deserializer);
+        let mut var_providerApproved = <bool>::sse_decode(deserializer);
+        let mut var_joinerConfirmed = <bool>::sse_decode(deserializer);
+        let mut var_detail = <String>::sse_decode(deserializer);
+        let mut var_expiresInSeconds = <u64>::sse_decode(deserializer);
+        let mut var_joinerFingerprint = <String>::sse_decode(deserializer);
+        return crate::api::enrollment::AdminSessionView {
+            id: var_id,
+            role: var_role,
+            label: var_label,
+            agent_uid: var_agentUid,
+            agent_gid: var_agentGid,
+            state: var_state,
+            provider_approved: var_providerApproved,
+            joiner_confirmed: var_joinerConfirmed,
+            detail: var_detail,
+            expires_in_seconds: var_expiresInSeconds,
+            joiner_fingerprint: var_joinerFingerprint,
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::AdminState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::AdminState::Unknown,
+            1 => crate::api::enrollment::AdminState::Ready,
+            2 => crate::api::enrollment::AdminState::Unauthorized,
+            3 => crate::api::enrollment::AdminState::Unsupported,
+            4 => crate::api::enrollment::AdminState::Unavailable,
+            _ => unreachable!("Invalid variant for AdminState: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::biometric::BiometricDecisionResult {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1433,6 +2153,64 @@ impl SseDecode for crate::api::Completion {
     }
 }
 
+impl SseDecode for crate::api::enrollment::EnrolleeRole {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::EnrolleeRole::Companion,
+            1 => crate::api::enrollment::EnrolleeRole::Agent,
+            _ => unreachable!("Invalid variant for EnrolleeRole: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::EnrollmentAdminRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_command = <crate::api::enrollment::AdminCommand>::sse_decode(deserializer);
+        let mut var_role = <crate::api::enrollment::EnrolleeRole>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_agentUid = <u32>::sse_decode(deserializer);
+        let mut var_agentGid = <u32>::sse_decode(deserializer);
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_code = <String>::sse_decode(deserializer);
+        let mut var_password = <String>::sse_decode(deserializer);
+        return crate::api::enrollment::EnrollmentAdminRequest {
+            command: var_command,
+            role: var_role,
+            label: var_label,
+            agent_uid: var_agentUid,
+            agent_gid: var_agentGid,
+            id: var_id,
+            code: var_code,
+            password: var_password,
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::EnrollmentAdminSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_state = <crate::api::enrollment::AdminState>::sse_decode(deserializer);
+        let mut var_outcome = <crate::api::enrollment::AdminOutcome>::sse_decode(deserializer);
+        let mut var_refusal = <crate::api::enrollment::AdminRefusal>::sse_decode(deserializer);
+        let mut var_busy = <bool>::sse_decode(deserializer);
+        let mut var_issued =
+            <Option<crate::api::enrollment::IssuedInvitationView>>::sse_decode(deserializer);
+        let mut var_sessions =
+            <Vec<crate::api::enrollment::AdminSessionView>>::sse_decode(deserializer);
+        return crate::api::enrollment::EnrollmentAdminSnapshot {
+            state: var_state,
+            outcome: var_outcome,
+            refusal: var_refusal,
+            busy: var_busy,
+            issued: var_issued,
+            sessions: var_sessions,
+        };
+    }
+}
+
 impl SseDecode for crate::api::Fixture {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1521,6 +2299,114 @@ impl SseDecode for crate::api::management::InventoryState {
     }
 }
 
+impl SseDecode for crate::api::enrollment::IssuedInvitationView {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_role = <crate::api::enrollment::EnrolleeRole>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_expiresInSeconds = <u64>::sse_decode(deserializer);
+        return crate::api::enrollment::IssuedInvitationView {
+            id: var_id,
+            role: var_role,
+            label: var_label,
+            expires_in_seconds: var_expiresInSeconds,
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::JoinerCommand {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::JoinerCommand::Retry,
+            1 => crate::api::enrollment::JoinerCommand::Status,
+            2 => crate::api::enrollment::JoinerCommand::Confirm,
+            3 => crate::api::enrollment::JoinerCommand::Decline,
+            4 => crate::api::enrollment::JoinerCommand::Cancel,
+            _ => unreachable!("Invalid variant for JoinerCommand: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::JoinerEnd {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::JoinerEnd::None,
+            1 => crate::api::enrollment::JoinerEnd::Declined,
+            2 => crate::api::enrollment::JoinerEnd::Cancelled,
+            3 => crate::api::enrollment::JoinerEnd::CancelledByProvider,
+            4 => crate::api::enrollment::JoinerEnd::CodeMismatch,
+            5 => crate::api::enrollment::JoinerEnd::DuplicateJoin,
+            6 => crate::api::enrollment::JoinerEnd::TooManyFailures,
+            7 => crate::api::enrollment::JoinerEnd::Expired,
+            8 => crate::api::enrollment::JoinerEnd::IdentityRefused,
+            9 => crate::api::enrollment::JoinerEnd::CommitUnavailable,
+            10 => crate::api::enrollment::JoinerEnd::InvalidInvitation,
+            11 => crate::api::enrollment::JoinerEnd::AlreadyUsed,
+            12 => crate::api::enrollment::JoinerEnd::ProviderNotAuthenticated,
+            13 => crate::api::enrollment::JoinerEnd::WrongRole,
+            14 => crate::api::enrollment::JoinerEnd::Malformed,
+            15 => crate::api::enrollment::JoinerEnd::OutcomeUnknown,
+            16 => crate::api::enrollment::JoinerEnd::ProviderChanged,
+            _ => unreachable!("Invalid variant for JoinerEnd: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::JoinerPhase {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::enrollment::JoinerPhase::Idle,
+            1 => crate::api::enrollment::JoinerPhase::Joining,
+            2 => crate::api::enrollment::JoinerPhase::Compare,
+            3 => crate::api::enrollment::JoinerPhase::Waiting,
+            4 => crate::api::enrollment::JoinerPhase::Enrolled,
+            5 => crate::api::enrollment::JoinerPhase::Ended,
+            _ => unreachable!("Invalid variant for JoinerPhase: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::enrollment::JoinerSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_phase = <crate::api::enrollment::JoinerPhase>::sse_decode(deserializer);
+        let mut var_busy = <bool>::sse_decode(deserializer);
+        let mut var_role = <crate::api::enrollment::EnrolleeRole>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_comparisonCode = <String>::sse_decode(deserializer);
+        let mut var_secondsRemaining = <u64>::sse_decode(deserializer);
+        let mut var_providerApproved = <bool>::sse_decode(deserializer);
+        let mut var_confirmed = <bool>::sse_decode(deserializer);
+        let mut var_withdrawing = <bool>::sse_decode(deserializer);
+        let mut var_end = <crate::api::enrollment::JoinerEnd>::sse_decode(deserializer);
+        let mut var_retryable = <bool>::sse_decode(deserializer);
+        let mut var_invitationId = <String>::sse_decode(deserializer);
+        let mut var_enrolledFingerprint = <String>::sse_decode(deserializer);
+        return crate::api::enrollment::JoinerSnapshot {
+            phase: var_phase,
+            busy: var_busy,
+            role: var_role,
+            label: var_label,
+            comparison_code: var_comparisonCode,
+            seconds_remaining: var_secondsRemaining,
+            provider_approved: var_providerApproved,
+            confirmed: var_confirmed,
+            withdrawing: var_withdrawing,
+            end: var_end,
+            retryable: var_retryable,
+            invitation_id: var_invitationId,
+            enrolled_fingerprint: var_enrolledFingerprint,
+        };
+    }
+}
+
 impl SseDecode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1528,6 +2414,20 @@ impl SseDecode for Vec<String> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::enrollment::AdminSessionView> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::enrollment::AdminSessionView>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -1720,6 +2620,19 @@ impl SseDecode for Option<crate::api::biometric::BiometricRefusal> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::api::biometric::BiometricRefusal>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::enrollment::IssuedInvitationView> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::enrollment::IssuedInvitationView>::sse_decode(
                 deserializer,
             ));
         } else {
@@ -2107,64 +3020,109 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        2 => wire__crate__api__biometric__biometric_decision_result_default_impl(
+        1 => wire__crate__api__enrollment__admin_outcome_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__biometric__biometric_key_outcome_default_impl(
+        2 => wire__crate__api__enrollment__admin_refusal_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__biometric__biometric_key_state_default_impl(
+        3 => wire__crate__api__enrollment__admin_state_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__biometric__biometric_support_default_impl(
+        5 => wire__crate__api__biometric__biometric_decision_result_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        13 => {
+        12 => wire__crate__api__biometric__biometric_key_outcome_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        14 => wire__crate__api__biometric__biometric_key_state_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        15 => wire__crate__api__biometric__biometric_support_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        16 => {
             wire__crate__api__installation__enable_commands_impl(port, ptr, rust_vec_len, data_len)
         }
-        15 => wire__crate__api__installation__inspect_installation_impl(
+        17 => wire__crate__api__enrollment__enrollee_role_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        17 => wire__crate__api__management__inventory_state_default_impl(
+        24 => wire__crate__api__enrollment__enrollment_admin_snapshot_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        22 => wire__crate__api__management__management_outcome_default_impl(
+        31 => wire__crate__api__installation__inspect_installation_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__provider__provider_history_state_default_impl(
+        33 => wire__crate__api__management__inventory_state_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        33 => wire__crate__api__provider__provider_outcome_default_impl(
+        34 => {
+            wire__crate__api__enrollment__joiner_end_default_impl(port, ptr, rust_vec_len, data_len)
+        }
+        35 => wire__crate__api__enrollment__joiner_phase_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        35 => wire__crate__api__provider__provider_status_progress_default_impl(
+        36 => wire__crate__api__enrollment__joiner_snapshot_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        41 => wire__crate__api__management__management_outcome_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        50 => wire__crate__api__provider__provider_history_state_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        52 => wire__crate__api__provider__provider_outcome_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        54 => wire__crate__api__provider__provider_status_progress_default_impl(
             port,
             ptr,
             rust_vec_len,
@@ -2182,58 +3140,259 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => wire__crate__api__begin_impl(ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__biometric__biometric_key_begin_impl(ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__biometric__biometric_key_begin_enroll_impl(
+        4 => wire__crate__api__begin_impl(ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__biometric__biometric_key_begin_impl(ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__biometric__biometric_key_begin_enroll_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        5 => wire__crate__api__biometric__biometric_key_begin_revoke_impl(
+        8 => wire__crate__api__biometric__biometric_key_begin_revoke_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        6 => wire__crate__api__biometric__biometric_key_configure_impl(ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__biometric__biometric_key_enroll_transcript_impl(
+        9 => wire__crate__api__biometric__biometric_key_configure_impl(ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__biometric__biometric_key_enroll_transcript_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__biometric__biometric_key_finish_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__biometric__biometric_key_snapshot_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__finish_impl(ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__invalidate_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__management__management_begin_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__management__management_configure_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__management__management_finish_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__management__management_invalidate_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__management__management_snapshot_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__provider__provider_begin_impl(ptr, rust_vec_len, data_len),
-        25 => {
+        11 => wire__crate__api__biometric__biometric_key_finish_impl(ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__biometric__biometric_key_snapshot_impl(ptr, rust_vec_len, data_len),
+        18 => {
+            wire__crate__api__enrollment__enrollment_admin_begin_impl(ptr, rust_vec_len, data_len)
+        }
+        19 => wire__crate__api__enrollment__enrollment_admin_dismiss_invitation_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        20 => {
+            wire__crate__api__enrollment__enrollment_admin_finish_impl(ptr, rust_vec_len, data_len)
+        }
+        21 => wire__crate__api__enrollment__enrollment_admin_invalidate_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        22 => wire__crate__api__enrollment__enrollment_admin_invitation_code_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        23 => wire__crate__api__enrollment__enrollment_admin_snapshot_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        25 => wire__crate__api__enrollment__enrollment_join_impl(ptr, rust_vec_len, data_len),
+        26 => {
+            wire__crate__api__enrollment__enrollment_joiner_begin_impl(ptr, rust_vec_len, data_len)
+        }
+        27 => {
+            wire__crate__api__enrollment__enrollment_joiner_finish_impl(ptr, rust_vec_len, data_len)
+        }
+        28 => {
+            wire__crate__api__enrollment__enrollment_joiner_reset_impl(ptr, rust_vec_len, data_len)
+        }
+        29 => wire__crate__api__enrollment__enrollment_joiner_snapshot_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        30 => wire__crate__api__finish_impl(ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__invalidate_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__management__management_begin_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__management__management_configure_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__management__management_finish_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__management__management_invalidate_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__management__management_snapshot_impl(ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__provider__provider_begin_impl(ptr, rust_vec_len, data_len),
+        44 => {
             wire__crate__api__biometric__provider_biometric_begin_impl(ptr, rust_vec_len, data_len)
         }
-        26 => wire__crate__api__biometric__provider_biometric_pin_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__biometric__provider_biometric_prepare_impl(
+        45 => wire__crate__api__biometric__provider_biometric_pin_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__biometric__provider_biometric_prepare_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => {
+        47 => {
             wire__crate__api__biometric__provider_biometric_state_impl(ptr, rust_vec_len, data_len)
         }
-        29 => wire__crate__api__provider__provider_configure_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__provider__provider_finish_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__provider__provider_invalidate_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__provider__provider_snapshot_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__select_fixture_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__snapshot_impl(ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__provider__provider_configure_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__provider__provider_finish_impl(ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__provider__provider_invalidate_impl(ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__provider__provider_snapshot_impl(ptr, rust_vec_len, data_len),
+        55 => wire__crate__api__select_fixture_impl(ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__snapshot_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
 
 // Section: rust2dart
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::AdminCommand {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Invite => 0.into_dart(),
+            Self::List => 1.into_dart(),
+            Self::Approve => 2.into_dart(),
+            Self::Cancel => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::AdminCommand
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::AdminCommand>
+    for crate::api::enrollment::AdminCommand
+{
+    fn into_into_dart(self) -> crate::api::enrollment::AdminCommand {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::AdminOutcome {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::None => 0.into_dart(),
+            Self::Listed => 1.into_dart(),
+            Self::Invited => 2.into_dart(),
+            Self::Approved => 3.into_dart(),
+            Self::Cancelled => 4.into_dart(),
+            Self::Refused => 5.into_dart(),
+            Self::AuthenticationFailed => 6.into_dart(),
+            Self::RateLimited => 7.into_dart(),
+            Self::Unavailable => 8.into_dart(),
+            Self::Invalid => 9.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::AdminOutcome
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::AdminOutcome>
+    for crate::api::enrollment::AdminOutcome
+{
+    fn into_into_dart(self) -> crate::api::enrollment::AdminOutcome {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::AdminRefusal {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::None => 0.into_dart(),
+            Self::InvalidRequest => 1.into_dart(),
+            Self::Duplicate => 2.into_dart(),
+            Self::LimitReached => 3.into_dart(),
+            Self::NotFound => 4.into_dart(),
+            Self::Expired => 5.into_dart(),
+            Self::Final => 6.into_dart(),
+            Self::AwaitingPeer => 7.into_dart(),
+            Self::CodeMismatch => 8.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::AdminRefusal
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::AdminRefusal>
+    for crate::api::enrollment::AdminRefusal
+{
+    fn into_into_dart(self) -> crate::api::enrollment::AdminRefusal {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::AdminSessionState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::AwaitingJoin => 0.into_dart(),
+            Self::AwaitingApprovals => 1.into_dart(),
+            Self::Enrolled => 2.into_dart(),
+            Self::Cancelled => 3.into_dart(),
+            Self::Expired => 4.into_dart(),
+            Self::Aborted => 5.into_dart(),
+            Self::Failed => 6.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::AdminSessionState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::AdminSessionState>
+    for crate::api::enrollment::AdminSessionState
+{
+    fn into_into_dart(self) -> crate::api::enrollment::AdminSessionState {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::AdminSessionView {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.role.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.agent_uid.into_into_dart().into_dart(),
+            self.agent_gid.into_into_dart().into_dart(),
+            self.state.into_into_dart().into_dart(),
+            self.provider_approved.into_into_dart().into_dart(),
+            self.joiner_confirmed.into_into_dart().into_dart(),
+            self.detail.into_into_dart().into_dart(),
+            self.expires_in_seconds.into_into_dart().into_dart(),
+            self.joiner_fingerprint.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::AdminSessionView
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::AdminSessionView>
+    for crate::api::enrollment::AdminSessionView
+{
+    fn into_into_dart(self) -> crate::api::enrollment::AdminSessionView {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::AdminState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Unknown => 0.into_dart(),
+            Self::Ready => 1.into_dart(),
+            Self::Unauthorized => 2.into_dart(),
+            Self::Unsupported => 3.into_dart(),
+            Self::Unavailable => 4.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::AdminState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::AdminState>
+    for crate::api::enrollment::AdminState
+{
+    fn into_into_dart(self) -> crate::api::enrollment::AdminState {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::biometric::BiometricDecisionResult {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -2490,6 +3649,79 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::Completion> for crate::api::C
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::EnrolleeRole {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Companion => 0.into_dart(),
+            Self::Agent => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::EnrolleeRole
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::EnrolleeRole>
+    for crate::api::enrollment::EnrolleeRole
+{
+    fn into_into_dart(self) -> crate::api::enrollment::EnrolleeRole {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::EnrollmentAdminRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.command.into_into_dart().into_dart(),
+            self.role.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.agent_uid.into_into_dart().into_dart(),
+            self.agent_gid.into_into_dart().into_dart(),
+            self.id.into_into_dart().into_dart(),
+            self.code.into_into_dart().into_dart(),
+            self.password.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::EnrollmentAdminRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::EnrollmentAdminRequest>
+    for crate::api::enrollment::EnrollmentAdminRequest
+{
+    fn into_into_dart(self) -> crate::api::enrollment::EnrollmentAdminRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::EnrollmentAdminSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.state.into_into_dart().into_dart(),
+            self.outcome.into_into_dart().into_dart(),
+            self.refusal.into_into_dart().into_dart(),
+            self.busy.into_into_dart().into_dart(),
+            self.issued.into_into_dart().into_dart(),
+            self.sessions.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::EnrollmentAdminSnapshot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::EnrollmentAdminSnapshot>
+    for crate::api::enrollment::EnrollmentAdminSnapshot
+{
+    fn into_into_dart(self) -> crate::api::enrollment::EnrollmentAdminSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::Fixture {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2610,6 +3842,146 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::management::InventoryState>
     for crate::api::management::InventoryState
 {
     fn into_into_dart(self) -> crate::api::management::InventoryState {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::IssuedInvitationView {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.role.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.expires_in_seconds.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::IssuedInvitationView
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::IssuedInvitationView>
+    for crate::api::enrollment::IssuedInvitationView
+{
+    fn into_into_dart(self) -> crate::api::enrollment::IssuedInvitationView {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::JoinerCommand {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Retry => 0.into_dart(),
+            Self::Status => 1.into_dart(),
+            Self::Confirm => 2.into_dart(),
+            Self::Decline => 3.into_dart(),
+            Self::Cancel => 4.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::JoinerCommand
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::JoinerCommand>
+    for crate::api::enrollment::JoinerCommand
+{
+    fn into_into_dart(self) -> crate::api::enrollment::JoinerCommand {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::JoinerEnd {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::None => 0.into_dart(),
+            Self::Declined => 1.into_dart(),
+            Self::Cancelled => 2.into_dart(),
+            Self::CancelledByProvider => 3.into_dart(),
+            Self::CodeMismatch => 4.into_dart(),
+            Self::DuplicateJoin => 5.into_dart(),
+            Self::TooManyFailures => 6.into_dart(),
+            Self::Expired => 7.into_dart(),
+            Self::IdentityRefused => 8.into_dart(),
+            Self::CommitUnavailable => 9.into_dart(),
+            Self::InvalidInvitation => 10.into_dart(),
+            Self::AlreadyUsed => 11.into_dart(),
+            Self::ProviderNotAuthenticated => 12.into_dart(),
+            Self::WrongRole => 13.into_dart(),
+            Self::Malformed => 14.into_dart(),
+            Self::OutcomeUnknown => 15.into_dart(),
+            Self::ProviderChanged => 16.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::JoinerEnd
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::JoinerEnd>
+    for crate::api::enrollment::JoinerEnd
+{
+    fn into_into_dart(self) -> crate::api::enrollment::JoinerEnd {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::JoinerPhase {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Idle => 0.into_dart(),
+            Self::Joining => 1.into_dart(),
+            Self::Compare => 2.into_dart(),
+            Self::Waiting => 3.into_dart(),
+            Self::Enrolled => 4.into_dart(),
+            Self::Ended => 5.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::JoinerPhase
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::JoinerPhase>
+    for crate::api::enrollment::JoinerPhase
+{
+    fn into_into_dart(self) -> crate::api::enrollment::JoinerPhase {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::enrollment::JoinerSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.phase.into_into_dart().into_dart(),
+            self.busy.into_into_dart().into_dart(),
+            self.role.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.comparison_code.into_into_dart().into_dart(),
+            self.seconds_remaining.into_into_dart().into_dart(),
+            self.provider_approved.into_into_dart().into_dart(),
+            self.confirmed.into_into_dart().into_dart(),
+            self.withdrawing.into_into_dart().into_dart(),
+            self.end.into_into_dart().into_dart(),
+            self.retryable.into_into_dart().into_dart(),
+            self.invitation_id.into_into_dart().into_dart(),
+            self.enrolled_fingerprint.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::enrollment::JoinerSnapshot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::enrollment::JoinerSnapshot>
+    for crate::api::enrollment::JoinerSnapshot
+{
+    fn into_into_dart(self) -> crate::api::enrollment::JoinerSnapshot {
         self
     }
 }
@@ -3120,6 +4492,128 @@ impl SseEncode for String {
     }
 }
 
+impl SseEncode for crate::api::enrollment::AdminCommand {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::AdminCommand::Invite => 0,
+                crate::api::enrollment::AdminCommand::List => 1,
+                crate::api::enrollment::AdminCommand::Approve => 2,
+                crate::api::enrollment::AdminCommand::Cancel => 3,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::AdminOutcome {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::AdminOutcome::None => 0,
+                crate::api::enrollment::AdminOutcome::Listed => 1,
+                crate::api::enrollment::AdminOutcome::Invited => 2,
+                crate::api::enrollment::AdminOutcome::Approved => 3,
+                crate::api::enrollment::AdminOutcome::Cancelled => 4,
+                crate::api::enrollment::AdminOutcome::Refused => 5,
+                crate::api::enrollment::AdminOutcome::AuthenticationFailed => 6,
+                crate::api::enrollment::AdminOutcome::RateLimited => 7,
+                crate::api::enrollment::AdminOutcome::Unavailable => 8,
+                crate::api::enrollment::AdminOutcome::Invalid => 9,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::AdminRefusal {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::AdminRefusal::None => 0,
+                crate::api::enrollment::AdminRefusal::InvalidRequest => 1,
+                crate::api::enrollment::AdminRefusal::Duplicate => 2,
+                crate::api::enrollment::AdminRefusal::LimitReached => 3,
+                crate::api::enrollment::AdminRefusal::NotFound => 4,
+                crate::api::enrollment::AdminRefusal::Expired => 5,
+                crate::api::enrollment::AdminRefusal::Final => 6,
+                crate::api::enrollment::AdminRefusal::AwaitingPeer => 7,
+                crate::api::enrollment::AdminRefusal::CodeMismatch => 8,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::AdminSessionState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::AdminSessionState::AwaitingJoin => 0,
+                crate::api::enrollment::AdminSessionState::AwaitingApprovals => 1,
+                crate::api::enrollment::AdminSessionState::Enrolled => 2,
+                crate::api::enrollment::AdminSessionState::Cancelled => 3,
+                crate::api::enrollment::AdminSessionState::Expired => 4,
+                crate::api::enrollment::AdminSessionState::Aborted => 5,
+                crate::api::enrollment::AdminSessionState::Failed => 6,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::AdminSessionView {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <crate::api::enrollment::EnrolleeRole>::sse_encode(self.role, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <u32>::sse_encode(self.agent_uid, serializer);
+        <u32>::sse_encode(self.agent_gid, serializer);
+        <crate::api::enrollment::AdminSessionState>::sse_encode(self.state, serializer);
+        <bool>::sse_encode(self.provider_approved, serializer);
+        <bool>::sse_encode(self.joiner_confirmed, serializer);
+        <String>::sse_encode(self.detail, serializer);
+        <u64>::sse_encode(self.expires_in_seconds, serializer);
+        <String>::sse_encode(self.joiner_fingerprint, serializer);
+    }
+}
+
+impl SseEncode for crate::api::enrollment::AdminState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::AdminState::Unknown => 0,
+                crate::api::enrollment::AdminState::Ready => 1,
+                crate::api::enrollment::AdminState::Unauthorized => 2,
+                crate::api::enrollment::AdminState::Unsupported => 3,
+                crate::api::enrollment::AdminState::Unavailable => 4,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for crate::api::biometric::BiometricDecisionResult {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3305,6 +4799,48 @@ impl SseEncode for crate::api::Completion {
     }
 }
 
+impl SseEncode for crate::api::enrollment::EnrolleeRole {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::EnrolleeRole::Companion => 0,
+                crate::api::enrollment::EnrolleeRole::Agent => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::EnrollmentAdminRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::enrollment::AdminCommand>::sse_encode(self.command, serializer);
+        <crate::api::enrollment::EnrolleeRole>::sse_encode(self.role, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <u32>::sse_encode(self.agent_uid, serializer);
+        <u32>::sse_encode(self.agent_gid, serializer);
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.code, serializer);
+        <String>::sse_encode(self.password, serializer);
+    }
+}
+
+impl SseEncode for crate::api::enrollment::EnrollmentAdminSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::enrollment::AdminState>::sse_encode(self.state, serializer);
+        <crate::api::enrollment::AdminOutcome>::sse_encode(self.outcome, serializer);
+        <crate::api::enrollment::AdminRefusal>::sse_encode(self.refusal, serializer);
+        <bool>::sse_encode(self.busy, serializer);
+        <Option<crate::api::enrollment::IssuedInvitationView>>::sse_encode(self.issued, serializer);
+        <Vec<crate::api::enrollment::AdminSessionView>>::sse_encode(self.sessions, serializer);
+    }
+}
+
 impl SseEncode for crate::api::Fixture {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3408,12 +4944,121 @@ impl SseEncode for crate::api::management::InventoryState {
     }
 }
 
+impl SseEncode for crate::api::enrollment::IssuedInvitationView {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <crate::api::enrollment::EnrolleeRole>::sse_encode(self.role, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <u64>::sse_encode(self.expires_in_seconds, serializer);
+    }
+}
+
+impl SseEncode for crate::api::enrollment::JoinerCommand {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::JoinerCommand::Retry => 0,
+                crate::api::enrollment::JoinerCommand::Status => 1,
+                crate::api::enrollment::JoinerCommand::Confirm => 2,
+                crate::api::enrollment::JoinerCommand::Decline => 3,
+                crate::api::enrollment::JoinerCommand::Cancel => 4,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::JoinerEnd {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::JoinerEnd::None => 0,
+                crate::api::enrollment::JoinerEnd::Declined => 1,
+                crate::api::enrollment::JoinerEnd::Cancelled => 2,
+                crate::api::enrollment::JoinerEnd::CancelledByProvider => 3,
+                crate::api::enrollment::JoinerEnd::CodeMismatch => 4,
+                crate::api::enrollment::JoinerEnd::DuplicateJoin => 5,
+                crate::api::enrollment::JoinerEnd::TooManyFailures => 6,
+                crate::api::enrollment::JoinerEnd::Expired => 7,
+                crate::api::enrollment::JoinerEnd::IdentityRefused => 8,
+                crate::api::enrollment::JoinerEnd::CommitUnavailable => 9,
+                crate::api::enrollment::JoinerEnd::InvalidInvitation => 10,
+                crate::api::enrollment::JoinerEnd::AlreadyUsed => 11,
+                crate::api::enrollment::JoinerEnd::ProviderNotAuthenticated => 12,
+                crate::api::enrollment::JoinerEnd::WrongRole => 13,
+                crate::api::enrollment::JoinerEnd::Malformed => 14,
+                crate::api::enrollment::JoinerEnd::OutcomeUnknown => 15,
+                crate::api::enrollment::JoinerEnd::ProviderChanged => 16,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::JoinerPhase {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::enrollment::JoinerPhase::Idle => 0,
+                crate::api::enrollment::JoinerPhase::Joining => 1,
+                crate::api::enrollment::JoinerPhase::Compare => 2,
+                crate::api::enrollment::JoinerPhase::Waiting => 3,
+                crate::api::enrollment::JoinerPhase::Enrolled => 4,
+                crate::api::enrollment::JoinerPhase::Ended => 5,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::enrollment::JoinerSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::enrollment::JoinerPhase>::sse_encode(self.phase, serializer);
+        <bool>::sse_encode(self.busy, serializer);
+        <crate::api::enrollment::EnrolleeRole>::sse_encode(self.role, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <String>::sse_encode(self.comparison_code, serializer);
+        <u64>::sse_encode(self.seconds_remaining, serializer);
+        <bool>::sse_encode(self.provider_approved, serializer);
+        <bool>::sse_encode(self.confirmed, serializer);
+        <bool>::sse_encode(self.withdrawing, serializer);
+        <crate::api::enrollment::JoinerEnd>::sse_encode(self.end, serializer);
+        <bool>::sse_encode(self.retryable, serializer);
+        <String>::sse_encode(self.invitation_id, serializer);
+        <String>::sse_encode(self.enrolled_fingerprint, serializer);
+    }
+}
+
 impl SseEncode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <String>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::enrollment::AdminSessionView> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::enrollment::AdminSessionView>::sse_encode(item, serializer);
         }
     }
 }
@@ -3571,6 +5216,16 @@ impl SseEncode for Option<crate::api::biometric::BiometricRefusal> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::biometric::BiometricRefusal>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::enrollment::IssuedInvitationView> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::enrollment::IssuedInvitationView>::sse_encode(value, serializer);
         }
     }
 }

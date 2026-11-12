@@ -73,3 +73,25 @@ The large-text images intentionally center the action by scrolling. This capture
 run passed 73 tests and failed exactly the six missing Activity references; the
 existing review/action references passed and remain unchanged. Adoption keeps
 exact comparisons, with full final-revision CI recorded in PR #54.
+
+## Guided enrollment, 2026-11-10 (#59 phase 2)
+
+`enrollment_golden_test.dart` adds four captures per host: the joining
+device's comparison step (`*_join_enrollment.png`, a pure widget with a fixed
+synthetic code) and the owner's approval form (`*_approve_enrollment.png`,
+driven through the test provider oracle), light and dark, 900 px wide. The
+macOS 27 arm64 references were rendered locally with pinned Flutter 3.47.7 and
+reviewed for the large tabular code, labels above fields, and reachable
+actions. The other hosts' references must be adopted from that host's
+reviewed CI captures (`EnrollmentCaptureComparator` writes every capture to
+`test/failures`). Intel macOS (`macos-26-x64`) is unsupported
+(owner decision 2026-11-10); no x64 enrollment reference is adopted.
+
+Linux, Windows and macOS 26 arm64 enrollment references were individually
+visually reviewed and copied byte-for-byte from [CI run 43030456636](https://github.com/sixtoad/vaultwarden-cli/actions/runs/43030456636),
+source `904d5e2`, where they failed only as missing references (163 other
+tests passed on each host). The macOS 26 arm64 host was image
+`macos-26-arm64/20261102.0473.1`. Both themes show the complete approval form
+(labels above fields, the typed code, reachable Approve/Back/Cancel/Close) and
+the joining comparison step (large grouped code, countdown, all three
+choices); differences from macOS 27 are glyph-edge rasterization only.
