@@ -423,7 +423,12 @@ fn collect_files(
             .map_err(|_| fail("Invalid inventory path"))?
             .to_string_lossy()
             .replace('\\', "/");
-        if relative.split('/').any(|s| s == "_CodeSignature") || path == manifest_path(root) {
+        // Signature metadata is bound by `verify_signature`, not the manifest: the
+        // seal, and on macOS the notarization ticket `stapler` adds after it (#62).
+        if relative.split('/').any(|s| s == "_CodeSignature")
+            || path == manifest_path(root)
+            || (platform() == "macos" && relative == "Contents/CodeResources")
+        {
             continue;
         }
         let metadata =
@@ -1073,6 +1078,23 @@ mod tests {
         let g = Fixture::new();
         fs::write(g.root.join("unexpected.dll"), b"untrusted").unwrap();
         assert!(validate(&g.root).is_err());
+    }
+    #[test]
+    fn stapled_notarization_ticket_is_signature_metadata_only_on_macos() {
+        // `xcrun stapler staple` writes the ticket after the final signature, so
+        // the manifest sealed inside that signature cannot list it (#62).
+        let f = Fixture::new();
+        fs::create_dir_all(f.root.join("Contents")).unwrap();
+        fs::write(f.root.join("Contents/CodeResources"), b"stapled ticket").unwrap();
+        assert_eq!(validate(&f.root).is_ok(), platform() == "macos");
+        // Only that exact path: any other unlisted file still changes the inventory.
+        for extra in ["CodeResources", "Contents/Resources/CodeResources"] {
+            let g = Fixture::new();
+            let path = g.root.join(extra);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path, b"untrusted").unwrap();
+            assert!(validate(&g.root).is_err(), "{extra}");
+        }
     }
     #[test]
     fn missing_damaged_and_path_escape_refuse_activation() {

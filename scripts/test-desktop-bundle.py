@@ -134,13 +134,13 @@ class BundleTests(unittest.TestCase):
 
     def test_build_metadata_and_platform_commands_are_not_version_equality(self):
         with tempfile.TemporaryDirectory() as temporary:
-            repo = Path(temporary) / 'source'; repo.mkdir()
+            repo = Path(temporary) / 'source'; repo.mkdir(exist_ok=True)
             (repo / 'companion/rust/target/command-launcher/release').mkdir(parents=True)
             (repo / 'target/release').mkdir(parents=True)
             (repo / 'Cargo.toml').write_text('[package]\nversion="7.2.1"\n')
             (repo / 'companion/rust/Cargo.toml').write_text('[package]\nversion="0.1.0"\n')
             (repo / 'companion/pubspec.yaml').write_text('version: 0.1.0+1\n')
-            root = Path(temporary) / 'bundle'; root.mkdir()
+            root = Path(temporary) / 'bundle'; root.mkdir(exist_ok=True)
             for name in ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']:
                 p = repo / 'target/release' / name; p.write_bytes(b'synthetic'); p.chmod(0o755)
             p = repo / 'companion/rust/target/command-launcher/release/companion-command'; p.write_bytes(b'launcher'); p.chmod(0o755)
@@ -158,10 +158,10 @@ class BundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'damaged'):
                 bundle.verify(root, manifest)
 
-    def synthetic_populate(self, temporary, platform, machine):
+    def synthetic_populate(self, temporary, platform, machine, env=None):
         """populate() over synthetic files; macOS signing/lipo calls are faked."""
         suffix = '.exe' if platform == 'windows' else ''
-        repo = Path(temporary) / 'source'; repo.mkdir()
+        repo = Path(temporary) / 'source'; repo.mkdir(exist_ok=True)
         (repo / 'companion/rust/target/command-launcher/release').mkdir(parents=True)
         (repo / 'target/release').mkdir(parents=True)
         (repo / 'Cargo.toml').write_text('[package]\nversion="7.2.1"\n')
@@ -172,7 +172,7 @@ class BundleTests(unittest.TestCase):
         for name in ['vaultwarden-cli', 'vw-access', 'vaultwarden-accessd', 'vaultwarden-access-exec']:
             p = repo / 'target/release' / (name + suffix); p.write_bytes(b'synthetic ' + name.encode()); p.chmod(0o755)
         p = repo / 'companion/rust/target/command-launcher/release' / ('companion-command' + suffix); p.write_bytes(b'launcher'); p.chmod(0o755)
-        root = Path(temporary) / 'bundle'; root.mkdir()
+        root = Path(temporary) / 'bundle'; root.mkdir(exist_ok=True)
         runtime = {'macos': ['Contents/MacOS/companion_slice', 'Contents/Frameworks/libcompanion_core.dylib'],
                    'windows': ['companion_slice.exe', 'companion_core.dll'],
                    'linux': ['companion_slice', 'lib/libcompanion_core.so']}[platform]
@@ -182,7 +182,7 @@ class BundleTests(unittest.TestCase):
         def run(argv, *args, **kwargs):
             return subprocess.CompletedProcess(argv, 0, '', 'Signature=adhoc\n')
         source = {'revision': 'a' * 40, 'inputs_sha256': 'b' * 64}
-        with patch.dict(os.environ, {}, clear=True), patch.object(bundle.host_platform, 'machine', return_value=machine), \
+        with patch.dict(os.environ, env or {}, clear=True), patch.object(bundle.host_platform, 'machine', return_value=machine), \
                 patch.object(bundle.subprocess, 'run', side_effect=run) as fake_run, \
                 patch.object(bundle.subprocess, 'check_output', return_value=f'{lipo}\n'), \
                 patch.object(bundle, 'verify_macos_entitlements'):
@@ -222,6 +222,61 @@ class BundleTests(unittest.TestCase):
             (helpers / 'vaultwarden-accessd').write_bytes(b'replaced')
             with self.assertRaisesRegex(ValueError, 'damaged'):
                 bundle.verify(root, manifest)
+
+    def test_macos_developer_id_signing_happens_before_the_manifest_and_replaces_ad_hoc(self):
+        import datetime
+        events = []
+        declared = {'com.apple.security.app-sandbox': True, 'com.apple.security.network.client': True,
+                    'com.apple.security.files.user-selected.read-write': True, 'com.apple.security.files.user-selected.executable': True}
+        profile = {'Platform': ['OSX'], 'TeamIdentifier': ['9884BZY594'], 'ProvisionsAllDevices': True,
+                   'ExpirationDate': datetime.datetime(2044, 1, 1),
+                   'Entitlements': {'com.apple.application-identifier': '9884BZY594.dev.vaultwarden.companionSlice',
+                                    'com.apple.developer.team-identifier': '9884BZY594', 'keychain-access-groups': ['9884BZY594.*']}}
+        signer = bundle.release_signing
+        def prepare(temporary):
+            repo = Path(temporary) / 'source'
+            (repo / 'companion/macos/Runner').mkdir(parents=True)
+            (repo / 'companion/macos/Runner/Release.entitlements').write_bytes(plistlib.dumps(declared))
+            (Path(temporary) / 'bundle/Contents').mkdir(parents=True)
+            (Path(temporary) / 'bundle/Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'dev.vaultwarden.companionSlice'}))
+        with tempfile.TemporaryDirectory() as temporary:
+            source_profile = Path(temporary) / 'companion.provisionprofile'
+            source_profile.write_bytes(b'profile bytes')
+            prepare(temporary)
+            env = {'MACOS_SIGNING_IDENTITY': 'A' * 40, 'MACOS_PROVISIONING_PROFILE': str(source_profile)}
+            with patch.object(signer, 'entitlements_of', return_value={**declared, 'com.apple.security.get-task-allow': True}), \
+                    patch.object(signer, 'read_profile', return_value=profile), \
+                    patch.object(signer, 'sign_nested', side_effect=lambda root, s: events.append(('nested', (root / 'Contents/embedded.provisionprofile').exists(), (root / 'Contents/Resources/bundle.json').exists()))), \
+                    patch.object(signer, 'sign_app', side_effect=lambda root, s, e: events.append(('app', e, (root / 'Contents/Resources/bundle.json').exists()))), \
+                    patch.object(signer, 'verify', side_effect=lambda root, team, e: events.append(('verify', team, e))):
+                root, manifest, run = self.synthetic_populate(temporary, 'macos', 'arm64', env)
+            expected = {**declared, 'com.apple.application-identifier': '9884BZY594.dev.vaultwarden.companionSlice',
+                        'com.apple.developer.team-identifier': '9884BZY594', 'keychain-access-groups': ['9884BZY594.dev.vaultwarden.companionSlice']}
+            # Profile embedded and nested code signed before the manifest; the app sealed after it.
+            self.assertEqual(events, [('nested', True, False), ('app', expected, True), ('verify', '9884BZY594', expected)])
+            self.assertFalse([c for c in run.call_args_list if '--sign' in c.args[0] and '-' in c.args[0]])
+            payloads = {entry['path']: entry['sha256'] for entry in manifest['payloads']}
+            self.assertEqual(payloads['Contents/embedded.provisionprofile'], bundle.artifact.digest(source_profile))
+            # A built app that is not Flutter's Release.entitlements is refused, not resealed.
+            events.clear()
+            with patch.object(signer, 'entitlements_of', return_value={**declared, 'com.apple.security.cs.allow-jit': True}), \
+                    patch.object(signer, 'read_profile', return_value=profile), patch.object(signer, 'sign_nested') as nested:
+                second = Path(temporary) / 'second'
+                prepare(second)
+                with self.assertRaisesRegex(ValueError, 'differ from Release.entitlements'):
+                    self.synthetic_populate(str(second), 'macos', 'arm64', env)
+            nested.assert_not_called()
+
+    def test_archive_variant_follows_the_configured_signing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(bundle.signing_variant('macos'), ('development', None, None))
+        configured = {'MACOS_SIGNING_IDENTITY': 'A' * 40, 'MACOS_PROVISIONING_PROFILE': '/p'}
+        with patch.dict(os.environ, configured, clear=True):
+            self.assertEqual(bundle.signing_variant('macos')[0], 'signed')
+            self.assertEqual(bundle.signing_variant('linux'), ('development', None, None))
+        with patch.dict(os.environ, {**configured, 'MACOS_NOTARY_KEYCHAIN_PROFILE': 'vw'}, clear=True):
+            variant, signing, notary = bundle.signing_variant('macos')
+            self.assertEqual((variant, signing.team, notary.keychain_profile), ('notarized', '9884BZY594', 'vw'))
 
     def test_macos_intel_is_refused_at_every_stage(self):
         # Owner decision 2026-11-10: Intel (x86_64) macOS is no longer supported
