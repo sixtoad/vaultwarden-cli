@@ -1,0 +1,43 @@
+src/adapters/native/mod.rs:46:9: replace <impl ImageVerifier for NativeExecutablePreparer>::verify -> Result<(), ExecutionError> with Ok(())
+src/adapters/native/mod.rs:110:9: replace || with && in arguments
+src/adapters/native/mod.rs:109:9: replace || with && in arguments
+src/adapters/native/mod.rs:108:9: replace || with && in arguments
+src/adapters/native/mod.rs:108:23: replace > with == in arguments
+src/adapters/native/mod.rs:108:23: replace > with >= in arguments
+src/adapters/native/mod.rs:110:60: replace > with == in arguments
+src/adapters/native/mod.rs:110:60: replace > with >= in arguments
+src/adapters/native/mod.rs:110:40: replace + with - in arguments
+src/adapters/native/mod.rs:110:40: replace + with * in arguments
+src/adapters/native/mod.rs:129:9: replace || with && in validate_file
+src/adapters/native/mod.rs:128:9: replace || with && in validate_file
+src/adapters/native/mod.rs:127:9: replace || with && in validate_file
+src/adapters/native/mod.rs:126:9: replace || with && in validate_file
+src/adapters/native/mod.rs:125:9: replace || with && in validate_file
+src/adapters/native/mod.rs:128:21: replace & with | in validate_file
+src/adapters/native/mod.rs:128:21: replace & with ^ in validate_file
+src/adapters/native/mod.rs:129:20: replace > with == in validate_file
+src/adapters/native/mod.rs:129:20: replace > with >= in validate_file
+src/adapters/native/mod.rs:170:35: replace || with && in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:170:12: delete ! in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:170:60: replace != with == in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:179:13: replace != with == in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:178:13: replace & with | in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:178:13: replace & with ^ in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:188:66: replace != with == in NativeProcessSupervisor::installed
+src/adapters/native/mod.rs:196:9: replace NativeProcessSupervisor::recover -> Result<(), ExecutionError> with Ok(())
+src/adapters/native/mod.rs:210:35: replace || with && in NativeProcessSupervisor::recover_stopped
+src/adapters/native/mod.rs:232:9: replace <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::ssh_material_root -> Option<&Path> with None
+src/adapters/native/mod.rs:235:9: replace <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::available -> bool with true
+src/adapters/native/mod.rs:294:27: replace == with != in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:306:27: replace < with == in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:306:27: replace < with > in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:306:27: replace < with <= in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:316:16: replace > with == in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:316:16: replace > with < in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:316:16: replace > with >= in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:448:13: replace || with && in Spawn::start
+src/adapters/native/mod.rs:457:9: replace <impl Drop for Spawn>::drop with ()
+src/adapters/native/mod.rs:471:9: replace <impl ExecutionDispatcher for Dispatch>::dispatch -> Result<(), SessionError> with Ok(())
+src/adapters/native/mod.rs:504:9: replace ExecutionWorker::is_finished -> bool with true
+src/adapters/native/mod.rs:504:9: replace ExecutionWorker::is_finished -> bool with false
+src/adapters/native/mod.rs:509:9: replace ExecutionWorker::join -> Result<(), SessionError> with Ok(())

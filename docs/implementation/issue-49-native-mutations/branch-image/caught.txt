@@ -1,0 +1,197 @@
+src/adapters/native/image.rs:20:5: replace word -> Result<u32, ExecutionError> with Ok(0)
+src/adapters/native/image.rs:20:5: replace word -> Result<u32, ExecutionError> with Ok(1)
+src/adapters/native/image.rs:22:25: replace + with - in word
+src/adapters/native/image.rs:22:25: replace + with * in word
+src/adapters/native/image.rs:29:5: replace big -> Result<u32, ExecutionError> with Ok(0)
+src/adapters/native/image.rs:29:5: replace big -> Result<u32, ExecutionError> with Ok(1)
+src/adapters/native/image.rs:31:25: replace + with - in big
+src/adapters/native/image.rs:31:25: replace + with * in big
+src/adapters/native/image.rs:38:5: replace big64 -> Result<usize, ExecutionError> with Ok(0)
+src/adapters/native/image.rs:38:5: replace big64 -> Result<usize, ExecutionError> with Ok(1)
+src/adapters/native/image.rs:40:25: replace + with - in big64
+src/adapters/native/image.rs:40:25: replace + with * in big64
+src/adapters/native/image.rs:49:5: replace macho -> Result<Vec<usize>, ExecutionError> with Ok(vec![])
+src/adapters/native/image.rs:49:5: replace macho -> Result<Vec<usize>, ExecutionError> with Ok(vec![0])
+src/adapters/native/image.rs:49:5: replace macho -> Result<Vec<usize>, ExecutionError> with Ok(vec![1])
+src/adapters/native/image.rs:49:20: replace > with == in macho
+src/adapters/native/image.rs:49:20: replace > with < in macho
+src/adapters/native/image.rs:49:20: replace > with >= in macho
+src/adapters/native/image.rs:49:32: replace * with + in macho
+src/adapters/native/image.rs:49:32: replace * with / in macho
+src/adapters/native/image.rs:49:25: replace * with + in macho
+src/adapters/native/image.rs:49:25: replace * with / in macho
+src/adapters/native/image.rs:52:24: replace == with != in macho
+src/adapters/native/image.rs:57:8: delete ! in macho
+src/adapters/native/image.rs:61:19: replace || with && in macho
+src/adapters/native/image.rs:61:14: replace == with != in macho
+src/adapters/native/image.rs:61:28: replace > with == in macho
+src/adapters/native/image.rs:61:28: replace > with < in macho
+src/adapters/native/image.rs:61:28: replace > with >= in macho
+src/adapters/native/image.rs:64:25: replace == with != in macho
+src/adapters/native/image.rs:68:19: replace + with - in macho
+src/adapters/native/image.rs:68:19: replace + with * in macho
+src/adapters/native/image.rs:68:23: replace * with + in macho
+src/adapters/native/image.rs:68:23: replace * with / in macho
+src/adapters/native/image.rs:69:40: replace == with != in macho
+src/adapters/native/image.rs:70:29: replace + with - in macho
+src/adapters/native/image.rs:70:29: replace + with * in macho
+src/adapters/native/image.rs:70:51: replace + with - in macho
+src/adapters/native/image.rs:70:51: replace + with * in macho
+src/adapters/native/image.rs:72:27: replace + with - in macho
+src/adapters/native/image.rs:72:27: replace + with * in macho
+src/adapters/native/image.rs:72:56: replace + with - in macho
+src/adapters/native/image.rs:72:56: replace + with * in macho
+src/adapters/native/image.rs:77:38: replace + with - in macho
+src/adapters/native/image.rs:77:38: replace + with * in macho
+src/adapters/native/image.rs:77:50: replace == with != in macho
+src/adapters/native/image.rs:84:13: replace || with && in macho
+src/adapters/native/image.rs:83:13: replace || with && in macho
+src/adapters/native/image.rs:82:13: replace || with && in macho
+src/adapters/native/image.rs:81:13: replace || with && in macho
+src/adapters/native/image.rs:80:13: replace || with && in macho
+src/adapters/native/image.rs:79:13: replace || with && in macho
+src/adapters/native/image.rs:78:17: replace == with != in macho
+src/adapters/native/image.rs:79:26: replace >= with < in macho
+src/adapters/native/image.rs:80:47: replace != with == in macho
+src/adapters/native/image.rs:80:23: replace % with / in macho
+src/adapters/native/image.rs:80:23: replace % with + in macho
+src/adapters/native/image.rs:80:33: replace << with >> in macho
+src/adapters/native/image.rs:81:30: replace && with || in macho
+src/adapters/native/image.rs:81:24: replace == with != in macho
+src/adapters/native/image.rs:81:53: replace != with == in macho
+src/adapters/native/image.rs:81:46: replace + with - in macho
+src/adapters/native/image.rs:81:46: replace + with * in macho
+src/adapters/native/image.rs:82:23: replace < with == in macho
+src/adapters/native/image.rs:82:23: replace < with > in macho
+src/adapters/native/image.rs:82:23: replace < with <= in macho
+src/adapters/native/image.rs:82:27: replace + with - in macho
+src/adapters/native/image.rs:82:27: replace + with * in macho
+src/adapters/native/image.rs:82:35: replace * with + in macho
+src/adapters/native/image.rs:82:35: replace * with / in macho
+src/adapters/native/image.rs:83:20: replace > with == in macho
+src/adapters/native/image.rs:83:20: replace > with < in macho
+src/adapters/native/image.rs:83:20: replace > with >= in macho
+src/adapters/native/image.rs:84:55: replace && with || in macho
+src/adapters/native/image.rs:84:51: replace < with == in macho
+src/adapters/native/image.rs:84:51: replace < with > in macho
+src/adapters/native/image.rs:84:51: replace < with <= in macho
+src/adapters/native/image.rs:84:62: replace > with == in macho
+src/adapters/native/image.rs:84:62: replace > with < in macho
+src/adapters/native/image.rs:84:62: replace > with >= in macho
+src/adapters/native/image.rs:89:27: replace == with != in macho
+src/adapters/native/image.rs:92:33: replace != with == in macho
+src/adapters/native/image.rs:92:49: replace + with - in macho
+src/adapters/native/image.rs:92:49: replace + with * in macho
+src/adapters/native/image.rs:104:5: replace slice -> Result<(), ExecutionError> with Ok(())
+src/adapters/native/image.rs:104:71: replace || with && in slice
+src/adapters/native/image.rs:104:38: replace || with && in slice
+src/adapters/native/image.rs:104:24: replace != with == in slice
+src/adapters/native/image.rs:104:57: replace != with == in slice
+src/adapters/native/image.rs:104:91: replace != with == in slice
+src/adapters/native/image.rs:111:35: replace || with && in slice
+src/adapters/native/image.rs:111:19: replace || with && in slice
+src/adapters/native/image.rs:111:14: replace == with != in slice
+src/adapters/native/image.rs:111:28: replace > with == in slice
+src/adapters/native/image.rs:111:28: replace > with < in slice
+src/adapters/native/image.rs:111:28: replace > with >= in slice
+src/adapters/native/image.rs:111:42: replace > with == in slice
+src/adapters/native/image.rs:111:42: replace > with < in slice
+src/adapters/native/image.rs:119:34: replace + with - in slice
+src/adapters/native/image.rs:119:34: replace + with * in slice
+src/adapters/native/image.rs:120:48: replace || with && in slice
+src/adapters/native/image.rs:120:21: replace || with && in slice
+src/adapters/native/image.rs:120:17: replace < with == in slice
+src/adapters/native/image.rs:120:17: replace < with > in slice
+src/adapters/native/image.rs:120:17: replace < with <= in slice
+src/adapters/native/image.rs:120:24: delete ! in slice
+src/adapters/native/image.rs:120:88: replace > with == in slice
+src/adapters/native/image.rs:120:88: replace > with < in slice
+src/adapters/native/image.rs:120:88: replace > with >= in slice
+src/adapters/native/image.rs:124:13: delete match arm 0xc | 0x80000018 | 0x8000001f | 0x80000023 in slice
+src/adapters/native/image.rs:147:13: delete match arm 0xe in slice
+src/adapters/native/image.rs:162:13: delete match arm 0x1d in slice
+src/adapters/native/image.rs:178:13: delete match arm 0x19 | 0x2 | 0xb | 0x1b | 0x24 | 0x25 | 0x26 | 0x29 | 0x2a | 0x2b | 0x2d | 0x2e | 0x32 | 0x80000022 | 0x80000028 | 0x80000033 | 0x80000034 in slice
+src/adapters/native/image.rs:125:44: replace + with - in slice
+src/adapters/native/image.rs:125:44: replace + with * in slice
+src/adapters/native/image.rs:126:32: replace || with && in slice
+src/adapters/native/image.rs:126:27: replace < with == in slice
+src/adapters/native/image.rs:126:27: replace < with > in slice
+src/adapters/native/image.rs:126:27: replace < with <= in slice
+src/adapters/native/image.rs:126:42: replace >= with < in slice
+src/adapters/native/image.rs:129:38: replace + with - in slice
+src/adapters/native/image.rs:129:38: replace + with * in slice
+src/adapters/native/image.rs:129:50: replace + with - in slice
+src/adapters/native/image.rs:129:50: replace + with * in slice
+src/adapters/native/image.rs:132:38: replace == with != in slice
+src/adapters/native/image.rs:137:21: replace || with && in slice
+src/adapters/native/image.rs:135:20: delete ! in slice
+src/adapters/native/image.rs:136:21: replace || with && in slice
+src/adapters/native/image.rs:143:20: delete ! in slice
+src/adapters/native/image.rs:148:44: replace + with - in slice
+src/adapters/native/image.rs:148:44: replace + with * in slice
+src/adapters/native/image.rs:149:42: replace || with && in slice
+src/adapters/native/image.rs:149:27: replace || with && in slice
+src/adapters/native/image.rs:149:37: replace < with == in slice
+src/adapters/native/image.rs:149:37: replace < with > in slice
+src/adapters/native/image.rs:149:37: replace < with <= in slice
+src/adapters/native/image.rs:149:52: replace >= with < in slice
+src/adapters/native/image.rs:152:38: replace + with - in slice
+src/adapters/native/image.rs:152:38: replace + with * in slice
+src/adapters/native/image.rs:152:50: replace + with - in slice
+src/adapters/native/image.rs:152:50: replace + with * in slice
+src/adapters/native/image.rs:155:44: replace == with != in slice
+src/adapters/native/image.rs:157:41: replace != with == in slice
+src/adapters/native/image.rs:167:21: replace || with && in slice
+src/adapters/native/image.rs:166:21: replace || with && in slice
+src/adapters/native/image.rs:165:21: replace || with && in slice
+src/adapters/native/image.rs:164:21: replace || with && in slice
+src/adapters/native/image.rs:164:29: replace != with == in slice
+src/adapters/native/image.rs:165:45: replace == with != in slice
+src/adapters/native/image.rs:165:38: replace + with - in slice
+src/adapters/native/image.rs:165:38: replace + with * in slice
+src/adapters/native/image.rs:166:55: replace < with == in slice
+src/adapters/native/image.rs:166:55: replace < with > in slice
+src/adapters/native/image.rs:166:55: replace < with <= in slice
+src/adapters/native/image.rs:166:39: replace + with - in slice
+src/adapters/native/image.rs:166:39: replace + with * in slice
+src/adapters/native/image.rs:167:39: replace + with - in slice
+src/adapters/native/image.rs:167:39: replace + with * in slice
+src/adapters/native/image.rs:168:52: replace + with - in slice
+src/adapters/native/image.rs:168:52: replace + with * in slice
+src/adapters/native/image.rs:169:67: replace > with == in slice
+src/adapters/native/image.rs:169:67: replace > with < in slice
+src/adapters/native/image.rs:169:67: replace > with >= in slice
+src/adapters/native/image.rs:182:11: replace += with -= in slice
+src/adapters/native/image.rs:182:11: replace += with *= in slice
+src/adapters/native/image.rs:184:28: replace || with && in slice
+src/adapters/native/image.rs:184:17: replace || with && in slice
+src/adapters/native/image.rs:184:10: replace != with == in slice
+src/adapters/native/image.rs:184:20: delete ! in slice
+src/adapters/native/image.rs:184:31: delete ! in slice
+src/adapters/native/image.rs:214:5: replace signature -> Result<String, ExecutionError> with Ok(String::new())
+src/adapters/native/image.rs:214:5: replace signature -> Result<String, ExecutionError> with Ok("xyzzy".into())
+src/adapters/native/image.rs:218:25: replace * with + in signature
+src/adapters/native/image.rs:218:25: replace * with / in signature
+src/adapters/native/image.rs:218:18: replace * with + in signature
+src/adapters/native/image.rs:218:18: replace * with / in signature
+src/adapters/native/image.rs:237:11: replace != with == in signature
+src/adapters/native/image.rs:248:25: replace != with == in signature
+src/adapters/native/image.rs:275:5: replace trusted_requirement -> String with String::new()
+src/adapters/native/image.rs:275:5: replace trusted_requirement -> String with "xyzzy".into()
+src/adapters/native/image.rs:279:5: replace release_requirement -> String with String::new()
+src/adapters/native/image.rs:279:5: replace release_requirement -> String with "xyzzy".into()
+src/adapters/native/image.rs:282:5: replace satisfies -> Result<bool, ExecutionError> with Ok(true)
+src/adapters/native/image.rs:282:5: replace satisfies -> Result<bool, ExecutionError> with Ok(false)
+src/adapters/native/image.rs:291:8: delete ! in slice_signature
+src/adapters/native/image.rs:336:84: replace != with == in signing_information
+src/adapters/native/image.rs:346:5: replace signature_policy -> Result<String, ExecutionError> with Ok(String::new())
+src/adapters/native/image.rs:346:5: replace signature_policy -> Result<String, ExecutionError> with Ok("xyzzy".into())
+src/adapters/native/image.rs:353:29: replace || with && in signature_policy
+src/adapters/native/image.rs:353:24: replace == with != in signature_policy
+src/adapters/native/image.rs:353:14: replace & with | in signature_policy
+src/adapters/native/image.rs:353:14: replace & with ^ in signature_policy
+src/adapters/native/image.rs:353:44: replace != with == in signature_policy
+src/adapters/native/image.rs:353:38: replace & with | in signature_policy
+src/adapters/native/image.rs:353:38: replace & with ^ in signature_policy
+src/adapters/native/image.rs:379:19: replace != with == in signature_policy
+src/adapters/native/image.rs:392:5: replace dynamic -> Result<(), ExecutionError> with Ok(())

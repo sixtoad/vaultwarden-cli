@@ -54,19 +54,31 @@ wrapper refuses a cargo-mutants binary without an `arm64` slice.
 <!-- RESULTS -->
 ## Results
 
-Final run: workflow run **RUNID** on `HEADSHA` (all jobs green). Score =
+Final run: workflow run
+[**43209334431**](https://github.com/sixtoad/vaultwarden-cli/actions/runs/43209334431)
+on `ed52aac` (after merging `main` at `c6a01ca`, which brought the Developer ID
+publisher checks into `image.rs`); all 14 jobs green. Score =
 caught / (caught + missed + timeout); unviable mutants are excluded. *Adjusted*
 also excludes the survivors classified **equivalent** below.
 
 | File | main (pre-campaign tests) | branch | branch adjusted |
 | --- | --- | --- | --- |
-| `reaper.rs` | 5 / 11 (45.5%) | 11 / 11 (100%) | 100% |
+| `reaper.rs` | 5 / 11 (45.5%) | 11 / 11 (100%) | 11 / 11 (100%) |
 | `identity.rs` | 6 / 34 (17.6%) | 32 / 34 (94.1%) | 32 / 32 (100%) |
-| `image.rs` | 165 / 199 (82.9%) | 191 / 199 (96.0%) | 191 / 194 (98.5%) |
-| `mod.rs` | 46 / 89 (51.7%) | MODB | MODA |
-| `platform.rs` | 55 / 88 (62.5%) | 66 / 88 (75.0%) | 66 / 74 (89.2%) |
+| `image.rs` | 171 / 213 (80.3%) | 197 / 213 (92.5%) | 197 / 208 (94.7%) |
+| `mod.rs` | 46 / 89 (51.7%) | 83 / 89 (93.3%)¹ | 83 / 87 (95.4%) |
+| `platform.rs` | 56 / 88 (63.6%) | 66 / 88 (75.0%) | 66 / 74 (89.2%) |
 | `producer.rs` | 31 / 44 (70.5%) | 33 / 44 (75.0%) | 33 / 39 (84.6%) |
-| **total** | 308 / 465 (66.2%) | TOTB | TOTA |
+| **total** | 315 / 479 (65.8%) | 422 / 479 (88.1%) | 422 / 451 (93.6%) |
+
+Unviable (excluded): reaper 3, identity 1, image 5, mod 8, platform 2, producer 5
+on both legs. Timeouts: producer 2 on both legs (see producer.rs).
+
+¹ cargo-mutants reports 84 caught: it also counts `129:20 > with >=` as caught, but
+that mutant failed only the timing assertion `live_calls > 5` of
+`native_supervision_maps_natural_exit_status_and_reports_reaped_cleanup` (the
+previous run, 43176132176, missed it). It is not a genuine kill and is counted as
+missed here.
 
 Semantic faults (11): every fault caught on the branch (baseline passed, mutant
 `test result: FAILED`): release race, implicit termination, peer-token PID, peer
@@ -116,17 +128,22 @@ panics on; a zero-size command; a dylib name inside its fixed fields) kills
 `111:42 > with ==`, `120:21`, `126:32`;
 `native_signature_policy_requires_the_hardened_runtime` (ad-hoc signature without
 `--options runtime`) kills `271:29 \|\| with &&` and `271:14 & with \|`.
-`249:5 slice_signature -> Ok(..)` (two mutants) survived only under Rosetta and is
-killed natively by the existing ad-hoc signature test.
+`slice_signature -> Ok(..)` survived only under Rosetta and is killed natively by the
+existing ad-hoc signature test.
+
+`main` (#80) added the publisher classification (`satisfies`, `publisher`,
+`team_identifier`, `signing_information`); the image row grew from 199 to 213
+viable mutants and the line numbers below are those of the merged file.
 
 | Survivor | Classification |
 | --- | --- |
 | `111:42 > with >=` | Equivalent: a signed slice needs signature data after its load commands (`dataoff >= end`, `datasize > 0`, within the file), so `end == len` is rejected later in every case. |
 | `176:13 delete forbidden-command arm` | Equivalent: those commands then reach the fail-closed `_` arm, same `UnsupportedImage`. |
-| `236:13 \|\| with &&`, `259:9 \|\| with &&` | Equivalent under the Security API contract: the out pointer is set exactly when the call returns `errSecSuccess`. |
-| `250:48 \| with ^` | Equivalent: `STRICT_VALIDATE` and `NO_NETWORK_ACCESS` are disjoint bits. |
-| `250:48 \| with &` (no flags) | Not killed: needs an Apple-anchored slice that only strict validation rejects. A byte appended to `/usr/bin/ssh` (after, or inside, its last slice) fails `codesign --strict` but per-slice `SecStaticCodeCheckValidity` accepted it with and without the strict flag, so no fixture distinguishes them. |
-| `217:32 + with -`, `+ with *` (read bound 64 MiB + 1) | Not killed: distinguishing needs an Apple-anchored executable of 64 MiB or more; `macho()`'s own 64 MiB limit (killed) rejects any larger image. |
+| `238:13 \|\| with &&` (static code creation), `337:9 \|\| with &&` (`signing_information`) | Equivalent under the Security API contract: the out pointer is set exactly when the call returns `errSecSuccess`. |
+| `285:36 \| with ^` (`satisfies`) | Equivalent: `STRICT_VALIDATE` and `NO_NETWORK_ACCESS` are disjoint bits. |
+| `285:36 \| with &` (no flags) | Not killed: needs an Apple-anchored slice that only strict validation rejects. A byte appended to `/usr/bin/ssh` (after, or inside, its last slice) fails `codesign --strict` but per-slice `SecStaticCodeCheckValidity` accepted it with and without the strict flag, so no fixture distinguishes them. |
+| `218:32 + with -`, `+ with *` (read bound 64 MiB + 1) | Not killed: distinguishing needs an Apple-anchored executable of 64 MiB or more; `macho()`'s own 64 MiB limit (killed) rejects any larger image. |
+| `305:8 delete !`, `310:13 == with !=` (`publisher`); `316:5 team_identifier -> Ok(String::new())`, `-> Ok("xyzzy".into())`, `323:19 != with ==`, `324:9 \|\| with &&`, `324:12 delete !`, `326:45 \|\| with &&` (`team_identifier`) | Not killed (new code from #80): reachable only for a Developer ID Application signature that is not Apple's. CI has no signing identity; the release-fixture tests are `#[ignore]` (`VW_RELEASE_SIGNED_FIXTURE`), and an ad hoc signature carries no team identifier, so every such mutant still ends in `UnsupportedImage`. Killing them needs a Developer ID fixture of another team and one of `RELEASE_TEAM_ID`. |
 
 ### mod.rs
 
@@ -138,7 +155,11 @@ checks) kills `125:9`, `126:9`, `127:9`, `128:9`, `129:9` (`\|\| with &&`) and
 `128:21 & with \|`/`& with ^`; `native_supervision_detaches_only_a_live_consumer_to_the_reaper`
 kills `316:16 > with ==`/`> with <` (the lost consumer must be reaped, not left a
 zombie) and `> with >=` (a completed supervision must not detach PID 0, which makes
-the reaper `waitpid(0)` and steal an exited sibling's status). The supervision
+the reaper `waitpid(0)` and steal an exited sibling's status). The supervision tests
+compare every direct child of the test process before and after a supervision, so
+each runs its body in a re-executed copy of the test binary that runs only that
+test (`isolated`); in the parallel lib run other tests' children otherwise appeared
+in that view (CI run 43176147291). The supervision
 fixtures are bounded (liveness ends after 20 s, the fixture server after 10 s) so
 that the argument-vector mutants `107:5 -> Ok(vec![])`/`Ok(vec![Default::default()])`
 end as caught instead of timeouts.
@@ -149,15 +170,19 @@ end as caught instead of timeouts.
 | `448:13 \|\| with &&` (`posix_spawn != 0 && pid <= 0`) | Equivalent under the `posix_spawn` contract: it writes a positive PID exactly on success and leaves the zero-initialised PID on failure. |
 | `457:9 Drop for Spawn -> ()` | Not killed: only leaks the spawn attribute and file-action objects (no descriptor is held by them). |
 | `504:9 is_finished -> false` | Not killed: the worker owns its sender until `join`, so the thread can finish only by panicking in `run_execution`; no seam induces that. |
-| `129:20 > with ==`, `> with >=` | Not killed: needs a root-owned executable of 64 MiB or more; `macho()` rejects anything larger independently. |
+| `129:20 > with >=` | Not killed (see footnote ¹): needs a root-owned executable of exactly 64 MiB; `macho()` rejects anything larger independently. (`129:20 > with ==` and `> with <` are caught.) |
 
 ### platform.rs
 
 Pre-campaign: 33 survivors. New kills:
 `native_process_listing_skips_the_caller_and_holds_every_listed_process` (the
-test binary is not "another process" with its own name; with 48 extra children the
-listing buffer must still hold every process of the account) kills `65:27` and
-`93:32 * with +`; `native_peer_audit_fails_without_a_connected_peer` kills
+test binary is not "another process" with its own name; a uniquely named probe
+placed behind `older / 3 + 64` newer children must still be listed, so a
+quarter-sized buffer misses it whether the kernel lists newest or oldest first)
+kills `65:27` and `93:32 * with +`. With a fixed 48 children the `93:32` kill
+depended on the runner's process count (missed in run 43176132176); the probe makes
+it deterministic. The test shares a lock with the isolated supervision copies, which
+carry the same binary name; `native_peer_audit_fails_without_a_connected_peer` kills
 `224:9`; `native_no_writer_open_never_blocks_on_a_fifo_component` kills
 `173:74 \| with &` (dropping `O_NONBLOCK` blocks on a FIFO; the test is bounded).
 

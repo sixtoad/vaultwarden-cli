@@ -1,0 +1,2 @@
+src/adapters/native/producer.rs:105:22: replace > with == in drain
+src/adapters/native/producer.rs:105:22: replace > with >= in drain

@@ -1,0 +1,2 @@
+src/adapters/native/platform.rs:146:5: replace open_no_writers -> Result<File, ExecutionError> with Ok(Default::default())
+src/adapters/native/platform.rs:200:5: replace socket -> std::io::Result<std::os::unix::net::UnixStream> with Ok(Default::default())
