@@ -373,6 +373,46 @@ fn native_signed_request_replay_wrong_identity_revocation_and_locked_restart() {
     assert!(restarted.submit_signed(1, &[1], next, &Launcher).is_err());
 }
 
+/// Another test thread spawning a child while the provider restarts: on macOS the
+/// spawned process briefly shares every open file description of this process
+/// (until its exec closes the close-on-exec ones), the provider's flocked writer
+/// lock included. A restart inside that window must still own the store.
+#[test]
+fn native_restart_is_not_blocked_by_a_concurrent_spawn() {
+    const RESTARTS: usize = 60;
+    let mut f = Fixture::new();
+    let root = f.root.path().join("provider");
+    drop(f.app.take());
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let spawners = (0..3)
+        .map(|_| {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                while !stop.load(Ordering::SeqCst) {
+                    std::process::Command::new("/usr/bin/true")
+                        .env_clear()
+                        .status()
+                        .unwrap();
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    let restarts = (0..RESTARTS)
+        .map(|_| Provider::start(&root).map(drop))
+        .collect::<Vec<_>>();
+    stop.store(true, Ordering::SeqCst);
+    for spawner in spawners {
+        spawner.join().unwrap();
+    }
+    let failures = restarts.iter().filter(|restart| restart.is_err()).count();
+    assert_eq!(
+        failures,
+        0,
+        "{:?}",
+        restarts.into_iter().find(Result::is_err)
+    );
+}
+
 #[test]
 fn native_preparer_rejects_digest_mutation_writable_copy_symlink_and_foreign_profile() {
     let reg = image_registration();
