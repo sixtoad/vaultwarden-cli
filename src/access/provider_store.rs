@@ -291,7 +291,24 @@ pub(crate) struct ProviderStore {
     #[cfg(target_os = "macos")]
     administrator_uid: u32,
     poisoned: bool,
-    _writer_lock: File,
+    _writer_lock: WriterLock,
+}
+/// The provider's exclusive `flock`, released explicitly before its descriptor
+/// closes.
+///
+/// An `flock` belongs to the open file description and lasts while any process
+/// still references it. A child that another thread spawns (`fork`, or
+/// `posix_spawn` even with `POSIX_SPAWN_CLOEXEC_DEFAULT`) shares every
+/// description of this process until its exec closes the close-on-exec ones, so
+/// merely closing ours left the lock held for that window: a provider restarted
+/// in the same process met `EWOULDBLOCK` and failed with `PersistenceFailure`.
+/// `LOCK_UN` releases the description's lock whatever else still references it.
+#[derive(Debug)]
+struct WriterLock(File);
+impl Drop for WriterLock {
+    fn drop(&mut self) {
+        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
+    }
 }
 
 impl ProviderStore {
@@ -315,9 +332,10 @@ impl ProviderStore {
         }
         validate_dir(&root, owner_uid, true)?;
         validate_regular_file(&root.join(LOCK_FILE), PRIVATE_FILE_MODE, owner_uid)?;
-        let lock = open_lock(&root.join(LOCK_FILE))?;
+        let lock = open_existing(&root.join(LOCK_FILE), true)?;
         validate_open_file(&lock, PRIVATE_FILE_MODE, owner_uid)?;
         try_lock_exclusive(&lock)?;
+        let lock = WriterLock(lock);
         #[cfg(target_os = "macos")]
         let identity = crate::adapters::native::identity::load()
             .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
@@ -353,7 +371,7 @@ impl ProviderStore {
         TEST_STATE_READS.with(|count| count.set(count.get() + 1));
         self.ensure_healthy()?;
         validate_layout(&self.root, self.owner_uid)?;
-        let mut file = open_existing(&self.state_path())?;
+        let mut file = open_existing(&self.state_path(), false)?;
         validate_open_file(&file, PRIVATE_FILE_MODE, self.owner_uid)?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)
@@ -645,37 +663,19 @@ fn validate_regular_file(path: &Path, mode: u32, owner_uid: u32) -> Result<(), P
         Ok(())
     }
 }
-fn open_existing(path: &Path) -> Result<File, ProviderError> {
-    OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)
-        .map_err(|_error| error(ProviderDiagnostic::InvalidState))
-}
-/// `O_CLOFORK` from the macOS SDK's `<sys/fcntl.h>`; the `libc` crate does not
-/// export it yet.
-#[cfg(target_os = "macos")]
-const O_CLOFORK: libc::c_int = 0x0800_0000;
-/// Opens the writer lock outside every child process.
-///
-/// The lock is an `flock` on this open file description. A process that any
-/// other thread spawns (`posix_spawn` included, even with
-/// `POSIX_SPAWN_CLOEXEC_DEFAULT`) shares every description this process holds
-/// until its exec closes the close-on-exec ones, and an `flock` stays held while
-/// any reference remains. Dropping the store and starting it again inside that
-/// window found the lock taken (`EWOULDBLOCK`), so a restart failed with
-/// `PersistenceFailure`. Close-on-fork keeps the description out of every child.
-/// Linux has no close-on-fork flag; the lock keeps close-on-exec alone there.
-fn open_lock(path: &Path) -> Result<File, ProviderError> {
+fn open_existing(path: &Path, write: bool) -> Result<File, ProviderError> {
     let mut options = OpenOptions::new();
-    #[cfg(target_os = "macos")]
-    options.custom_flags(libc::O_NOFOLLOW | O_CLOFORK);
-    #[cfg(not(target_os = "macos"))]
-    options.custom_flags(libc::O_NOFOLLOW);
     options
-        .write(true)
-        .open(path)
-        .map_err(|_error| error(ProviderDiagnostic::PersistenceFailure))
+        .read(!write)
+        .write(write)
+        .custom_flags(libc::O_NOFOLLOW);
+    options.open(path).map_err(|_error| {
+        error(if write {
+            ProviderDiagnostic::PersistenceFailure
+        } else {
+            ProviderDiagnostic::InvalidState
+        })
+    })
 }
 fn validate_open_file(file: &File, mode: u32, owner_uid: u32) -> Result<(), ProviderError> {
     #[cfg(target_os = "macos")]
@@ -1061,19 +1061,22 @@ mod tests {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
-mod close_on_fork_tests {
+#[cfg(test)]
+mod writer_lock_tests {
     use super::*;
-    /// `FD_CLOFORK` from the macOS SDK's `<sys/fcntl.h>`.
-    const FD_CLOFORK: libc::c_int = 2;
+    /// `dup` stands in for a child spawned by another thread: it references the
+    /// same open file description until its exec, after the store has gone.
     #[test]
-    fn writer_lock_is_close_on_exec_and_close_on_fork() {
+    fn released_writer_lock_is_free_while_another_reference_remains() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join(LOCK_FILE);
         File::create(&path).unwrap();
-        let lock = open_lock(&path).unwrap();
-        let flags = unsafe { libc::fcntl(lock.as_raw_fd(), libc::F_GETFD) };
-        assert_ne!(flags & libc::FD_CLOEXEC, 0, "{flags:#x}");
-        assert_ne!(flags & FD_CLOFORK, 0, "{flags:#x}");
+        let lock = open_existing(&path, true).unwrap();
+        try_lock_exclusive(&lock).unwrap();
+        let shared = lock.try_clone().unwrap();
+        drop(WriterLock(lock));
+        let reopened = open_existing(&path, true).unwrap();
+        assert!(try_lock_exclusive(&reopened).is_ok());
+        drop(shared);
     }
 }
