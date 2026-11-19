@@ -198,3 +198,29 @@ Map<String, dynamic> providerHistory({
     },
   ],
 };
+
+/// Opens the authorization step of the shown review: the second step of an
+/// approval (#50 slice 2), where the password field and Touch ID live.
+Future<void> startAuthorization(WidgetTester tester) async {
+  final start = find.byKey(const Key('approve-start'));
+  await tester.ensureVisible(start);
+  await tester.tap(start);
+  await tester.pumpAndSettle();
+}
+
+/// Denies the shown review through its confirmation. [settle] false leaves a
+/// held decision in flight (one frame only).
+Future<void> denyRequest(WidgetTester tester, {bool settle = true}) async {
+  final start = find.byKey(const Key('deny-start'));
+  await tester.ensureVisible(start);
+  await tester.tap(start);
+  await tester.pumpAndSettle();
+  final confirm = find.byKey(const Key('confirm-deny'));
+  await tester.ensureVisible(confirm);
+  await tester.tap(confirm);
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
+}
