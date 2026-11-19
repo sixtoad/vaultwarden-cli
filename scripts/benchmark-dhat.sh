@@ -20,22 +20,16 @@ fi
 
 mkdir -p "$DHAT_DIR"
 
-cargo bench --bench "$BENCH_NAME" --no-run
-
+# Ask Cargo where the benchmark binary is. Cargo >= 1.100 builds each unit in its
+# own build-dir directory (target/release/build/<pkg>/<hash>/out) and no longer
+# fills target/release/deps, so the path is never assumed.
 bench_bin="$(
-  find "$TARGET_DIR/release/deps" \
-    -maxdepth 1 \
-    -type f \
-    -executable \
-    -name "${BENCH_NAME}-*" \
-    ! -name "*.d" \
-    -printf '%T@ %p\n' |
-  sort -nr |
-  awk 'NR == 1 { print $2 }'
+  cargo bench --bench "$BENCH_NAME" --no-run --message-format=json |
+  python3 -c 'import json,sys; print(next((x["executable"] for x in [json.loads(line) for line in sys.stdin] if x.get("reason")=="compiler-artifact" and x["target"]["name"]==sys.argv[1] and x["target"]["kind"]==["bench"] and x.get("executable")),""))' "$BENCH_NAME"
 )"
 
-if [[ -z "$bench_bin" ]]; then
-  echo "DHAT allocation profile failed: benchmark binary for ${BENCH_NAME} was not found under ${TARGET_DIR}/release/deps." >&2
+if [[ -z "$bench_bin" || ! -x "$bench_bin" ]]; then
+  echo "DHAT allocation profile failed: Cargo reported no benchmark binary for ${BENCH_NAME}." >&2
   exit 1
 fi
 

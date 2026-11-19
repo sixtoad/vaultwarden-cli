@@ -34,8 +34,6 @@ const MAX_REGISTRY_BYTES: usize = 65536;
 /// version that represents the content: version 2 (byte-compatible with the
 /// previous release) unless Touch ID state or audit exists, then version 3.
 const REGISTRY_VERSION: u8 = 3;
-const STOPPED_PROVIDER_ATTEMPTS: u32 = 50;
-const STOPPED_PROVIDER_RETRY: std::time::Duration = std::time::Duration::from_millis(10);
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnrolledCompanion {
@@ -536,18 +534,28 @@ pub(crate) fn revoke_online(
 fn valid_label(label: &str) -> bool {
     !label.is_empty() && label.len() <= 128 && !label.chars().any(char::is_control)
 }
-fn stopped_provider(root: &Path) -> Result<File, SessionError> {
+/// Proof that no provider holds the state lock, released explicitly on drop.
+///
+/// An `flock` belongs to the open file description and lasts while any process
+/// references it. A child that another thread spawns shares every description
+/// until its exec, so merely closing ours could leave the lock held for that
+/// window and the next offline writer in this process would find it taken.
+/// `LOCK_UN` releases it whatever else still references the description, as
+/// the provider's own writer lock does (`access::provider_store::WriterLock`).
+#[derive(Debug)]
+struct StoppedProvider(File);
+impl Drop for StoppedProvider {
+    fn drop(&mut self) {
+        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
+    }
+}
+fn stopped_provider(root: &Path) -> Result<StoppedProvider, SessionError> {
     private_directory(root)?;
     let lock = private_open(&root.join(".provider-state.lock"), true)?;
-    // A child spawned between our open and its exec briefly shares the lock;
-    // a running provider holds it far longer than this bounded wait.
-    for _ in 0..STOPPED_PROVIDER_ATTEMPTS {
-        if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-            return Ok(lock);
-        }
-        std::thread::sleep(STOPPED_PROVIDER_RETRY);
+    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+        return Err(SessionError::BackendUnavailable);
     }
-    Err(SessionError::BackendUnavailable)
+    Ok(StoppedProvider(lock))
 }
 fn read_or_initial(root: &Path) -> Result<Registry, SessionError> {
     let path = root.join(STORE_FILE);
@@ -888,17 +896,31 @@ mod tests {
         let registry = registry(&path).unwrap();
         assert_eq!(registry.audit.len(), 2);
     }
+}
+
+#[cfg(test)]
+mod stopped_provider_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    fn offline_root() -> tempfile::TempDir {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let lock = root.path().join(".provider-state.lock");
+        std::fs::write(&lock, b"").unwrap();
+        std::fs::set_permissions(&lock, std::fs::Permissions::from_mode(0o600)).unwrap();
+        root
+    }
+    /// `try_clone` stands in for a child spawned by another thread: it
+    /// references the same open file description until its exec.
     #[test]
-    fn stopped_provider_waits_out_a_transient_lock_holder() {
-        // A child spawned by another thread inherits the lock until it execs.
-        let root = root();
+    fn released_stopped_provider_lock_is_free_while_another_reference_remains() {
+        let root = offline_root();
         let held = stopped_provider(root.path()).unwrap();
-        let release = std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            drop(held);
-        });
+        let shared = held.0.try_clone().unwrap();
+        assert!(stopped_provider(root.path()).is_err());
+        drop(held);
         assert!(stopped_provider(root.path()).is_ok());
-        release.join().unwrap();
+        drop(shared);
     }
 }
 

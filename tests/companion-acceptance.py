@@ -11,7 +11,8 @@ resume-revoked ROOT -> revokes its client offline, then restarts the same fixtur
 submit ROOT -> actual signed non-TTY CLI submission from that distinct UID.
 stop ROOT -> asks fixture to reap work and stop; retains evidence and test identities.
 
-Requires existing cargo-built test/helper/CLI binaries, openssl, cc, user systemd,
+Requires existing cargo-built helper/CLI binaries (the lib test binary is located,
+and rebuilt if stale, through `cargo test --lib --no-run`), openssl, cc, user systemd,
 and configured subordinate UID/GID ranges. Run outside the remapping sandbox.
 """
 import base64
@@ -148,6 +149,24 @@ def prepare(hostname, prior=None):
                       "status": "prepared; no service started"}, indent=2))
 
 
+def lib_test_binaries():
+    """The lib test binaries Cargo reports, never a guessed target/debug/deps.
+
+    Cargo >= 1.100 builds each unit in its own build-dir directory
+    (target/debug/build/<pkg>/<hash>/out) and no longer fills target/debug/deps,
+    so the path is read from Cargo's JSON messages; this also rebuilds a stale one.
+    """
+    messages = run(["cargo", "test", "--offline", "--locked", "--lib", "--no-run", "--message-format=json"],
+                   cwd=REPO, stdout=subprocess.PIPE, timeout=1800, text=True).stdout
+    binaries = []
+    for line in messages.splitlines():
+        message = json.loads(line) if line.startswith("{") else {}
+        if (message.get("reason") == "compiler-artifact" and message.get("profile", {}).get("test")
+                and message.get("target", {}).get("kind") == ["lib"] and message.get("executable")):
+            binaries.append(Path(message["executable"]))
+    return binaries
+
+
 def start(root, client_revoked=False, drop_approval_reply=False, resume=False):
     root = check_root(root); config = json.loads((root / "launcher.json").read_text())
     if resume:
@@ -183,9 +202,8 @@ def start(root, client_revoked=False, drop_approval_reply=False, resume=False):
     elif (root / "provider").exists():
         raise ValueError("fixture already used; prepare a fresh one or explicitly resume")
     fixture = config.get("fixture", FIXTURE)
-    candidates = [p for p in (REPO / "target/debug/deps").glob("vaultwarden_cli-*") if p.is_file() and os.access(p, os.X_OK) and not p.suffix]
     binary = None
-    for candidate in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
+    for candidate in lib_test_binaries():
         probe = subprocess.run([candidate, "--list"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=10)
         if probe.returncode == 0 and fixture in probe.stdout:
             binary = candidate
