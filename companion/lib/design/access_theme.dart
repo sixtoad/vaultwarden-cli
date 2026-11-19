@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Quiet Instrument semantic colors. Status is always expressed in text too.
+import 'metrics.dart';
+import 'typography.dart';
+
+/// Quiet Instrument semantic colors (#50 §1.1). Status is always expressed in
+/// text too, never by color alone.
 @immutable
 class AccessTheme extends ThemeExtension<AccessTheme> {
   const AccessTheme({
@@ -10,8 +14,18 @@ class AccessTheme extends ThemeExtension<AccessTheme> {
     required this.divider,
     required this.accent,
     required this.soft,
+    required this.back,
+    required this.statusText,
+    required this.error,
+    required this.actionFill,
   });
+
+  /// [soft] fills the sidebar, panels and notices; [back] is the page behind
+  /// a drawn window. [statusText] is accent-colored text on [surface]: the
+  /// dark accent itself is below 4.5:1. [actionFill] backs filled actions
+  /// (white labels exceed 5:1 on it in both themes).
   final Color surface, text, secondary, divider, accent, soft;
+  final Color back, statusText, error, actionFill;
   static const light = AccessTheme(
     surface: Color(0xffffffff),
     text: Color(0xff242d34),
@@ -19,6 +33,10 @@ class AccessTheme extends ThemeExtension<AccessTheme> {
     divider: Color(0xffe5e9ed),
     accent: Color(0xff305f82),
     soft: Color(0xfff4f7f9),
+    back: Color(0xffedf0f2),
+    statusText: Color(0xff305f82),
+    error: Color(0xffb34d42),
+    actionFill: Color(0xff305f82),
   );
   static const dark = AccessTheme(
     surface: Color(0xff232a30),
@@ -27,6 +45,10 @@ class AccessTheme extends ThemeExtension<AccessTheme> {
     divider: Color(0xff3c454e),
     accent: Color(0xff557fa2),
     soft: Color(0xff2a333b),
+    back: Color(0xff191f24),
+    statusText: Color(0xffb1cbe0),
+    error: Color(0xffffb6ab),
+    actionFill: Color(0xff456d8e),
   );
   static AccessTheme of(BuildContext context) =>
       Theme.of(context).extension<AccessTheme>() ??
@@ -39,6 +61,10 @@ class AccessTheme extends ThemeExtension<AccessTheme> {
     Color? divider,
     Color? accent,
     Color? soft,
+    Color? back,
+    Color? statusText,
+    Color? error,
+    Color? actionFill,
   }) => AccessTheme(
     surface: surface ?? this.surface,
     text: text ?? this.text,
@@ -46,18 +72,28 @@ class AccessTheme extends ThemeExtension<AccessTheme> {
     divider: divider ?? this.divider,
     accent: accent ?? this.accent,
     soft: soft ?? this.soft,
+    back: back ?? this.back,
+    statusText: statusText ?? this.statusText,
+    error: error ?? this.error,
+    actionFill: actionFill ?? this.actionFill,
   );
   @override
-  AccessTheme lerp(AccessTheme? other, double t) => other == null
-      ? this
-      : AccessTheme(
-          surface: Color.lerp(surface, other.surface, t)!,
-          text: Color.lerp(text, other.text, t)!,
-          secondary: Color.lerp(secondary, other.secondary, t)!,
-          divider: Color.lerp(divider, other.divider, t)!,
-          accent: Color.lerp(accent, other.accent, t)!,
-          soft: Color.lerp(soft, other.soft, t)!,
-        );
+  AccessTheme lerp(AccessTheme? other, double t) {
+    if (other == null) return this;
+    Color mix(Color a, Color b) => Color.lerp(a, b, t)!;
+    return AccessTheme(
+      surface: mix(surface, other.surface),
+      text: mix(text, other.text),
+      secondary: mix(secondary, other.secondary),
+      divider: mix(divider, other.divider),
+      accent: mix(accent, other.accent),
+      soft: mix(soft, other.soft),
+      back: mix(back, other.back),
+      statusText: mix(statusText, other.statusText),
+      error: mix(error, other.error),
+      actionFill: mix(actionFill, other.actionFill),
+    );
+  }
 }
 
 final _lightTheme = _buildAccessTheme(Brightness.light);
@@ -69,8 +105,6 @@ ThemeData _buildAccessTheme(Brightness brightness) {
   final c = brightness == Brightness.dark
       ? AccessTheme.dark
       : AccessTheme.light;
-  // Preserve the reference accent while using a darker action fill in dark
-  // mode: white on #456d8e exceeds 5:1 for small button labels.
   final scheme =
       ColorScheme.fromSeed(
         seedColor: c.accent,
@@ -82,6 +116,8 @@ ThemeData _buildAccessTheme(Brightness brightness) {
         onSurface: c.text,
         onSurfaceVariant: c.secondary,
         outlineVariant: c.divider,
+        error: c.error,
+        onError: brightness == Brightness.dark ? c.surface : Colors.white,
       );
   final base = ThemeData(
     useMaterial3: true,
@@ -95,6 +131,8 @@ ThemeData _buildAccessTheme(Brightness brightness) {
       EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     ),
     shape: WidgetStatePropertyAll(shape),
+    // Focus ring: 3 px in the text color rather than the prototype's
+    // #739cb9, whose contrast was not sufficient on both surfaces (#51).
     side: WidgetStateProperty.resolveWith(
       (states) => states.contains(WidgetState.focused)
           ? BorderSide(color: c.text, width: 3)
@@ -102,41 +140,19 @@ ThemeData _buildAccessTheme(Brightness brightness) {
     ),
   );
   return base.copyWith(
-    extensions: [c],
+    extensions: [
+      c,
+      AccessMetrics.standard,
+      AccessType.build(text: c.text, secondary: c.secondary, accent: c.accent),
+    ],
     scaffoldBackgroundColor: c.soft,
-    textTheme: base.textTheme
-        .copyWith(
-          headlineMedium: TextStyle(
-            fontSize: 28,
-            height: 34 / 28,
-            fontWeight: FontWeight.w600,
-            color: c.text,
-          ),
-          titleLarge: TextStyle(
-            fontSize: 20,
-            height: 1.4,
-            fontWeight: FontWeight.w600,
-            color: c.text,
-          ),
-          bodyMedium: TextStyle(fontSize: 15, height: 1.6, color: c.text),
-          bodyLarge: TextStyle(fontSize: 15, height: 1.6, color: c.text),
-          labelLarge: TextStyle(
-            fontSize: 13,
-            height: 20 / 13,
-            fontWeight: FontWeight.w600,
-            color: c.text,
-          ),
-        )
-        .apply(fontFamily: base.textTheme.bodyMedium!.fontFamily),
+    textTheme: _textTheme(base.textTheme, c),
     dividerColor: c.divider,
     filledButtonTheme: FilledButtonThemeData(
       style: action(filled: true).copyWith(
         backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.disabled)
-              ? null
-              : brightness == Brightness.dark
-              ? const Color(0xff456d8e)
-              : c.accent,
+          (states) =>
+              states.contains(WidgetState.disabled) ? null : c.actionFill,
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) =>
@@ -159,4 +175,36 @@ ThemeData _buildAccessTheme(Brightness brightness) {
       ),
     ),
   );
+}
+
+/// The direction A type scale (#50 §1.2) on the platform sans-serif.
+TextTheme _textTheme(TextTheme base, AccessTheme c) {
+  TextStyle style(
+    double size,
+    double height, {
+    FontWeight weight = FontWeight.w400,
+    double? spacing,
+    Color? color,
+  }) => TextStyle(
+    fontSize: size,
+    height: height,
+    fontWeight: weight,
+    letterSpacing: spacing,
+    color: color ?? c.text,
+  );
+  const semibold = FontWeight.w600;
+  return base
+      .copyWith(
+        headlineMedium: style(28, 34 / 28, weight: semibold, spacing: -0.8),
+        headlineSmall: style(25, 1.3, weight: semibold, spacing: -0.6),
+        titleLarge: style(22, 1.3, weight: semibold),
+        titleMedium: style(16, 1.4, weight: semibold),
+        bodyLarge: style(15, 1.6),
+        bodyMedium: style(15, 1.6),
+        bodySmall: style(13, 1.5),
+        labelLarge: style(13, 20 / 13, weight: semibold),
+        labelMedium: style(12, 1.4, weight: semibold, color: c.statusText),
+        labelSmall: style(11, 1.4, color: c.secondary),
+      )
+      .apply(fontFamily: base.bodyMedium!.fontFamily);
 }

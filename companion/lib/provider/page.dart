@@ -1,23 +1,28 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
 import '../platform/approval_key.dart';
+import '../platform/installation.dart';
 import '../platform/notifications.dart';
 import '../platform/provider.dart';
 import '../app/access_shell.dart';
+import '../app/capabilities.dart';
+import '../app/shell_status.dart';
 import '../design/access_theme.dart';
 import '../design/components.dart';
-import 'request_review.dart';
+import '../design/metrics.dart';
+import 'request_panes.dart';
+import 'requests_view.dart';
+import 'settings_view.dart';
 import 'support_views.dart';
-import 'installation_settings.dart';
 import 'devices_view.dart';
 import 'enrollment_flow.dart';
 import 'controller.dart';
 import 'pilot_bundle.dart';
 import 'review_notifications.dart';
 import 'touch_id.dart';
-import 'touch_id_views.dart';
 
 class ProviderPage extends StatefulWidget {
   const ProviderPage({
@@ -26,8 +31,12 @@ class ProviderPage extends StatefulWidget {
     required this.syntheticBuilder,
     this.approvalKeys,
     this.notifications,
+    this.installation,
   });
   final ProviderPlatform platform;
+
+  /// Desktop installation inspection; null uses the native one.
+  final InstallationPlatform? installation;
   final ApprovalKeyPlatform? approvalKeys;
   final ReviewNotificationPlatform? notifications;
   final WidgetBuilder syntheticBuilder;
@@ -57,6 +66,10 @@ class _ProviderPageState extends State<ProviderPage>
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
   bool detailOpen = false;
+
+  /// The request the user (or a notification) last opened; marks its row
+  /// while the detail is open, even before its review has loaded.
+  String openedRequest = '';
   AccessDestination destination = AccessDestination.requests;
   ThemeMode appearance = ThemeMode.system;
   @override
@@ -149,6 +162,7 @@ class _ProviderPageState extends State<ProviderPage>
     setState(() {
       destination = AccessDestination.requests;
       detailOpen = true;
+      openedRequest = id;
       notificationRequest = id;
       notificationNote = '';
     });
@@ -308,336 +322,55 @@ class _ProviderPageState extends State<ProviderPage>
     setState(() {
       destination = AccessDestination.requests;
       detailOpen = true;
+      openedRequest = id;
     });
     unawaited(controller.review(id));
   }
 
-  Widget recoveryAndStatus() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      if (controller.recoveryId.isNotEmpty) ...[
-        AccessPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const StatusLabel(
-                'Decision outcome requires recovery',
-                icon: Icons.help_outline,
-              ),
-              const SizedBox(height: 8),
-              SelectableText(
-                'Uncertain decision for request: ${controller.recoveryId}',
-                key: const Key('provider-uncertain'),
-              ),
-              const Text(
-                'Only the original request status will be checked. A pending or unavailable status remains uncertain; decisions and unlocks are never resent.',
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: controller.busy ? null : controller.refresh,
-                child: const Text('Refresh original request status'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-      Text(controller.state.message, key: const Key('provider-status')),
-      if (controller.diagnostic.isNotEmpty) Text(controller.diagnostic),
-      if (controller.busy) const LinearProgressIndicator(),
-      const SizedBox(height: 16),
-    ],
-  );
-
-  Widget requestList() {
-    final state = controller.state, config = controller.configuration;
-    return AccessPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AccessHeading(
-            'Requests',
-            'Review the exact scope before each decision.',
-          ),
-          if (!config.configured) ...[
-            const Text(
-              'Connect a dedicated development identity in Settings to load requests.',
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: () => navigate(AccessDestination.settings),
-              child: const Text('Open advanced setup'),
-            ),
-          ] else ...[
-            StatusLabel(
-              state.locked
-                  ? 'Provider locked or authority not refreshed'
-                  : 'Provider unlocked',
-              icon: state.locked ? Icons.lock_outline : Icons.lock_open,
-            ),
-            const SizedBox(height: 16),
-            if (state.locked && controller.recoveryId.isEmpty) ...[
-              const Text(
-                'Unlock is separate from approval. After unlocking, the agent must submit a new request.',
-              ),
-              const SizedBox(height: 12),
-              accessPassword(unlockPassword, 'Provider unlock password'),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: controller.busy
-                    ? null
-                    : () {
-                        final secret = unlockPassword.text; // secrets-ignore: runtime input, not a credential literal
-                        clearPasswords();
-                        unawaited(controller.unlock(secret));
-                      },
-                child: const Text('Unlock provider'),
-              ),
-            ],
-            OutlinedButton(
-              onPressed: controller.busy ? null : controller.refresh,
-              child: const Text('Refresh authority and inbox'),
-            ),
-            if (notificationNote.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(notificationNote, key: const Key('notification-note')),
-            ],
-            const SizedBox(height: 16),
-            Text(
-              'Pending requests: ${state.requests.length} / 256 maximum. The provider caps the inbox at 256; this is not pagination.',
-            ),
-            const SizedBox(height: 16),
-            if (state.requests.isEmpty)
-              const Text('No pending request IDs are currently available.'),
-            for (final id in state.requests)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: OutlinedButton(
-                  onPressed:
-                      controller.busy ||
-                          state.locked ||
-                          controller.recoveryId.isNotEmpty
-                      ? null
-                      : () => openRequest(id),
-                  child: Text('Review $id'),
-                ),
-              ),
-          ],
-        ],
-      ),
-    );
+  // Every operation below reads its secret once, then clears all of them
+  // before the operation starts.
+  void unlock() {
+    final secret = unlockPassword
+        .text; // secrets-ignore: runtime input, not a credential literal
+    clearPasswords();
+    unawaited(controller.unlock(secret));
   }
 
-  Widget requestDetail() {
-    final state = controller.state;
-    if (state.review == null) {
-      return AccessPanel(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AccessHeading(
-              'Request review',
-              'A fresh validated review is required for every decision.',
-            ),
-            if (controller.busy ||
-                controller.pendingReview == notificationRequest &&
-                    notificationRequest.isNotEmpty)
-              const Text('Loading or finishing the original operation…')
-            else if (notificationRequest.isNotEmpty)
-              const Text(
-                'The request from the notification could not be loaded. It may have been removed or the provider is locked or unreachable. Pending requests are listed.',
-                key: Key('notification-unavailable'),
-              )
-            else
-              const Text(
-                'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
-              ),
-            if (touchId.message.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(touchId.message, key: const Key('touch-id-message')),
-            ],
-            if (state.statusId.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              FactRow('Latest status request', state.statusId),
-              SelectableText(state.statusText),
-            ],
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: backToRequests,
-              child: const Text('Back to requests'),
-            ),
-          ],
-        ),
-      );
-    }
-    return RequestReview(
-      state: state,
-      endpoint: controller.configuration.endpoint,
-      origin: controller.management.originId == controller.state.reviewId
-          ? controller.management.originText
-          : '',
-      password: approvalPassword, // secrets-ignore: UI controller
-      onApprove: () {
-        final secret = approvalPassword.text; // secrets-ignore: runtime input
-        clearPasswords();
-        unawaited(controller.decide(true, secret));
-      },
-      onDeny: () {
-        clearPasswords();
-        unawaited(controller.decide(false, ''));
-      },
-      onCancel: backToRequests,
-      touchIdOffered: touchId.available,
-      onTouchId: touchId.canApprove ? () => unawaited(touchId.approve()) : null,
-      touchIdNote: touchId.working ? '' : touchId.unavailableReason,
-      touchIdMessage: touchId.message,
-    );
+  void approve() {
+    final secret = approvalPassword.text; // secrets-ignore: runtime input
+    clearPasswords();
+    unawaited(controller.decide(true, secret));
   }
 
-  Widget settings() {
-    final config = controller.configuration;
-    return AccessPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AccessHeading(
-            'Settings',
-            'Appearance, native capabilities and advanced development setup',
-          ),
-          DropdownButtonFormField<ThemeMode>(
-            initialValue: appearance,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Appearance'),
-            items: const [
-              DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
-              DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-              DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
-            ],
-            onChanged: (value) {
-              if (value != null) setState(() => appearance = value);
-            },
-          ),
-          const SizedBox(height: 24),
-          ReviewNotificationSettings(notifier: notifier),
-          const SizedBox(height: 24),
-          const InstallationSettings(),
-          if (config.configured) ...[
-            TouchIdKeyPanel(
-              touchId: touchId,
-              keys: controller.keys,
-              password: touchIdPassword, // secrets-ignore: UI controller
-              enabled: controller.canManage && !controller.managementPending,
-            ),
-            const SizedBox(height: 24),
-          ],
-          const ProviderCapabilities(),
-          const SizedBox(height: 24),
-          if (disposablePilotEnabled &&
-              widget.platform is PilotProviderPlatform) ...[
-            const Text(
-              'Disposable test only. This bundle contains a private identity and test passwords. Never paste real vault credentials.',
-            ),
-            TextField(
-              key: const Key('pilot-bundle'),
-              controller: pilotBundle,
-              enabled: controller.canSetupPilot,
-              obscureText: true,
-              maxLength: PilotBundle.maximumLength,
-              enableSuggestions: false,
-              autocorrect: false,
-              enableIMEPersonalizedLearning: false,
-              decoration: const InputDecoration(
-                labelText: 'Paste disposable test bundle',
-                counterText: '',
-              ),
-            ),
-            FilledButton(
-              onPressed: controller.canSetupPilot
-                  ? () {
-                      final input = pilotBundle.text;
-                      clearPasswords();
-                      unawaited(controller.setupPilot(input));
-                    }
-                  : null,
-              child: const Text('Configure and unlock'),
-            ),
-            const SizedBox(height: 20),
-          ],
-          ExpansionTile(
-            title: const Text('Advanced development provider setup'),
-            initiallyExpanded: !config.configured,
-            children: [
-              const Text(
-                'Use a separately issued and enrolled Flutter development client certificate. Do not import the installed Swift companion identity. Select the private CA in DER format and the dedicated PKCS#12 in the native file dialogs.',
-              ),
-              TextField(
-                controller: endpoint,
-                enabled: controller.canSetup,
-                decoration: const InputDecoration(
-                  labelText: 'HTTPS provider endpoint',
-                ),
-              ),
-              TextField(
-                controller: pin,
-                enabled: controller.canSetup,
-                decoration: const InputDecoration(
-                  labelText: 'Trusted server leaf SHA-256 (64 lowercase hex)',
-                ),
-              ),
-              accessPassword(importPassword, 'PKCS#12 import passphrase'),
-              CheckboxListTile(
-                value: dedicated,
-                onChanged: controller.canSetup
-                    ? (value) => setState(() => dedicated = value ?? false)
-                    : null,
-                title: const Text(
-                  'This is a dedicated development identity, separately enrolled on Linux.',
-                ),
-              ),
-              FilledButton(
-                onPressed: controller.canSetup && dedicated
-                    ? () {
-                        final secret = importPassword.text; // secrets-ignore: runtime input, not a credential literal
-                        clearPasswords();
-                        unawaited(
-                          controller.setup(endpoint.text, pin.text, secret),
-                        );
-                      }
-                    : null,
-                child: const Text('Select CA and import dedicated identity'),
-              ),
-            ],
-          ),
+  void deny() {
+    clearPasswords();
+    unawaited(controller.decide(false, ''));
+  }
 
-          if (!config.configured)
-            OutlinedButton(
-              onPressed: controller.busy ? null : controller.refresh,
-              child: const Text('Reload saved provider setup'),
-            ),
-          const SizedBox(height: 24),
-          OutlinedButton(
-            onPressed:
-                controller.busy ||
-                    controller.recoveryId.isNotEmpty ||
-                    controller.managementPending
-                ? null
-                : () async {
-                    controller.setRouteCurrent(false);
-                    await Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (context) => Theme(
-                          data: accessTheme(resolvedBrightness),
-                          child: widget.syntheticBuilder(context),
-                        ),
-                      ),
-                    );
-                    if (mounted) controller.setRouteCurrent(true);
-                  },
-            child: const Text('Open separate synthetic signing demonstration'),
-          ),
-        ],
+  void setupPilot() {
+    final input = pilotBundle.text;
+    clearPasswords();
+    unawaited(controller.setupPilot(input));
+  }
+
+  void setupProvider() {
+    final secret = importPassword
+        .text; // secrets-ignore: runtime input, not a credential literal
+    clearPasswords();
+    unawaited(controller.setup(endpoint.text, pin.text, secret));
+  }
+
+  Future<void> openSynthetic() async {
+    controller.setRouteCurrent(false);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Theme(
+          data: accessTheme(resolvedBrightness),
+          child: widget.syntheticBuilder(context),
+        ),
       ),
     );
+    if (mounted) controller.setRouteCurrent(true);
   }
 
   Brightness get resolvedBrightness => switch (appearance) {
@@ -645,6 +378,97 @@ class _ProviderPageState extends State<ProviderPage>
     ThemeMode.dark => Brightness.dark,
     ThemeMode.system => MediaQuery.platformBrightnessOf(context),
   };
+
+  ShellStatus get shellStatus => ShellStatus(
+    connection: ShellConnection.of(
+      available: widget.platform.available,
+      configured: controller.configuration.configured,
+      connected: controller.connected,
+      locked: controller.state.locked,
+    ),
+    endpoint: controller.configuration.endpoint,
+    capabilities: DeviceCapabilities.derive(
+      operatingSystem: Platform.operatingSystem,
+      providerTransport: widget.platform.available,
+      biometricSigner: touchId.available,
+      reviewNotifications: notifier.available,
+    ),
+  );
+
+  Widget content(double width) {
+    final state = controller.state;
+    return switch (destination) {
+      AccessDestination.requests => RequestsView(
+        width: width,
+        detailOpen: detailOpen,
+        list: RequestListPane(
+          controller: controller,
+          unlockPassword: unlockPassword, // secrets-ignore: UI controller
+          notificationNote: notificationNote,
+          selectedId: detailOpen ? openedRequest : '',
+          onUnlock: unlock,
+          onOpenRequest: openRequest,
+          onOpenSettings: () => navigate(AccessDestination.settings),
+        ),
+        detail: RequestDetailPane(
+          controller: controller,
+          touchId: touchId,
+          approvalPassword: approvalPassword, // secrets-ignore: UI controller
+          notificationRequest: notificationRequest,
+          onApprove: approve,
+          onDeny: deny,
+          onBack: backToRequests,
+        ),
+      ),
+      AccessDestination.devices => ProviderDevices(
+        controller: controller,
+        password: managementPassword, // secrets-ignore: UI controller
+        enrollment: enrollment,
+        enrollmentPassword: enrollmentPassword, // secrets-ignore: UI controller
+      ),
+      AccessDestination.activity => ProviderActivity(
+        state: state,
+        connected: controller.connected,
+        configured: controller.configuration.configured,
+        recoveryPending: controller.recoveryId.isNotEmpty,
+        managementPending: controller.managementPending,
+        onRefresh:
+            controller.busy ||
+                !controller.eligible ||
+                controller.managementPending
+            ? null
+            : controller.refresh,
+        onReopen:
+            !controller.connected ||
+                state.locked ||
+                controller.busy ||
+                (controller.recoveryId.isNotEmpty ||
+                    controller.managementPending)
+            ? null
+            : openRequest,
+      ),
+      AccessDestination.settings => ProviderSettings(
+        controller: controller,
+        notifier: notifier,
+        touchId: touchId,
+        installation: widget.installation,
+        pilotOffered:
+            disposablePilotEnabled && widget.platform is PilotProviderPlatform,
+        appearance: appearance,
+        onAppearance: (value) => setState(() => appearance = value),
+        dedicated: dedicated,
+        onDedicated: (value) => setState(() => dedicated = value),
+        endpoint: endpoint,
+        pin: pin,
+        importPassword: importPassword, // secrets-ignore: UI controller
+        pilotBundle: pilotBundle,
+        touchIdPassword: touchIdPassword, // secrets-ignore: UI controller
+        onSetupPilot: setupPilot,
+        onSetup: setupProvider,
+        onOpenSynthetic: () => unawaited(openSynthetic()),
+      ),
+    };
+  }
 
   @override
   Widget build(BuildContext context) => Theme(
@@ -654,60 +478,18 @@ class _ProviderPageState extends State<ProviderPage>
       onDestination: navigate,
       detailOpen: detailOpen,
       onBack: backToRequests,
+      pendingCount: controller.state.requests.length,
+      status: shellStatus,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final wide =
-              constraints.maxWidth >= 800 &&
-              MediaQuery.textScalerOf(context).scale(15) <= 21;
-          final state = controller.state;
-          final content = switch (destination) {
-            AccessDestination.requests =>
-              wide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(width: 300, child: requestList()),
-                        const SizedBox(width: 24),
-                        Expanded(child: requestDetail()),
-                      ],
-                    )
-                  : detailOpen
-                  ? requestDetail()
-                  : requestList(),
-            AccessDestination.devices => ProviderDevices(
-              controller: controller,
-              password: managementPassword, // secrets-ignore: UI controller
-              enrollment: enrollment,
-              enrollmentPassword:
-                  enrollmentPassword, // secrets-ignore: UI controller
-            ),
-            AccessDestination.activity => ProviderActivity(
-              state: state,
-              connected: controller.connected,
-              configured: controller.configuration.configured,
-              recoveryPending: controller.recoveryId.isNotEmpty,
-              managementPending: controller.managementPending,
-              onRefresh:
-                  controller.busy ||
-                      !controller.eligible ||
-                      controller.managementPending
-                  ? null
-                  : controller.refresh,
-              onReopen:
-                  !controller.connected ||
-                      state.locked ||
-                      controller.busy ||
-                      (controller.recoveryId.isNotEmpty ||
-                          controller.managementPending)
-                  ? null
-                  : openRequest,
-            ),
-            AccessDestination.settings => settings(),
-          };
+          final m = AccessMetrics.of(context);
+          final side = constraints.maxWidth >= 600 ? m.space[5] : m.space[3];
+          final width = constraints.maxWidth - 2 * side;
+          final page = content(width);
           return SingleChildScrollView(
             controller: contentScroll,
             key: ValueKey(destination),
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.symmetric(horizontal: side, vertical: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -718,8 +500,14 @@ class _ProviderPageState extends State<ProviderPage>
                   ),
                   const SizedBox(height: 16),
                 ],
-                recoveryAndStatus(),
-                content,
+                ProviderStatusArea(controller: controller),
+                if (destination == AccessDestination.requests)
+                  page
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: m.workpageMaxWidth),
+                    child: page,
+                  ),
               ],
             ),
           );

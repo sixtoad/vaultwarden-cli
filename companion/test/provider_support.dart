@@ -15,6 +15,9 @@ Map<String, dynamic> providerReview() => jsonDecode(
   File('../tests/fixtures/companion/review.json').readAsStringSync(),
 ) as Map<String, dynamic>;
 
+/// The pending-request row that opens a fresh review of [id].
+Finder requestRow(String id) => find.byKey(Key('request-row-$id'));
+
 String reviewFact(WidgetTester tester, String key) => tester
     .widget<SelectableText>(
       find.descendant(

@@ -569,7 +569,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Review $providerId'));
+      await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
       final password = find.byKey(const Key('Fresh approval password'));
       await tester.enterText(password, 'synthetic');
@@ -746,7 +746,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Review $providerId'));
+      await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('provider-review')), findsOneWidget);
       expect(find.text('Arguments (1 separate values)'), findsOneWidget);
@@ -773,8 +773,8 @@ void main() {
       expect(native.commands.where((c) => c['command'] == 'decision'), isEmpty);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Review $providerId'));
-      await tester.tap(find.text('Review $providerId'));
+      await tester.ensureVisible(requestRow(providerId));
+      await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(password).controller!.text, isEmpty);
       await tester.ensureVisible(password);

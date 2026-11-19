@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'access_theme.dart';
 
+export 'facts.dart';
+export 'notice.dart';
+export 'section_bar.dart';
+export 'status.dart';
+
 class AccessHeading extends StatelessWidget {
   const AccessHeading(this.title, this.description, {super.key});
   final String title, description;
@@ -36,37 +41,6 @@ class AccessPanel extends StatelessWidget {
     child: SizedBox(
       width: double.infinity,
       child: Padding(padding: const EdgeInsets.all(24), child: child),
-    ),
-  );
-}
-
-class StatusLabel extends StatelessWidget {
-  const StatusLabel(this.label, {super.key, this.icon = Icons.info_outline});
-  final String label;
-  final IconData icon;
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, size: 20),
-      const SizedBox(width: 8),
-      Expanded(child: Text(label)),
-    ],
-  );
-}
-
-class FactRow extends StatelessWidget {
-  const FactRow(this.label, this.value, {super.key});
-  final String label, value;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: AccessTheme.of(context).secondary)),
-        SelectableText(value),
-      ],
     ),
   );
 }

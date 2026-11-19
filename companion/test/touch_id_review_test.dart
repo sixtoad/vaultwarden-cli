@@ -185,8 +185,8 @@ void main() {
 
   Future<void> openReview(WidgetTester tester) async {
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Review $providerId'));
-    await tester.tap(find.text('Review $providerId'));
+    await tester.ensureVisible(requestRow(providerId));
+    await tester.tap(requestRow(providerId));
     await tester.pumpAndSettle();
   }
 
