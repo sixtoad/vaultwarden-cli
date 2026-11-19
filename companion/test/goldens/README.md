@@ -109,6 +109,7 @@ installation (`FakeInstallation`) so no host path appears in a capture.
 The `macos-27-arm64` references (22 changed: review/actions/activity and the
 four enrollment captures, whose only change is heading letter spacing; 24 new)
 were rendered locally with pinned Flutter 3.47.7 on macOS 27.0.1 and visually
-reviewed. The `linux`, `windows` and `macos-26-arm64` references were NOT
-regenerated here: the same 46 images per host must be adopted from that host's
-reviewed CI captures, with exact comparison kept.
+reviewed. The `linux`, `windows` and `macos-26-arm64` references (the same 46
+images per host) were adopted from CI run 44614054785's captures
+(`companion-slice-*-development` artifacts) after the owner reviewed them on
+2026-11-19; exact comparison is kept.
