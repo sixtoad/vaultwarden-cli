@@ -216,6 +216,7 @@ void main() {
     await open(tester, providerId);
     expect(find.text('Valid for 55 s'), findsOneWidget);
     await startAuthorization(tester);
+    final field = await typePassword(tester);
     now = now.add(const Duration(seconds: 54, milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 300));
     expect(step, findsOneWidget);
@@ -224,6 +225,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('review-expired')), findsOneWidget);
     expect(step, findsNothing);
+    expect(field.text, isEmpty, reason: 'expiry clears the typed password');
     expect(find.byKey(const Key('approve-start')), findsNothing);
     expect(find.byKey(const Key('approve-password')), findsNothing);
     // A clock moving backwards does not bring the decision back.
@@ -297,6 +299,116 @@ void main() {
     expect(find.text('Approved · not completed'), findsOneWidget);
     expect(find.textContaining('Do not approve again'), findsOneWidget);
     expect(find.textContaining('Completed'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a review retired after expiry offers a reload, once', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2030, 1, 1, 12);
+    final native = FixtureProviderPlatform();
+    await showPage(tester, native, clock: () => now);
+    await open(tester, providerId);
+    now = now.add(const Duration(seconds: 56));
+    // Rust retires the review on its own clock.
+    core.providerInvalidate();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(core.providerSnapshot().review, isNull);
+    expect(find.byKey(const Key('review-expired')), findsOneWidget);
+    // The reload finds the request gone: no expired loop.
+    native.reviewReply = {'version': 1, 'error': 'not_found'};
+    await tester.ensureVisible(find.byKey(const Key('reload-review')));
+    await tester.tap(find.byKey(const Key('reload-review')));
+    await tester.pumpAndSettle();
+    expect(core.providerSnapshot().review, isNull);
+    expect(find.byKey(const Key('review-expired')), findsNothing);
+    expect(find.byKey(const Key('reload-review')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a changed scope on the Touch ID re-review closes the step', (
+    tester,
+  ) async {
+    final native = FixtureProviderPlatform()..approvalBinding = binding;
+    await showPage(tester, native, keys: FakeKeys());
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await open(tester, providerId);
+    await startAuthorization(tester);
+    final field = await typePassword(tester);
+    native.reviewReply = providerReview()
+      ..['review']['arguments'] = ['production'];
+    await tester.ensureVisible(find.byKey(const Key('approve-touch-id')));
+    await tester.tap(find.byKey(const Key('approve-touch-id')));
+    await tester.pumpAndSettle();
+    expect(reviewFact(tester, 'review-argument-0'), '"production"');
+    expect(step, findsNothing, reason: 'a new scope is reviewed first');
+    expect(field.text, isEmpty);
+    expect(find.byKey(const Key('approve-start')), findsOneWidget);
+    expect(decisions(native), isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('no decision control is enabled while a decision is in flight', (
+    tester,
+  ) async {
+    final native = FixtureProviderPlatform()
+      ..heldDecision = Completer<Uint8List>();
+    await showPage(tester, native);
+    await open(tester, providerId);
+    await startAuthorization(tester);
+    await typePassword(tester);
+    await tester.ensureVisible(find.byKey(const Key('approve-password')));
+    await tester.tap(find.byKey(const Key('approve-password')));
+    await tester.pump();
+    expect(core.providerSnapshot().busy, isTrue);
+    // Rust retires the review while the decision is in flight: no review,
+    // so no decision control at all, only the in-flight notice.
+    expect(core.providerSnapshot().canDecide, isFalse);
+    expect(find.byKey(const Key('provider-review')), findsNothing);
+    expect(
+      find.text('Loading or finishing the original operation…'),
+      findsOneWidget,
+    );
+    for (final key in [
+      'approve-password',
+      'approve-touch-id',
+      'approve-start',
+      'deny-start',
+      'confirm-deny',
+    ]) {
+      for (final button in tester.widgetList<ButtonStyleButton>(
+        find.byKey(Key(key)),
+      )) {
+        expect(button.onPressed, isNull, reason: key);
+      }
+    }
+    native.heldDecision!.complete(
+      encoded({
+        'version': 1,
+        'status': {'status': 'approved'},
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(decisions(native), hasLength(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a review still loading says so', (tester) async {
+    final native = FixtureProviderPlatform()
+      ..heldReview = Completer<Uint8List>();
+    await showPage(tester, native);
+    await tester.tap(requestRow(providerId));
+    await tester.pump();
+    expect(
+      find.text('Loading or finishing the original operation…'),
+      findsOneWidget,
+    );
+    native.heldReview!.complete(encoded(providerReview()));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Loading or finishing the original operation…'),
+      findsNothing,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

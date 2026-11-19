@@ -212,7 +212,7 @@ class RequestDetailPane extends StatelessWidget {
               onPressed: controller.busy ? null : onReload,
               child: const Text('Reload review'),
             ),
-          ] else if (state.statusId.isEmpty)
+          ] else if (state.statusId.isEmpty || state.statusId != openedRequest)
             const Text(
               'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
             ),

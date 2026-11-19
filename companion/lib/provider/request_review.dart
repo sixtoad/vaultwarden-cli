@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../design/components.dart';
+import '../design/metrics.dart';
 import '../src/rust/api/provider.dart' as core;
 import 'review/authorization_step.dart';
 import 'review/consequence.dart';
@@ -179,7 +180,9 @@ class RequestReview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LayoutBuilder(
-          builder: (context, constraints) => constraints.maxWidth < 320
+          builder: (context, constraints) =>
+              constraints.maxWidth < 320 ||
+                  AccessMetrics.of(context).largeText(context)
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [approve, const SizedBox(height: 12), deny],

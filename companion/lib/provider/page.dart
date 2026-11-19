@@ -76,7 +76,14 @@ class _ProviderPageState extends State<ProviderPage>
   /// The authorization/denial step (bound to one request ID) and the
   /// countdown of the loaded review.
   final reviewSession = ReviewSession();
-  DateTime now() => (widget.clock ?? DateTime.now)();
+  DateTime now() => (widget.clock ?? _monotonic)();
+
+  /// Wall time at start plus monotonic elapsed time: a wall clock moved
+  /// during the session never stretches or shortens the 55 s ticket
+  /// countdown (Rust measures it with a monotonic clock).
+  late final DateTime _started = DateTime.now();
+  final _elapsed = Stopwatch()..start();
+  DateTime _monotonic() => _started.add(_elapsed.elapsed);
 
   /// The request the user (or a notification) last opened; marks its row
   /// while the detail is open, even before its review has loaded.
@@ -207,7 +214,7 @@ class _ProviderPageState extends State<ProviderPage>
         controller.state.review?.id == notificationRequest) {
       notificationRequest = ''; // loaded; later retirement reads normally
     }
-    reviewSession.observe(controller.state, now());
+    if (reviewSession.observe(controller.state, now())) clearPasswords();
     if (mounted) setState(() {});
   }
 
@@ -329,7 +336,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void openRequest(String id) {
     controller.cancelPendingReview();
-    reviewSession.closeStep(); // mutation: selection closes step
+    reviewSession.beginLoad(id); // mutation: selection closes step
     notificationRequest = '';
     notificationNote = '';
     controller.devicesVisible = false;

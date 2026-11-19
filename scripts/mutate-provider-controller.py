@@ -40,7 +40,8 @@ page_mutations = {
 
 # Review step and countdown (#50 slice 2): (file, anchor, replacement).
 review_mutations = {
-    "selection-closes-step": ("page", "reviewSession.closeStep(); // mutation: selection closes step", "// mutation: selection step close removed"),
+    "selection-closes-step": ("page", "reviewSession.beginLoad(id); // mutation: selection closes step", "// mutation: selection step close removed"),
+    "changed-scope-closes-step": ("session", "closeStep(); // mutation: changed scope closes step", "// mutation: changed scope step close removed"),
     "step-clears-secrets": ("page", "clearPasswords(); // mutation: step change clears secrets", "// mutation: step secret clear removed"),
     "step-binding": ("session", "return bound ? _step : ReviewStep.review; // mutation: step binding", "return _step; // mutation: step binding removed"),
     "expiry-reached": ("session", "if (reached) _expired = true; // mutation: expiry reached", "// mutation: expiry never reached"),

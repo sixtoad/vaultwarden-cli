@@ -13,7 +13,7 @@ class ReviewSession {
   String _stepId = '';
   DateTime? _flightAt;
   bool _seenReview = false, _expired = false;
-  String _loadedId = '';
+  String _loadedId = '', _loadedText = '';
   ReviewDeadline? _deadline;
 
   /// The step for the review of [requestId]; any other request reads as the
@@ -34,6 +34,16 @@ class ReviewSession {
     _step = ReviewStep.review;
   }
 
+  /// A review of [requestId] was asked for: forget the previous load, so an
+  /// expiry latched for it never stands for a load that did not arrive.
+  void beginLoad(String requestId) {
+    closeStep();
+    _loadedId = '';
+    _loadedText = '';
+    _deadline = null;
+    _expired = false;
+  }
+
   /// The request whose review was last loaded, and its deadline.
   String get loadedId => _loadedId;
   ReviewDeadline? get deadline => _deadline;
@@ -42,15 +52,25 @@ class ReviewSession {
   /// request) is a new load: its ticket started when the review command went
   /// out, which the first busy snapshot without a review approximates from
   /// above by microseconds (Rust counts from the command's begin).
-  void observe(core.ProviderSnapshot state, DateTime now) {
+  ///
+  /// Returns true when typed secrets must be cleared: the shown scope changed
+  /// under an open step (the step closes; it never carries over to a
+  /// different scope), or the countdown has just reached zero.
+  bool observe(core.ProviderSnapshot state, DateTime now) {
     final review = state.review;
     if (review == null) {
       _flightAt = state.busy ? (_flightAt ?? now) : null;
       _seenReview = false;
-      return;
+      return false;
     }
+    var clear = false;
     if (!_seenReview || state.reviewId != _loadedId) {
+      if (state.reviewId == _loadedId && state.reviewText != _loadedText) {
+        clear = _stepId.isNotEmpty;
+        closeStep(); // mutation: changed scope closes step
+      }
       _loadedId = state.reviewId;
+      _loadedText = state.reviewText;
       _deadline = ReviewDeadline(
         loadedAt: _flightAt ?? now,
         expiresAtUnixSeconds: review.expiresAtUnixSeconds,
@@ -59,7 +79,12 @@ class ReviewSession {
     }
     _seenReview = true;
     _flightAt = null;
-    expiredAt(now);
+    final before = _expired;
+    if (expiredAt(now) && !before) {
+      clear = true;
+      closeStep();
+    }
+    return clear;
   }
 
   /// Whether the loaded review's countdown reached zero. Latched: a clock
