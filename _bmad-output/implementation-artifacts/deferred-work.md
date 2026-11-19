@@ -70,3 +70,17 @@ requirements are tracked in [the capability checklist](../../docs/implementation
   registry format bump); admin-companion approvals are recorded as the provider
   owner's, with no companion actor.
 - Phone/QR joining is phase 3 (#60).
+
+## #50 slice 1 (shell conformance) review follow-ups — 2026-11-19
+
+- Wide layout: the "Back to requests" control sits in the section bar, after the
+  sidebar in focus order (it was the AppBar leading slot). Consider
+  `FocusTraversalOrder` when the review is redesigned (slice 2).
+- `DeviceCapabilities.cliInstall` is derived from the OS name; take the
+  `InstallationPlatform` and an injectable OS when Settings consumes it (slice 4).
+- Token drift left for slices 2–4: fact-row mono at 11 px and top divider of the
+  fact grid, mobile title sizes (27/28), `AccessMetrics.copyWith` ignores
+  arguments, `back` defined but unused while native window chrome is used.
+- Requests list has no distinct "disconnected" rendering or golden yet.
+- `provider/page.dart` is ~520 lines: state, lifecycle, notifications and the
+  navigation retirement (mutation anchors) stay together.

@@ -2,7 +2,7 @@
 title: 'Issue 50 slice 1: Quiet Instrument theme tokens and shell conformance'
 type: 'feature'
 created: '2026-11-19'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '8f82cd7'
 context:
   - '/Volumes/sixto_dev/ai/vaultwarden-cli-wt/plan-50.md (sections 1, 2, 4 slice 1; outside the repo)'
@@ -49,18 +49,29 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `design/access_theme.dart` -- add back/statusText/error/actionFill, map error into ColorScheme, full TextTheme per §1.2 -- tokens
-- [ ] `design/typography.dart`, `design/metrics.dart` -- `AccessType` (kicker, mono, code, brand) and `AccessMetrics` extensions -- §1.2/§1.3
-- [ ] `design/{facts,status,notice,section_bar}.dart` -- split from components (re-exported): wide two-column `FactRow` with optional sub/mono, `StatusLabel` + `CountBadge`, `AccessNotice`, `AccessSectionBar`
-- [ ] `app/capabilities.dart` -- pure `DeviceCapabilities.derive`
-- [ ] `app/access_shell.dart` (+ `app/shell_parts.dart`) -- brand, selected rule, badge, footer status, section bar on wide, compact AppBar title/status, breakpoint 850
-- [ ] `provider/requests_view.dart`, `provider/settings_view.dart` -- moved from `page.dart`; master/detail (270 px list), `RequestRow`, recovery as `AccessNotice`
-- [ ] tests -- re-key `Review <id>` finders to `requestRow(id)`; badge/footer/capabilities/contrast tests; shell goldens (Requests empty/two/locked/recovery, Devices, Settings × light/dark × desktop/compact)
+- [x] `design/access_theme.dart` -- add back/statusText/error/actionFill, map error into ColorScheme, full TextTheme per §1.2 -- tokens
+- [x] `design/typography.dart`, `design/metrics.dart` -- `AccessType` (kicker, mono, code, brand) and `AccessMetrics` extensions -- §1.2/§1.3
+- [x] `design/{facts,status,notice,section_bar}.dart` -- split from components (re-exported): wide two-column `FactRow` with optional sub/mono, `StatusLabel` + `CountBadge`, `AccessNotice`, `AccessSectionBar`
+- [x] `app/capabilities.dart` -- pure `DeviceCapabilities.derive`
+- [x] `app/access_shell.dart` (+ `app/shell_parts.dart`) -- brand, selected rule, badge, footer status, section bar on wide, compact AppBar title/status, breakpoint 850
+- [x] `provider/requests_view.dart`, `provider/settings_view.dart` -- moved from `page.dart`; master/detail (270 px list), `RequestRow`, recovery as `AccessNotice`
+- [x] tests -- re-key `Review <id>` finders to `requestRow(id)`; badge/footer/capabilities/contrast tests; shell goldens (Requests empty/two/locked/recovery, Devices, Settings × light/dark × desktop/compact)
 
 **Acceptance Criteria:**
 - Given the existing suite, when run after re-keying, then every test passes unmodified otherwise.
 - Given `scripts/mutate-provider-controller.py`, when run, then all 12 mutations are caught.
 - Given `flutter analyze`, then no issues.
+
+## Spec Change Log
+
+- 2026-11-19 review round 1 (edge-case + acceptance reviewers, read-only): patched
+  disabled rows not looking disabled, bottom-bar badge overflow on narrow phones,
+  list/detail split under a compact shell, contradictory "no provider configured"
+  for unparseable endpoints, IPv6 host brackets, compact strip role line, selected
+  row tracking the opened request (not the last loaded review), screen-reader
+  labels for the inbox kicker and rows, clipped focus ring. KEEP: navigation
+  methods and mutation anchors in page.dart; one SelectableText per FactRow.
+  Deferred items: deferred-work.md "#50 slice 1".
 
 ## Design Notes
 
@@ -72,3 +83,31 @@ The shell keeps one page scroll (`contentScroll`) in both layouts so scroll-rese
 - `flutter analyze` -- expected: No issues found
 - `flutter test --concurrency=2` -- expected: all pass on macos-27-arm64 references
 - `python3 scripts/mutate-provider-controller.py <evidence>` -- expected: 12/12 caught
+
+## Suggested Review Order
+
+**Shell and status**
+
+- Entry point: wide sidebar/section bar vs compact app bar, PopScope kept
+  [`access_shell.dart:70`](../../companion/lib/app/access_shell.dart#L70)
+- Connection precedence; lock only shown with current authority
+  [`shell_status.dart:19`](../../companion/lib/app/shell_status.dart#L19)
+- Roles derived from adapters, never from the platform label
+  [`capabilities.dart:48`](../../companion/lib/app/capabilities.dart#L48)
+
+**Page split (no flow change)**
+
+- Secrets read once then cleared, now named methods
+  [`page.dart:332`](../../companion/lib/provider/page.dart#L332)
+- List and detail panes moved verbatim, enable conditions unchanged
+  [`request_panes.dart:1`](../../companion/lib/provider/request_panes.dart#L1)
+
+**Tokens**
+
+- New colors and type scale
+  [`access_theme.dart:1`](../../companion/lib/design/access_theme.dart#L1)
+
+**Tests**
+
+- Badge, footer, rows, breakpoints, contrast
+  [`shell_chrome_test.dart:1`](../../companion/test/shell_chrome_test.dart#L1)
