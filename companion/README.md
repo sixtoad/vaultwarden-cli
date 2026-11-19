@@ -29,6 +29,23 @@ System/Light/Dark appearance, capability limits, advanced certificate import and
 the separate synthetic signer. Disposable pilot setup remains build-gated there.
 Appearance is local to the open application session; it is not saved.
 
+### Shell conformance (issue #50, slice 1)
+
+`lib/design/` holds the direction A tokens: `AccessTheme` colors (including
+`back`, `statusText`, `error`, `actionFill`), the full text scale, `AccessType`
+(kicker, monospace, verification code, brand) and `AccessMetrics` (spacing,
+widths, radii, breakpoints). Shared widgets live in `facts.dart` (two-column
+`FactRow` when it fits), `status.dart` (`StatusLabel`, `CountBadge`),
+`notice.dart` and `section_bar.dart`. From 850 px the shell shows a sidebar
+with the brand, the four destinations (a pending-count badge on Requests) and a
+status block: provider connection (Connected, Locked, Disconnected, Not
+configured or Unavailable), the provider host that executes, and this device's
+role from `DeviceCapabilities` (`lib/app/capabilities.dart`). The app never
+executes operations. Requests shows the pending list beside the review when the
+content area fits both; otherwise list then review, as before. Navigation,
+retirement and the request flow are unchanged. Appearance is still not saved
+across launches.
+
 The complete Rust-escaped review now appears as typed, labeled fields, including
 indexed arguments, credential labels/use types, digests, exact Unix deadline,
 closed status and one-time scope. Strings retain Rust's quoting and escaping;

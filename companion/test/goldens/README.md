@@ -95,3 +95,20 @@ tests passed on each host). The macOS 26 arm64 host was image
 (labels above fields, the typed code, reachable Approve/Back/Cancel/Close) and
 the joining comparison step (large grouped code, countdown, all three
 choices); differences from macOS 27 are glyph-edge rasterization only.
+
+## Shell conformance, 2026-11-19 (#50 slice 1)
+
+The direction A tokens and shell change every existing capture, and
+`shell_golden_test.dart` adds 24 per host: Requests empty, two IDs, locked and
+recovery, plus the first Devices and Settings references, light/dark,
+desktop (1440×900)/compact (390×844). Settings renders a fixed synthetic
+installation (`FakeInstallation`) so no host path appears in a capture.
+`CaptureComparator` (`golden_support.dart`) writes every shell capture to
+`test/failures` for adoption.
+
+The `macos-27-arm64` references (22 changed: review/actions/activity and the
+four enrollment captures, whose only change is heading letter spacing; 24 new)
+were rendered locally with pinned Flutter 3.47.7 on macOS 27.0.1 and visually
+reviewed. The `linux`, `windows` and `macos-26-arm64` references were NOT
+regenerated here: the same 46 images per host must be adopted from that host's
+reviewed CI captures, with exact comparison kept.
