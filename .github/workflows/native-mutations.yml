@@ -1,0 +1,127 @@
+name: Native adapter mutations
+
+# Opt-in generated mutation campaign for src/adapters/native/ (#49). It is not a
+# merge gate: it runs on manual dispatch, or on pushes to a test/native-*mutations*
+# branch, and publishes cargo-mutants outcomes as artifacts. Classifications live in
+# docs/implementation/issue-49-native-mutations.md.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['test/native-*mutations*']
+    # Documentation-only pushes (the results write-up) need no new campaign.
+    paths:
+      - 'src/**'
+      - 'scripts/mutate-native-*'
+      - '.github/workflows/native-mutations.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-mutations-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 2
+
+jobs:
+  tool:
+    # cargo-mutants publishes only an x86_64 macOS binary. Run under Rosetta, it makes
+    # every universal tool the tests launch (clang) prefer x86_64, so the arm64-only
+    # native spawn of a compiled fixture fails (EBADARCH) and the baseline goes red.
+    # Build it natively once and share it with the matrix.
+    name: build native cargo-mutants
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build cargo-mutants for arm64
+        run: |
+          cargo install --locked --root "$RUNNER_TEMP/cargo-mutants" cargo-mutants@27.1.0
+          lipo -archs "$RUNNER_TEMP/cargo-mutants/bin/cargo-mutants"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-mutants-arm64
+          path: ${{ runner.temp }}/cargo-mutants/bin/cargo-mutants
+          retention-days: 1
+
+  generated:
+    name: cargo-mutants ${{ matrix.file }}.rs (${{ matrix.source }} tests)
+    needs: tool
+    runs-on: macos-26
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # "main" mutates and tests origin/main's sources (the pre-campaign tests);
+        # "branch" uses this ref, so survivors and new kills are directly comparable.
+        source: [main, branch]
+        file: [mod, platform, identity, producer, reaper, image]
+        include:
+          - file: mod
+            filters: ''
+          - file: platform
+            filters: ''
+          - file: identity
+            filters: ''
+          - file: producer
+            filters: 'adapters::native::producer:: adapters::native::tests::native_producer adapters::native::tests::native_create'
+          - file: reaper
+            filters: 'adapters::native::reaper:: adapters::native::tests::native_reaper adapters::native::tests::native_release adapters::native::mutation_tests::native_supervision'
+          - file: image
+            filters: 'adapters::native::image:: adapters::native::tests::native_preparer adapters::native::tests::native_approved adapters::ssh_agent::tests::native_ adapters::native::mutation_tests::native_image adapters::native::mutation_tests::native_preparer'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use origin/main sources
+        if: matrix.source == 'main'
+        run: |
+          git fetch --depth=1 origin main
+          git checkout FETCH_HEAD -- src
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
+        with:
+          name: cargo-mutants-arm64
+          path: ${{ runner.temp }}/cargo-mutants-bin
+      - name: Use the native cargo-mutants
+        run: |
+          chmod +x "$RUNNER_TEMP/cargo-mutants-bin/cargo-mutants"
+          echo "$RUNNER_TEMP/cargo-mutants-bin" >> "$GITHUB_PATH"
+      - name: Run the generated campaign
+        # cargo-mutants exits 2 for missed and 3 for timed-out mutants: those are
+        # findings recorded in the artifact, not infrastructure failures.
+        run: |
+          set +e
+          # shellcheck disable=SC2086
+          bash scripts/mutate-native-generated.sh "src/adapters/native/${{ matrix.file }}.rs" \
+            "$RUNNER_TEMP/native-mutations" ${{ matrix.filters }}
+          code=$?
+          echo "cargo-mutants exit $code"
+          for outcome in caught missed timeout unviable; do
+            printf '%s: %s\n' "$outcome" "$(wc -l < "$RUNNER_TEMP/native-mutations/mutants.out/$outcome.txt" | tr -d ' ')"
+          done
+          cat "$RUNNER_TEMP/native-mutations/mutants.out/missed.txt" "$RUNNER_TEMP/native-mutations/mutants.out/timeout.txt"
+          [ "$code" -eq 0 ] || [ "$code" -eq 2 ] || [ "$code" -eq 3 ]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-mutations-${{ matrix.source }}-${{ matrix.file }}
+          path: |
+            ${{ runner.temp }}/native-mutations/mutants.out/*.txt
+            ${{ runner.temp }}/native-mutations/mutants.out/outcomes.json
+            ${{ runner.temp }}/native-mutations/mutants.out/log
+
+  semantic:
+    name: semantic native faults
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Apply each fault to a private copy and require its named test to fail
+        run: python3 scripts/mutate-native-adapter.py "$RUNNER_TEMP/native-semantic"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-mutations-semantic
+          path: ${{ runner.temp }}/native-semantic

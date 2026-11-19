@@ -1,0 +1,16 @@
+src/adapters/native/image.rs:111:42: replace > with >= in slice
+src/adapters/native/image.rs:176:13: delete match arm 0x8000001c | 0x27 | 0x10 | 0x20 | 0xf in slice
+src/adapters/native/image.rs:218:32: replace + with - in signature
+src/adapters/native/image.rs:218:32: replace + with * in signature
+src/adapters/native/image.rs:238:13: replace || with && in signature
+src/adapters/native/image.rs:285:36: replace | with & in satisfies
+src/adapters/native/image.rs:285:36: replace | with ^ in satisfies
+src/adapters/native/image.rs:305:8: delete ! in publisher
+src/adapters/native/image.rs:310:13: replace == with != in publisher
+src/adapters/native/image.rs:316:5: replace team_identifier -> Result<String, ExecutionError> with Ok(String::new())
+src/adapters/native/image.rs:316:5: replace team_identifier -> Result<String, ExecutionError> with Ok("xyzzy".into())
+src/adapters/native/image.rs:324:9: replace || with && in team_identifier
+src/adapters/native/image.rs:323:19: replace != with == in team_identifier
+src/adapters/native/image.rs:324:12: delete ! in team_identifier
+src/adapters/native/image.rs:326:45: replace || with && in team_identifier
+src/adapters/native/image.rs:337:9: replace || with && in signing_information

@@ -1,0 +1,11 @@
+src/adapters/native/producer.rs:21:42: replace + with *
+src/adapters/native/producer.rs:49:21: delete - in open
+src/adapters/native/producer.rs:58:16: replace < with == in open
+src/adapters/native/producer.rs:58:16: replace < with <= in open
+src/adapters/native/producer.rs:67:14: replace < with > in open
+src/adapters/native/producer.rs:68:94: replace < with > in open
+src/adapters/native/producer.rs:68:72: replace | with ^ in open
+src/adapters/native/producer.rs:113:17: delete match arm Some(libc::EINTR) in drain
+src/adapters/native/producer.rs:142:9: replace <impl Drop for NativeProducerOutput>::drop with ()
+src/adapters/native/producer.rs:162:31: replace < with <= in frame
+src/adapters/native/producer.rs:166:17: replace || with && in frame

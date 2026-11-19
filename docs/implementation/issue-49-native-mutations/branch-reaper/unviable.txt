@@ -1,0 +1,3 @@
+src/adapters/native/reaper.rs:21:9: replace Reaper::create -> Result<Self, ExecutionError> with Ok(Default::default())
+src/adapters/native/reaper.rs:26:9: replace Reaper::reserve -> Result<Reservation, ExecutionError> with Ok(Default::default())
+src/adapters/native/reaper.rs:101:5: replace reserve -> Result<Reservation, ExecutionError> with Ok(Default::default())

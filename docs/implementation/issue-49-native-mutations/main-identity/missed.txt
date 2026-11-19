@@ -1,0 +1,28 @@
+src/adapters/native/identity.rs:44:9: replace || with && in uuid
+src/adapters/native/identity.rs:43:9: replace || with && in uuid
+src/adapters/native/identity.rs:67:39: replace || with && in load
+src/adapters/native/identity.rs:67:21: replace || with && in load
+src/adapters/native/identity.rs:67:8: delete ! in load
+src/adapters/native/identity.rs:67:34: replace != with == in load
+src/adapters/native/identity.rs:67:50: replace > with == in load
+src/adapters/native/identity.rs:67:50: replace > with < in load
+src/adapters/native/identity.rs:67:50: replace > with >= in load
+src/adapters/native/identity.rs:85:9: replace || with && in load
+src/adapters/native/identity.rs:84:9: replace || with && in load
+src/adapters/native/identity.rs:83:9: replace || with && in load
+src/adapters/native/identity.rs:82:9: replace || with && in load
+src/adapters/native/identity.rs:81:9: replace || with && in load
+src/adapters/native/identity.rs:80:9: replace || with && in load
+src/adapters/native/identity.rs:79:9: replace || with && in load
+src/adapters/native/identity.rs:78:9: replace || with && in load
+src/adapters/native/identity.rs:77:9: replace || with && in load
+src/adapters/native/identity.rs:76:27: replace == with != in load
+src/adapters/native/identity.rs:77:31: replace == with != in load
+src/adapters/native/identity.rs:78:31: replace == with != in load
+src/adapters/native/identity.rs:79:28: replace == with != in load
+src/adapters/native/identity.rs:80:28: replace == with != in load
+src/adapters/native/identity.rs:81:28: replace == with != in load
+src/adapters/native/identity.rs:82:38: replace != with == in load
+src/adapters/native/identity.rs:83:38: replace != with == in load
+src/adapters/native/identity.rs:84:12: delete ! in load
+src/adapters/native/identity.rs:85:12: delete ! in load

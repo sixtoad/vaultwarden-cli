@@ -20,7 +20,7 @@ fn digest(path: &Path) -> String {
         .map(|b| format!("{b:02x}"))
         .collect()
 }
-fn image_registration() -> ImageRegistration {
+pub(crate) fn image_registration() -> ImageRegistration {
     ImageRegistration {
         id: "native-ssh".into(),
         execution_root: "/usr/bin".into(),
@@ -141,7 +141,7 @@ pub(crate) struct Fixture {
     pub(crate) root: tempfile::TempDir,
     app: Option<ProviderApplication>,
     pub(crate) clock: Arc<AtomicU64>,
-    resolved: Arc<AtomicUsize>,
+    pub(crate) resolved: Arc<AtomicUsize>,
     revision: String,
 }
 impl Drop for Fixture {
@@ -153,6 +153,10 @@ impl Drop for Fixture {
 impl Fixture {
     pub(crate) fn app(&self) -> &ProviderApplication {
         self.app.as_ref().unwrap()
+    }
+    /// Moves the application out for adapters that own it (the execution worker).
+    pub(crate) fn take_app(&mut self) -> ProviderApplication {
+        self.app.take().unwrap()
     }
     pub(crate) fn new() -> Self {
         use std::os::unix::fs::PermissionsExt;
@@ -200,7 +204,7 @@ impl Fixture {
             revision,
         }
     }
-    fn request(&self) -> String {
+    pub(crate) fn request(&self) -> String {
         self.app()
             .submit_direct(
                 self.app().human_owner(),
@@ -214,7 +218,7 @@ impl Fixture {
             .unwrap()
             .id
     }
-    fn approve(&self, id: &str) {
+    pub(crate) fn approve(&self, id: &str) {
         let approval = self
             .app()
             .prepare_approval(self.app().human_owner(), id)
@@ -540,6 +544,9 @@ fn native_release_denial_does_not_launch_and_withdrawal_does_not_signal_consumer
             Err(error) => panic!("consumer did not survive withdrawal: {error}"),
         }
     };
+    // Darwin's accept inherits the listener's O_NONBLOCK; wait for the banner instead
+    // of failing with EAGAIN when the consumer is slower than this read.
+    stream.set_nonblocking(false).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(3)))
         .unwrap();

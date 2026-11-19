@@ -1,0 +1,2 @@
+src/adapters/native/identity.rs:44:9: replace || with && in uuid
+src/adapters/native/identity.rs:43:9: replace || with && in uuid

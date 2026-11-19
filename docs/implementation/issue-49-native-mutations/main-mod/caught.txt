@@ -1,0 +1,46 @@
+src/adapters/native/mod.rs:58:13: replace || with && in <impl ProtectedExecution for NativeExecutablePreparer>::prepare
+src/adapters/native/mod.rs:57:13: replace || with && in <impl ProtectedExecution for NativeExecutablePreparer>::prepare
+src/adapters/native/mod.rs:56:12: delete ! in <impl ProtectedExecution for NativeExecutablePreparer>::prepare
+src/adapters/native/mod.rs:57:33: replace != with == in <impl ProtectedExecution for NativeExecutablePreparer>::prepare
+src/adapters/native/mod.rs:58:16: delete ! in <impl ProtectedExecution for NativeExecutablePreparer>::prepare
+src/adapters/native/mod.rs:107:5: replace arguments -> Result<Vec<CString>, ExecutionError> with Ok(vec![])
+src/adapters/native/mod.rs:107:5: replace arguments -> Result<Vec<CString>, ExecutionError> with Ok(vec![Default::default()])
+src/adapters/native/mod.rs:108:23: replace > with < in arguments
+src/adapters/native/mod.rs:110:60: replace > with < in arguments
+src/adapters/native/mod.rs:119:5: replace validate_file -> Result<(), ExecutionError> with Ok(())
+src/adapters/native/mod.rs:124:8: delete ! in validate_file
+src/adapters/native/mod.rs:125:20: replace != with == in validate_file
+src/adapters/native/mod.rs:126:22: replace != with == in validate_file
+src/adapters/native/mod.rs:127:30: replace != with == in validate_file
+src/adapters/native/mod.rs:127:21: replace & with | in validate_file
+src/adapters/native/mod.rs:127:21: replace & with ^ in validate_file
+src/adapters/native/mod.rs:128:29: replace == with != in validate_file
+src/adapters/native/mod.rs:129:20: replace > with < in validate_file
+src/adapters/native/mod.rs:129:32: replace * with + in validate_file
+src/adapters/native/mod.rs:129:32: replace * with / in validate_file
+src/adapters/native/mod.rs:129:25: replace * with + in validate_file
+src/adapters/native/mod.rs:129:25: replace * with / in validate_file
+src/adapters/native/mod.rs:141:13: replace != with == in validate_file
+src/adapters/native/mod.rs:155:9: replace Recipient::peer -> bool with true
+src/adapters/native/mod.rs:155:9: replace Recipient::peer -> bool with false
+src/adapters/native/mod.rs:158:17: replace && with || in Recipient::peer
+src/adapters/native/mod.rs:157:17: replace && with || in Recipient::peer
+src/adapters/native/mod.rs:156:22: replace == with != in Recipient::peer
+src/adapters/native/mod.rs:157:29: replace == with != in Recipient::peer
+src/adapters/native/mod.rs:209:9: replace NativeProcessSupervisor::recover_stopped -> Result<(), ExecutionError> with Ok(())
+src/adapters/native/mod.rs:210:12: delete ! in NativeProcessSupervisor::recover_stopped
+src/adapters/native/mod.rs:210:60: replace != with == in NativeProcessSupervisor::recover_stopped
+src/adapters/native/mod.rs:235:9: replace <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::available -> bool with false
+src/adapters/native/mod.rs:262:35: replace != with == in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:266:50: replace != with == in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:286:20: delete ! in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:297:54: replace == with != in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:315:32: replace || with && in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:315:27: replace != with == in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:320:33: replace && with || in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:325:29: replace > with == in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:325:29: replace > with < in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:325:29: replace > with >= in <impl ProcessSupervisor<NativeExecutablePreparer> for NativeProcessSupervisor>::supervise_controlled
+src/adapters/native/mod.rs:437:9: replace Spawn::start -> Result<libc::pid_t, ExecutionError> with Ok(Default::default())
+src/adapters/native/mod.rs:447:11: replace != with == in Spawn::start
+src/adapters/native/mod.rs:448:20: replace <= with > in Spawn::start

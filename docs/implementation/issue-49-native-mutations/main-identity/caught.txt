@@ -1,0 +1,6 @@
+src/adapters/native/identity.rs:24:5: replace uuid -> Result<String, ExecutionError> with Ok(String::new())
+src/adapters/native/identity.rs:24:5: replace uuid -> Result<String, ExecutionError> with Ok("xyzzy".into())
+src/adapters/native/identity.rs:27:31: replace == with != in uuid
+src/adapters/native/identity.rs:42:7: replace != with == in uuid
+src/adapters/native/identity.rs:44:27: replace != with == in uuid
+src/adapters/native/identity.rs:49:60: replace != with == in uuid

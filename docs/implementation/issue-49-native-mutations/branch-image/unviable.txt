@@ -1,0 +1,5 @@
+src/adapters/native/image.rs:17:5: replace invalid -> ExecutionError with Default::default()
+src/adapters/native/image.rs:291:5: replace slice_signature -> Result<(String, Publisher), ExecutionError> with Ok((String::new(), Default::default()))
+src/adapters/native/image.rs:291:5: replace slice_signature -> Result<(String, Publisher), ExecutionError> with Ok(("xyzzy".into(), Default::default()))
+src/adapters/native/image.rs:299:5: replace publisher -> Result<Publisher, ExecutionError> with Ok(Default::default())
+src/adapters/native/image.rs:335:5: replace signing_information -> Result<CFDictionary<CFString, CFType>, ExecutionError> with Ok(Default::default())
