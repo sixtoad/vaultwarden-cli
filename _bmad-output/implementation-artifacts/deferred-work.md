@@ -63,3 +63,10 @@ requirements are tracked in [the capability checklist](../../docs/implementation
 ## From #61 review notifications (2026-11-09)
 
 - Notifications after the window closes need menu-bar/background lifetime (parity item); Windows/Linux notifications follow their approval transport.
+
+## Guided enrollment UI (#59 phase 2) follow-ups — 2026-11-10
+
+- Companion enrollments are still not audited in the identity registry (needs a
+  registry format bump); admin-companion approvals are recorded as the provider
+  owner's, with no companion actor.
+- Phone/QR joining is phase 3 (#60).

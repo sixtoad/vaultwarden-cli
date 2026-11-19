@@ -5,6 +5,7 @@
 
 import 'api.dart';
 import 'api/biometric.dart';
+import 'api/enrollment.dart';
 import 'api/installation.dart';
 import 'api/management.dart';
 import 'api/provider.dart';
@@ -27,6 +28,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String dco_decode_String(dynamic raw);
+
+  @protected
+  AdminCommand dco_decode_admin_command(dynamic raw);
+
+  @protected
+  AdminOutcome dco_decode_admin_outcome(dynamic raw);
+
+  @protected
+  AdminRefusal dco_decode_admin_refusal(dynamic raw);
+
+  @protected
+  AdminSessionState dco_decode_admin_session_state(dynamic raw);
+
+  @protected
+  AdminSessionView dco_decode_admin_session_view(dynamic raw);
+
+  @protected
+  AdminState dco_decode_admin_state(dynamic raw);
 
   @protected
   BiometricDecisionResult dco_decode_biometric_decision_result(dynamic raw);
@@ -65,6 +84,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Completion dco_decode_box_autoadd_completion(dynamic raw);
 
   @protected
+  EnrollmentAdminRequest dco_decode_box_autoadd_enrollment_admin_request(
+    dynamic raw,
+  );
+
+  @protected
+  IssuedInvitationView dco_decode_box_autoadd_issued_invitation_view(
+    dynamic raw,
+  );
+
+  @protected
   ManagedIdentity dco_decode_box_autoadd_managed_identity(dynamic raw);
 
   @protected
@@ -75,6 +104,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Completion dco_decode_completion(dynamic raw);
+
+  @protected
+  EnrolleeRole dco_decode_enrollee_role(dynamic raw);
+
+  @protected
+  EnrollmentAdminRequest dco_decode_enrollment_admin_request(dynamic raw);
+
+  @protected
+  EnrollmentAdminSnapshot dco_decode_enrollment_admin_snapshot(dynamic raw);
 
   @protected
   Fixture dco_decode_fixture(dynamic raw);
@@ -98,7 +136,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   InventoryState dco_decode_inventory_state(dynamic raw);
 
   @protected
+  IssuedInvitationView dco_decode_issued_invitation_view(dynamic raw);
+
+  @protected
+  JoinerCommand dco_decode_joiner_command(dynamic raw);
+
+  @protected
+  JoinerEnd dco_decode_joiner_end(dynamic raw);
+
+  @protected
+  JoinerPhase dco_decode_joiner_phase(dynamic raw);
+
+  @protected
+  JoinerSnapshot dco_decode_joiner_snapshot(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<AdminSessionView> dco_decode_list_admin_session_view(dynamic raw);
 
   @protected
   List<IdentityRole> dco_decode_list_identity_role(dynamic raw);
@@ -139,6 +195,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BiometricRefusal? dco_decode_opt_box_autoadd_biometric_refusal(dynamic raw);
+
+  @protected
+  IssuedInvitationView? dco_decode_opt_box_autoadd_issued_invitation_view(
+    dynamic raw,
+  );
 
   @protected
   ManagedIdentity? dco_decode_opt_box_autoadd_managed_identity(dynamic raw);
@@ -207,6 +268,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AdminCommand sse_decode_admin_command(SseDeserializer deserializer);
+
+  @protected
+  AdminOutcome sse_decode_admin_outcome(SseDeserializer deserializer);
+
+  @protected
+  AdminRefusal sse_decode_admin_refusal(SseDeserializer deserializer);
+
+  @protected
+  AdminSessionState sse_decode_admin_session_state(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AdminSessionView sse_decode_admin_session_view(SseDeserializer deserializer);
+
+  @protected
+  AdminState sse_decode_admin_state(SseDeserializer deserializer);
+
+  @protected
   BiometricDecisionResult sse_decode_biometric_decision_result(
     SseDeserializer deserializer,
   );
@@ -259,6 +340,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Completion sse_decode_box_autoadd_completion(SseDeserializer deserializer);
 
   @protected
+  EnrollmentAdminRequest sse_decode_box_autoadd_enrollment_admin_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  IssuedInvitationView sse_decode_box_autoadd_issued_invitation_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ManagedIdentity sse_decode_box_autoadd_managed_identity(
     SseDeserializer deserializer,
   );
@@ -273,6 +364,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Completion sse_decode_completion(SseDeserializer deserializer);
+
+  @protected
+  EnrolleeRole sse_decode_enrollee_role(SseDeserializer deserializer);
+
+  @protected
+  EnrollmentAdminRequest sse_decode_enrollment_admin_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  EnrollmentAdminSnapshot sse_decode_enrollment_admin_snapshot(
+    SseDeserializer deserializer,
+  );
 
   @protected
   Fixture sse_decode_fixture(SseDeserializer deserializer);
@@ -296,7 +400,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   InventoryState sse_decode_inventory_state(SseDeserializer deserializer);
 
   @protected
+  IssuedInvitationView sse_decode_issued_invitation_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  JoinerCommand sse_decode_joiner_command(SseDeserializer deserializer);
+
+  @protected
+  JoinerEnd sse_decode_joiner_end(SseDeserializer deserializer);
+
+  @protected
+  JoinerPhase sse_decode_joiner_phase(SseDeserializer deserializer);
+
+  @protected
+  JoinerSnapshot sse_decode_joiner_snapshot(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<AdminSessionView> sse_decode_list_admin_session_view(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<IdentityRole> sse_decode_list_identity_role(
@@ -343,6 +469,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BiometricRefusal? sse_decode_opt_box_autoadd_biometric_refusal(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  IssuedInvitationView? sse_decode_opt_box_autoadd_issued_invitation_view(
     SseDeserializer deserializer,
   );
 
@@ -429,6 +560,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_admin_command(AdminCommand self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_admin_outcome(AdminOutcome self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_admin_refusal(AdminRefusal self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_admin_session_state(
+    AdminSessionState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_admin_session_view(
+    AdminSessionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_admin_state(AdminState self, SseSerializer serializer);
+
+  @protected
   void sse_encode_biometric_decision_result(
     BiometricDecisionResult self,
     SseSerializer serializer,
@@ -498,6 +653,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_enrollment_admin_request(
+    EnrollmentAdminRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_issued_invitation_view(
+    IssuedInvitationView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_managed_identity(
     ManagedIdentity self,
     SseSerializer serializer,
@@ -514,6 +681,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_completion(Completion self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_enrollee_role(EnrolleeRole self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_enrollment_admin_request(
+    EnrollmentAdminRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_enrollment_admin_snapshot(
+    EnrollmentAdminSnapshot self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_fixture(Fixture self, SseSerializer serializer);
@@ -540,7 +722,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_issued_invitation_view(
+    IssuedInvitationView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_joiner_command(JoinerCommand self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_joiner_end(JoinerEnd self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_joiner_phase(JoinerPhase self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_joiner_snapshot(
+    JoinerSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_admin_session_view(
+    List<AdminSessionView> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_identity_role(
@@ -605,6 +814,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_biometric_refusal(
     BiometricRefusal? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_issued_invitation_view(
+    IssuedInvitationView? self,
     SseSerializer serializer,
   );
 

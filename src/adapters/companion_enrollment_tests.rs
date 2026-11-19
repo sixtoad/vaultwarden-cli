@@ -226,3 +226,151 @@ fn an_unreadable_registry_is_unavailable_and_does_not_burn_the_invitation() {
     let joined = enroll(&service, &f, &device, attempt.request().clone());
     assert!(attempt.accept(&joined).is_ok());
 }
+// Provider side for an administrator companion (#59 phase 2).
+fn admin_join(
+    service: &Companion,
+    f: &Fixture,
+    device: &str,
+    code: &str,
+    nonce: u8,
+) -> crate::access::enrollment::joiner::JoinedSession {
+    use crate::access::enrollment::joiner::{InvitationCode, JoinAttempt};
+    let attempt = JoinAttempt::companion(
+        InvitationCode::parse(code).unwrap(),
+        device,
+        &service.provider_fingerprint,
+        [nonce; 32],
+    )
+    .unwrap();
+    let joined = enroll(service, f, device, attempt.request().clone());
+    attempt.accept(&joined).unwrap()
+}
+fn admin_invite(service: &Companion, f: &Fixture, label: &str) -> serde_json::Value {
+    let (status, body) = management_exchange(
+        service,
+        f,
+        serde_json::json!({"version":1,"command":"enroll_invite","kind":{"role":"companion","label":label}}),
+    );
+    assert_eq!(status, 200, "{body}");
+    body["invitation"].clone()
+}
+#[test]
+fn admin_enrollment_needs_an_administrator_and_never_returns_the_code() {
+    use crate::access::enrollment::{EnrollmentState, wire::EnrollmentReply};
+    let f = fixture();
+    let (service, _, _) = service(&f);
+    let invite = serde_json::json!({"version":1,"command":"enroll_invite","kind":{"role":"companion","label":"Studio Mac"}});
+    let list = serde_json::json!({"version":1,"command":"enroll_list"});
+    // An enrolled approval client without administration cannot invite or list.
+    assert_eq!(management_exchange(&service, &f, invite.clone()).0, 403);
+    assert_eq!(management_exchange(&service, &f, list.clone()).0, 403);
+    assert!(f.app.enrollment_list(f.app.human_owner()).unwrap().is_empty());
+    grant_fixture_admin(&service);
+    let issued = admin_invite(&service, &f, "Studio Mac");
+    let code = issued["invitation_code"].as_str().unwrap();
+    assert!(code.starts_with("vwe1."));
+    let id = issued["id"].as_str().unwrap().to_owned();
+    let device = "c".repeat(64);
+    let session = admin_join(&service, &f, &device, code, 4);
+    let (status, listed) = management_exchange(&service, &f, list.clone());
+    assert_eq!(status, 200);
+    let text = listed.to_string();
+    assert!(text.contains("awaiting_approvals"));
+    assert!(!text.contains("invitation_code"));
+    // The provider never shows the comparison code, in any spelling.
+    let digits = session.comparison_code.replace('-', "");
+    assert!(!text.contains(&session.comparison_code) && !text.contains(&digits));
+    let approve = |code: &str, password: &str| {
+        serde_json::json!({"version":1,"command":"enroll_approve","id":id,"code":code,"password":password})
+    };
+    // A wrong password approves nothing and does not burn the session.
+    let (status, body) =
+        management_exchange(&service, &f, approve(&session.comparison_code, "wrong"));
+    assert_eq!((status, body["error"].as_str()), (422, Some("authentication_failed")));
+    // A different code aborts the session: a relay between the endpoints.
+    let wrong = if session.comparison_code == "0000-0000" { "1111-1111" } else { "0000-0000" };
+    let (status, body) = management_exchange(&service, &f, approve(wrong, "synthetic-password"));
+    assert_eq!(status, 409, "{body}");
+    assert_eq!(body["reason"], "code_mismatch");
+    assert!(!body.to_string().contains(&digits));
+    let reply = enroll(&service, &f, &device, session.confirm(None));
+    assert!(matches!(
+        reply,
+        EnrollmentReply::State {
+            state: EnrollmentState::Aborted { .. },
+            ..
+        }
+    ));
+    assert_eq!(
+        service
+            .dispatch(&device, Command::List { version: 1 }, &f.app)
+            .status,
+        403
+    );
+    // Malformed admin commands are refused before any use case runs.
+    for bad in [
+        serde_json::json!({"version":2,"command":"enroll_list"}),
+        serde_json::json!({"version":1,"command":"enroll_cancel","id":"forged"}),
+        serde_json::json!({"version":1,"command":"enroll_invite","kind":{"role":"companion","label":""}}),
+        serde_json::json!({"version":1,"command":"enroll_approve","id":id,"code":"1234-5678","password":""}),
+    ] {
+        assert_eq!(management_exchange(&service, &f, bad).0, 400);
+    }
+}
+#[test]
+fn admin_approval_with_the_joiners_code_enrolls_an_approval_client_only() {
+    use crate::access::enrollment::{EnrollmentState, wire::EnrollmentReply};
+    let f = fixture();
+    let (service, _, _) = service(&f);
+    grant_fixture_admin(&service);
+    let issued = admin_invite(&service, &f, "Studio Mac");
+    let id = issued["id"].as_str().unwrap().to_owned();
+    // Approving before the join changes nothing.
+    let (status, body) = management_exchange(
+        &service,
+        &f,
+        serde_json::json!({"version":1,"command":"enroll_approve","id":id,"code":"1234-5678","password":"synthetic-password"}),
+    );
+    assert_eq!((status, body["reason"].as_str()), (409, Some("awaiting_peer")));
+    let device = "c".repeat(64);
+    let session = admin_join(&service, &f, &device, issued["invitation_code"].as_str().unwrap(), 4);
+    let (status, body) = management_exchange(
+        &service,
+        &f,
+        serde_json::json!({"version":1,"command":"enroll_approve","id":id,"code":session.comparison_code,"password":"synthetic-password"}),
+    );
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["enrollment"]["state"]["provider_approved"], true);
+    assert_eq!(body["enrollment"]["state"]["joiner_confirmed"], false);
+    // The commit happens on the joiner's channel, after its own confirmation.
+    assert!(matches!(
+        enroll(&service, &f, &device, session.confirm(None)),
+        EnrollmentReply::State {
+            state: EnrollmentState::Enrolled { .. },
+            ..
+        }
+    ));
+    assert_eq!(
+        service
+            .dispatch(&device, Command::List { version: 1 }, &f.app)
+            .status,
+        200
+    );
+    assert!(!identity::administrator(&service.identity_store, &device));
+    // Cancel ends a live invitation; the owner's own agent account is refused.
+    let other = admin_invite(&service, &f, "Spare Mac");
+    let (status, body) = management_exchange(
+        &service,
+        &f,
+        serde_json::json!({"version":1,"command":"enroll_cancel","id":other["id"]}),
+    );
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["enrollment"]["state"]["state"], "cancelled");
+    let owner = f.app.human_owner().uid();
+    let (status, body) = management_exchange(
+        &service,
+        &f,
+        serde_json::json!({"version":1,"command":"enroll_invite","kind":{"role":"agent","label":"ci","uid":owner,"gid":owner}}),
+    );
+    assert_eq!((status, body["reason"].as_str()), (409, Some("invalid_request")));
+}

@@ -12,6 +12,7 @@ import 'request_review.dart';
 import 'support_views.dart';
 import 'installation_settings.dart';
 import 'devices_view.dart';
+import 'enrollment_flow.dart';
 import 'controller.dart';
 import 'pilot_bundle.dart';
 import 'review_notifications.dart';
@@ -50,6 +51,8 @@ class _ProviderPageState extends State<ProviderPage>
       unlockPassword = TextEditingController();
   final pilotBundle = TextEditingController();
   final managementPassword = TextEditingController();
+  final enrollmentPassword = TextEditingController();
+  late final EnrollmentFlow enrollment;
   final touchIdPassword = TextEditingController();
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
@@ -66,6 +69,7 @@ class _ProviderPageState extends State<ProviderPage>
       widget.notifications ?? NativeReviewNotificationPlatform(),
     )..addListener(changed);
     controller.addListener(changed);
+    enrollment = EnrollmentFlow(controller)..addListener(changed);
     touchId = TouchIdController(
       controller,
       widget.approvalKeys ?? NativeApprovalKeyPlatform(),
@@ -186,6 +190,7 @@ class _ProviderPageState extends State<ProviderPage>
     unlockPassword.clear();
     pilotBundle.clear();
     managementPassword.clear();
+    enrollmentPassword.clear();
     touchIdPassword.clear();
   }
 
@@ -224,6 +229,9 @@ class _ProviderPageState extends State<ProviderPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     controller.removeListener(changed);
+    enrollment
+      ..removeListener(changed)
+      ..dispose();
     touchId.removeListener(changed);
     touchId.dispose();
     notifier.removeListener(changed);
@@ -238,6 +246,7 @@ class _ProviderPageState extends State<ProviderPage>
       unlockPassword,
       pilotBundle,
       managementPassword,
+      enrollmentPassword,
       touchIdPassword,
     ]) {
       field.dispose();
@@ -262,6 +271,7 @@ class _ProviderPageState extends State<ProviderPage>
     notificationRequest = '';
     notificationNote = '';
     controller.invalidate(); // mutation: navigation retirement
+    enrollment.close();
     controller.devicesVisible = next == AccessDestination.devices;
     controller.setActivityCurrent(next == AccessDestination.activity);
     setState(() {
@@ -277,6 +287,7 @@ class _ProviderPageState extends State<ProviderPage>
     notificationRequest = '';
     notificationNote = '';
     controller.invalidate(); // mutation: back retirement
+    enrollment.close();
     controller.devicesVisible = false;
     controller.setActivityCurrent(false);
     setState(() {
@@ -666,6 +677,9 @@ class _ProviderPageState extends State<ProviderPage>
             AccessDestination.devices => ProviderDevices(
               controller: controller,
               password: managementPassword, // secrets-ignore: UI controller
+              enrollment: enrollment,
+              enrollmentPassword:
+                  enrollmentPassword, // secrets-ignore: UI controller
             ),
             AccessDestination.activity => ProviderActivity(
               state: state,

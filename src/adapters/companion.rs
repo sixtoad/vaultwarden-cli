@@ -128,6 +128,29 @@ enum Command {
         version: u8,
         message: crate::access::enrollment::wire::EnrollmentRequest,
     },
+    /// Guided enrollment, provider side (#59 phase 2): an administrator
+    /// companion invites, lists, approves (typing the joiner's code, with a
+    /// fresh password) and cancels. The comparison code is never returned.
+    EnrollInvite {
+        version: u8,
+        kind: crate::access::enrollment::EnrolleeKind,
+        #[serde(default)]
+        ttl_seconds: Option<u64>,
+    },
+    EnrollList {
+        version: u8,
+    },
+    EnrollApprove {
+        version: u8,
+        id: String,
+        code: String,
+        #[serde(deserialize_with = "password")]
+        password: SensitiveString,
+    },
+    EnrollCancel {
+        version: u8,
+        id: String,
+    },
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -179,6 +202,9 @@ impl Command {
         if let Some(valid) = management::valid(self) {
             return valid;
         }
+        if let Some(valid) = enrollment::valid_admin(self) {
+            return valid;
+        }
         let (version, id) = match self {
             Self::IdentityList { .. }
             | Self::IdentityDetail { .. }
@@ -188,7 +214,11 @@ impl Command {
             | Self::BiometricPrepare { .. }
             | Self::BiometricEnroll { .. }
             | Self::BiometricRevoke { .. }
-            | Self::RequestOrigin { .. } => return false,
+            | Self::RequestOrigin { .. }
+            | Self::EnrollInvite { .. }
+            | Self::EnrollList { .. }
+            | Self::EnrollApprove { .. }
+            | Self::EnrollCancel { .. } => return false,
             Self::Enroll { version, message } => {
                 return *version == 1 && message.validate().is_ok();
             }
@@ -342,6 +372,10 @@ impl FixtureTraffic {
             Command::Decision { .. } => "decision",
             Command::Unlock { .. } => "unlock",
             Command::Enroll { .. } => "enroll",
+            Command::EnrollInvite { .. } => "enroll_invite",
+            Command::EnrollList { .. } => "enroll_list",
+            Command::EnrollApprove { .. } => "enroll_approve",
+            Command::EnrollCancel { .. } => "enroll_cancel",
         };
         let mut state = self.0.lock().unwrap();
         let count = state.counts.entry(name).or_default();
@@ -510,6 +544,9 @@ impl Companion {
         if management::valid(&command).is_some() {
             return management::dispatch(self, device, command, app);
         }
+        if enrollment::valid_admin(&command).is_some() {
+            return enrollment::admin(self, device, command, app);
+        }
         match command {
             Command::IdentityList { .. }
             | Command::IdentityDetail { .. }
@@ -520,7 +557,11 @@ impl Companion {
             | Command::BiometricEnroll { .. }
             | Command::BiometricRevoke { .. }
             | Command::RequestOrigin { .. }
-            | Command::Enroll { .. } => Response::error(Error::Invalid),
+            | Command::Enroll { .. }
+            | Command::EnrollInvite { .. }
+            | Command::EnrollList { .. }
+            | Command::EnrollApprove { .. }
+            | Command::EnrollCancel { .. } => Response::error(Error::Invalid),
             Command::Session { .. } => Self::session(app),
             Command::List { .. } => match app.companion_pending() {
                 Ok(requests) => Response::ok(serde_json::json!({"version":1,"requests":requests})),

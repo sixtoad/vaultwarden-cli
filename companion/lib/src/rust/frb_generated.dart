@@ -5,6 +5,7 @@
 
 import 'api.dart';
 import 'api/biometric.dart';
+import 'api/enrollment.dart';
 import 'api/installation.dart';
 import 'api/management.dart';
 import 'api/provider.dart';
@@ -71,7 +72,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 98180100;
+  int get rustContentHash => 1639414828;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -83,6 +84,12 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<AdminOutcome> crateApiEnrollmentAdminOutcomeDefault();
+
+  Future<AdminRefusal> crateApiEnrollmentAdminRefusalDefault();
+
+  Future<AdminState> crateApiEnrollmentAdminStateDefault();
+
   Work crateApiBegin({required Operation operation});
 
   Future<BiometricDecisionResult>
@@ -129,6 +136,49 @@ abstract class RustLibApi extends BaseApi {
     required String directory,
   });
 
+  Future<EnrolleeRole> crateApiEnrollmentEnrolleeRoleDefault();
+
+  ProviderWork crateApiEnrollmentEnrollmentAdminBegin({
+    required EnrollmentAdminRequest request,
+  });
+
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminDismissInvitation();
+
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminFinish({
+    required int token,
+    required List<int> response,
+  });
+
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminInvalidate();
+
+  String crateApiEnrollmentEnrollmentAdminInvitationCode();
+
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminSnapshot();
+
+  Future<EnrollmentAdminSnapshot>
+  crateApiEnrollmentEnrollmentAdminSnapshotDefault();
+
+  ProviderWork crateApiEnrollmentEnrollmentJoin({
+    required String invitation,
+    required String deviceFingerprint,
+    required String providerPin,
+  });
+
+  ProviderWork crateApiEnrollmentEnrollmentJoinerBegin({
+    required JoinerCommand command,
+    required String deviceFingerprint,
+    required String providerPin,
+  });
+
+  JoinerSnapshot crateApiEnrollmentEnrollmentJoinerFinish({
+    required int token,
+    required List<int> response,
+  });
+
+  JoinerSnapshot crateApiEnrollmentEnrollmentJoinerReset();
+
+  JoinerSnapshot crateApiEnrollmentEnrollmentJoinerSnapshot();
+
   Snapshot crateApiFinish({
     required int token,
     required int epoch,
@@ -143,6 +193,12 @@ abstract class RustLibApi extends BaseApi {
   Snapshot crateApiInvalidate({required Invalidation reason});
 
   Future<InventoryState> crateApiManagementInventoryStateDefault();
+
+  Future<JoinerEnd> crateApiEnrollmentJoinerEndDefault();
+
+  Future<JoinerPhase> crateApiEnrollmentJoinerPhaseDefault();
+
+  Future<JoinerSnapshot> crateApiEnrollmentJoinerSnapshotDefault();
 
   ProviderWork crateApiManagementManagementBegin({
     required ManagementCommand command,
@@ -221,13 +277,94 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
+  Future<AdminOutcome> crateApiEnrollmentAdminOutcomeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_admin_outcome,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentAdminOutcomeDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentAdminOutcomeDefaultConstMeta =>
+      const TaskConstMeta(debugName: "admin_outcome_default", argNames: []);
+
+  @override
+  Future<AdminRefusal> crateApiEnrollmentAdminRefusalDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_admin_refusal,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentAdminRefusalDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentAdminRefusalDefaultConstMeta =>
+      const TaskConstMeta(debugName: "admin_refusal_default", argNames: []);
+
+  @override
+  Future<AdminState> crateApiEnrollmentAdminStateDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_admin_state,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentAdminStateDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentAdminStateDefaultConstMeta =>
+      const TaskConstMeta(debugName: "admin_state_default", argNames: []);
+
+  @override
   Work crateApiBegin({required Operation operation}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_operation(operation, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_work,
@@ -253,7 +390,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 5,
             port: port_,
           );
         },
@@ -283,7 +420,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_biometric_key_command(command, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -315,7 +452,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(password, serializer);
           sse_encode_list_prim_u_8_loose(publicKey, serializer);
           sse_encode_list_prim_u_8_loose(signature, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -343,7 +480,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -373,7 +510,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(providerIdentity, serializer);
           sse_encode_String(approvalClient, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_key_snapshot,
@@ -401,7 +538,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_list_prim_u_8_loose(publicKey, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_enroll_request,
@@ -431,7 +568,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_key_snapshot,
@@ -459,7 +596,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 12,
             port: port_,
           );
         },
@@ -486,7 +623,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_key_snapshot,
@@ -511,7 +648,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 14,
             port: port_,
           );
         },
@@ -541,7 +678,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 15,
             port: port_,
           );
         },
@@ -573,7 +710,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 16,
             port: port_,
           );
         },
@@ -595,6 +732,362 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<EnrolleeRole> crateApiEnrollmentEnrolleeRoleDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_enrollee_role,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrolleeRoleDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrolleeRoleDefaultConstMeta =>
+      const TaskConstMeta(debugName: "enrollee_role_default", argNames: []);
+
+  @override
+  ProviderWork crateApiEnrollmentEnrollmentAdminBegin({
+    required EnrollmentAdminRequest request,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_enrollment_admin_request(request, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminBeginConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentAdminBeginConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_admin_begin",
+        argNames: ["request"],
+      );
+
+  @override
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminDismissInvitation() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_enrollment_admin_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminDismissInvitationConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiEnrollmentEnrollmentAdminDismissInvitationConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_admin_dismiss_invitation",
+        argNames: [],
+      );
+
+  @override
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminFinish({
+    required int token,
+    required List<int> response,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(token, serializer);
+          sse_encode_list_prim_u_8_loose(response, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_enrollment_admin_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminFinishConstMeta,
+        argValues: [token, response],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentAdminFinishConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_admin_finish",
+        argNames: ["token", "response"],
+      );
+
+  @override
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminInvalidate() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_enrollment_admin_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminInvalidateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentAdminInvalidateConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_admin_invalidate",
+        argNames: [],
+      );
+
+  @override
+  String crateApiEnrollmentEnrollmentAdminInvitationCode() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminInvitationCodeConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentAdminInvitationCodeConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_admin_invitation_code",
+        argNames: [],
+      );
+
+  @override
+  EnrollmentAdminSnapshot crateApiEnrollmentEnrollmentAdminSnapshot() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_enrollment_admin_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentAdminSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "enrollment_admin_snapshot", argNames: []);
+
+  @override
+  Future<EnrollmentAdminSnapshot>
+  crateApiEnrollmentEnrollmentAdminSnapshotDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_enrollment_admin_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentAdminSnapshotDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiEnrollmentEnrollmentAdminSnapshotDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_admin_snapshot_default",
+        argNames: [],
+      );
+
+  @override
+  ProviderWork crateApiEnrollmentEnrollmentJoin({
+    required String invitation,
+    required String deviceFingerprint,
+    required String providerPin,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(invitation, serializer);
+          sse_encode_String(deviceFingerprint, serializer);
+          sse_encode_String(providerPin, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentJoinConstMeta,
+        argValues: [invitation, deviceFingerprint, providerPin],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentJoinConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_join",
+        argNames: ["invitation", "deviceFingerprint", "providerPin"],
+      );
+
+  @override
+  ProviderWork crateApiEnrollmentEnrollmentJoinerBegin({
+    required JoinerCommand command,
+    required String deviceFingerprint,
+    required String providerPin,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_joiner_command(command, serializer);
+          sse_encode_String(deviceFingerprint, serializer);
+          sse_encode_String(providerPin, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentJoinerBeginConstMeta,
+        argValues: [command, deviceFingerprint, providerPin],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentJoinerBeginConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_joiner_begin",
+        argNames: ["command", "deviceFingerprint", "providerPin"],
+      );
+
+  @override
+  JoinerSnapshot crateApiEnrollmentEnrollmentJoinerFinish({
+    required int token,
+    required List<int> response,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(token, serializer);
+          sse_encode_list_prim_u_8_loose(response, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_joiner_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentJoinerFinishConstMeta,
+        argValues: [token, response],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentJoinerFinishConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_joiner_finish",
+        argNames: ["token", "response"],
+      );
+
+  @override
+  JoinerSnapshot crateApiEnrollmentEnrollmentJoinerReset() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_joiner_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentJoinerResetConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentJoinerResetConstMeta =>
+      const TaskConstMeta(debugName: "enrollment_joiner_reset", argNames: []);
+
+  @override
+  JoinerSnapshot crateApiEnrollmentEnrollmentJoinerSnapshot() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_joiner_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentEnrollmentJoinerSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentEnrollmentJoinerSnapshotConstMeta =>
+      const TaskConstMeta(
+        debugName: "enrollment_joiner_snapshot",
+        argNames: [],
+      );
+
+  @override
   Snapshot crateApiFinish({
     required int token,
     required int epoch,
@@ -607,7 +1100,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(token, serializer);
           sse_encode_u_32(epoch, serializer);
           sse_encode_box_autoadd_completion(completion, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -639,7 +1132,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 31,
             port: port_,
           );
         },
@@ -667,7 +1160,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_invalidation(reason, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -692,7 +1185,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 33,
             port: port_,
           );
         },
@@ -711,6 +1204,87 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "inventory_state_default", argNames: []);
 
   @override
+  Future<JoinerEnd> crateApiEnrollmentJoinerEndDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 34,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_joiner_end,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentJoinerEndDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentJoinerEndDefaultConstMeta =>
+      const TaskConstMeta(debugName: "joiner_end_default", argNames: []);
+
+  @override
+  Future<JoinerPhase> crateApiEnrollmentJoinerPhaseDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 35,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_joiner_phase,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentJoinerPhaseDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentJoinerPhaseDefaultConstMeta =>
+      const TaskConstMeta(debugName: "joiner_phase_default", argNames: []);
+
+  @override
+  Future<JoinerSnapshot> crateApiEnrollmentJoinerSnapshotDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 36,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_joiner_snapshot,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEnrollmentJoinerSnapshotDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEnrollmentJoinerSnapshotDefaultConstMeta =>
+      const TaskConstMeta(debugName: "joiner_snapshot_default", argNames: []);
+
+  @override
   ProviderWork crateApiManagementManagementBegin({
     required ManagementCommand command,
     required IdentityKind kind,
@@ -725,7 +1299,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_identity_kind(kind, serializer);
           sse_encode_String(id, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -753,7 +1327,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(recovery, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -783,7 +1357,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -808,7 +1382,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -833,7 +1407,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 41,
             port: port_,
           );
         },
@@ -860,7 +1434,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -889,7 +1463,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_provider_command(command, serializer);
           sse_encode_String(requestId, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -921,7 +1495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_64(handle, serializer);
           sse_encode_String(keyId, serializer);
           sse_encode_list_prim_u_8_loose(signature, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -951,7 +1525,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(providerIdentity, serializer);
           sse_encode_String(approvalClient, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_biometric_state,
@@ -976,7 +1550,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_signing_request,
@@ -1001,7 +1575,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_biometric_state,
@@ -1026,7 +1600,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(uncertainId, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1056,7 +1630,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1084,7 +1658,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1111,7 +1685,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1136,7 +1710,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 52,
             port: port_,
           );
         },
@@ -1160,7 +1734,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1186,7 +1760,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 54,
             port: port_,
           );
         },
@@ -1214,7 +1788,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 55)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -1236,7 +1810,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -1256,6 +1830,57 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
+  }
+
+  @protected
+  AdminCommand dco_decode_admin_command(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return AdminCommand.values[raw as int];
+  }
+
+  @protected
+  AdminOutcome dco_decode_admin_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return AdminOutcome.values[raw as int];
+  }
+
+  @protected
+  AdminRefusal dco_decode_admin_refusal(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return AdminRefusal.values[raw as int];
+  }
+
+  @protected
+  AdminSessionState dco_decode_admin_session_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return AdminSessionState.values[raw as int];
+  }
+
+  @protected
+  AdminSessionView dco_decode_admin_session_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return AdminSessionView(
+      id: dco_decode_String(arr[0]),
+      role: dco_decode_enrollee_role(arr[1]),
+      label: dco_decode_String(arr[2]),
+      agentUid: dco_decode_u_32(arr[3]),
+      agentGid: dco_decode_u_32(arr[4]),
+      state: dco_decode_admin_session_state(arr[5]),
+      providerApproved: dco_decode_bool(arr[6]),
+      joinerConfirmed: dco_decode_bool(arr[7]),
+      detail: dco_decode_String(arr[8]),
+      expiresInSeconds: dco_decode_u_64(arr[9]),
+      joinerFingerprint: dco_decode_String(arr[10]),
+    );
+  }
+
+  @protected
+  AdminState dco_decode_admin_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return AdminState.values[raw as int];
   }
 
   @protected
@@ -1357,6 +1982,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  EnrollmentAdminRequest dco_decode_box_autoadd_enrollment_admin_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_enrollment_admin_request(raw);
+  }
+
+  @protected
+  IssuedInvitationView dco_decode_box_autoadd_issued_invitation_view(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_issued_invitation_view(raw);
+  }
+
+  @protected
   ManagedIdentity dco_decode_box_autoadd_managed_identity(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_managed_identity(raw);
@@ -1384,6 +2025,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       outcome: dco_decode_outcome(arr[0]),
       publicKey: dco_decode_list_prim_u_8_strict(arr[1]),
       signature: dco_decode_list_prim_u_8_strict(arr[2]),
+    );
+  }
+
+  @protected
+  EnrolleeRole dco_decode_enrollee_role(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return EnrolleeRole.values[raw as int];
+  }
+
+  @protected
+  EnrollmentAdminRequest dco_decode_enrollment_admin_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return EnrollmentAdminRequest(
+      command: dco_decode_admin_command(arr[0]),
+      role: dco_decode_enrollee_role(arr[1]),
+      label: dco_decode_String(arr[2]),
+      agentUid: dco_decode_u_32(arr[3]),
+      agentGid: dco_decode_u_32(arr[4]),
+      id: dco_decode_String(arr[5]),
+      code: dco_decode_String(arr[6]),
+      password: dco_decode_String(arr[7]),
+    );
+  }
+
+  @protected
+  EnrollmentAdminSnapshot dco_decode_enrollment_admin_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return EnrollmentAdminSnapshot(
+      state: dco_decode_admin_state(arr[0]),
+      outcome: dco_decode_admin_outcome(arr[1]),
+      refusal: dco_decode_admin_refusal(arr[2]),
+      busy: dco_decode_bool(arr[3]),
+      issued: dco_decode_opt_box_autoadd_issued_invitation_view(arr[4]),
+      sessions: dco_decode_list_admin_session_view(arr[5]),
     );
   }
 
@@ -1437,9 +2118,70 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  IssuedInvitationView dco_decode_issued_invitation_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return IssuedInvitationView(
+      id: dco_decode_String(arr[0]),
+      role: dco_decode_enrollee_role(arr[1]),
+      label: dco_decode_String(arr[2]),
+      expiresInSeconds: dco_decode_u_64(arr[3]),
+    );
+  }
+
+  @protected
+  JoinerCommand dco_decode_joiner_command(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return JoinerCommand.values[raw as int];
+  }
+
+  @protected
+  JoinerEnd dco_decode_joiner_end(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return JoinerEnd.values[raw as int];
+  }
+
+  @protected
+  JoinerPhase dco_decode_joiner_phase(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return JoinerPhase.values[raw as int];
+  }
+
+  @protected
+  JoinerSnapshot dco_decode_joiner_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
+    return JoinerSnapshot(
+      phase: dco_decode_joiner_phase(arr[0]),
+      busy: dco_decode_bool(arr[1]),
+      role: dco_decode_enrollee_role(arr[2]),
+      label: dco_decode_String(arr[3]),
+      comparisonCode: dco_decode_String(arr[4]),
+      secondsRemaining: dco_decode_u_64(arr[5]),
+      providerApproved: dco_decode_bool(arr[6]),
+      confirmed: dco_decode_bool(arr[7]),
+      withdrawing: dco_decode_bool(arr[8]),
+      end: dco_decode_joiner_end(arr[9]),
+      retryable: dco_decode_bool(arr[10]),
+      invitationId: dco_decode_String(arr[11]),
+      enrolledFingerprint: dco_decode_String(arr[12]),
+    );
+  }
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  List<AdminSessionView> dco_decode_list_admin_session_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_admin_session_view).toList();
   }
 
   @protected
@@ -1553,6 +2295,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BiometricRefusal? dco_decode_opt_box_autoadd_biometric_refusal(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_biometric_refusal(raw);
+  }
+
+  @protected
+  IssuedInvitationView? dco_decode_opt_box_autoadd_issued_invitation_view(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_issued_invitation_view(raw);
   }
 
   @protected
@@ -1783,6 +2535,72 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AdminCommand sse_decode_admin_command(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return AdminCommand.values[inner];
+  }
+
+  @protected
+  AdminOutcome sse_decode_admin_outcome(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return AdminOutcome.values[inner];
+  }
+
+  @protected
+  AdminRefusal sse_decode_admin_refusal(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return AdminRefusal.values[inner];
+  }
+
+  @protected
+  AdminSessionState sse_decode_admin_session_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return AdminSessionState.values[inner];
+  }
+
+  @protected
+  AdminSessionView sse_decode_admin_session_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_role = sse_decode_enrollee_role(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_agentUid = sse_decode_u_32(deserializer);
+    var var_agentGid = sse_decode_u_32(deserializer);
+    var var_state = sse_decode_admin_session_state(deserializer);
+    var var_providerApproved = sse_decode_bool(deserializer);
+    var var_joinerConfirmed = sse_decode_bool(deserializer);
+    var var_detail = sse_decode_String(deserializer);
+    var var_expiresInSeconds = sse_decode_u_64(deserializer);
+    var var_joinerFingerprint = sse_decode_String(deserializer);
+    return AdminSessionView(
+      id: var_id,
+      role: var_role,
+      label: var_label,
+      agentUid: var_agentUid,
+      agentGid: var_agentGid,
+      state: var_state,
+      providerApproved: var_providerApproved,
+      joinerConfirmed: var_joinerConfirmed,
+      detail: var_detail,
+      expiresInSeconds: var_expiresInSeconds,
+      joinerFingerprint: var_joinerFingerprint,
+    );
+  }
+
+  @protected
+  AdminState sse_decode_admin_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return AdminState.values[inner];
+  }
+
+  @protected
   BiometricDecisionResult sse_decode_biometric_decision_result(
     SseDeserializer deserializer,
   ) {
@@ -1905,6 +2723,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  EnrollmentAdminRequest sse_decode_box_autoadd_enrollment_admin_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_enrollment_admin_request(deserializer));
+  }
+
+  @protected
+  IssuedInvitationView sse_decode_box_autoadd_issued_invitation_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_issued_invitation_view(deserializer));
+  }
+
+  @protected
   ManagedIdentity sse_decode_box_autoadd_managed_identity(
     SseDeserializer deserializer,
   ) {
@@ -1936,6 +2770,61 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       outcome: var_outcome,
       publicKey: var_publicKey,
       signature: var_signature,
+    );
+  }
+
+  @protected
+  EnrolleeRole sse_decode_enrollee_role(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return EnrolleeRole.values[inner];
+  }
+
+  @protected
+  EnrollmentAdminRequest sse_decode_enrollment_admin_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_command = sse_decode_admin_command(deserializer);
+    var var_role = sse_decode_enrollee_role(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_agentUid = sse_decode_u_32(deserializer);
+    var var_agentGid = sse_decode_u_32(deserializer);
+    var var_id = sse_decode_String(deserializer);
+    var var_code = sse_decode_String(deserializer);
+    var var_password = sse_decode_String(deserializer);
+    return EnrollmentAdminRequest(
+      command: var_command,
+      role: var_role,
+      label: var_label,
+      agentUid: var_agentUid,
+      agentGid: var_agentGid,
+      id: var_id,
+      code: var_code,
+      password: var_password,
+    );
+  }
+
+  @protected
+  EnrollmentAdminSnapshot sse_decode_enrollment_admin_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_state = sse_decode_admin_state(deserializer);
+    var var_outcome = sse_decode_admin_outcome(deserializer);
+    var var_refusal = sse_decode_admin_refusal(deserializer);
+    var var_busy = sse_decode_bool(deserializer);
+    var var_issued = sse_decode_opt_box_autoadd_issued_invitation_view(
+      deserializer,
+    );
+    var var_sessions = sse_decode_list_admin_session_view(deserializer);
+    return EnrollmentAdminSnapshot(
+      state: var_state,
+      outcome: var_outcome,
+      refusal: var_refusal,
+      busy: var_busy,
+      issued: var_issued,
+      sessions: var_sessions,
     );
   }
 
@@ -1990,6 +2879,77 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  IssuedInvitationView sse_decode_issued_invitation_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_role = sse_decode_enrollee_role(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_expiresInSeconds = sse_decode_u_64(deserializer);
+    return IssuedInvitationView(
+      id: var_id,
+      role: var_role,
+      label: var_label,
+      expiresInSeconds: var_expiresInSeconds,
+    );
+  }
+
+  @protected
+  JoinerCommand sse_decode_joiner_command(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return JoinerCommand.values[inner];
+  }
+
+  @protected
+  JoinerEnd sse_decode_joiner_end(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return JoinerEnd.values[inner];
+  }
+
+  @protected
+  JoinerPhase sse_decode_joiner_phase(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return JoinerPhase.values[inner];
+  }
+
+  @protected
+  JoinerSnapshot sse_decode_joiner_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_phase = sse_decode_joiner_phase(deserializer);
+    var var_busy = sse_decode_bool(deserializer);
+    var var_role = sse_decode_enrollee_role(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_comparisonCode = sse_decode_String(deserializer);
+    var var_secondsRemaining = sse_decode_u_64(deserializer);
+    var var_providerApproved = sse_decode_bool(deserializer);
+    var var_confirmed = sse_decode_bool(deserializer);
+    var var_withdrawing = sse_decode_bool(deserializer);
+    var var_end = sse_decode_joiner_end(deserializer);
+    var var_retryable = sse_decode_bool(deserializer);
+    var var_invitationId = sse_decode_String(deserializer);
+    var var_enrolledFingerprint = sse_decode_String(deserializer);
+    return JoinerSnapshot(
+      phase: var_phase,
+      busy: var_busy,
+      role: var_role,
+      label: var_label,
+      comparisonCode: var_comparisonCode,
+      secondsRemaining: var_secondsRemaining,
+      providerApproved: var_providerApproved,
+      confirmed: var_confirmed,
+      withdrawing: var_withdrawing,
+      end: var_end,
+      retryable: var_retryable,
+      invitationId: var_invitationId,
+      enrolledFingerprint: var_enrolledFingerprint,
+    );
+  }
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1997,6 +2957,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <String>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<AdminSessionView> sse_decode_list_admin_session_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <AdminSessionView>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_admin_session_view(deserializer));
     }
     return ans_;
   }
@@ -2170,6 +3144,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_biometric_refusal(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  IssuedInvitationView? sse_decode_opt_box_autoadd_issued_invitation_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_issued_invitation_view(deserializer));
     } else {
       return null;
     }
@@ -2474,6 +3461,58 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_admin_command(AdminCommand self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_admin_outcome(AdminOutcome self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_admin_refusal(AdminRefusal self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_admin_session_state(
+    AdminSessionState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_admin_session_view(
+    AdminSessionView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_enrollee_role(self.role, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_u_32(self.agentUid, serializer);
+    sse_encode_u_32(self.agentGid, serializer);
+    sse_encode_admin_session_state(self.state, serializer);
+    sse_encode_bool(self.providerApproved, serializer);
+    sse_encode_bool(self.joinerConfirmed, serializer);
+    sse_encode_String(self.detail, serializer);
+    sse_encode_u_64(self.expiresInSeconds, serializer);
+    sse_encode_String(self.joinerFingerprint, serializer);
+  }
+
+  @protected
+  void sse_encode_admin_state(AdminState self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_biometric_decision_result(
     BiometricDecisionResult self,
     SseSerializer serializer,
@@ -2590,6 +3629,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_enrollment_admin_request(
+    EnrollmentAdminRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_enrollment_admin_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_issued_invitation_view(
+    IssuedInvitationView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_issued_invitation_view(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_managed_identity(
     ManagedIdentity self,
     SseSerializer serializer,
@@ -2619,6 +3676,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_outcome(self.outcome, serializer);
     sse_encode_list_prim_u_8_strict(self.publicKey, serializer);
     sse_encode_list_prim_u_8_strict(self.signature, serializer);
+  }
+
+  @protected
+  void sse_encode_enrollee_role(EnrolleeRole self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_enrollment_admin_request(
+    EnrollmentAdminRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_admin_command(self.command, serializer);
+    sse_encode_enrollee_role(self.role, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_u_32(self.agentUid, serializer);
+    sse_encode_u_32(self.agentGid, serializer);
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.code, serializer);
+    sse_encode_String(self.password, serializer);
+  }
+
+  @protected
+  void sse_encode_enrollment_admin_snapshot(
+    EnrollmentAdminSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_admin_state(self.state, serializer);
+    sse_encode_admin_outcome(self.outcome, serializer);
+    sse_encode_admin_refusal(self.refusal, serializer);
+    sse_encode_bool(self.busy, serializer);
+    sse_encode_opt_box_autoadd_issued_invitation_view(self.issued, serializer);
+    sse_encode_list_admin_session_view(self.sessions, serializer);
   }
 
   @protected
@@ -2669,11 +3762,74 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_issued_invitation_view(
+    IssuedInvitationView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_enrollee_role(self.role, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_u_64(self.expiresInSeconds, serializer);
+  }
+
+  @protected
+  void sse_encode_joiner_command(JoinerCommand self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_joiner_end(JoinerEnd self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_joiner_phase(JoinerPhase self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_joiner_snapshot(
+    JoinerSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_joiner_phase(self.phase, serializer);
+    sse_encode_bool(self.busy, serializer);
+    sse_encode_enrollee_role(self.role, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_String(self.comparisonCode, serializer);
+    sse_encode_u_64(self.secondsRemaining, serializer);
+    sse_encode_bool(self.providerApproved, serializer);
+    sse_encode_bool(self.confirmed, serializer);
+    sse_encode_bool(self.withdrawing, serializer);
+    sse_encode_joiner_end(self.end, serializer);
+    sse_encode_bool(self.retryable, serializer);
+    sse_encode_String(self.invitationId, serializer);
+    sse_encode_String(self.enrolledFingerprint, serializer);
+  }
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_admin_session_view(
+    List<AdminSessionView> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_admin_session_view(item, serializer);
     }
   }
 
@@ -2822,6 +3978,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_biometric_refusal(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_issued_invitation_view(
+    IssuedInvitationView? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_issued_invitation_view(self, serializer);
     }
   }
 

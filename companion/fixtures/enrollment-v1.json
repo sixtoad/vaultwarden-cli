@@ -1,0 +1,52 @@
+{
+  "cancel": {
+    "invitation_id": "TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc",
+    "mac": "pApqVS2qHnTRwH_-gJmnyIl-ba97iQq8KZ741jfelHk",
+    "protocol_version": 1,
+    "purpose": "enroll_cancel",
+    "reason": "cancelled"
+  },
+  "comparison_code": "9821-9597",
+  "confirm": {
+    "invitation_id": "TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc",
+    "mac": "CXcqLRgKdwisAKAKbwm1Y1UMd6d_L0kphYdudOxx5Hk",
+    "protocol_version": 1,
+    "purpose": "enroll_confirm"
+  },
+  "decline": {
+    "invitation_id": "TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc",
+    "mac": "0bRIyWaL1jiqviAkklaVPY5b2MM_lqloePcPCl7ysf4",
+    "protocol_version": 1,
+    "purpose": "enroll_cancel",
+    "reason": "code_mismatch"
+  },
+  "device_fingerprint": "bb00000000000000000000000000000000000000000000000000000000000002",
+  "invitation_code": "vwe1.TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc.LTU7Q0lRV19lbXN7gYmPl52lq7O5wcfP1d3j6_H5_wc",
+  "join": {
+    "invitation_id": "TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc",
+    "mac": "LhAuZzUM__6w7exWVA7l_-P1vTVuNwMQNONHStMbemY",
+    "nonce": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU",
+    "protocol_version": 1,
+    "purpose": "enroll_join"
+  },
+  "joined": {
+    "expires_in_seconds": 599,
+    "invitation_id": "TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc",
+    "kind": {
+      "label": "Studio Mac",
+      "role": "companion"
+    },
+    "protocol_version": 1,
+    "provider_mac": "fTu5zgMY6mvvKrjrpau85AzeK1HUfODJsDXEe6m3bHQ",
+    "provider_nonce": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk",
+    "result": "joined"
+  },
+  "joiner_nonce": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU",
+  "provider_fingerprint": "aa00000000000000000000000000000000000000000000000000000000000001",
+  "status": {
+    "invitation_id": "TVVbY2lxd3-FjZOboamvt73Fy9PZ4efv9f0DCxEZHyc",
+    "mac": "v2ZOn0Ru1amvlT2TvVgja9uU1K90wj_UaMeu9lEcruQ",
+    "protocol_version": 1,
+    "purpose": "enroll_status"
+  }
+}

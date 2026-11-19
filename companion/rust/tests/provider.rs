@@ -171,15 +171,15 @@ fn review_accepts_existing_provider_count_boundaries_without_losing_entries() {
     let review = state.review.unwrap();
     assert_eq!(review.arguments.len(), 32);
     assert_eq!(review.credentials.len(), 16);
-    for i in 0..32 {
-        assert_eq!(review.arguments[i], format!("\"argument {i}\""));
+    for (i, argument) in review.arguments.iter().enumerate() {
+        assert_eq!(argument, &format!("\"argument {i}\""));
         assert!(state
             .review_text
             .contains(&format!("[{i}] \"argument {i}\"")));
     }
-    for i in 0..16 {
-        assert_eq!(review.credentials[i].label, format!("\"credential {i}\""));
-        assert_eq!(review.credentials[i].use_type, "\"login\"");
+    for (i, credential) in review.credentials.iter().enumerate() {
+        assert_eq!(credential.label, format!("\"credential {i}\""));
+        assert_eq!(credential.use_type, "\"login\"");
         assert!(state
             .review_text
             .contains(&format!("label=\"credential {i}\"")));
