@@ -113,3 +113,20 @@ reviewed. The `linux`, `windows` and `macos-26-arm64` references (the same 46
 images per host) were adopted from CI run 44614054785's captures
 (`companion-slice-*-development` artifacts) after the owner reviewed them on
 2026-11-19; exact comparison is kept.
+
+## Request review states, 2026-11-19 (#50 slice 2)
+
+The review redesign changes 16 existing captures per host: review and actions
+(light/dark × desktop/compact/200%) and the four `shell_recovery` captures
+(the outcome-unknown notice). `review_states_golden_test.dart` adds 18 per
+host: the authorization step (password only, Touch ID available, Touch ID
+offered but unable to approve) and the running, completed, failed, denied,
+expired and outcome-unknown states, light desktop (1440×900) and dark compact
+(390×844). A fixed `ProviderPage.clock` keeps the countdown at 55 s. Every
+capture is written to `test/failures` by `CaptureComparator`.
+
+The `macos-27-arm64` references (16 changed, 18 new) were rendered locally with
+pinned Flutter 3.47.7 on macOS 27.0.1 and visually reviewed. The `linux`,
+`windows` and `macos-26-arm64` references were NOT regenerated: CI on those
+hosts fails on the same 16 changed and 18 missing references until the owner
+reviews and adopts each host's captures from the CI artifacts.
