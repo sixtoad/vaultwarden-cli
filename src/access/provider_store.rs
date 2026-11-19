@@ -291,7 +291,24 @@ pub(crate) struct ProviderStore {
     #[cfg(target_os = "macos")]
     administrator_uid: u32,
     poisoned: bool,
-    _writer_lock: File,
+    _writer_lock: WriterLock,
+}
+/// The provider's exclusive `flock`, released explicitly before its descriptor
+/// closes.
+///
+/// An `flock` belongs to the open file description and lasts while any process
+/// still references it. A child that another thread spawns (`fork`, or
+/// `posix_spawn` even with `POSIX_SPAWN_CLOEXEC_DEFAULT`) shares every
+/// description of this process until its exec closes the close-on-exec ones, so
+/// merely closing ours left the lock held for that window: a provider restarted
+/// in the same process met `EWOULDBLOCK` and failed with `PersistenceFailure`.
+/// `LOCK_UN` releases the description's lock whatever else still references it.
+#[derive(Debug)]
+struct WriterLock(File);
+impl Drop for WriterLock {
+    fn drop(&mut self) {
+        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
+    }
 }
 
 impl ProviderStore {
@@ -318,6 +335,7 @@ impl ProviderStore {
         let lock = open_existing(&root.join(LOCK_FILE), true)?;
         validate_open_file(&lock, PRIVATE_FILE_MODE, owner_uid)?;
         try_lock_exclusive(&lock)?;
+        let lock = WriterLock(lock);
         #[cfg(target_os = "macos")]
         let identity = crate::adapters::native::identity::load()
             .map_err(|_error| error(ProviderDiagnostic::UnsafeState))?;
@@ -1040,5 +1058,25 @@ mod tests {
 
         let directory = File::open(temp.path()).unwrap();
         assert!(validate_open_file(&directory, PRIVATE_FILE_MODE, current_uid()).is_err());
+    }
+}
+
+#[cfg(test)]
+mod writer_lock_tests {
+    use super::*;
+    /// `dup` stands in for a child spawned by another thread: it references the
+    /// same open file description until its exec, after the store has gone.
+    #[test]
+    fn released_writer_lock_is_free_while_another_reference_remains() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join(LOCK_FILE);
+        File::create(&path).unwrap();
+        let lock = open_existing(&path, true).unwrap();
+        try_lock_exclusive(&lock).unwrap();
+        let shared = lock.try_clone().unwrap();
+        drop(WriterLock(lock));
+        let reopened = open_existing(&path, true).unwrap();
+        assert!(try_lock_exclusive(&reopened).is_ok());
+        drop(shared);
     }
 }
