@@ -132,8 +132,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Review $providerId'));
-        await tester.tap(find.text('Review $providerId'));
+        await tester.ensureVisible(requestRow(providerId));
+        await tester.tap(requestRow(providerId));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('review-requester')), findsOneWidget);
         expect(find.byKey(const Key('review-one-time')), findsOneWidget);

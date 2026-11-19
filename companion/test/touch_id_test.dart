@@ -199,8 +199,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Review $providerId'));
-      await tester.tap(find.text('Review $providerId'));
+      await tester.ensureVisible(requestRow(providerId));
+      await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
       final button = find.byKey(const Key('approve-touch-id'));
       expect(button, available ? findsOneWidget : findsNothing);
@@ -229,8 +229,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Review $providerId'));
-    await tester.tap(find.text('Review $providerId'));
+    await tester.ensureVisible(requestRow(providerId));
+    await tester.tap(requestRow(providerId));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('review-final')), findsOneWidget);
     // A final request shows its state only (review round 1, #61).

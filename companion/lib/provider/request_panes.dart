@@ -1,0 +1,184 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../design/components.dart';
+import '../design/typography.dart';
+import 'controller.dart';
+import 'request_review.dart';
+import 'requests_view.dart';
+import 'touch_id.dart';
+
+/// The pending list: configuration and lock state, unlock (separate from
+/// approval), refresh and one row per pending request ID.
+class RequestListPane extends StatelessWidget {
+  const RequestListPane({
+    super.key,
+    required this.controller,
+    required this.unlockPassword,
+    required this.notificationNote,
+    required this.selectedId,
+    required this.onUnlock,
+    required this.onOpenRequest,
+    required this.onOpenSettings,
+  });
+  final ProviderController controller;
+  final TextEditingController unlockPassword;
+  final String notificationNote, selectedId;
+  final VoidCallback onUnlock, onOpenSettings;
+  final ValueChanged<String> onOpenRequest;
+  @override
+  Widget build(BuildContext context) {
+    final state = controller.state, config = controller.configuration;
+    final kicker = AccessType.of(context).kicker;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!config.configured) ...[
+          const Text(
+            'Connect a dedicated development identity in Settings to load requests.',
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: onOpenSettings,
+            child: const Text('Open advanced setup'),
+          ),
+        ] else ...[
+          StatusLabel(
+            state.locked
+                ? 'Provider locked or authority not refreshed'
+                : 'Provider unlocked',
+            icon: state.locked ? Icons.lock_outline : Icons.lock_open,
+          ),
+          const SizedBox(height: 16),
+          if (state.locked && controller.recoveryId.isEmpty) ...[
+            AccessNotice(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Unlock is separate from approval. After unlocking, the agent must submit a new request.',
+                  ),
+                  const SizedBox(height: 12),
+                  accessPassword(unlockPassword, 'Provider unlock password'),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: controller.busy ? null : onUnlock,
+                    child: const Text('Unlock provider'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          OutlinedButton(
+            onPressed: controller.busy ? null : controller.refresh,
+            child: const Text('Refresh authority and inbox'),
+          ),
+          if (notificationNote.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(notificationNote, key: const Key('notification-note')),
+          ],
+          const SizedBox(height: 24),
+          Text('PENDING · ${state.requests.length} OF 256 MAX', style: kicker),
+          Text(
+            'The provider caps the inbox at 256; this is not pagination.',
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+          const SizedBox(height: 12),
+          if (state.requests.isEmpty)
+            const Text('No pending request IDs are currently available.'),
+          for (final id in state.requests)
+            RequestRow(
+              id: id,
+              selected: id == selectedId,
+              onOpen:
+                  controller.busy ||
+                      state.locked ||
+                      controller.recoveryId.isNotEmpty
+                  ? null
+                  : () => onOpenRequest(id),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// The detail pane: the fresh review, or why there is none.
+class RequestDetailPane extends StatelessWidget {
+  const RequestDetailPane({
+    super.key,
+    required this.controller,
+    required this.touchId,
+    required this.approvalPassword,
+    required this.notificationRequest,
+    required this.onApprove,
+    required this.onDeny,
+    required this.onBack,
+  });
+  final ProviderController controller;
+  final TouchIdController touchId;
+  final TextEditingController approvalPassword;
+  final String notificationRequest;
+  final VoidCallback onApprove, onDeny, onBack;
+  @override
+  Widget build(BuildContext context) {
+    final state = controller.state;
+    if (state.review == null) {
+      return AccessPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AccessHeading(
+              'Request review',
+              'A fresh validated review is required for every decision.',
+            ),
+            if (controller.busy ||
+                controller.pendingReview == notificationRequest &&
+                    notificationRequest.isNotEmpty)
+              const Text('Loading or finishing the original operation…')
+            else if (notificationRequest.isNotEmpty)
+              const Text(
+                'The request from the notification could not be loaded. It may have been removed or the provider is locked or unreachable. Pending requests are listed.',
+                key: Key('notification-unavailable'),
+              )
+            else
+              const Text(
+                'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
+              ),
+            if (touchId.message.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(touchId.message, key: const Key('touch-id-message')),
+            ],
+            if (state.statusId.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              FactRow('Latest status request', state.statusId),
+              SelectableText(state.statusText),
+            ],
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: onBack,
+              child: const Text('Back to requests'),
+            ),
+          ],
+        ),
+      );
+    }
+    return RequestReview(
+      state: state,
+      endpoint: controller.configuration.endpoint,
+      origin: controller.management.originId == controller.state.reviewId
+          ? controller.management.originText
+          : '',
+      password: approvalPassword, // secrets-ignore: UI controller
+      onApprove: onApprove,
+      onDeny: onDeny,
+      onCancel: onBack,
+      touchIdOffered: touchId.available,
+      onTouchId: touchId.canApprove ? () => unawaited(touchId.approve()) : null,
+      touchIdNote: touchId.working ? '' : touchId.unavailableReason,
+      touchIdMessage: touchId.message,
+    );
+  }
+}

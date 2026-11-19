@@ -46,8 +46,8 @@ Future<void> destination(WidgetTester tester, String name) async {
 }
 
 Future<void> review(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Review $providerId'));
-  await tester.tap(find.text('Review $providerId'));
+  await tester.ensureVisible(requestRow(providerId));
+  await tester.tap(requestRow(providerId));
   await tester.pumpAndSettle();
 }
 
@@ -230,9 +230,9 @@ void main() {
     final native = longInbox();
     await showShell(tester, native, size: const Size(390, 844));
     for (final systemBack in [false, true]) {
-      await tester.ensureVisible(find.text('Review $providerId'));
+      await tester.ensureVisible(requestRow(providerId));
       expect(contentPosition(tester).pixels, greaterThan(1000));
-      await tester.tap(find.text('Review $providerId'));
+      await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
       expect(contentPosition(tester).pixels, 0);
       await tester.ensureVisible(find.text('Cancel review'));
@@ -260,7 +260,7 @@ void main() {
       await tester.tap(find.text('Deny without password'));
       await tester.pumpAndSettle();
       await destination(tester, 'requests');
-      await tester.ensureVisible(find.text('Review $providerId'));
+      await tester.ensureVisible(requestRow(providerId));
       expect(contentPosition(tester).pixels, greaterThan(1000));
       await destination(tester, 'activity');
       await tester.ensureVisible(find.text('Open request with fresh review'));
@@ -353,13 +353,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(field.text, isEmpty);
       expect(core.providerSnapshot().canDecide, false);
-      expect(find.text('Review $providerId'), findsOneWidget);
+      expect(requestRow(providerId), findsOneWidget);
       await review(tester);
       await tester.ensureVisible(find.text('Cancel review'));
       await tester.tap(find.text('Cancel review'));
       await tester.pumpAndSettle();
       expect(core.providerSnapshot().canDecide, false);
-      expect(find.text('Review $providerId'), findsOneWidget);
+      expect(requestRow(providerId), findsOneWidget);
       expect(native.commands.where((c) => c['command'] == 'decision'), isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -371,7 +371,7 @@ void main() {
     final native = FixtureProviderPlatform()
       ..heldReview = Completer<Uint8List>();
     await showShell(tester, native);
-    await tester.tap(find.text('Review $providerId'));
+    await tester.tap(requestRow(providerId));
     await tester.pump();
     await tester.tap(find.byKey(const Key('destination-devices')));
     await tester.pump();
