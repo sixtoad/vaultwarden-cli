@@ -14,6 +14,8 @@ import '../design/access_theme.dart';
 import '../design/components.dart';
 import '../design/metrics.dart';
 import 'request_panes.dart';
+import 'review/review_session.dart';
+import 'review/validity.dart';
 import 'requests_view.dart';
 import 'settings_view.dart';
 import 'support_views.dart';
@@ -32,8 +34,12 @@ class ProviderPage extends StatefulWidget {
     this.approvalKeys,
     this.notifications,
     this.installation,
+    this.clock,
   });
   final ProviderPlatform platform;
+
+  /// The wall clock for the review countdown; null reads `DateTime.now`.
+  final ReviewClock? clock;
 
   /// Desktop installation inspection; null uses the native one.
   final InstallationPlatform? installation;
@@ -66,6 +72,11 @@ class _ProviderPageState extends State<ProviderPage>
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
   bool detailOpen = false;
+
+  /// The authorization/denial step (bound to one request ID) and the
+  /// countdown of the loaded review.
+  final reviewSession = ReviewSession();
+  DateTime now() => (widget.clock ?? DateTime.now)();
 
   /// The request the user (or a notification) last opened; marks its row
   /// while the detail is open, even before its review has loaded.
@@ -143,6 +154,7 @@ class _ProviderPageState extends State<ProviderPage>
     final id = notifier.resolve(token);
     controller.devicesVisible = false;
     controller.setActivityCurrent(false);
+    reviewSession.closeStep();
     resetContentScroll();
     if (id == null) {
       controller.cancelPendingReview();
@@ -195,6 +207,7 @@ class _ProviderPageState extends State<ProviderPage>
         controller.state.review?.id == notificationRequest) {
       notificationRequest = ''; // loaded; later retirement reads normally
     }
+    reviewSession.observe(controller.state, now());
     if (mounted) setState(() {});
   }
 
@@ -285,6 +298,7 @@ class _ProviderPageState extends State<ProviderPage>
     notificationRequest = '';
     notificationNote = '';
     controller.invalidate(); // mutation: navigation retirement
+    reviewSession.closeStep();
     enrollment.close();
     controller.devicesVisible = next == AccessDestination.devices;
     controller.setActivityCurrent(next == AccessDestination.activity);
@@ -301,6 +315,7 @@ class _ProviderPageState extends State<ProviderPage>
     notificationRequest = '';
     notificationNote = '';
     controller.invalidate(); // mutation: back retirement
+    reviewSession.closeStep();
     enrollment.close();
     controller.devicesVisible = false;
     controller.setActivityCurrent(false);
@@ -314,6 +329,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void openRequest(String id) {
     controller.cancelPendingReview();
+    reviewSession.closeStep(); // mutation: selection closes step
     notificationRequest = '';
     notificationNote = '';
     controller.devicesVisible = false;
@@ -345,6 +361,20 @@ class _ProviderPageState extends State<ProviderPage>
   void deny() {
     clearPasswords();
     unawaited(controller.decide(false, ''));
+  }
+
+  /// Opens or leaves the authorization/denial step of the shown review.
+  /// Every change clears the typed password first.
+  void setReviewStep(ReviewStep step) {
+    clearPasswords(); // mutation: step change clears secrets
+    setState(() => reviewSession.setStep(controller.state.reviewId, step));
+  }
+
+  /// A fresh review of the request whose review expired.
+  void reloadReview() {
+    final shown = controller.state.reviewId;
+    final id = shown.isNotEmpty ? shown : openedRequest;
+    if (id.isNotEmpty) openRequest(id);
   }
 
   void setupPilot() {
@@ -415,9 +445,15 @@ class _ProviderPageState extends State<ProviderPage>
           touchId: touchId,
           approvalPassword: approvalPassword, // secrets-ignore: UI controller
           notificationRequest: notificationRequest,
+          openedRequest: detailOpen ? openedRequest : '',
+          session: reviewSession,
+          now: now(),
           onApprove: approve,
           onDeny: deny,
           onBack: backToRequests,
+          onStep: setReviewStep,
+          onReload: reloadReview,
+          onActivity: () => navigate(AccessDestination.activity),
         ),
       ),
       AccessDestination.devices => ProviderDevices(

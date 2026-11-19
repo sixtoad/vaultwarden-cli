@@ -6,6 +6,8 @@ import '../design/components.dart';
 import '../design/typography.dart';
 import 'controller.dart';
 import 'request_review.dart';
+import 'review/latest_status.dart';
+import 'review/review_session.dart';
 import 'requests_view.dart';
 import 'touch_id.dart';
 
@@ -112,7 +114,8 @@ class RequestListPane extends StatelessWidget {
   }
 }
 
-/// The detail pane: the fresh review, or why there is none.
+/// The detail pane: the fresh review, or why there is none (loading, the
+/// notification's request unavailable, the latest status, an expired review).
 class RequestDetailPane extends StatelessWidget {
   const RequestDetailPane({
     super.key,
@@ -120,58 +123,30 @@ class RequestDetailPane extends StatelessWidget {
     required this.touchId,
     required this.approvalPassword,
     required this.notificationRequest,
+    required this.openedRequest,
+    required this.session,
+    required this.now,
     required this.onApprove,
     required this.onDeny,
     required this.onBack,
+    required this.onStep,
+    required this.onReload,
+    this.onActivity,
   });
   final ProviderController controller;
   final TouchIdController touchId;
   final TextEditingController approvalPassword;
-  final String notificationRequest;
-  final VoidCallback onApprove, onDeny, onBack;
+  final String notificationRequest, openedRequest;
+  final ReviewSession session;
+  final DateTime now;
+  final VoidCallback onApprove, onDeny, onBack, onReload;
+  final VoidCallback? onActivity;
+  final ValueChanged<ReviewStep> onStep;
   @override
   Widget build(BuildContext context) {
     final state = controller.state;
-    if (state.review == null) {
-      return AccessPanel(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AccessHeading(
-              'Request review',
-              'A fresh validated review is required for every decision.',
-            ),
-            if (controller.busy ||
-                controller.pendingReview == notificationRequest &&
-                    notificationRequest.isNotEmpty)
-              const Text('Loading or finishing the original operation…')
-            else if (notificationRequest.isNotEmpty)
-              const Text(
-                'The request from the notification could not be loaded. It may have been removed or the provider is locked or unreachable. Pending requests are listed.',
-                key: Key('notification-unavailable'),
-              )
-            else
-              const Text(
-                'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
-              ),
-            if (touchId.message.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(touchId.message, key: const Key('touch-id-message')),
-            ],
-            if (state.statusId.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              FactRow('Latest status request', state.statusId),
-              SelectableText(state.statusText),
-            ],
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: onBack,
-              child: const Text('Back to requests'),
-            ),
-          ],
-        ),
-      );
-    }
+    final review = state.review;
+    if (review == null) return _absent(context);
     return RequestReview(
       state: state,
       endpoint: controller.configuration.endpoint,
@@ -181,11 +156,82 @@ class RequestDetailPane extends StatelessWidget {
       password: approvalPassword, // secrets-ignore: UI controller
       onApprove: onApprove,
       onDeny: onDeny,
-      onCancel: onBack,
+      onClose: onBack,
+      step: session.step(state.reviewId),
+      onStep: onStep,
+      left: session.remaining(now),
+      expired: session.expiredAt(now),
+      onReload: onReload,
+      onActivity: onActivity,
       touchIdOffered: touchId.available,
       onTouchId: touchId.canApprove ? () => unawaited(touchId.approve()) : null,
       touchIdNote: touchId.working ? '' : touchId.unavailableReason,
       touchIdMessage: touchId.message,
+    );
+  }
+
+  Widget _absent(BuildContext context) {
+    final state = controller.state;
+    final loading =
+        controller.busy ||
+        controller.pendingReview == notificationRequest &&
+            notificationRequest.isNotEmpty;
+    // The review of the opened request ran out and Rust retired it.
+    final expired =
+        !loading &&
+        notificationRequest.isEmpty &&
+        openedRequest.isNotEmpty &&
+        session.loadedId == openedRequest &&
+        state.statusId != openedRequest &&
+        session.expiredAt(now);
+    return AccessPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AccessHeading(
+            'Request review',
+            'A fresh validated review is required for every decision.',
+          ),
+          if (loading)
+            const Text('Loading or finishing the original operation…')
+          else if (notificationRequest.isNotEmpty)
+            const Text(
+              'The request from the notification could not be loaded. It may have been removed or the provider is locked or unreachable. Pending requests are listed.',
+              key: Key('notification-unavailable'),
+            )
+          else if (expired) ...[
+            AccessNotice(
+              key: const Key('review-expired'),
+              child: Text(
+                'The review of $openedRequest expired before a decision. Nothing was sent.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const Key('reload-review'),
+              onPressed: controller.busy ? null : onReload,
+              child: const Text('Reload review'),
+            ),
+          ] else if (state.statusId.isEmpty)
+            const Text(
+              'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
+            ),
+          if (touchId.message.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(touchId.message, key: const Key('touch-id-message')),
+          ],
+          if (state.statusId.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            LatestStatus(
+              requestId: state.statusId,
+              progress: state.statusProgress,
+              text: state.statusText,
+            ),
+          ],
+          const SizedBox(height: 16),
+          TextButton(onPressed: onBack, child: const Text('Back to requests')),
+        ],
+      ),
     );
   }
 }

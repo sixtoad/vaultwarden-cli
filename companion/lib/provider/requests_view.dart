@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../design/access_theme.dart';
-import '../design/components.dart';
 import '../design/metrics.dart';
 import '../design/typography.dart';
 import 'controller.dart';
+import 'review/outcome_unknown.dart';
 
 /// Shown above every destination: an unresolved decision outcome, the
 /// provider's status line and the busy indicator.
@@ -16,29 +16,9 @@ class ProviderStatusArea extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       if (controller.recoveryId.isNotEmpty) ...[
-        AccessNotice(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const StatusLabel(
-                'Decision outcome requires recovery',
-                icon: Icons.help_outline,
-              ),
-              const SizedBox(height: 8),
-              SelectableText(
-                'Uncertain decision for request: ${controller.recoveryId}',
-                key: const Key('provider-uncertain'),
-              ),
-              const Text(
-                'Only the original request status will be checked. A pending or unavailable status remains uncertain; decisions and unlocks are never resent.',
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: controller.busy ? null : controller.refresh,
-                child: const Text('Refresh original request status'),
-              ),
-            ],
-          ),
+        OutcomeUnknownNotice(
+          requestId: controller.recoveryId,
+          onCheck: controller.busy ? null : controller.refresh,
         ),
         const SizedBox(height: 16),
       ],
