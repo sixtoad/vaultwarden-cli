@@ -84,3 +84,27 @@ requirements are tracked in [the capability checklist](../../docs/implementation
 - Requests list has no distinct "disconnected" rendering or golden yet.
 - `provider/page.dart` is ~520 lines: state, lifecycle, notifications and the
   navigation retirement (mutation anchors) stay together.
+
+## #50 slice 2 (request review) review follow-ups — 2026-11-19
+
+- Every automatic poll is `controller.busy`, so the absent-review pane briefly
+  shows "Loading or finishing…" instead of the expired notice and its Reload
+  button. Count only a review in flight (or `pendingReview`) as loading.
+- Suspending the app does not call `ReviewSession.closeStep()`; the step stays
+  bound to the old request ID and is hidden only because Rust retires the
+  review. Every reload goes through `openRequest` (which starts a new load),
+  so it cannot reappear today; close it on suspend for defence in depth.
+- A review replaced by another without a null snapshot in between would start
+  its countdown at the reply time (overstating it by one round trip).
+  `controller.review()` always invalidates first, so this cannot happen yet.
+- `provider_test` "password clears on deny": a denial is now reachable only
+  after leaving the step (which clears the field), so a mutant that sent the
+  approval password with a denial is no longer exercised by that test. Add a
+  page-level unit check of `deny()` with a non-empty controller.
+- Goldens: no capture of the ticket-expired countdown view ("Review expired…
+  Reload review"); the "expired" capture is the provider's `expired` status.
+  Add an `expired_ticket` scene if the owner wants it (one more per host).
+- The Touch ID explanation in the authorization step mentions a prompt being
+  "cancelled" (an action, not a request status); reword if the owner wants the
+  word gone from the review entirely.
+- `Arguments (1 separate values)` keeps its old wording for existing finders.
