@@ -94,6 +94,9 @@ class ShellDestination extends StatelessWidget {
           style: TextButton.styleFrom(
             shape: const RoundedRectangleBorder(),
             alignment: vertical ? Alignment.center : Alignment.centerLeft,
+            padding: vertical
+                ? const EdgeInsets.symmetric(horizontal: 4, vertical: 8)
+                : null,
           ),
           onPressed: onPressed,
           child: Semantics(
@@ -102,14 +105,18 @@ class ShellDestination extends StatelessWidget {
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                      // The badge overlaps the icon's corner so it never
+                      // widens a quarter-width cell.
+                      Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           icon,
-                          if (count != null) ...[
-                            const SizedBox(width: 4),
-                            count,
-                          ],
+                          if (count != null)
+                            PositionedDirectional(
+                              start: 14,
+                              top: -6,
+                              child: count,
+                            ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -144,6 +151,7 @@ class ShellStatusBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AccessTheme.of(context), text = Theme.of(context).textTheme;
     final connection = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(status.connection.icon, size: 16, color: c.statusText),
         const SizedBox(width: 6),
@@ -167,6 +175,7 @@ class ShellStatusBlock extends StatelessWidget {
             children: [
               connection,
               Text(status.executesText, style: text.labelSmall),
+              Text(status.capabilities.roleText, style: text.labelSmall),
             ],
           ),
         ),

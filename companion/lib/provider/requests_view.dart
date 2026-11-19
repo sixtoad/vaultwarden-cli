@@ -103,48 +103,78 @@ class RequestRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AccessTheme.of(context), m = AccessMetrics.of(context);
     final text = Theme.of(context).textTheme;
+    final enabled = onOpen != null;
+    // Disabled rows (busy, locked, recovery) are visibly muted, not only in
+    // semantics.
+    final ink = enabled ? c.text : c.secondary;
+    final status = enabled ? c.statusText : c.secondary;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(m.radius),
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: selected ? c.soft : c.surface,
-          borderRadius: BorderRadius.circular(m.radius),
-          border: Border.all(color: c.divider),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(m.radius),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: BorderDirectional(
-                start: selected
-                    ? BorderSide(color: c.accent, width: m.selectedRule)
-                    : BorderSide.none,
+      child: TextButton(
+        key: Key('request-row-$id'),
+        onPressed: onOpen,
+        style:
+            TextButton.styleFrom(
+              alignment: AlignmentDirectional.centerStart,
+              backgroundColor: selected ? c.soft : c.surface,
+              disabledForegroundColor: c.secondary,
+              shape: shape,
+              padding: EdgeInsetsDirectional.zero,
+            ).copyWith(
+              // Keep the theme's 3 px focus ring; otherwise the divider outline.
+              side: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.focused)
+                    ? BorderSide(color: c.text, width: 3)
+                    : BorderSide(color: c.divider),
               ),
             ),
-            child: TextButton(
-              key: Key('request-row-$id'),
-              onPressed: onOpen,
-              style: TextButton.styleFrom(
-                alignment: AlignmentDirectional.centerStart,
-                shape: const RoundedRectangleBorder(),
-              ),
-              child: Semantics(
-                selected: selected,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(id, style: AccessType.of(context).mono),
-                    const SizedBox(height: 4),
-                    Row(
+        child: Semantics(
+          selected: selected,
+          label: 'Review request $id, pending',
+          excludeSemantics: true,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // The selected rule sits inside the rounded shape, so the
+                // focus ring is never clipped.
+                SizedBox(
+                  width: m.selectedRule,
+                  child: selected ? ColoredBox(color: c.accent) : null,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 12,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.schedule, size: 14, color: c.statusText),
-                        const SizedBox(width: 4),
-                        Text('Pending', style: text.labelMedium),
+                        Text(
+                          id,
+                          style: AccessType.of(context).mono
+                              .copyWith(color: ink),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.schedule, size: 14, color: status),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Pending',
+                              style: text.labelMedium!.copyWith(color: status),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),

@@ -61,11 +61,12 @@ class AccessMetrics extends ThemeExtension<AccessMetrics> {
 
   /// Width of a master list next to a detail pane in a content area of
   /// [contentWidth], or null when the two must be shown one at a time.
+  /// Only a window with sidebar navigation shows both; the list is full
+  /// width from [fullBreakpoint], as the sidebar is.
   double? masterWidth(BuildContext context, double contentWidth) {
-    if (largeText(context)) return null;
-    final list = contentWidth >= fullBreakpoint - sidebarWidth
-        ? listWidth
-        : listCompressedWidth;
+    final window = MediaQuery.sizeOf(context).width;
+    if (largeText(context) || window < sidebarBreakpoint) return null;
+    final list = window >= fullBreakpoint ? listWidth : listCompressedWidth;
     return contentWidth >= list + space[4] + detailMinWidth ? list : null;
   }
 

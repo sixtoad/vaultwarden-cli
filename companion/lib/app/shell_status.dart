@@ -52,10 +52,13 @@ class ShellStatus {
   String get host {
     final uri = Uri.tryParse(endpoint.trim());
     if (uri == null || uri.host.isEmpty) return '';
-    return uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+    final name = uri.host.contains(':') ? '[${uri.host}]' : uri.host;
+    return uri.hasPort ? '$name:${uri.port}' : name;
   }
 
-  String get executesText => host.isEmpty
-      ? 'Executes: no provider configured'
-      : 'Executes: provider at $host';
+  String get executesText {
+    if (endpoint.trim().isEmpty) return 'Executes: no provider configured';
+    if (host.isEmpty) return 'Executes: provider (endpoint unreadable)';
+    return 'Executes: provider at $host';
+  }
 }

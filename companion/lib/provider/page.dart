@@ -66,6 +66,10 @@ class _ProviderPageState extends State<ProviderPage>
   final contentScroll = ScrollController(keepScrollOffset: false);
   bool dedicated = false;
   bool detailOpen = false;
+
+  /// The request the user (or a notification) last opened; marks its row
+  /// while the detail is open, even before its review has loaded.
+  String openedRequest = '';
   AccessDestination destination = AccessDestination.requests;
   ThemeMode appearance = ThemeMode.system;
   @override
@@ -158,6 +162,7 @@ class _ProviderPageState extends State<ProviderPage>
     setState(() {
       destination = AccessDestination.requests;
       detailOpen = true;
+      openedRequest = id;
       notificationRequest = id;
       notificationNote = '';
     });
@@ -317,6 +322,7 @@ class _ProviderPageState extends State<ProviderPage>
     setState(() {
       destination = AccessDestination.requests;
       detailOpen = true;
+      openedRequest = id;
     });
     unawaited(controller.review(id));
   }
@@ -399,7 +405,7 @@ class _ProviderPageState extends State<ProviderPage>
           controller: controller,
           unlockPassword: unlockPassword, // secrets-ignore: UI controller
           notificationNote: notificationNote,
-          selectedId: detailOpen ? state.reviewId : '',
+          selectedId: detailOpen ? openedRequest : '',
           onUnlock: unlock,
           onOpenRequest: openRequest,
           onOpenSettings: () => navigate(AccessDestination.settings),

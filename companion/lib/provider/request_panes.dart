@@ -80,7 +80,14 @@ class RequestListPane extends StatelessWidget {
             Text(notificationNote, key: const Key('notification-note')),
           ],
           const SizedBox(height: 24),
-          Text('PENDING · ${state.requests.length} OF 256 MAX', style: kicker),
+          Semantics(
+            label: 'Pending requests: ${state.requests.length} of 256 maximum',
+            excludeSemantics: true,
+            child: Text(
+              'PENDING · ${state.requests.length} OF 256 MAX',
+              style: kicker,
+            ),
+          ),
           Text(
             'The provider caps the inbox at 256; this is not pagination.',
             style: Theme.of(context).textTheme.labelSmall,

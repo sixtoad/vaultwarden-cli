@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'access_theme.dart';
+import 'metrics.dart';
 
 /// A status: always an icon and its text, never color alone.
 class StatusLabel extends StatelessWidget {
@@ -33,7 +34,9 @@ class CountBadge extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: c.actionFill,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(
+            AccessMetrics.of(context).badgeRadius,
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

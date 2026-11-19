@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/design/access_theme.dart';
 import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/provider/page.dart';
+import 'package:companion_slice/provider/request_panes.dart';
 import 'package:companion_slice/src/rust/frb_generated.dart';
 
 import 'provider_support.dart';
@@ -14,6 +17,7 @@ Future<void> show(
   WidgetTester tester,
   FixtureProviderPlatform platform, {
   Size size = const Size(1200, 1000),
+  double textScale = 1,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -21,6 +25,11 @@ Future<void> show(
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: ProviderPage(
         platform: platform,
         syntheticBuilder: (_) => const Text('Synthetic only'),
@@ -141,6 +150,101 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected(), isFalse);
     expect(find.byKey(const Key('provider-review')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    semantics.dispose();
+  });
+
+  TextButton row(WidgetTester tester) =>
+      tester.widget<TextButton>(requestRow(providerId));
+
+  testWidgets('rows are disabled and muted while an operation runs', (
+    tester,
+  ) async {
+    final native = FixtureProviderPlatform()
+      ..heldReview = Completer<Uint8List>();
+    await show(tester, native);
+    expect(row(tester).onPressed, isNotNull);
+    await tester.tap(requestRow(providerId));
+    await tester.pump();
+    expect(row(tester).onPressed, isNull);
+    final id = tester.widget<Text>(
+      find.descendant(
+        of: requestRow(providerId),
+        matching: find.text(providerId),
+      ),
+    );
+    final c = accessTheme(Brightness.light).extension<AccessTheme>()!;
+    expect(id.style!.color, c.secondary);
+    native.heldReview!.complete(encoded(providerReview()));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final (size, scale) in [
+    (const Size(320, 640), 1.0),
+    (const Size(360, 740), 1.3),
+    (const Size(849, 700), 1.0),
+  ]) {
+    testWidgets('a full inbox badge fits the bottom bar at $size x$scale', (
+      tester,
+    ) async {
+      final native = FixtureProviderPlatform()
+        ..requestIds = [
+          for (var i = 0; i < 256; i++)
+            base64Url.encode(List<int>.filled(31, 0) + [i]).replaceAll('=', ''),
+        ];
+      await show(tester, native, size: size, textScale: scale);
+      expect(find.text('256'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final (width, list) in [
+    (849.0, null),
+    (963.0, null),
+    (964.0, 220.0),
+    (1149.0, 220.0),
+    (1150.0, 270.0),
+  ]) {
+    testWidgets('list beside detail at window $width: $list', (tester) async {
+      await show(tester, FixtureProviderPlatform(), size: Size(width, 900));
+      final pane = find.byType(RequestListPane);
+      expect(
+        find.byType(RequestDetailPane),
+        list == null ? findsNothing : findsOneWidget,
+      );
+      if (list != null) expect(tester.getSize(pane).width, list);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('the row of the opened request is selected before it loads', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final native = FixtureProviderPlatform()
+      ..requestIds = [providerId, secondId];
+    await show(tester, native);
+    await tester.tap(requestRow(providerId));
+    await tester.pumpAndSettle();
+    native.heldReview = Completer<Uint8List>();
+    await tester.tap(find.byTooltip('Back to requests'));
+    await tester.pumpAndSettle();
+    await tester.tap(requestRow(secondId));
+    await tester.pump();
+    bool selected(String id) =>
+        tester
+            .getSemantics(requestRow(id))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected ==
+        Tristate.isTrue;
+    expect(selected(secondId), isTrue);
+    expect(selected(providerId), isFalse);
+    native.heldReview!.complete(encoded(providerReview()));
+    await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox.shrink());
     semantics.dispose();
   });

@@ -87,6 +87,15 @@ void main() {
     );
     expect(status('').host, isEmpty);
     expect(status('not a url').host, isEmpty);
+    expect(status('https://[::1]:8443/v1').host, '[::1]:8443');
+    expect(
+      status('fixture.example:8443/v1').executesText,
+      'Executes: provider (endpoint unreadable)',
+    );
+    expect(
+      status('https://user:secret@fixture.example/v1').executesText,
+      isNot(contains('secret')),
+    );
     expect(status('').executesText, 'Executes: no provider configured');
     expect(
       status('https://fixture.example').executesText,
