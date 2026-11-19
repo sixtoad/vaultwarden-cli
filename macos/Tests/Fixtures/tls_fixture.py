@@ -29,8 +29,11 @@ def provision(root):
     def run(*args):
         subprocess.run([openssl, *map(str, args)], cwd=root, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
+    # Key identifiers make every chain RFC 5280 complete. Strict X.509 checks
+    # (Python 3.13+ default contexts) refuse a leaf without an Authority Key
+    # Identifier, and LibreSSL, unlike OpenSSL 3, adds neither identifier itself.
     for ca in ["ca", "other-ca"]:
-        (root / f"{ca}.cnf").write_text(f"[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=Synthetic {ca}\n[ext]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\n")
+        (root / f"{ca}.cnf").write_text(f"[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=Synthetic {ca}\n[ext]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid:always\n")
         run("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2", "-config", f"{ca}.cnf", "-keyout", f"{ca}.key", "-out", f"{ca}.pem")
         run("x509", "-in", f"{ca}.pem", "-outform", "DER", "-out", f"{ca}.der")
     for name, ca, client, san in [
@@ -40,7 +43,7 @@ def provision(root):
         ("revoked", "ca", True, None),
         ("foreign", "other-ca", True, None),
     ]:
-        (root / f"{name}.ext").write_text("basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=" + ("clientAuth" if client else "serverAuth") + "\n" + (f"subjectAltName={san}\n" if san else ""))
+        (root / f"{name}.ext").write_text("basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=" + ("clientAuth" if client else "serverAuth") + "\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid:always\n" + (f"subjectAltName={san}\n" if san else ""))
         run("req", "-new", "-newkey", "rsa:2048", "-nodes", "-subj", f"/CN=Synthetic {name}", "-keyout", f"{name}.key", "-out", f"{name}.csr")
         run("x509", "-req", "-in", f"{name}.csr", "-CA", f"{ca}.pem", "-CAkey", f"{ca}.key", "-CAcreateserial", "-days", "2", "-extfile", f"{name}.ext", "-out", f"{name}.pem")
         run("x509", "-in", f"{name}.pem", "-outform", "DER", "-out", f"{name}.der")

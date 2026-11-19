@@ -14,11 +14,18 @@ VW18_TEST_BINARY="$(python3 -c 'import json,sys; print(next(x["executable"] for 
 export VW18_TEST_BINARY
 VW18_HELPER="$(python3 -c 'import json,sys; print(next(x["executable"] for x in map(json.loads,open(sys.argv[1])) if x.get("reason")=="compiler-artifact" and x["target"]["name"]=="vaultwarden-access-exec" and x.get("executable")))' "$VW18_RUN_DIR/artifacts.json")"
 VW18_LIBRARY="$(python3 -c 'import json,sys; print(next(p for x in map(json.loads,open(sys.argv[1])) if x.get("reason")=="compiler-artifact" and x["target"]["name"]=="vaultwarden_cli" and x["target"]["kind"]==["lib"] for p in x["filenames"] if p.endswith(".rlib")))' "$VW18_RUN_DIR/artifacts.json")"
-VW18_DEPS="$(dirname "$VW18_HELPER")/deps"
+# Every directory Cargo reported a library artifact in. Cargo >= 1.100 keeps each
+# unit in its own build-dir directory (target/debug/build/<pkg>/<hash>/out) rather
+# than one target/debug/deps, so the paths are read from Cargo, never assumed.
+VW18_DEPS=()
+while IFS= read -r dependency_dir; do
+    VW18_DEPS+=(-L "dependency=$dependency_dir")
+done < <(python3 -c 'import json,os,sys; print("\n".join(sorted({os.path.dirname(p) for x in map(json.loads,open(sys.argv[1])) if x.get("reason")=="compiler-artifact" for p in x["filenames"] if p.endswith((".rlib",".rmeta",".so",".dylib",".dll"))})))' "$VW18_RUN_DIR/artifacts.json")
+test "${#VW18_DEPS[@]}" -gt 0
 export VW18_HELPER
 VW18_ENV_HELPER="$VW18_RUN_DIR/helper-environment"
 export VW18_ENV_HELPER
-rustc --edition=2024 tests/fixtures/helper-environment.rs -L "dependency=$VW18_DEPS" --extern "vaultwarden_cli=$VW18_LIBRARY" -o "$VW18_ENV_HELPER"
+rustc --edition=2024 tests/fixtures/helper-environment.rs "${VW18_DEPS[@]}" --extern "vaultwarden_cli=$VW18_LIBRARY" -o "$VW18_ENV_HELPER"
 chmod 500 "$VW18_ENV_HELPER"
 VW18_IMAGE="$VW18_RUN_DIR/protected-tree"
 export VW18_IMAGE
