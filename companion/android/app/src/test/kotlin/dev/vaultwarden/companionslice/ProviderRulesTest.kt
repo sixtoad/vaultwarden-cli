@@ -56,7 +56,7 @@ class ProviderRulesTest {
     @Test fun aDecisionStaysUncertainUntilSettled() {
         val start = RecoveryState()
         assertEquals(start, start.beforeSend(bytes("""{"version":1,"command":"status"}""")))
-        val pending = start.beforeSend(bytes("""{"version":1,"command":"decision","request_id":"$id","ticket":"$ticket","decision":"approve"}""")))!!
+        val pending = start.beforeSend(bytes("""{"version":1,"command":"decision","request_id":"$id","ticket":"$ticket","decision":"approve"}"""))!!
         assertEquals(id, pending.pendingId)
         assertTrue(pending.hasPending)
         // While uncertain only that request's status may be sent.
