@@ -154,3 +154,14 @@ the `companion-slice-macOS-arm64-development` and
 `companion-macOS-disposable-pilot` artifacts, and the 30 unchanged shell
 captures in each artifact matched the committed references byte for byte.
 The PNGs are copied byte for byte; comparison stays exact.
+
+## Review reveal and inbox row status, 2026-11-21 (#50 slice 2)
+
+Two review fixes change nine captures per host. In single-pane layouts an
+opened review now scrolls to its own top, so the 200% capture shows the whole
+"who wants what" sentence above the navigation bar (`*_compact_review.png`,
+`*_large_review.png`, light and dark). The inbox row shows the final status the
+companion holds for a request instead of a fixed "Pending"
+(`light_desktop_review_{running,completed,failed,denied,expired}.png`). The
+`macos-27-arm64` references were regenerated locally and reviewed; the other
+hosts adopt their reviewed CI actuals.

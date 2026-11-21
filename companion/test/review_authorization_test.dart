@@ -72,6 +72,14 @@ Future<TextEditingController> typePassword(WidgetTester tester) async {
   return tester.widget<TextField>(passwordField).controller!;
 }
 
+Finder latestStatus(String label) => find.descendant(
+  of: find.byKey(const Key('latest-status')),
+  matching: find.text(label),
+);
+
+Finder rowStatus(String label) =>
+    find.descendant(of: requestRow(providerId), matching: find.text(label));
+
 void main() {
   setUpAll(() async => RustLib.init());
   setUp(resetProvider);
@@ -280,7 +288,9 @@ void main() {
     expect(decisions(native).single['decision'], 'deny');
     expect(decisions(native).single.containsKey('password'), isFalse);
     expect(find.byKey(const Key('latest-status')), findsOneWidget);
-    expect(find.text('Denied'), findsOneWidget);
+    expect(latestStatus('Denied'), findsOneWidget);
+    // The inbox row follows until the next read drops the request.
+    expect(rowStatus('Denied'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -296,7 +306,8 @@ void main() {
     await tester.tap(find.byKey(const Key('approve-password')));
     await tester.pumpAndSettle();
     expect(decisions(native).single['decision'], 'approve');
-    expect(find.text('Approved · not completed'), findsOneWidget);
+    expect(latestStatus('Approved · not completed'), findsOneWidget);
+    expect(rowStatus('Approved · not completed'), findsOneWidget);
     expect(find.textContaining('Do not approve again'), findsOneWidget);
     expect(find.textContaining('Completed'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());

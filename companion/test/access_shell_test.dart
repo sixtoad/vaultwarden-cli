@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/provider/page.dart';
+import 'package:companion_slice/provider/request_review.dart';
 import 'package:companion_slice/design/access_theme.dart';
 import 'package:companion_slice/src/rust/api/provider.dart' as core;
 import 'package:companion_slice/src/rust/frb_generated.dart';
@@ -224,6 +225,21 @@ void main() {
       )
       .position;
 
+  // A single-pane review opens at its own top (#50 slice 2), never at the
+  // inbox offset it was opened from.
+  void expectReviewAtTop(WidgetTester tester) {
+    final viewport = tester.getRect(
+      find
+          .descendant(
+            of: find.byType(SingleChildScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tester.getRect(find.byType(RequestReview)).top, viewport.top);
+    expect(contentPosition(tester).pixels, lessThan(1000));
+  }
+
   testWidgets('long inbox review, cancel and system back start at the top', (
     tester,
   ) async {
@@ -234,7 +250,7 @@ void main() {
       expect(contentPosition(tester).pixels, greaterThan(1000));
       await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
-      expect(contentPosition(tester).pixels, 0);
+      expectReviewAtTop(tester);
       await tester.ensureVisible(find.text('Close review'));
       expect(contentPosition(tester).pixels, greaterThan(0));
       if (systemBack) {
@@ -264,8 +280,8 @@ void main() {
       await tester.ensureVisible(find.text('Open request with fresh review'));
       await tester.tap(find.text('Open request with fresh review'));
       await tester.pumpAndSettle();
-      expect(contentPosition(tester).pixels, 0);
       expect(find.byKey(const Key('provider-review')), findsOneWidget);
+      expectReviewAtTop(tester);
       await destination(tester, 'devices');
       await destination(tester, 'requests');
       expect(contentPosition(tester).pixels, 0);

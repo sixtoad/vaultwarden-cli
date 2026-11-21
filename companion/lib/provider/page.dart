@@ -432,7 +432,7 @@ class _ProviderPageState extends State<ProviderPage>
     ),
   );
 
-  Widget content(double width) {
+  Widget content(BuildContext context, double width) {
     final state = controller.state;
     return switch (destination) {
       AccessDestination.requests => RequestsView(
@@ -461,6 +461,8 @@ class _ProviderPageState extends State<ProviderPage>
           onStep: setReviewStep,
           onReload: reloadReview,
           onActivity: () => navigate(AccessDestination.activity),
+          revealOnOpen:
+              AccessMetrics.of(context).masterWidth(context, width) == null,
         ),
       ),
       AccessDestination.devices => ProviderDevices(
@@ -528,7 +530,7 @@ class _ProviderPageState extends State<ProviderPage>
           final m = AccessMetrics.of(context);
           final side = constraints.maxWidth >= 600 ? m.space[5] : m.space[3];
           final width = constraints.maxWidth - 2 * side;
-          final page = content(width);
+          final page = content(context, width);
           return SingleChildScrollView(
             controller: contentScroll,
             key: ValueKey(destination),

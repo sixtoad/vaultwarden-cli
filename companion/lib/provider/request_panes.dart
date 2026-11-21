@@ -7,6 +7,7 @@ import '../design/typography.dart';
 import 'controller.dart';
 import 'request_review.dart';
 import 'review/latest_status.dart';
+import 'review/review_status.dart';
 import 'review/review_session.dart';
 import 'requests_view.dart';
 import 'touch_id.dart';
@@ -101,6 +102,7 @@ class RequestListPane extends StatelessWidget {
             RequestRow(
               id: id,
               selected: id == selectedId,
+              status: _knownStatus(id),
               onOpen:
                   controller.busy ||
                       state.locked ||
@@ -111,6 +113,24 @@ class RequestListPane extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  /// The freshest final status the companion holds for an inbox ID: the open
+  /// review's, else the latest status after a decision or status check. The
+  /// inbox lists pending IDs only, so anything unknown, unreadable or still
+  /// pending shows as pending until the next inbox read drops a final one.
+  ReviewStatus _knownStatus(String id) {
+    final state = controller.state;
+    final review = state.review;
+    final raw = review != null && state.reviewId == id
+        ? review.status
+        : state.statusId == id
+        ? state.statusText
+        : '';
+    final status = ReviewStatus.parse(raw);
+    return status.phase == ReviewPhase.unreadable
+        ? const ReviewStatus(ReviewPhase.pending)
+        : status;
   }
 }
 
@@ -132,6 +152,7 @@ class RequestDetailPane extends StatelessWidget {
     required this.onStep,
     required this.onReload,
     this.onActivity,
+    this.revealOnOpen = false,
   });
   final ProviderController controller;
   final TouchIdController touchId;
@@ -142,12 +163,17 @@ class RequestDetailPane extends StatelessWidget {
   final VoidCallback onApprove, onDeny, onBack, onReload;
   final VoidCallback? onActivity;
   final ValueChanged<ReviewStep> onStep;
+
+  /// Single-pane layouts (compact, large text): scroll each newly loaded
+  /// review to its own top, so the status, operation and "who wants what"
+  /// sentence are on screen instead of the provider status above it.
+  final bool revealOnOpen;
   @override
   Widget build(BuildContext context) {
     final state = controller.state;
     final review = state.review;
     if (review == null) return _absent(context);
-    return RequestReview(
+    final detail = RequestReview(
       state: state,
       endpoint: controller.configuration.endpoint,
       origin: controller.management.originId == controller.state.reviewId
@@ -168,6 +194,8 @@ class RequestDetailPane extends StatelessWidget {
       touchIdNote: touchId.working ? '' : touchId.unavailableReason,
       touchIdMessage: touchId.message,
     );
+    if (!revealOnOpen) return detail;
+    return _RevealOnOpen(key: ValueKey(state.reviewId), child: detail);
   }
 
   Widget _absent(BuildContext context) {
@@ -234,4 +262,27 @@ class RequestDetailPane extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Brings its child to the top of the enclosing scroll view once, after the
+/// first frame it is laid out in. Keyed by request ID, so each loaded review
+/// is revealed once; later rebuilds (polling, steps) keep the reader's place.
+class _RevealOnOpen extends StatefulWidget {
+  const _RevealOnOpen({super.key, required this.child});
+  final Widget child;
+  @override
+  State<_RevealOnOpen> createState() => _RevealOnOpenState();
+}
+
+class _RevealOnOpenState extends State<_RevealOnOpen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(Scrollable.ensureVisible(context));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
