@@ -120,6 +120,57 @@ jobs:
             ${{ runner.temp }}/desktop-evidence
             companion/test/failures
 
+  mobile-rust-core:
+    # Issue 60: the companion Rust core (FRB bridge, approval v2, enrollment)
+    # for the Android and iOS approval clients. cdylib for Android
+    # (jniLibs/<abi>/libcompanion_core.so), staticlib for iOS (linked into the
+    # Runner). Built on GitHub-hosted runners: the Android NDK is preinstalled
+    # on ubuntu-24.04 and the iOS SDK on macos-26. No phone app is built here.
+    name: Companion Rust core (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: aarch64-linux-android
+            artifact: libcompanion_core.so
+          - os: macos-26
+            target: aarch64-apple-ios
+            artifact: libcompanion_core.a
+          - os: macos-26
+            target: aarch64-apple-ios-sim
+            artifact: libcompanion_core.a
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Point Cargo at the preinstalled Android NDK (API 24)
+        if: matrix.target == 'aarch64-linux-android'
+        run: |
+          ndk="${ANDROID_NDK_LATEST_HOME:?Android NDK not preinstalled}"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$bin/aarch64-linux-android24-clang"
+          {
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android24-clang"
+            echo "CC_aarch64_linux_android=$bin/aarch64-linux-android24-clang"
+            echo "AR_aarch64_linux_android=$bin/llvm-ar"
+          } >> "$GITHUB_ENV"
+      - name: Check the library for ${{ matrix.target }}
+        run: cargo check --locked --lib --manifest-path companion/rust/Cargo.toml --target ${{ matrix.target }}
+      - name: Build the release library for ${{ matrix.target }}
+        run: cargo build --release --locked --lib --manifest-path companion/rust/Cargo.toml --target ${{ matrix.target }}
+      - name: The packaged artifact exists
+        run: |
+          built="companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}"
+          test -s "$built"
+          ls -l "$built"
+
   desktop-companion-msrv:
     name: Companion Rust 1.88 and security mutations
     runs-on: ubuntu-24.04
