@@ -26,9 +26,6 @@ enum UserVerification {
 
   /// Android Class 3 (strong) biometrics.
   biometric('biometrics'),
-
-  /// The device PIN, pattern or passcode, required for every signature.
-  deviceCredential('device credential'),
   unavailable('unavailable');
 
   const UserVerification(this.label);
@@ -37,23 +34,67 @@ enum UserVerification {
 
 /// The native `availability` replies each system may give. Anything else,
 /// including another system's value, is `unavailable`: macOS reports only
-/// `touchID`, exactly as before.
+/// `touchID`, exactly as before. No system approves with its passcode alone
+/// (docs/mobile-clients.md section 2): a `deviceCredential` reply is
+/// `unavailable`, and password approval is the fallback.
 const verificationReplies = <String, Map<String, UserVerification>>{
   'macos': {'touchID': UserVerification.touchId},
   'ios': {
     'touchID': UserVerification.touchId,
     'faceID': UserVerification.faceId,
-    'deviceCredential': UserVerification.deviceCredential,
   },
-  'android': {
-    'biometric': UserVerification.biometric,
-    'deviceCredential': UserVerification.deviceCredential,
-  },
+  'android': {'biometric': UserVerification.biometric},
 };
 
 UserVerification parseUserVerification(String operatingSystem, Object? reply) =>
     verificationReplies[operatingSystem]?[reply] ??
     UserVerification.unavailable;
+
+/// How the approval UI names the user verification and this device (#60).
+/// macOS keeps its historical wording ("Touch ID", "this Mac") whatever the
+/// reply; phones use the verification's [UserVerification.label].
+class VerificationWording {
+  const VerificationWording._(this.method, this.device, this.change);
+
+  /// The wording for [operatingSystem] when its key reports [verification]
+  /// (when `unavailable`, the method the system would normally use).
+  factory VerificationWording.of(
+    String operatingSystem,
+    UserVerification verification,
+  ) {
+    if (!isMobileSystem(operatingSystem)) return macOS;
+    final method = verification != UserVerification.unavailable
+        ? verification.label
+        : operatingSystem == 'ios'
+        ? 'Face ID or Touch ID'
+        : UserVerification.biometric.label;
+    return VerificationWording._(method, 'this device', 'biometric enrollment');
+  }
+
+  static const macOS = VerificationWording._(
+    'Touch ID',
+    'this Mac',
+    'fingerprint',
+  );
+
+  /// The verification as written mid-sentence ("Touch ID", "biometrics").
+  final String method;
+
+  /// This device, mid-sentence ("this Mac", "this device").
+  final String device;
+
+  /// What invalidates the key ("fingerprint", "biometric enrollment").
+  final String change;
+
+  /// [method] at the start of a sentence.
+  String get startMethod => _capital(method);
+
+  /// [device] at the start of a sentence.
+  String get startDevice => _capital(device);
+
+  static String _capital(String text) =>
+      text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+}
 
 /// Implemented by an approval key platform that can say which verification
 /// its key requires (Face ID, Android biometrics, ...).

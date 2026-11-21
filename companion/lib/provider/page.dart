@@ -102,7 +102,9 @@ class _ProviderPageState extends State<ProviderPage>
   String get os => widget.operatingSystem ?? Platform.operatingSystem;
   bool get mobile => isMobileSystem(os);
 
-  /// A device lock signal arrived; only a lifecycle `resumed` clears it.
+  /// A device lock signal arrived while the app was already out of the
+  /// foreground; the next lifecycle `resumed` (even one deferred during a
+  /// system prompt) clears it.
   bool _locked = false;
   void Function()? _stopSignals;
   AccessDestination destination = AccessDestination.requests;
@@ -121,6 +123,7 @@ class _ProviderPageState extends State<ProviderPage>
     touchId = TouchIdController(
       controller,
       widget.approvalKeys ?? NativeApprovalKeyPlatform(),
+      operatingSystem: os,
     )..addListener(changed);
     touchId.onExemptionEnded = applyLifecycle;
     _stopSignals =
@@ -227,9 +230,18 @@ class _ProviderPageState extends State<ProviderPage>
 
   /// A phone locked or was interrupted: retire the authorization and the
   /// review at once, whatever Flutter's lifecycle says yet (#60).
+  ///
+  /// A `locked` that arrives while Flutter still reports `resumed` (the
+  /// signal raced ahead of the lifecycle, or came late after an unlock) is
+  /// handled like `interrupted`: a real lock always takes the app out of
+  /// `resumed`, which suspends it until the next `resumed`. Latching it
+  /// would leave the phone suspended after an unlock that already happened.
   void onDeviceSignal(DeviceSignal signal) {
     if (!mounted) return;
-    if (signal == DeviceSignal.locked) _locked = true;
+    if (signal == DeviceSignal.locked &&
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      _locked = true;
+    }
     unawaited(touchId.retire());
     controller.suspend();
     if (!touchId.lifecycleExempt) applyLifecycle();
@@ -285,10 +297,13 @@ class _ProviderPageState extends State<ProviderPage>
       // (`applyLifecycle`). Hiding, pausing and detaching still cancel the
       // prompt and suspend at once; the native signer also cancels it on
       // sleep, display sleep, screen lock, session switch, close and quit.
-      if (state == AppLifecycleState.inactive ||
-          state == AppLifecycleState.resumed) {
+      if (state == AppLifecycleState.resumed) {
+        // The device is unlocked again; `applyLifecycle` resumes when the
+        // prompt ends.
+        _locked = false;
         return;
       }
+      if (state == AppLifecycleState.inactive) return;
       unawaited(touchId.retire());
       controller.suspend();
       return;
