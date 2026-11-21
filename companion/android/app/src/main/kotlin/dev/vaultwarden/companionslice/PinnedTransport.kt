@@ -42,8 +42,9 @@ class PinnedTrustManager(ca: X509Certificate, private val leafSha256: String) : 
         if (!pinMatches(chain[0].encoded, leafSha256)) throw CertificateException("pin mismatch")
     }
 
-    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) =
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
         throw CertificateException("client role unsupported")
+    }
 
     override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
 

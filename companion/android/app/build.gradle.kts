@@ -58,6 +58,9 @@ kotlin {
 dependencies {
     // BiometricPrompt with a CryptoObject: the only way a signature is produced.
     implementation("androidx.biometric:biometric:1.1.0")
+    // Imported directly (FragmentActivity, Lifecycle); also what the Flutter embedding uses.
+    implementation("androidx.fragment:fragment:1.7.1")
+    implementation("androidx.core:core:1.13.1")
     testImplementation("junit:junit:4.13.2")
     // android.jar's org.json is a stub in JVM unit tests.
     testImplementation("org.json:json:20240303")

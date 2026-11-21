@@ -31,22 +31,21 @@ object ApprovalKeyStore {
         class Failure(val reply: KeyReply) : Lookup()
     }
 
-    fun lookup(binding: ApprovalBinding): Lookup = try {
-        val store = keyStore()
-        if (!store.containsAlias(binding.alias)) {
-            Lookup.Failure(KeyReply(KeyOutcome.absent))
-        } else {
+    fun lookup(binding: ApprovalBinding): Lookup {
+        try {
+            val store = keyStore()
+            if (!store.containsAlias(binding.alias)) return Lookup.Failure(KeyReply(KeyOutcome.absent))
             val entry = store.getEntry(binding.alias, null) as? KeyStore.PrivateKeyEntry
-            val public = entry?.certificate?.publicKey as? ECPublicKey
-            val sec1 = public?.let { SignatureEncoding.sec1(it) }
-            when {
-                entry == null || sec1 == null -> Lookup.Failure(KeyReply(KeyOutcome.unsafe))
-                !KeyAttributePolicy.admits(facts(entry.privateKey)) -> Lookup.Failure(KeyReply(KeyOutcome.unsafe))
-                else -> Lookup.Found(entry.privateKey, sec1)
-            }
+                ?: return Lookup.Failure(KeyReply(KeyOutcome.unsafe))
+            val public = entry.certificate?.publicKey as? ECPublicKey
+                ?: return Lookup.Failure(KeyReply(KeyOutcome.unsafe))
+            val sec1 = SignatureEncoding.sec1(public) ?: return Lookup.Failure(KeyReply(KeyOutcome.unsafe))
+            // Only a hardware, generated, per-use biometric key may sign.
+            if (!KeyAttributePolicy.admits(facts(entry.privateKey))) return Lookup.Failure(KeyReply(KeyOutcome.unsafe))
+            return Lookup.Found(entry.privateKey, sec1)
+        } catch (_: Exception) {
+            return Lookup.Failure(KeyReply(KeyOutcome.failed))
         }
-    } catch (_: Exception) {
-        Lookup.Failure(KeyReply(KeyOutcome.failed))
     }
 
     fun facts(key: PrivateKey): KeyFacts {
