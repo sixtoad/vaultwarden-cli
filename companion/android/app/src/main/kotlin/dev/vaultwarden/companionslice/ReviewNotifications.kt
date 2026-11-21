@@ -88,6 +88,9 @@ class ReviewNotifications(private val activity: FragmentActivity, messenger: Bin
             }
             "post" -> {
                 val token = ReviewNotificationContract.token(call.arguments) ?: return result.error("invalid", null, null)
+                // The native preference is the authority: a post that raced a
+                // setEnabled(false) (or a stale Dart view) shows nothing.
+                if (!preferences.getBoolean(ENABLED, false)) return result.success(null)
                 try {
                     manager.notify(token, ReviewNotificationContract.NOTIFICATION_ID, build(token))
                     result.success(null)

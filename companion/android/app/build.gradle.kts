@@ -62,7 +62,9 @@ dependencies {
     implementation("androidx.fragment:fragment:1.7.1")
     implementation("androidx.core:core:1.13.1")
     testImplementation("junit:junit:4.13.2")
-    // android.jar's org.json is a stub in JVM unit tests.
+    // android.jar's org.json is a stub in JVM unit tests. Maven org.json is a
+    // superset of Android's public API (keySet, toMap, ...): OrgJsonAndroidApiTest
+    // refuses those members in the main sources, which compile against android.jar.
     testImplementation("org.json:json:20240303")
 }
 

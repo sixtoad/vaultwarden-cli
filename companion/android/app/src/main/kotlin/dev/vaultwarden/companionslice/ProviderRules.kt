@@ -61,6 +61,14 @@ object ProviderRules {
 }
 
 /**
+ * The object's member names. Android's org.json has no public `keySet()`
+ * (it is `@hide`, absent from android.jar); `keys()` is public API on Android
+ * and in the Maven org.json the unit tests run against.
+ * `OrgJsonAndroidApiTest` refuses the Maven-only members in main sources.
+ */
+internal fun JSONObject.memberNames(): Set<String> = keys().asSequence().toSet()
+
+/**
  * The durable recovery marker (`ProviderSettings.beforeSend`/`settle` on
  * macOS): a sent decision stays uncertain until Dart settles it, and while it
  * is unresolved only its own `status` may be sent and the configuration may
@@ -78,8 +86,8 @@ data class RecoveryState(val pendingId: String? = null, val managementKind: Stri
         if (pendingId != null && (command != "status" || json.opt("request_id") != pendingId)) return null
         if (managementAction != null) {
             val target = json.optJSONObject("target") ?: return null
-            if (command != "identity_status" || json.opt("version") != 2 || json.keySet() != setOf("version", "command", "target", "action_id") ||
-                target.keySet() != setOf("kind", "id") || target.opt("kind") != managementKind ||
+            if (command != "identity_status" || json.opt("version") != 2 || json.memberNames() != setOf("version", "command", "target", "action_id") ||
+                target.memberNames() != setOf("kind", "id") || target.opt("kind") != managementKind ||
                 target.opt("id") != managementId || json.opt("action_id") != managementAction) return null
         }
         var next = this
@@ -90,8 +98,8 @@ data class RecoveryState(val pendingId: String? = null, val managementKind: Stri
             val action = json.opt("action_id") as? String
             val ticket = json.opt("ticket") as? String
             val password = json.opt("password") as? String
-            if (hasPending || json.keySet() != setOf("version", "command", "target", "action_id", "ticket", "password") ||
-                json.opt("version") != 2 || target.keySet() != setOf("kind", "id") ||
+            if (hasPending || json.memberNames() != setOf("version", "command", "target", "action_id", "ticket", "password") ||
+                json.opt("version") != 2 || target.memberNames() != setOf("kind", "id") ||
                 kind == null || id == null || action == null || ticket == null || !Wire.validHex(ticket, 64) ||
                 password.isNullOrEmpty() || password.toByteArray().size > 4096 || !validManagement(kind, id, action)) return null
             next = next.copy(managementKind = kind, managementId = id, managementAction = action)

@@ -8,7 +8,7 @@ package dev.vaultwarden.companionslice
  * never signs.
  *
  * Numeric values are `android.security.keystore.KeyProperties` constants
- * (pinned against the real ones by `KeyAttributePolicyAndroidTest`).
+ * (pinned against the real ones by `KeyPolicyTest`).
  */
 object KeyProps {
     const val PURPOSE_SIGN = 4
@@ -71,7 +71,11 @@ object KeyAttributePolicy {
             facts.keySize == 256 &&
             facts.userAuthenticationRequired &&
             facts.authenticationEnforcedBySecureHardware &&
-            facts.authenticationValiditySeconds == 0 &&
+            // 0 is what the key was generated with; API 30 may report -1 for
+            // the same per-use key after setUserAuthenticationParameters(0, ...).
+            // Both mean one operation per authentication; a positive window does not.
+            // (-1 on API 30 still needs confirmation on a real device.)
+            facts.authenticationValiditySeconds <= 0 &&
             facts.authenticators == KeyProps.AUTH_BIOMETRIC_STRONG &&
             facts.invalidatedByBiometricEnrollment &&
             !facts.validWhileOnBody
@@ -87,7 +91,7 @@ class KeyReply(val outcome: KeyOutcome, val publicKey: ByteArray = ByteArray(0),
 
 /**
  * BiometricPrompt error codes (`androidx.biometric.BiometricPrompt.ERROR_*`,
- * pinned by `KeyAttributePolicyAndroidTest`). No error ever approves: the
+ * pinned by `KeyPolicyTest`). No error ever approves: the
  * reply carries no signature, and Dart never falls back to a password
  * submission on its own.
  */

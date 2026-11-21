@@ -69,6 +69,9 @@ class KeyPolicyTest {
     @Test fun onlyAHardwarePerUseBiometricKeyIsAdmitted() {
         assertTrue(KeyAttributePolicy.admits(good))
         assertTrue(KeyAttributePolicy.admits(good.copy(securityLevel = KeyProps.SECURITY_LEVEL_TRUSTED_ENVIRONMENT)))
+        // API 30 may report -1 for the per-use key generated with validity 0
+        // (to confirm on a real API 30 device); both are one operation per authentication.
+        assertTrue(KeyAttributePolicy.admits(good.copy(authenticationValiditySeconds = -1)))
         val refused = listOf(
             good.copy(securityLevel = KeyProps.SECURITY_LEVEL_SOFTWARE),
             good.copy(securityLevel = -2), // unknown secure
@@ -77,7 +80,7 @@ class KeyPolicyTest {
             good.copy(keySize = 384),
             good.copy(userAuthenticationRequired = false),
             good.copy(authenticationEnforcedBySecureHardware = false),
-            good.copy(authenticationValiditySeconds = -1),
+            good.copy(authenticationValiditySeconds = 1),
             good.copy(authenticationValiditySeconds = 30),
             good.copy(authenticators = KeyProps.AUTH_BIOMETRIC_STRONG or KeyProps.AUTH_DEVICE_CREDENTIAL),
             good.copy(authenticators = KeyProps.AUTH_DEVICE_CREDENTIAL),

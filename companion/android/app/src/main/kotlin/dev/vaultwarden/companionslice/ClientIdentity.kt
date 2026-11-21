@@ -40,7 +40,7 @@ object ClientIdentity {
             var imported = false
             for (strongBox in listOf(true, false)) {
                 try {
-                    store.setEntry(alias, KeyStore.PrivateKeyEntry(key, chain), protection(strongBox))
+                    store.setEntry(alias, KeyStore.PrivateKeyEntry(key, chain), protection(strongBox, rsa = key.algorithm == KeyProperties.KEY_ALGORITHM_RSA))
                     imported = true
                     break
                 } catch (_: StrongBoxUnavailableException) {
@@ -62,12 +62,15 @@ object ClientIdentity {
         }
     }
 
-    private fun protection(strongBox: Boolean): KeyProtection =
+    private fun protection(strongBox: Boolean, rsa: Boolean): KeyProtection =
         KeyProtection.Builder(KeyProperties.PURPOSE_SIGN)
             // TLS client authentication signs with the stack's own digest choice.
             .setDigests(KeyProperties.DIGEST_NONE, KeyProperties.DIGEST_SHA256,
                 KeyProperties.DIGEST_SHA384, KeyProperties.DIGEST_SHA512)
-            .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1, KeyProperties.SIGNATURE_PADDING_RSA_PSS)
+            .apply {
+                // Signature paddings are RSA-only; an EC key is imported without them.
+                if (rsa) setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1, KeyProperties.SIGNATURE_PADDING_RSA_PSS)
+            }
             .setUserAuthenticationRequired(false)
             .setIsStrongBoxBacked(strongBox)
             .build()

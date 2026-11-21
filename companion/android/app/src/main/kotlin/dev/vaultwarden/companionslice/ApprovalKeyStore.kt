@@ -4,11 +4,11 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.ProviderException
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
@@ -99,7 +99,13 @@ object ApprovalKeyStore {
                     }.generateKeyPair()
                     generated = true
                     break
-                } catch (_: StrongBoxUnavailableException) {
+                } catch (error: ProviderException) {
+                    // StrongBoxUnavailableException is one; some devices report a
+                    // broken or busy StrongBox as another ProviderException. Fall
+                    // back to the TEE only from StrongBox: the policy check below
+                    // still refuses any key that is not hardware-backed.
+                    if (!spec.strongBox) throw error
+                    runCatching { keyStore().deleteEntry(binding.alias) }
                     continue
                 }
             }
