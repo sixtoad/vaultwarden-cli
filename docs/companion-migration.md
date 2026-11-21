@@ -54,7 +54,7 @@ can be recovered with Refresh/Reload saved setup; a completed replacement never
 uses the old displayed provider metadata for new transport work.
 
 Operation admission remains closed through durable native settlement. If clearing
-the saved marker fails, Refresh original request status retries status/settlement
+the saved marker fails, Check status (the outcome-unknown notice) retries status/settlement
 against the same configuration and request ID, never decision or unlock. Native
 settlement already in flight is completed even after page disposal. Authoritative
 approved/running resolves delivery uncertainty but is not terminal execution:

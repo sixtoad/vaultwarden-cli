@@ -113,3 +113,76 @@ reviewed. The `linux`, `windows` and `macos-26-arm64` references (the same 46
 images per host) were adopted from CI run 44614054785's captures
 (`companion-slice-*-development` artifacts) after the owner reviewed them on
 2026-11-19; exact comparison is kept.
+
+## Request review states, 2026-11-19 (#50 slice 2)
+
+The review redesign changes 16 existing captures per host: review and actions
+(light/dark × desktop/compact/200%) and the four `shell_recovery` captures
+(the outcome-unknown notice). `review_states_golden_test.dart` adds 18 per
+host: the authorization step (password only, Touch ID available, Touch ID
+offered but unable to approve) and the running, completed, failed, denied,
+expired and outcome-unknown states, light desktop (1440×900) and dark compact
+(390×844). A fixed `ProviderPage.clock` keeps the countdown at 55 s. Every
+capture is written to `test/failures` by `CaptureComparator`.
+
+The `macos-27-arm64` references (16 changed, 18 new) were rendered locally with
+pinned Flutter 3.47.7 on macOS 27.0.1 and visually reviewed. The `linux`,
+`windows` and `macos-26-arm64` references were NOT regenerated: CI on those
+hosts fails on the same 16 changed and 18 missing references until the owner
+reviews and adopts each host's captures from the CI artifacts.
+
+## Request review adoption, 2026-11-21 (#50 slice 2)
+
+The `linux`, `windows` and `macos-26-arm64` references for the slice 2
+review redesign (the two-step review and the outcome-unknown shell recovery
+notice) were adopted from [CI run 44642376391](https://github.com/sixtoad/vaultwarden-cli/actions/runs/44642376391)
+on source `f1dd2fb`, where each host failed exactly the 16 changed
+review/actions/`shell_recovery` captures and the 18 missing
+`review_states_golden_test.dart` captures (243 other tests passed on Linux).
+The `macos-27-arm64` references were regenerated locally in the slice.
+
+All 34 actual captures per host were visually compared with the matching
+`macos-27-arm64` reference: same content, wrapping, review facts, status
+notices and visible actions (Approve/Deny/Close review, Cancel
+authorization, Approve once with Touch ID or password, Back to requests,
+View activity, Check status, Refresh authority and inbox); differences are
+glyph-edge rasterization only. All 48 isolated diffs of the changed
+captures show the old-to-new redesign and nothing host-specific. The 200%
+review captures cut the summary at the navigation bar by scrolling, as the
+macOS 27 reference does. The macOS 26 captures were identical (sha256) in
+the `companion-slice-macOS-arm64-development` and
+`companion-macOS-disposable-pilot` artifacts, and the 30 unchanged shell
+captures in each artifact matched the committed references byte for byte.
+The PNGs are copied byte for byte; comparison stays exact.
+
+## Review reveal and inbox row status, 2026-11-21 (#50 slice 2)
+
+Two review fixes change nine captures per host. In single-pane layouts an
+opened review now scrolls to its own top, so the 200% capture shows the whole
+"who wants what" sentence above the navigation bar (`*_compact_review.png`,
+`*_large_review.png`, light and dark). The inbox row shows the final status the
+companion holds for a request instead of a fixed "Pending"
+(`light_desktop_review_{running,completed,failed,denied,expired}.png`). The
+`macos-27-arm64` references were regenerated locally and reviewed; the other
+hosts adopt their reviewed CI actuals.
+
+## Review reveal and inbox row status adoption, 2026-11-21 (#50 slice 2)
+
+The `linux`, `windows` and `macos-26-arm64` references for the review reveal
+and inbox row status fixes were adopted from [CI run 44886352824](https://github.com/sixtoad/vaultwarden-cli/actions/runs/44886352824)
+on source `d1ede07`, where each host failed exactly the nine changed captures
+(`{light,dark}_compact_review.png`, `{light,dark}_large_review.png`,
+`light_desktop_review_{completed,denied,expired,failed,running}.png`).
+
+All 27 actual captures were visually compared with the matching
+`macos-27-arm64` reference: the compact and 200% reviews open at the review's
+own top (status, request ID, operation and the whole "who wants what"
+sentence above the navigation bar), and each desktop inbox row shows the
+review's final status (Completed · exit code 0, Denied, Expired, Failed,
+Running · not completed); differences are glyph-edge rasterization only. All
+27 isolated diffs show only the old-to-new scroll position or inbox row
+status. The macOS 26 captures were identical (sha256) in the
+`companion-slice-macOS-arm64-development` and
+`companion-macOS-disposable-pilot` artifacts, and the 47 unchanged shell and
+review state captures in each artifact matched the committed references byte
+for byte. The PNGs are copied byte for byte; comparison stays exact.

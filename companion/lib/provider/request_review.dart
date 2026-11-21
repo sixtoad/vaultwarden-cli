@@ -1,12 +1,23 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../design/components.dart';
+import '../design/metrics.dart';
 import '../src/rust/api/provider.dart' as core;
+import 'review/authorization_step.dart';
+import 'review/consequence.dart';
+import 'review/deny_confirm.dart';
+import 'review/final_state.dart';
+import 'review/request_header.dart';
+import 'review/review_session.dart';
+import 'review/review_status.dart';
+import 'review/scope_facts.dart';
+import 'review/validity.dart';
+
+export 'review/review_session.dart' show ReviewStep;
 
 /// Displays Rust's complete escaped projection verbatim; never parses authority
 /// or reconstructs arguments, identities, credentials or deadlines from text.
+/// Only the status object is read, to choose the view.
 class RequestReview extends StatelessWidget {
   const RequestReview({
     super.key,
@@ -16,7 +27,13 @@ class RequestReview extends StatelessWidget {
     required this.password,
     required this.onApprove,
     required this.onDeny,
-    required this.onCancel,
+    required this.onClose,
+    required this.step,
+    required this.onStep,
+    required this.left,
+    required this.expired,
+    required this.onReload,
+    this.onActivity,
     this.touchIdOffered = false,
     this.onTouchId,
     this.touchIdNote = '',
@@ -25,7 +42,15 @@ class RequestReview extends StatelessWidget {
   final core.ProviderSnapshot state;
   final String endpoint, origin;
   final TextEditingController password;
-  final VoidCallback onApprove, onDeny, onCancel;
+  final VoidCallback onApprove, onDeny, onClose, onReload;
+  final VoidCallback? onActivity;
+  final ReviewStep step;
+  final ValueChanged<ReviewStep> onStep;
+
+  /// Time left on this review, and whether it ran out (latched by the page:
+  /// once expired, this load never admits a decision again).
+  final Duration left;
+  final bool expired;
 
   /// Whether this Mac has Touch ID. Without it only the password path shows.
   final bool touchIdOffered;
@@ -33,196 +58,171 @@ class RequestReview extends StatelessWidget {
   /// Null when Touch ID cannot approve this review; `touchIdNote` says why.
   final VoidCallback? onTouchId;
   final String touchIdNote, touchIdMessage;
+
+  /// Whether the provider's status is final (anything but `pending`). An
+  /// unreadable status counts as final: no approval controls for it.
+  static bool isFinal(String status) => ReviewStatus.parse(status).isFinal;
+
   @override
   Widget build(BuildContext context) {
     final review = state.review;
     if (review == null) return const SizedBox.shrink();
-    if (isFinal(review.status)) return _finalView(review);
+    final status = ReviewStatus.parse(review.status);
+    final scope = [
+      ScopeFacts(review: review, endpoint: endpoint, origin: origin),
+      const SizedBox(height: 16),
+    ];
+    final message = [
+      if (touchIdMessage.isNotEmpty) ...[
+        Text(touchIdMessage, key: const Key('touch-id-message')),
+        const SizedBox(height: 16),
+      ],
+    ];
     return AccessPanel(
       child: Column(
         key: const Key('provider-review'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AccessHeading(
-            'Review request',
-            'Authorize only the exact operation below. Linux keeps secrets and executes approved operations.',
-          ),
-          FactRow('Request ID', review.id, key: const Key('review-id')),
-          FactRow('Provider endpoint', endpoint),
-          const Text(
-            'Complete request review · quoted values preserve argument boundaries. Unicode and controls appear as explicit escapes.',
-          ),
-          const SizedBox(height: 16),
-          FactRow(
-            'Requester',
-            review.requester,
-            key: const Key('review-requester'),
-          ),
-          FactRow(
-            origin.isEmpty
-                ? 'Originating device'
-                : 'Authenticated request origin',
-            origin.isEmpty ? 'Not supplied by provider protocol v1.' : origin,
-          ),
-          FactRow(
-            'Operation',
-            review.operation,
-            key: const Key('review-operation'),
-          ),
-          FactRow('Effect', review.effect, key: const Key('review-effect')),
-          FactRow('Target', review.target, key: const Key('review-target')),
-          Text('Arguments (${review.arguments.length} separate values)'),
-          const SizedBox(height: 8),
-          for (var i = 0; i < review.arguments.length; i++)
-            _argument(review, i),
-          Text('Credentials (${review.credentials.length})'),
-          const SizedBox(height: 8),
-          for (var i = 0; i < review.credentials.length; i++)
-            _credential(review, i),
-          FactRow(
-            'Executable SHA-256',
-            review.executableDigest,
-            key: const Key('review-executable-digest'),
-          ),
-          FactRow(
-            'Policy SHA-256',
-            review.policyDigest,
-            key: const Key('review-policy-digest'),
-          ),
-          FactRow(
-            'Arguments SHA-256',
-            review.argumentsDigest,
-            key: const Key('review-arguments-digest'),
-          ),
-          FactRow(
-            'Expires (Unix seconds)',
-            review.expiresAtUnixSeconds.toString(),
-            key: const Key('review-expiry'),
-          ),
-          FactRow(
-            'One-time scope',
-            review.oneTime,
-            key: const Key('review-one-time'),
-          ),
-          FactRow('Status', review.status, key: const Key('review-status')),
-          const SizedBox(height: 16),
-          const Text(
-            'Review expires within 55 seconds and at the request deadline. Every attempt consumes its ticket.',
-          ),
-          if (touchIdMessage.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(touchIdMessage, key: const Key('touch-id-message')),
-          ],
-          if (touchIdOffered) ...[
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              key: const Key('approve-touch-id'),
-              onPressed: state.canDecide ? onTouchId : null,
-              icon: const Icon(Icons.fingerprint),
-              label: const Text('Approve once with Touch ID'),
-            ),
-            if (touchIdNote.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(touchIdNote, key: const Key('touch-id-note')),
-            ],
-            const SizedBox(height: 16),
-            const Text(
-              'Touch ID signs this exact review after fetching it again. If it is unavailable, cancelled or refused, nothing is sent and you can approve with your password instead.',
-            ),
-          ],
+          RequestHeader(review: review, status: status),
           const SizedBox(height: 24),
-          accessPassword(password, 'Fresh approval password'),
-          const SizedBox(height: 16),
-          AccessActions(
-            children: [
-              FilledButton(
-                onPressed: state.canDecide ? onApprove : null,
-                child: const Text('Approve once with password'),
-              ),
-              OutlinedButton(
-                onPressed: state.canDecide ? onDeny : null,
-                child: const Text('Deny without password'),
-              ),
-              TextButton(
-                onPressed: onCancel,
-                child: const Text('Cancel review'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Cancel review does not cancel the remote request. Approval and execution completion are separate states.',
-          ),
+          if (status.isFinal) ...[
+            FinalState(status: status, onBack: onClose, onActivity: onActivity),
+            const SizedBox(height: 24),
+            ...message,
+            ...scope,
+            VerificationDetails(review: review),
+          ] else ...[
+            ...scope,
+            Consequence(review: review),
+            const SizedBox(height: 24),
+            // Always rendered, before any decision control (owner, #50 Q1).
+            VerificationDetails(review: review),
+            const SizedBox(height: 24),
+            ValidityLine(left: left, expired: expired),
+            const SizedBox(height: 16),
+            ...message,
+            _decision(context, review),
+          ],
         ],
       ),
     );
   }
 
-  /// Whether the provider's status is final (anything but `pending`). An
-  /// unreadable status counts as final: no approval controls for it.
-  static bool isFinal(String status) {
-    try {
-      return (jsonDecode(status) as Map<String, dynamic>)['status'] !=
-          'pending';
-    } catch (_) {
-      return true;
+  Widget _decision(BuildContext context, core.ProviderReview review) {
+    final enabled = state.canDecide && !expired;
+    if (expired) {
+      // mutation: expired view
+      return Column(
+        key: const Key('review-expired'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AccessNotice(
+            child: Text(
+              'This review expired before a decision. Nothing was sent. Reload it to see the request’s current scope and status.',
+            ),
+          ),
+          const SizedBox(height: 16),
+          AccessActions(
+            children: [
+              FilledButton(
+                key: const Key('reload-review'),
+                onPressed: onReload,
+                child: const Text('Reload review'),
+              ),
+              TextButton(onPressed: onClose, child: const Text('Close review')),
+            ],
+          ),
+        ],
+      );
     }
+    return switch (step) {
+      ReviewStep.authorize => AuthorizationStep(
+        review: review,
+        password: password,
+        enabled: enabled,
+        onApprove: onApprove,
+        onCancel: () => onStep(ReviewStep.review),
+        touchIdOffered: touchIdOffered,
+        onTouchId: onTouchId,
+        touchIdNote: touchIdNote,
+      ),
+      ReviewStep.deny => DenyConfirm(
+        requestId: review.id,
+        enabled: enabled,
+        onDeny: onDeny,
+        onKeep: () => onStep(ReviewStep.review),
+      ),
+      ReviewStep.review => _choice(context, enabled),
+    };
   }
 
-  /// Expired, decided, running, completed or failed requests (#61): the
-  /// state only, no password field, no approval or denial controls.
-  Widget _finalView(core.ProviderReview review) => AccessPanel(
-    child: Column(
-      key: const Key('provider-review'),
+  /// Deny… and Approve… (the second step follows), then a quiet close.
+  Widget _choice(BuildContext context, bool enabled) {
+    final small = Theme.of(context).textTheme.labelSmall;
+    final deny = OutlinedButton(
+      key: const Key('deny-start'),
+      onPressed: enabled ? () => onStep(ReviewStep.deny) : null,
+      child: const Text('Deny…'),
+    );
+    final approve = FilledButton(
+      key: const Key('approve-start'),
+      onPressed: enabled ? () => onStep(ReviewStep.authorize) : null,
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: Text('Approve…')),
+          SizedBox(width: 12),
+          Icon(Icons.arrow_forward, size: 18),
+        ],
+      ),
+    );
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const AccessHeading(
-          'Request is final',
-          'This request can no longer be approved or denied.',
+        LayoutBuilder(
+          builder: (context, constraints) =>
+              constraints.maxWidth < 320 ||
+                  AccessMetrics.of(context).largeText(context)
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [approve, const SizedBox(height: 12), deny],
+                )
+              : Row(
+                  children: [
+                    Expanded(flex: 10, child: deny),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 17, child: approve),
+                  ],
+                ),
         ),
-        FactRow('Request ID', review.id, key: const Key('review-id')),
-        FactRow('Provider endpoint', endpoint),
-        FactRow(
-          'Operation',
-          review.operation,
-          key: const Key('review-operation'),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: Text(
+            touchIdOffered && onTouchId != null
+                ? 'Touch ID or password next · approval applies to this request only'
+                : 'Password required next · approval applies to this request only',
+            textAlign: TextAlign.center,
+            style: small,
+          ),
         ),
-        FactRow('Target', review.target, key: const Key('review-target')),
-        FactRow('Status', review.status, key: const Key('review-status')),
-        const SizedBox(height: 16),
-        const Text(
-          'Expired, cancelled and already decided requests are final; nothing can be approved from this review.',
-          key: Key('review-final'),
+        const SizedBox(height: 8),
+        Center(
+          child: TextButton(
+            key: const Key('close-review'),
+            onPressed: onClose,
+            child: const Text('Close review'),
+          ),
         ),
-        if (touchIdMessage.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(touchIdMessage, key: const Key('touch-id-message')),
-        ],
-        const SizedBox(height: 16),
-        TextButton(onPressed: onCancel, child: const Text('Back to requests')),
+        SizedBox(
+          width: double.infinity,
+          child: Text(
+            'Closing the review keeps the request pending. Approval and execution completion are separate states.',
+            textAlign: TextAlign.center,
+            style: small,
+          ),
+        ),
       ],
-    ),
-  );
-
-  Widget _argument(core.ProviderReview review, int i) => FactRow(
-    'Argument [$i]',
-    review.arguments[i],
-    key: Key('review-argument-$i'),
-  );
-
-  Widget _credential(core.ProviderReview review, int i) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      FactRow(
-        'Credential [$i] label',
-        review.credentials[i].label,
-        key: Key('review-credential-$i-label'),
-      ),
-      FactRow(
-        'Credential [$i] use type',
-        review.credentials[i].useType,
-        key: Key('review-credential-$i-use-type'),
-      ),
-    ],
-  );
+    );
+  }
 }

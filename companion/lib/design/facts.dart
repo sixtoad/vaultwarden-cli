@@ -72,3 +72,57 @@ class FactRow extends StatelessWidget {
     );
   }
 }
+
+/// A labelled fact whose value is several widgets (e.g. an operation and its
+/// separate arguments). Same grid, divider and stacking rules as [FactRow];
+/// each selectable value inside keeps its own key.
+class FactGroup extends StatelessWidget {
+  const FactGroup(this.label, {super.key, required this.children});
+  final String label;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AccessTheme.of(context), m = AccessMetrics.of(context);
+    final labelText = Text(
+      label,
+      style: Theme.of(context).textTheme.bodySmall!
+          .copyWith(color: c.secondary),
+    );
+    final value = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.divider)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final grid =
+                constraints.maxWidth >= FactRow.gridMinWidth &&
+                !m.largeText(context);
+            if (!grid) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [labelText, const SizedBox(height: 2), value],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: m.factLabelWidth, child: labelText),
+                SizedBox(width: m.factGap),
+                Expanded(child: value),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}

@@ -216,8 +216,9 @@ void main() {
         expect(find.byKey(const Key('review-final')), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
         expect(find.byKey(const Key('approve-touch-id')), findsNothing);
-        expect(find.text('Approve once with password'), findsNothing);
-        expect(find.text('Deny without password'), findsNothing);
+        expect(find.byKey(const Key('approve-start')), findsNothing);
+        expect(find.byKey(const Key('deny-start')), findsNothing);
+        expect(find.byKey(const Key('authorization-step')), findsNothing);
         expect(find.textContaining('expires within 55 seconds'), findsNothing);
         expect(find.text('Back to requests'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
@@ -241,6 +242,7 @@ void main() {
       final keys = FakeKeys()..prompt = Completer();
       await tester.pumpWidget(page(native, keys));
       await openReview(tester);
+      await startAuthorization(tester);
       await tester.ensureVisible(find.byKey(const Key('approve-touch-id')));
       await tester.tap(find.byKey(const Key('approve-touch-id')));
       await tester.pump();
@@ -276,6 +278,7 @@ void main() {
       final keys = FakeKeys()..prompt = Completer();
       await tester.pumpWidget(page(native, keys));
       await openReview(tester);
+      await startAuthorization(tester);
       await tester.ensureVisible(find.byKey(const Key('approve-touch-id')));
       await tester.tap(find.byKey(const Key('approve-touch-id')));
       await tester.pump();
@@ -301,6 +304,7 @@ void main() {
       final keys = FakeKeys()..prompt = Completer();
       await tester.pumpWidget(page(native, keys));
       await openReview(tester);
+      await startAuthorization(tester);
       await tester.ensureVisible(find.byKey(const Key('approve-touch-id')));
       await tester.tap(find.byKey(const Key('approve-touch-id')));
       await tester.pump();
@@ -329,6 +333,7 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await openReview(tester);
+    await startAuthorization(tester);
     expect(find.byKey(const Key('approve-touch-id')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });

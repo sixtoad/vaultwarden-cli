@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../design/access_theme.dart';
-import '../design/components.dart';
 import '../design/metrics.dart';
 import '../design/typography.dart';
 import 'controller.dart';
+import 'review/outcome_unknown.dart';
+import 'review/review_status.dart';
 
 /// Shown above every destination: an unresolved decision outcome, the
 /// provider's status line and the busy indicator.
@@ -16,29 +17,9 @@ class ProviderStatusArea extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       if (controller.recoveryId.isNotEmpty) ...[
-        AccessNotice(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const StatusLabel(
-                'Decision outcome requires recovery',
-                icon: Icons.help_outline,
-              ),
-              const SizedBox(height: 8),
-              SelectableText(
-                'Uncertain decision for request: ${controller.recoveryId}',
-                key: const Key('provider-uncertain'),
-              ),
-              const Text(
-                'Only the original request status will be checked. A pending or unavailable status remains uncertain; decisions and unlocks are never resent.',
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: controller.busy ? null : controller.refresh,
-                child: const Text('Refresh original request status'),
-              ),
-            ],
-          ),
+        OutcomeUnknownNotice(
+          requestId: controller.recoveryId,
+          onCheck: controller.busy ? null : controller.refresh,
         ),
         const SizedBox(height: 16),
       ],
@@ -87,18 +68,22 @@ class RequestsView extends StatelessWidget {
   }
 }
 
-/// One pending request: its ID in monospace and a "Pending" status. The
-/// open request carries the soft fill and a 3 px accent rule.
+/// One inbox request: its ID in monospace and its status, "Pending" unless
+/// the companion already holds a final status for it (the open review, or the
+/// latest status after a decision) that the next inbox read has not yet
+/// removed. The open request carries the soft fill and a 3 px accent rule.
 class RequestRow extends StatelessWidget {
   const RequestRow({
     super.key,
     required this.id,
     required this.selected,
     required this.onOpen,
+    this.status = const ReviewStatus(ReviewPhase.pending),
   });
   final String id;
   final bool selected;
   final VoidCallback? onOpen;
+  final ReviewStatus status;
   @override
   Widget build(BuildContext context) {
     final c = AccessTheme.of(context), m = AccessMetrics.of(context);
@@ -107,7 +92,9 @@ class RequestRow extends StatelessWidget {
     // Disabled rows (busy, locked, recovery) are visibly muted, not only in
     // semantics.
     final ink = enabled ? c.text : c.secondary;
-    final status = enabled ? c.statusText : c.secondary;
+    final tone = enabled ? c.statusText : c.secondary;
+    final pending = !status.isFinal;
+    final label = pending ? 'Pending' : status.label;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(m.radius),
     );
@@ -133,7 +120,7 @@ class RequestRow extends StatelessWidget {
             ),
         child: Semantics(
           selected: selected,
-          label: 'Review request $id, pending',
+          label: 'Review request $id, ${label.toLowerCase()}',
           excludeSemantics: true,
           child: IntrinsicHeight(
             child: Row(
@@ -162,11 +149,14 @@ class RequestRow extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.schedule, size: 14, color: status),
+                            Icon(status.icon, size: 14, color: tone),
                             const SizedBox(width: 4),
-                            Text(
-                              'Pending',
-                              style: text.labelMedium!.copyWith(color: status),
+                            Flexible(
+                              child: Text(
+                                label,
+                                key: Key('request-row-status-$id'),
+                                style: text.labelMedium!.copyWith(color: tone),
+                              ),
                             ),
                           ],
                         ),

@@ -48,7 +48,9 @@ String goldenHost() {
   final architecture = switch (Abi.current()) {
     // Intel (x86_64) macOS is no longer supported or built.
     Abi.macosArm64 => 'arm64',
-    _ => throw StateError('Unsupported macOS golden renderer ABI (Apple Silicon only)'),
+    _ => throw StateError(
+      'Unsupported macOS golden renderer ABI (Apple Silicon only)',
+    ),
   };
   return 'macos-${version.split('.').first}-$architecture';
 }
@@ -126,6 +128,8 @@ void main() {
               key: const Key('golden'),
               child: ProviderPage(
                 platform: FixtureProviderPlatform(),
+                // A fixed clock keeps the review countdown stable.
+                clock: () => DateTime.utc(2030, 1, 1, 12),
                 syntheticBuilder: (_) => const Text('Synthetic only'),
               ),
             ),
@@ -149,11 +153,7 @@ void main() {
           find.byKey(const Key('golden')),
           matchesGoldenFile('goldens/${name}_review.png'),
         );
-        await tester.ensureVisible(
-          find.text(
-            layout == 'large' ? 'Fresh approval password' : 'Cancel review',
-          ),
-        );
+        await tester.ensureVisible(find.byKey(const Key('close-review')));
         await tester.pumpAndSettle();
         await expectLater(
           find.byKey(const Key('golden')),
