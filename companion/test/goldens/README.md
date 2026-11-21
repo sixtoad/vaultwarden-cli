@@ -215,3 +215,36 @@ The `macos-27-arm64` references were rendered locally with pinned Flutter
 `macos-26-arm64` references were NOT regenerated: CI on those hosts fails on
 the same 44 changed and 18 missing references until each host's captures are
 reviewed and adopted from the CI artifacts.
+
+## Clean-up adoption, 2026-11-21 (#50)
+
+The `linux`, `windows` and `macos-26-arm64` references for the #50
+clean-up were adopted from [CI run 44919123214](https://github.com/sixtoad/vaultwarden-cli/actions/runs/44919123214)
+on source `62f4268`. On each host the Flutter suite passed 248 tests and
+failed 64, all of them golden comparisons (the Rust tests passed): 52
+changed captures and the 18 new ones listed above. The 52 changed captures
+are exactly the `macos-27-arm64` references this clean-up regenerated; the
+list above names 44 of them, and the other eight are
+`{light,dark}_desktop_shell_{empty,two,devices,settings}.png`, whose status
+line now reads "Inbox refreshed: N pending".
+
+All 70 actual captures per host were visually compared with the matching
+`macos-27-arm64` reference: same content, wrapping, status lines ("Request
+status: Awaiting your approval", "Inbox refreshed: N pending"), facts
+("Arguments (1 separate value)", "Reads as: …", "Request origin"), notices
+and visible actions (Approve…/Deny…, Close review, Cancel authorization,
+Approve once with Touch ID or password, Reload review, Back to requests,
+View activity, Check status, Refresh authority and inbox, Refresh provider
+identities, Review "…", Add a device or agent, Join this device to a
+provider); differences are glyph-edge rasterization only. The 200%
+captures clip at the navigation bar by scrolling, as the macOS 27
+references do. All 52 isolated diffs per host show only the old-to-new
+text changes. For the changed captures the actual is
+`<name>_testImage.png` (the access test writes no host-prefixed copy of its
+review/actions captures); for the new ones it is the host-prefixed capture.
+The macOS 26 actuals were identical (sha256) in the
+`companion-slice-macOS-arm64-development` and
+`companion-macOS-disposable-pilot` artifacts; in every artifact the 10
+unchanged Activity, enrollment and desktop locked-shell captures and all
+52 master images matched the committed references byte for byte. The PNGs
+are copied byte for byte; comparison stays exact.
