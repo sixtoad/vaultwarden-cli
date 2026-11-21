@@ -25,20 +25,48 @@ public struct ProviderConfiguration: Codable, Sendable {
 
 public enum KeychainIdentity {
     /// PKCS#12 is imported into the operator's Keychain; only its opaque persistent reference is saved in preferences.
+    #if os(macOS)
     public static func importPKCS12(_ data: Data, passphrase: String, keychain: SecKeychain? = nil) throws -> Data {
         var options: [String: Any] = [kSecImportExportPassphrase as String: passphrase]
         if let keychain { options[kSecImportExportKeychain as String] = keychain }
+        return try importPKCS12(data, options: options)
+    }
+    #else
+    /// iOS: `SecPKCS12Import` only decodes. The identity is added explicitly,
+    /// readable only while this device is unlocked and never migrated to
+    /// another device or backup (`...ThisDeviceOnly`). The key stays in the
+    /// app's Keychain; Dart and Rust only ever see the persistent reference.
+    public static func importPKCS12(_ data: Data, passphrase: String) throws -> Data {
+        try importPKCS12(data, options: [kSecImportExportPassphrase as String: passphrase])
+    }
+    #endif
+    private static func importPKCS12(_ data: Data, options: [String: Any]) throws -> Data {
         var items: CFArray?
         guard SecPKCS12Import(data as CFData, options as CFDictionary, &items) == errSecSuccess,
               let first = (items as? [[String: Any]])?.first,
               let identityValue = first[kSecImportItemIdentity as String] else { throw CompanionError.configuration }
         let identity = identityValue as! SecIdentity
         var reference: CFTypeRef?
+        #if os(macOS)
         let query: [String: Any] = [kSecClass as String: kSecClassIdentity,
                                    kSecMatchItemList as String: [identity],
                                    kSecReturnPersistentRef as String: true]
         guard SecItemCopyMatching(query as CFDictionary, &reference) == errSecSuccess,
               let reference = reference as? Data else { throw CompanionError.configuration }
+        #else
+        let add: [String: Any] = [kSecValueRef as String: identity,
+                                  kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                                  kSecReturnPersistentRef as String: true]
+        var status = SecItemAdd(add as CFDictionary, &reference)
+        if status == errSecDuplicateItem {
+            // Keychain items outlive an app reinstall. Re-importing the same
+            // package finds that item; the certificate check below refuses
+            // anything that is not byte-identical to the imported one.
+            status = SecItemCopyMatching([kSecValueRef as String: identity,
+                                          kSecReturnPersistentRef as String: true] as CFDictionary, &reference)
+        }
+        guard status == errSecSuccess, let reference = reference as? Data else { throw CompanionError.configuration }
+        #endif
         // Keychain certificate uniqueness can reject a renewed certificate that
         // collides with an older issuer/serial. Never return that older identity.
         var importedCertificate: SecCertificate?
