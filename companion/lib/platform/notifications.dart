@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import 'approval_client.dart';
+
 /// Operating-system permission for review notifications.
 enum NotificationPermission { notDetermined, denied, authorized, unavailable }
 
@@ -63,7 +65,7 @@ class UnavailableNotificationPlatform implements ReviewNotificationPlatform {
 
 class NativeReviewNotificationPlatform implements ReviewNotificationPlatform {
   NativeReviewNotificationPlatform({bool? macOS, MethodChannel? channel})
-    : available = macOS ?? Platform.isMacOS,
+    : available = macOS ?? isApprovalClientSystem(Platform.operatingSystem),
       _channel =
           channel ??
           const MethodChannel('dev.vaultwarden.companionSlice/notifications');
