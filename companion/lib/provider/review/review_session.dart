@@ -32,10 +32,15 @@ class ReviewSession {
     _step = step;
   }
 
-  /// Selection, navigation, notification and back close any open step.
+  /// Selection, navigation, notification, back and suspension close any open
+  /// step and forget the last ask: a review loaded afterwards without a new
+  /// ask (a notification's) counts from its own flight, never from an older
+  /// ask that failed (which would read as expired at once).
   void closeStep() {
     _stepId = '';
     _step = ReviewStep.review;
+    _askedId = '';
+    _askedAt = null;
   }
 
   /// A review of [requestId] was asked for at [now]: forget the previous
@@ -43,9 +48,9 @@ class ReviewSession {
   /// arrive. Its countdown starts at [now] even when its review replaces
   /// another with no empty snapshot in between.
   void beginLoad(String requestId, DateTime now) {
+    closeStep();
     _askedId = requestId;
     _askedAt = now;
-    closeStep();
     _loadedId = '';
     _loadedText = '';
     _deadline = null;
@@ -73,15 +78,15 @@ class ReviewSession {
     }
     var clear = false;
     if (!_seenReview || state.reviewId != _loadedId) {
+      final asked = state.reviewId == _askedId
+          ? _askedAt
+          : null; // mutation: countdown from request
       if (state.reviewId == _loadedId && state.reviewText != _loadedText) {
         clear = _stepId.isNotEmpty;
         closeStep(); // mutation: changed scope closes step
       }
       _loadedId = state.reviewId;
       _loadedText = state.reviewText;
-      final asked = state.reviewId == _askedId
-          ? _askedAt
-          : null; // mutation: countdown from request
       _askedId = '';
       _askedAt = null;
       _deadline = ReviewDeadline(

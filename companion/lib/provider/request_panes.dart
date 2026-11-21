@@ -125,6 +125,8 @@ class RequestListPane extends StatelessWidget {
     );
   }
 
+  // Suspended (the window lost focus or the app went to the background) is
+  // not an unanswered read: say the page paused and re-reads on return.
   Widget _disconnected() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -134,10 +136,15 @@ class RequestListPane extends StatelessWidget {
         key: Key('requests-disconnected'),
       ),
       const SizedBox(height: 12),
-      const AccessNotice(
-        child: Text(
-          'The provider has not answered a fresh authority read. Its lock state and pending requests are unknown until it does; nothing can be reviewed or approved meanwhile.',
-        ),
+      AccessNotice(
+        child: controller.suspended
+            ? const Text(
+                'Paused while the app is in the background; the provider is re-read on return. Nothing can be reviewed or approved meanwhile.',
+                key: Key('requests-paused'),
+              )
+            : const Text(
+                'The provider has not answered a fresh authority read. Its lock state and pending requests are unknown until it does; nothing can be reviewed or approved meanwhile.',
+              ),
       ),
       const SizedBox(height: 16),
       OutlinedButton(
