@@ -85,7 +85,7 @@ class AuthorizationStep extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           Text(
-            'Touch ID signs this exact review after fetching it again. If it is unavailable, cancelled or refused, nothing is sent and you can approve with your password instead.',
+            'Touch ID signs this exact review after fetching it again. If it is unavailable, dismissed or refused, nothing is sent and you can approve with your password instead.',
             style: small,
           ),
           const SizedBox(height: 16),

@@ -4,6 +4,7 @@ import '../../design/access_theme.dart';
 import '../../design/components.dart';
 import '../../design/typography.dart';
 import '../../src/rust/api/provider.dart' as core;
+import 'review_status.dart';
 
 /// A selectable value under a stable key (the key names the exact fact).
 Widget _value(
@@ -16,7 +17,7 @@ Widget _value(
   child: SelectableText(
     text,
     style: mono
-        ? AccessType.of(context).mono
+        ? AccessType.of(context).factMono
         : Theme.of(context).textTheme.bodySmall!
               .copyWith(fontWeight: FontWeight.w500),
   ),
@@ -54,7 +55,11 @@ class ScopeFacts extends StatelessWidget {
             'Operation',
             children: [
               _value(context, 'review-operation', review.operation),
-              _sub(context, 'Arguments (${arguments.length} separate values)'),
+              _sub(
+                context,
+                'Arguments (${arguments.length} separate '
+                '${arguments.length == 1 ? 'value' : 'values'})',
+              ),
               for (var i = 0; i < arguments.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -71,17 +76,18 @@ class ScopeFacts extends StatelessWidget {
             'Requested by',
             children: [
               _value(context, 'review-requester', review.requester),
-              _sub(
-                context,
-                origin.isEmpty
-                    ? 'Originating device'
-                    : 'Authenticated request origin',
-              ),
-              SelectableText(
-                origin.isEmpty
-                    ? 'Not supplied by provider protocol v1.'
-                    : origin,
-                style: Theme.of(context).textTheme.labelSmall,
+              // Rust's origin projection says itself whether the provider
+              // authenticated an agent binding or has no origin to report;
+              // the heading claims neither, nor a physical device.
+              _sub(context, 'Request origin'),
+              KeyedSubtree(
+                key: const Key('review-origin'),
+                child: SelectableText(
+                  origin.isEmpty
+                      ? 'Not supplied by provider protocol v1.'
+                      : origin,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
               ),
             ],
           ),
@@ -205,10 +211,14 @@ class VerificationDetails extends StatelessWidget {
                 sub: utc(review.expiresAtUnixSeconds),
                 key: const Key('review-expiry'),
               ),
+              // The exact status value, with its reading as a secondary line
+              // (as the deadline has its UTC time): the label comes only from
+              // the closed status vocabulary, never from free text.
               FactRow(
                 'Provider status',
                 review.status,
                 mono: true,
+                sub: 'Reads as: ${ReviewStatus.parse(review.status).label}',
                 key: const Key('review-status'),
               ),
             ],

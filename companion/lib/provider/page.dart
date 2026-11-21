@@ -196,7 +196,7 @@ class _ProviderPageState extends State<ProviderPage>
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
       if (controller.suspended) controller.resume();
     } else {
-      controller.suspend();
+      suspend();
     }
   }
 
@@ -241,7 +241,7 @@ class _ProviderPageState extends State<ProviderPage>
         return;
       }
       unawaited(touchId.cancel());
-      controller.suspend();
+      suspend();
       return;
     }
     if (state == AppLifecycleState.resumed) {
@@ -255,8 +255,16 @@ class _ProviderPageState extends State<ProviderPage>
       AppLifecycleState.paused,
       AppLifecycleState.detached,
     ].contains(state)) {
-      controller.suspend();
+      suspend();
     }
+  }
+
+  /// Suspending retires Rust authority; the step bound to the retired review
+  /// closes too and typed secrets are cleared, whatever reloads next.
+  void suspend() {
+    reviewSession.closeStep(); // mutation: suspend closes step
+    clearPasswords();
+    controller.suspend();
   }
 
   @override
@@ -336,7 +344,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void openRequest(String id) {
     controller.cancelPendingReview();
-    reviewSession.beginLoad(id); // mutation: selection closes step
+    reviewSession.beginLoad(id, now()); // mutation: selection closes step
     notificationRequest = '';
     notificationNote = '';
     controller.devicesVisible = false;

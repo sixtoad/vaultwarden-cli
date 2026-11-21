@@ -24,6 +24,9 @@ Investigation separated the broader read-model work into independent deliverable
 - **Origin identity:** add authoritative producer metadata rather than parsing
   the display-only requester field. Specify compatibility before adding fields
   to strict v1 replies.
+  (Agent bindings: delivered by management v2 `request_origin` and shown in
+  the review; see "#50 clean-up findings" below. Device/host identity remains
+  a proposal.)
 - **Additional operation reviews:** root DirectReview already supports optional
   `create` and `ssh` structures that the current companion rejects. Supporting
   these requires complete validated projection and presentation; never weaken
@@ -73,38 +76,86 @@ requirements are tracked in [the capability checklist](../../docs/implementation
 
 ## #50 slice 1 (shell conformance) review follow-ups — 2026-11-19
 
-- Wide layout: the "Back to requests" control sits in the section bar, after the
-  sidebar in focus order (it was the AppBar leading slot). Consider
-  `FocusTraversalOrder` when the review is redesigned (slice 2).
-- `DeviceCapabilities.cliInstall` is derived from the OS name; take the
-  `InstallationPlatform` and an injectable OS when Settings consumes it (slice 4).
-- Token drift left for slices 2–4: fact-row mono at 11 px and top divider of the
-  fact grid, mobile title sizes (27/28), `AccessMetrics.copyWith` ignores
-  arguments, `back` defined but unused while native window chrome is used.
-- Requests list has no distinct "disconnected" rendering or golden yet.
-- `provider/page.dart` is ~520 lines: state, lifecycle, notifications and the
-  navigation retirement (mutation anchors) stay together.
+Resolved in the #50 clean-up PR (2026-11-21) unless marked open. Tests are in
+`companion/test/review_followups_test.dart` unless named otherwise.
+
+- Fixed: wide-layout focus order. The sidebar and the content are traversal
+  groups; inside the content the section bar (and its Back) is ordered before
+  the body. Before, Tab went from Settings straight to the request row.
+  Test: "wide layout: Back follows the sidebar, before the review".
+- Open (slice 4): `DeviceCapabilities.cliInstall` is still derived from the OS
+  name. Nothing consumes it yet (only `roleText` is read, in
+  `app/shell_parts.dart`); take the `InstallationPlatform` and an injectable OS
+  when Settings consumes it.
+- Token drift:
+  - Fixed: fact values in monospace use `AccessType.factMono` (11 px, plan
+    §1.2 "fact 11"), in `FactRow` and the review's scope facts (goldens).
+  - Already fixed in slice 2: the review's fact grids (`ScopeFacts`,
+    `VerificationDetails`) have the top divider. The Devices/Settings fact
+    lists belong to the slice 3–4 workpage restyle.
+  - Fixed: mobile title sizes. Compact layouts use a 28 px section title
+    (default size kept at large text, where 28 px overflowed the toolbar) and a
+    27 px request title below the sidebar breakpoint (goldens).
+  - Fixed: `AccessMetrics.copyWith` applies its arguments. Test:
+    "AccessMetrics.copyWith applies its arguments".
+  - Not changed: `AccessTheme.back` stays defined and unused. It is the page
+    behind a drawn window; native window chrome draws the window on every
+    shipped platform. Remove it only if the owner rules out drawn windows.
+- Fixed: the Requests list has a distinct disconnected rendering (configured,
+  no current authority, no unknown outcome): no lock state, unlock form or stale
+  inbox, only an explanation and the refresh. Test: "an unreachable provider
+  lists no requests and no unlock"; goldens `*_shell_disconnected.png`.
+- Not changed: `provider/page.dart` (571 lines). The slice 1 spec keeps every
+  navigation retirement and its mutation anchors in that file.
 
 ## #50 slice 2 (request review) review follow-ups — 2026-11-19
 
-- Every automatic poll is `controller.busy`, so the absent-review pane briefly
-  shows "Loading or finishing…" instead of the expired notice and its Reload
-  button. Count only a review in flight (or `pendingReview`) as loading.
-- Suspending the app does not call `ReviewSession.closeStep()`; the step stays
-  bound to the old request ID and is hidden only because Rust retires the
-  review. Every reload goes through `openRequest` (which starts a new load),
-  so it cannot reappear today; close it on suspend for defence in depth.
-- A review replaced by another without a null snapshot in between would start
-  its countdown at the reply time (overstating it by one round trip).
-  `controller.review()` always invalidates first, so this cannot happen yet.
-- `provider_test` "password clears on deny": a denial is now reachable only
-  after leaving the step (which clears the field), so a mutant that sent the
-  approval password with a denial is no longer exercised by that test. Add a
-  page-level unit check of `deny()` with a non-empty controller.
-- Goldens: no capture of the ticket-expired countdown view ("Review expired…
-  Reload review"); the "expired" capture is the provider's `expired` status.
-  Add an `expired_ticket` scene if the owner wants it (one more per host).
-- The Touch ID explanation in the authorization step mentions a prompt being
-  "cancelled" (an action, not a request status); reword if the owner wants the
-  word gone from the review entirely.
-- `Arguments (1 separate values)` keeps its old wording for existing finders.
+All resolved in the #50 clean-up PR (2026-11-21); tests in
+`companion/test/review_followups_test.dart`.
+
+- Fixed: only a review or a decision in flight
+  (`ProviderController.reviewWorking`) reads as "Loading or finishing…";
+  automatic polls keep the expired notice and its Reload button. Tests: "an
+  automatic poll keeps the expired notice and its reload", "a review in flight
+  still reads as loading"; mutation `only-reviews-load`.
+- Fixed: suspending the app closes the step and clears typed secrets
+  (`_ProviderPageState.suspend`). Test: "suspending the app closes the
+  authorization step"; mutation `suspend-closes-step`.
+- Fixed: `ReviewSession.beginLoad(id, now)` records when a review was asked
+  for, and a review of that ID counts from then, even when it replaces another
+  without an empty snapshot. Test: "a review replacing another counts from its
+  own request"; mutation `countdown-from-request`.
+- Fixed: page-level check of `deny()` with a typed approval password (the field
+  is cleared and nothing is sent). Test: "a denial never sends or keeps a typed
+  approval password". The mutant "deny sends `approvalPassword.text` and skips
+  the clear" survives it as an equivalent: `ProviderController.perform` clears
+  every password for a decision, and Rust's deny body carries no password, so
+  nothing observable changes (checked by hand, 2026-11-21).
+- Fixed: `review_states_golden_test.dart` adds `expired_ticket` (the ticket ran
+  out: "Reload review"), light desktop and dark compact.
+- Fixed, owner may revert: the Touch ID explanation says "dismissed" instead of
+  "cancelled".
+- Fixed: "Arguments (1 separate value)" in the singular. Test: "one argument
+  reads in the singular".
+
+## #50 clean-up findings — 2026-11-21
+
+- Request origin: the provider already sends it, through the management v2
+  `request_origin` command (`src/access/provider.rs` `request_origin`), not in
+  the v1 review payload. The companion asks for it after each review and shows
+  Rust's escaped projection. The heading now reads "Request origin" in every
+  case: an `origin: null` reply ("Unavailable: no authenticated origin
+  snapshot…") was headed "Authenticated request origin", and "Originating
+  device" claimed a device the provider never identifies. A v1-only provider
+  still shows "Not supplied by provider protocol v1." Test: "an origin the
+  provider could not authenticate is not labelled authenticated"; goldens
+  `*_review_origin.png`. Not available from any provider: the physical device
+  or host behind an agent binding. Showing it would need authoritative producer
+  metadata (e.g. the enrollment record the binding came from) added to
+  `request_origin`, with its own compatibility rules; no protocol field was added.
+- Open (owner): the page status line above the review shows Rust's status
+  summary verbatim (`{"status":"pending"}`) after a review or status read; the
+  review's own "Provider status" fact now has a readable label.
+- Open: Devices and Settings captures keep "Contacting provider…" as the page
+  status after settling (the navigation invalidation leaves the begin message
+  of the retired read); worth a look in the slice 3–4 restyle.

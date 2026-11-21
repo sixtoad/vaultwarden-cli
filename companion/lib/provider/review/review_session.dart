@@ -16,6 +16,10 @@ class ReviewSession {
   String _loadedId = '', _loadedText = '';
   ReviewDeadline? _deadline;
 
+  /// The request last asked for and when: its ticket started no later.
+  String _askedId = '';
+  DateTime? _askedAt;
+
   /// The step for the review of [requestId]; any other request reads as the
   /// plain review (the step never follows a selection).
   ReviewStep step(String requestId) {
@@ -34,9 +38,13 @@ class ReviewSession {
     _step = ReviewStep.review;
   }
 
-  /// A review of [requestId] was asked for: forget the previous load, so an
-  /// expiry latched for it never stands for a load that did not arrive.
-  void beginLoad(String requestId) {
+  /// A review of [requestId] was asked for at [now]: forget the previous
+  /// load, so an expiry latched for it never stands for a load that did not
+  /// arrive. Its countdown starts at [now] even when its review replaces
+  /// another with no empty snapshot in between.
+  void beginLoad(String requestId, DateTime now) {
+    _askedId = requestId;
+    _askedAt = now;
     closeStep();
     _loadedId = '';
     _loadedText = '';
@@ -71,8 +79,13 @@ class ReviewSession {
       }
       _loadedId = state.reviewId;
       _loadedText = state.reviewText;
+      final asked = state.reviewId == _askedId
+          ? _askedAt
+          : null; // mutation: countdown from request
+      _askedId = '';
+      _askedAt = null;
       _deadline = ReviewDeadline(
-        loadedAt: _flightAt ?? now,
+        loadedAt: asked ?? _flightAt ?? now,
         expiresAtUnixSeconds: review.expiresAtUnixSeconds,
       );
       _expired = false;

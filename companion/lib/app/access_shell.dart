@@ -95,43 +95,58 @@ class AccessShell extends StatelessWidget {
               width: width >= m.fullBreakpoint
                   ? m.sidebarWidth
                   : m.sidebarCompressedWidth,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: c.soft,
-                  border: Border(right: BorderSide(color: c.divider)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.all(12),
-                        children: [
-                          const ShellBrand(),
-                          for (var i = 0; i < labels.length; i++)
-                            _destination(i, vertical: false),
-                        ],
+              child: FocusTraversalGroup(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.soft,
+                    border: Border(right: BorderSide(color: c.divider)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.all(12),
+                          children: [
+                            const ShellBrand(),
+                            for (var i = 0; i < labels.length; i++)
+                              _destination(i, vertical: false),
+                          ],
+                        ),
                       ),
-                    ),
-                    Divider(height: 1, color: c.divider),
-                    ShellStatusBlock(status: status),
-                  ],
+                      Divider(height: 1, color: c.divider),
+                      ShellStatusBlock(status: status),
+                    ],
+                  ),
                 ),
               ),
             ),
             Expanded(
               child: ColoredBox(
                 color: c.surface,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AccessSectionBar(
-                      title: labels[destination.index],
-                      subtitle: subtitles[destination.index],
-                      trailing: detailOpen ? _back() : null,
-                    ),
-                    Expanded(child: body),
-                  ],
+                // Keyboard order: after the sidebar, the section bar (and its
+                // Back) comes before the content, whatever their geometry.
+                child: FocusTraversalGroup(
+                  policy: OrderedTraversalPolicy(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FocusTraversalOrder(
+                        order: const NumericFocusOrder(0),
+                        child: AccessSectionBar(
+                          title: labels[destination.index],
+                          subtitle: subtitles[destination.index],
+                          trailing: detailOpen ? _back() : null,
+                        ),
+                      ),
+                      Expanded(
+                        child: FocusTraversalOrder(
+                          order: const NumericFocusOrder(1),
+                          child: FocusTraversalGroup(child: body),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -146,6 +161,11 @@ class AccessShell extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(labels[destination.index]),
+        // The prototype's mobile section title: 28 px semibold. At large
+        // text the default title keeps the scaled title inside the toolbar.
+        titleTextStyle: m.largeText(context)
+            ? null
+            : Theme.of(context).textTheme.headlineMedium,
         backgroundColor: c.surface,
         leading: detailOpen ? _back() : null,
       ),
