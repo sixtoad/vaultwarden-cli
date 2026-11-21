@@ -42,6 +42,7 @@ enum Commands {
     List(ListCommand),
     Get(GetCommand),
     Create(CreateCommand),
+    Update(UpdateCommand),
     ReadField(ReadFieldCommand),
     Reconcile(ReconcileCommand),
     GetUri(GetUriCommand),
@@ -65,6 +66,25 @@ struct CreateCommand {
     prompt: bool,
 }
 #[derive(Args)]
+/// Replace selected existing fields of one personal login item, after fresh terminal approval.
+struct UpdateCommand {
+    /// Immutable item ID; never resolved from a name.
+    #[arg(long)]
+    id: String,
+    #[arg(long)]
+    account: String,
+    #[arg(long)]
+    folder: String,
+    #[arg(long)]
+    reference: String,
+    /// Refuse unless the item's current revisionDate is exactly this value.
+    #[arg(long)]
+    expected_revision: Option<String>,
+    /// Replace only the password, read from a hidden terminal prompt instead of JSON stdin.
+    #[arg(long)]
+    prompt: bool,
+}
+#[derive(Args)]
 /// Read exactly one field by immutable ID, preserving bytes.
 struct ReadFieldCommand {
     /// Enforce a durable account/folder/reference/item/field binding.
@@ -77,7 +97,7 @@ struct ReadFieldCommand {
     field: String,
 }
 #[derive(Args)]
-/// Inspect a durable creation receipt or reconcile it with an explicit item ID.
+/// Inspect a durable create or update receipt, or reconcile it with an explicit item ID.
 struct ReconcileCommand {
     #[arg(long)]
     journal: std::path::PathBuf,
@@ -391,6 +411,7 @@ async fn run_cli(cli: Cli, raw_args: &[&str]) -> Result<commands::CommandOutcome
             .map(|()| commands::CommandOutcome::Success)
         }
         Commands::Create(CreateCommand { account, folder, reference, prompt }) => commands::create_secret(&account, &folder, &reference, prompt, &opts).await.map(|()| commands::CommandOutcome::Success),
+        Commands::Update(UpdateCommand { id, account, folder, reference, expected_revision, prompt }) => commands::update_secret(&id, &account, &folder, &reference, expected_revision.as_deref(), prompt, &opts).await.map(|()| commands::CommandOutcome::Success),
         Commands::ReadField(ReadFieldCommand { id, field, journal }) => commands::get_selected(&id,&field,journal.as_deref(),&opts).await.map(|()| commands::CommandOutcome::Success),
         Commands::Reconcile(ReconcileCommand { journal, id }) => commands::reconcile_secret(&journal,id.as_deref(),&opts).await.map(|()| commands::CommandOutcome::Success),
         Commands::Get(GetCommand {

@@ -556,3 +556,54 @@ async fn create_cipher_never_retries_or_echoes_server_body_and_retains_certainty
         assert!(!String::from_utf8_lossy(&requests[0].body).contains("private-create-sentinel"));
     }
 }
+
+#[tokio::test]
+async fn update_cipher_sends_once_never_echoes_and_maps_certainty() {
+    use vaultwarden_cli::secret_storage::WriteStatus;
+    let id = "33333333-3333-3333-3333-333333333333";
+    let body = serde_json::json!({"notes": "2.ciphertext|only|mac", "lastKnownRevisionDate": "r1"});
+    for (status, reply, expected) in [
+        (
+            400,
+            serde_json::json!("private-update-sentinel"),
+            Err(WriteStatus::Failed),
+        ),
+        (403, serde_json::json!({}), Err(WriteStatus::Failed)),
+        (
+            500,
+            serde_json::json!({"id": id}),
+            Err(WriteStatus::Uncertain),
+        ),
+        (
+            200,
+            serde_json::json!({"id": "44444444-4444-4444-4444-444444444444"}),
+            Err(WriteStatus::Uncertain),
+        ),
+        (
+            200,
+            serde_json::json!("not an item"),
+            Err(WriteStatus::Uncertain),
+        ),
+        (200, serde_json::json!({"id": id}), Ok(())),
+    ] {
+        let server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path(format!("/api/ciphers/{id}")))
+            .respond_with(ResponseTemplate::new(status).set_body_json(reply))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let api = ApiClient::new_with_flags(&server.uri(), true).unwrap();
+        assert_eq!(
+            api.update_cipher("token", id, &body).await.map(|_item| ()),
+            expected,
+            "{status}"
+        );
+        let requests = server.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&requests[0].body).unwrap(),
+            body
+        );
+    }
+}
