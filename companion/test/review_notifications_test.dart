@@ -499,7 +499,7 @@ void main() {
         expect(reviews(), [secondId], reason: 'fetched fresh, not cached');
         expect(find.byKey(const Key('review-final')), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
-        expect(find.text('Approve once with password'), findsNothing);
+        expect(find.byKey(const Key('approve-start')), findsNothing);
         await tester.pumpWidget(const SizedBox.shrink());
       });
     }

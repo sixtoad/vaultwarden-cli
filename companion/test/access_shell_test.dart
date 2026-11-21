@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/provider/page.dart';
+import 'package:companion_slice/provider/request_review.dart';
 import 'package:companion_slice/design/access_theme.dart';
 import 'package:companion_slice/src/rust/api/provider.dart' as core;
 import 'package:companion_slice/src/rust/frb_generated.dart';
@@ -224,6 +225,21 @@ void main() {
       )
       .position;
 
+  // A single-pane review opens at its own top (#50 slice 2), never at the
+  // inbox offset it was opened from.
+  void expectReviewAtTop(WidgetTester tester) {
+    final viewport = tester.getRect(
+      find
+          .descendant(
+            of: find.byType(SingleChildScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(tester.getRect(find.byType(RequestReview)).top, viewport.top);
+    expect(contentPosition(tester).pixels, lessThan(1000));
+  }
+
   testWidgets('long inbox review, cancel and system back start at the top', (
     tester,
   ) async {
@@ -234,13 +250,13 @@ void main() {
       expect(contentPosition(tester).pixels, greaterThan(1000));
       await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
-      expect(contentPosition(tester).pixels, 0);
-      await tester.ensureVisible(find.text('Cancel review'));
+      expectReviewAtTop(tester);
+      await tester.ensureVisible(find.text('Close review'));
       expect(contentPosition(tester).pixels, greaterThan(0));
       if (systemBack) {
         await tester.binding.handlePopRoute();
       } else {
-        await tester.tap(find.text('Cancel review'));
+        await tester.tap(find.text('Close review'));
       }
       await tester.pumpAndSettle();
       expect(contentPosition(tester).pixels, 0);
@@ -256,9 +272,7 @@ void main() {
       final native = longInbox();
       await showShell(tester, native, size: const Size(390, 844));
       await review(tester);
-      await tester.ensureVisible(find.text('Deny without password'));
-      await tester.tap(find.text('Deny without password'));
-      await tester.pumpAndSettle();
+      await denyRequest(tester);
       await destination(tester, 'requests');
       await tester.ensureVisible(requestRow(providerId));
       expect(contentPosition(tester).pixels, greaterThan(1000));
@@ -266,8 +280,8 @@ void main() {
       await tester.ensureVisible(find.text('Open request with fresh review'));
       await tester.tap(find.text('Open request with fresh review'));
       await tester.pumpAndSettle();
-      expect(contentPosition(tester).pixels, 0);
       expect(find.byKey(const Key('provider-review')), findsOneWidget);
+      expectReviewAtTop(tester);
       await destination(tester, 'devices');
       await destination(tester, 'requests');
       expect(contentPosition(tester).pixels, 0);
@@ -281,9 +295,7 @@ void main() {
       final native = FixtureProviderPlatform();
       await showShell(tester, native);
       await review(tester);
-      await tester.ensureVisible(find.text('Deny without password'));
-      await tester.tap(find.text('Deny without password'));
-      await tester.pumpAndSettle();
+      await denyRequest(tester);
       native.sessionReply = encoded({
         'version': 1,
         'state': 'locked',
@@ -322,6 +334,7 @@ void main() {
       await showShell(tester, native);
       for (final tab in ['devices', 'activity', 'settings', 'requests']) {
         await review(tester);
+        await startAuthorization(tester);
         final password = find.byKey(const Key('Fresh approval password'));
         await tester.ensureVisible(password);
         await tester.enterText(password, 'synthetic-never-send');
@@ -345,6 +358,7 @@ void main() {
       final native = FixtureProviderPlatform();
       await showShell(tester, native, size: const Size(390, 844));
       await review(tester);
+      await startAuthorization(tester);
       final password = find.byKey(const Key('Fresh approval password'));
       await tester.ensureVisible(password);
       await tester.enterText(password, 'synthetic-never-send');
@@ -355,8 +369,8 @@ void main() {
       expect(core.providerSnapshot().canDecide, false);
       expect(requestRow(providerId), findsOneWidget);
       await review(tester);
-      await tester.ensureVisible(find.text('Cancel review'));
-      await tester.tap(find.text('Cancel review'));
+      await tester.ensureVisible(find.text('Close review'));
+      await tester.tap(find.text('Close review'));
       await tester.pumpAndSettle();
       expect(core.providerSnapshot().canDecide, false);
       expect(requestRow(providerId), findsOneWidget);
@@ -392,6 +406,7 @@ void main() {
       final native = FixtureProviderPlatform()..loseDecision = true;
       await showShell(tester, native);
       await review(tester);
+      await startAuthorization(tester);
       final password = find.byKey(const Key('Fresh approval password'));
       await tester.ensureVisible(password);
       await tester.enterText(password, 'synthetic');
@@ -402,10 +417,8 @@ void main() {
       for (final tab in ['devices', 'activity', 'settings', 'requests']) {
         await destination(tester, tab);
         expect(find.byKey(const Key('provider-uncertain')), findsOneWidget);
-        await tester.ensureVisible(
-          find.text('Refresh original request status'),
-        );
-        await tester.tap(find.text('Refresh original request status'));
+        await tester.ensureVisible(find.text('Check status'));
+        await tester.tap(find.text('Check status'));
         await tester.pumpAndSettle();
       }
       expect(
@@ -431,9 +444,7 @@ void main() {
       final native = FixtureProviderPlatform();
       await showShell(tester, native);
       await review(tester);
-      await tester.ensureVisible(find.text('Deny without password'));
-      await tester.tap(find.text('Deny without password'));
-      await tester.pumpAndSettle();
+      await denyRequest(tester);
       final reviews = native.commands
           .where((c) => c['command'] == 'review')
           .length;
@@ -470,9 +481,7 @@ void main() {
         ..heldDecision = Completer<Uint8List>();
       await showShell(tester, native);
       await review(tester);
-      await tester.ensureVisible(find.text('Deny without password'));
-      await tester.tap(find.text('Deny without password'));
-      await tester.pump();
+      await denyRequest(tester, settle: false);
       await tester.tap(find.byKey(const Key('destination-settings')));
       await tester.pump();
       expect(core.providerSnapshot().canDecide, false);
@@ -616,7 +625,7 @@ void main() {
         expect(core.providerSnapshot().reviewText, isEmpty);
         expect(core.providerSnapshot().canDecide, false);
         expect(find.byKey(const Key('provider-review')), findsNothing);
-        expect(find.text('Approve once with password'), findsNothing);
+        expect(find.byKey(const Key('approve-start')), findsNothing);
         expect(
           native.commands.where((c) => c['command'] == 'decision'),
           isEmpty,
@@ -675,6 +684,7 @@ void main() {
         );
         expect(reviewFact(tester, 'review-credential-$i-use-type'), '"login"');
       }
+      await startAuthorization(tester);
       for (final key in [
         'review-argument-31',
         'review-credential-15-use-type',
@@ -713,8 +723,8 @@ void main() {
         expect(state.reviewText, isEmpty);
         expect(state.canDecide, false);
         expect(find.byKey(const Key('provider-review')), findsNothing);
-        expect(find.text('Approve once with password'), findsNothing);
-        expect(find.text('Deny without password'), findsNothing);
+        expect(find.byKey(const Key('approve-start')), findsNothing);
+        expect(find.byKey(const Key('deny-start')), findsNothing);
         expect(
           native.commands.where((c) => c['command'] == 'decision'),
           isEmpty,
@@ -769,11 +779,16 @@ void main() {
             await tester.pump();
             expect(tester.takeException(), isNull);
           }
+          for (final label in ['Approve\u2026', 'Deny\u2026', 'Close review']) {
+            await tester.ensureVisible(find.text(label));
+            await tester.pump();
+            expect(tester.takeException(), isNull);
+          }
+          await startAuthorization(tester);
           for (final label in [
             'Fresh approval password',
             'Approve once with password',
-            'Deny without password',
-            'Cancel review',
+            'Cancel authorization',
           ]) {
             await tester.ensureVisible(find.text(label));
             await tester.pump();

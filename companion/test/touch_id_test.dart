@@ -202,6 +202,7 @@ void main() {
       await tester.ensureVisible(requestRow(providerId));
       await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
+      await startAuthorization(tester);
       final button = find.byKey(const Key('approve-touch-id'));
       expect(button, available ? findsOneWidget : findsNothing);
       expect(find.text('Approve once with password'), findsOneWidget);

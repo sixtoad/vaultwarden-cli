@@ -17,7 +17,7 @@ Bindings are checked in; regeneration instructions are in the migration document
 
 The app opens Requests. Desktop widths use a sidebar and request master/detail;
 compact windows use four bottom destinations and list-to-review navigation.
-Back, Cancel review and destination changes retire the Rust review and clear
+Back, Close review and destination changes retire the Rust review and clear
 passwords before navigation. They do not cancel the remote request. Pending
 settlement/recovery remains visible on every destination and queries only the
 original request ID.
@@ -55,6 +55,28 @@ text is not a device identity. Approve requires a fresh password; deny carries
 none. Approved/running is not completed. Android/iOS native approval integration,
 phone enrollment, remote device management/history, notifications and bundled CLI
 repair remain open dependencies; the shell does not claim them implemented.
+
+### Request review (issue #50, slice 2)
+
+`lib/provider/review/` splits the review into a header (status label, monospace
+request ID, the operation as title, "requester wants to effect"), the scope facts
+(operation and arguments, requester and origin, where it runs, target,
+credential labels and use types), "What you're allowing" (the provider's effect
+text verbatim plus "this request only") and Verification details (digests,
+one-time scope, exact deadline, raw status), which are always rendered above the
+decision controls. Approval takes two steps: Approve… opens an authorization
+step bound to the review's request ID, with Touch ID as the primary action when
+it can approve this review and the password otherwise; Cancel authorization
+returns to the review and clears the password. Deny… asks for confirmation and
+sends no password. A countdown to the earlier of the 55 s review ticket and the
+request deadline disables both decisions at zero and offers Reload review; it
+never re-enables the same load. Selection, navigation, notifications and back
+close the step and clear passwords. Every provider status has its own view:
+approved and running are "not completed", completed shows only the exit code,
+failed shows the provider's reason, and denied, expired and unreadable statuses
+are final. There is no "cancelled" request status. An unknown outcome checks
+only the original request ("Check status"). Only the status object is parsed;
+effect and every other scope value are displayed verbatim.
 
 Golden fixtures use only synthetic requests and test-only licensed Roboto (also
 substituted for any monospace text in goldens). Production uses platform

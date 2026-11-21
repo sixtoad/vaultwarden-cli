@@ -571,6 +571,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
+      await startAuthorization(tester);
       final password = find.byKey(const Key('Fresh approval password'));
       await tester.enterText(password, 'synthetic');
       final field = tester.widget<TextField>(password).controller!;
@@ -758,6 +759,7 @@ void main() {
         '"Synthetic login"',
       );
       expect(core.providerSnapshot().review, isNotNull);
+      await startAuthorization(tester);
       final password = find.byKey(const Key('Fresh approval password'));
       await tester.ensureVisible(password);
       await tester.enterText(password, 'synthetic-password');
@@ -776,12 +778,19 @@ void main() {
       await tester.ensureVisible(requestRow(providerId));
       await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
+      // Reselection closed the step; reopening it shows an empty field.
+      expect(find.byKey(const Key('authorization-step')), findsNothing);
+      await startAuthorization(tester);
       expect(tester.widget<TextField>(password).controller!.text, isEmpty);
       await tester.ensureVisible(password);
       await tester.enterText(password, 'must-not-accompany-denial');
-      await tester.ensureVisible(find.text('Deny without password'));
-      await tester.tap(find.text('Deny without password'));
+      final field = tester.widget<TextField>(password).controller!;
+      // Denial is reached only by leaving the step, which clears the field.
+      await tester.ensureVisible(find.text('Cancel authorization'));
+      await tester.tap(find.text('Cancel authorization'));
       await tester.pumpAndSettle();
+      expect(field.text, isEmpty);
+      await denyRequest(tester);
       final denial = native.commands.singleWhere(
         (c) => c['command'] == 'decision',
       );
