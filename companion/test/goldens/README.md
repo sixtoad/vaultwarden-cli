@@ -130,3 +130,27 @@ pinned Flutter 3.47.7 on macOS 27.0.1 and visually reviewed. The `linux`,
 `windows` and `macos-26-arm64` references were NOT regenerated: CI on those
 hosts fails on the same 16 changed and 18 missing references until the owner
 reviews and adopts each host's captures from the CI artifacts.
+
+## Request review adoption, 2026-11-21 (#50 slice 2)
+
+The `linux`, `windows` and `macos-26-arm64` references for the slice 2
+review redesign (the two-step review and the outcome-unknown shell recovery
+notice) were adopted from [CI run 44642376391](https://github.com/sixtoad/vaultwarden-cli/actions/runs/44642376391)
+on source `f1dd2fb`, where each host failed exactly the 16 changed
+review/actions/`shell_recovery` captures and the 18 missing
+`review_states_golden_test.dart` captures (243 other tests passed on Linux).
+The `macos-27-arm64` references were regenerated locally in the slice.
+
+All 34 actual captures per host were visually compared with the matching
+`macos-27-arm64` reference: same content, wrapping, review facts, status
+notices and visible actions (Approve/Deny/Close review, Cancel
+authorization, Approve once with Touch ID or password, Back to requests,
+View activity, Check status, Refresh authority and inbox); differences are
+glyph-edge rasterization only. All 48 isolated diffs of the changed
+captures show the old-to-new redesign and nothing host-specific. The 200%
+review captures cut the summary at the navigation bar by scrolling, as the
+macOS 27 reference does. The macOS 26 captures were identical (sha256) in
+the `companion-slice-macOS-arm64-development` and
+`companion-macOS-disposable-pilot` artifacts, and the 30 unchanged shell
+captures in each artifact matched the committed references byte for byte.
+The PNGs are copied byte for byte; comparison stays exact.
