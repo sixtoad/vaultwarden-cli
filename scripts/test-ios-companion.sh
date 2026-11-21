@@ -39,6 +39,17 @@ ids = [d["udid"] for runtime, entries in sorted(devices.items(), reverse=True) i
        for d in entries if d["name"].startswith("iPhone")]
 print(ids[0] if ids else "")')
 [ -n "$device" ] || { echo "no available iPhone simulator" >&2; exit 1; }
-xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug \
-  -destination "platform=iOS Simulator,id=$device" -derivedDataPath "${RUNNER_TEMP:-$evidence}/ios-derived-data" \
-  -resultBundlePath "$evidence/RunnerTests.xcresult" 2>&1 | tee "$evidence/xcodebuild-test.log" | tail -40
+# One re-run: a simulator that fails to boot or hangs on first launch is a
+# runner flake, not a test failure. Each attempt keeps its own log and result
+# bundle; a test that fails twice fails the job.
+run_simulator_tests() {
+  attempt=$1
+  xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug \
+    -destination "platform=iOS Simulator,id=$device" -derivedDataPath "${RUNNER_TEMP:-$evidence}/ios-derived-data" \
+    -resultBundlePath "$evidence/RunnerTests-$attempt.xcresult" 2>&1 | tee "$evidence/xcodebuild-test-$attempt.log" | tail -40
+}
+if ! run_simulator_tests 1; then
+  echo "== simulator tests failed; shutting the simulator down and re-running once" >&2
+  xcrun simctl shutdown "$device" 2>/dev/null || true
+  run_simulator_tests 2
+fi

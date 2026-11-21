@@ -23,7 +23,15 @@ Two shared files gained iOS branches, leaving macOS behaviour unchanged:
 `ProductionApprovalKey.biometry()` admits Touch ID only on macOS and Face ID
 or Touch ID on iOS (Optic ID and future sensors are refused), and
 `KeychainIdentity.importPKCS12` adds the decoded identity explicitly on iOS
-(`SecPKCS12Import` does not persist there).
+(`SecPKCS12Import` does not persist there). Keychain items outlive an app
+reinstall, so on a duplicate the iOS import first looks the identity up
+(`kSecClassIdentity`); when the persisted certificate is not byte-identical to
+the imported one (a renewed certificate on the same key, or a stale identity
+from an earlier install), it deletes that key's certificate and private key
+(`kSecAttrPublicKeyHash` / `kSecAttrApplicationLabel`) and adds the imported
+identity once. A certificate that collides on issuer and serial with a
+different key still fails closed. The queries are pure and tested on the host
+(`macos/Tests/CompanionCoreTests/IOSIdentityQueryTests.swift`).
 
 iOS-only code lives in `companion/ios/Runner`:
 
@@ -61,8 +69,23 @@ The PKCS#12 identity is imported into the app's Keychain as
 device). Only its persistent reference is saved. Unlike the approval key, an
 imported private key cannot live in the Secure Enclave. `PinnedTransport`
 evaluates the enrolled private CA only, the hostname and validity, then the
-SHA-256 leaf pin; there is no system-trust fallback. ATS arbitrary loads are
-enabled for the same reason as on macOS (Info.plist comment).
+SHA-256 leaf pin; there is no system-trust fallback.
+
+### App Transport Security (justification for App Store review)
+
+`Info.plist` sets `NSAllowsArbitraryLoads`, as the macOS companion does. The
+app talks to exactly one host, the operator's own self-hosted provider, which
+is chosen at runtime during setup, so no `NSExceptionDomains` entry can name it
+at build time. That provider is normally served under a private CA the system
+does not trust, and ATS evaluates system trust before the app's
+`URLSession` delegate can apply the enrolled trust policy. The exemption does
+not weaken transport security: `ProviderConfiguration` accepts only `https`
+endpoints, the session requires TLS 1.2 or later, and `PinnedTransport`
+accepts only a chain to the enrolled CA (anchors only, no network fetch) whose
+leaf matches the enrolled SHA-256 pin, plus mutual TLS with the client
+identity. No other host is ever contacted. Whether the custom trust delegate
+alone works with ATS on is an open on-device check (`ats_on` in the hardware
+evidence checklist); if it does, the exemption should be narrowed or dropped.
 
 ## Lifecycle
 
@@ -99,7 +122,10 @@ never approves or denies.
   `macos-26`) also runs `scripts/test-ios-companion.sh`: the Swift contract
   tests, the Dart iOS channel-contract tests (`test/ios_approval_client_test.dart`),
   `flutter build ios --no-codesign` with the core force-loaded, and
-  `ios/RunnerTests` on a simulator. Unsigned; no provisioning or secrets.
+  `ios/RunnerTests` on a simulator (re-run once if the first attempt fails, so a
+  simulator that fails to boot is not a test failure). Unsigned; no
+  provisioning or secrets. The job is not yet required by Merge Ready; it
+  joins after a few green runs.
 - Locally (no simulator runtime here): `COMPANION_IOS_CORE=absent flutter build
   ios --no-codesign --debug` and `xcodebuild build-for-testing -destination
   'generic/platform=iOS Simulator'` compile the app and the XCTest bundle.
@@ -112,6 +138,14 @@ never approves or denies.
 A simulator has no Secure Enclave or enrolled biometry, so CI proves the
 contract and attributes, not a hardware signature.
 
+## Signing team
+
+The project commits no `DEVELOPMENT_TEAM` (neither does the macOS project).
+CI builds unsigned. To run on a physical iPhone, the operator sets their own
+team locally (Xcode: Runner target > Signing & Capabilities > Team, or
+`DEVELOPMENT_TEAM=<team id>` on the `xcodebuild` command line) and does not
+commit that change.
+
 ## Hardware evidence (operator, physical iPhone)
 
 `scripts/ios-approval-hardware-evidence.sh <evidence-dir> [Runner.app]` is an
@@ -119,7 +153,13 @@ interactive checklist. The operator builds, signs and installs the app with
 their own Apple developer identity; the script records the source revision,
 the executable hash, the device and each observed result: enroll, approve
 twice (separate prompts), cancel, no passcode fallback, background and lock
-during a prompt, notification tap, relaunch (same key fingerprint), biometric
-enrollment change (only with explicit owner authorization: key invalidated),
-re-enroll (new fingerprint) and revoke. It refuses to run in CI or without a
+during a prompt, notification tap, relaunch (same key fingerprint), ## Signing team
+
+The project commits no `DEVELOPMENT_TEAM` (neither does the macOS project).
+CI builds unsigned. To run on a physical iPhone, the operator sets their own
+team locally (Xcode: Runner target > Signing & Capabilities > Team, or
+`DEVELOPMENT_TEAM=<team id>` on the `xcodebuild` command line) and does not
+commit that change.
+
+## Hardware evidence (operator, physical iPhone) It refuses to run in CI or without a
 terminal and changes nothing itself. Failures remain failures.

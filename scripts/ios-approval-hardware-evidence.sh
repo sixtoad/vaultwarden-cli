@@ -3,7 +3,7 @@
 # (#60 phase 2, ties to #41). It records what the operator observes; it
 # builds, signs, installs, enrolls and approves NOTHING itself, never touches
 # Face ID / Touch ID enrollment, the Keychain or the provider, and refuses to
-# run in CI or without a terminal. See docs/ios-approval-hardware-evidence.md.
+# run in CI or without a terminal. See docs/ios-approval-client.md.
 #
 # Usage: scripts/ios-approval-hardware-evidence.sh <evidence-dir> [path/to/Runner.app]
 set -euo pipefail
@@ -55,6 +55,8 @@ steps=(
   "relaunch|Force-quit and relaunch. Expect the SAME approval key fingerprint as at enroll; approving still works."
   "enrollment_change|ONLY with explicit owner authorization: add or reset Face ID (or a Touch ID finger). Expect the app to report the key invalidated, approval refused, nothing signed."
   "re_enroll|Delete the invalidated key from the app and enroll again. Expect a NEW fingerprint; the old one is rejected by the provider."
+  "identity_renewal|Re-run provider setup with a renewed client certificate on the SAME private key (new PKCS#12). Expect setup to succeed, the provider to accept the new certificate, and the old identity gone from the app (no duplicate-item failure)."
+  "ats_on|Separate build, ONLY for this check: delete NSAllowsArbitraryLoads from ios/Runner/Info.plist, rebuild and install, then set up the provider and approve one request. Record whether the custom trust delegate alone (enrolled private CA + leaf pin) works with ATS on, or the exact ATS error. Reinstall the normal build afterwards."
   "revoke|Revoke this iPhone's approval client from the desktop. Expect a later approval from the iPhone rejected by the provider."
 )
 for step in "${steps[@]}"; do
