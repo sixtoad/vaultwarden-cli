@@ -23,13 +23,32 @@ cd "$companion"
 flutter pub get
 echo "== Dart iOS channel contract"
 flutter test test/ios_approval_client_test.dart test/approval_client_test.dart 2>&1 | tee "$evidence/flutter-ios-contract.log"
-echo "== Unsigned iPhone build"
-flutter build ios --no-codesign --debug 2>&1 | tee "$evidence/flutter-build-ios.log"
-binary=build/ios/iphoneos/Runner.app/Runner
-test -x "$binary"
-# The Rust core is linked in (its bridge symbols are global, for dlsym).
-nm -gU "$binary" | grep -qE '_frbgen_|_frb_' || { echo "companion_core symbols missing from Runner" >&2; exit 1; }
-shasum -a 256 "$binary" > "$evidence/runner-iphoneos.sha256"
+# The Rust core is linked into the image the linker produced for the app code
+# and keeps its bridge symbols global, for dlsym (ExternalLibrary.process).
+# A Debug build since Xcode 16 (ENABLE_DEBUG_DYLIB) splits Runner into a stub
+# executable and Runner.debug.dylib, which holds the app code and the
+# force-loaded core; inspect that image, never the stub. A Release executable
+# keeps the symbols only through -export_dynamic (otherwise -dead_strip drops
+# what only dlsym reaches), so both configurations are checked.
+check_core_linked() {
+  config=$1
+  app=build/ios/iphoneos/Runner.app
+  test -x "$app/Runner"
+  binary="$app/Runner"
+  if [ -e "$app/Runner.debug.dylib" ]; then
+    binary="$app/Runner.debug.dylib"
+    otool -L "$app/Runner" | grep -q '@rpath/Runner.debug.dylib' \
+      || { echo "Runner ($config) does not load Runner.debug.dylib" >&2; exit 1; }
+  fi
+  nm -gU "$binary" | grep -qE '_frbgen_|_frb_' \
+    || { echo "companion_core symbols missing from $binary ($config)" >&2; exit 1; }
+  shasum -a 256 "$app/Runner" "$binary" | sort -u > "$evidence/runner-iphoneos-$config.sha256"
+}
+for config in release debug; do
+  echo "== Unsigned iPhone build ($config)"
+  flutter build ios --no-codesign "--$config" 2>&1 | tee "$evidence/flutter-build-ios-$config.log"
+  check_core_linked "$config"
+done
 
 echo "== XCTest on an iOS simulator"
 device=$(xcrun simctl list devices available -j | python3 -c '

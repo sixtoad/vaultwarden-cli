@@ -461,6 +461,7 @@
 					"$(inherited)",
 					"-force_load",
 					"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+					"-Wl,-export_dynamic",
 				);
 				STRIP_STYLE = "non-global";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -652,6 +653,7 @@
 					"$(inherited)",
 					"-force_load",
 					"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+					"-Wl,-export_dynamic",
 				);
 				STRIP_STYLE = "non-global";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -681,6 +683,7 @@
 					"$(inherited)",
 					"-force_load",
 					"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+					"-Wl,-export_dynamic",
 				);
 				STRIP_STYLE = "non-global";
 				LD_RUNPATH_SEARCH_PATHS = (

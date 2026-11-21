@@ -121,7 +121,8 @@ never approves or denies.
 - CI: the `aarch64-apple-ios` row of `mobile-rust-core` (`.github/workflows/ci.yml`,
   `macos-26`) also runs `scripts/test-ios-companion.sh`: the Swift contract
   tests, the Dart iOS channel-contract tests (`test/ios_approval_client_test.dart`),
-  `flutter build ios --no-codesign` with the core force-loaded, and
+  `flutter build ios --no-codesign` (release and debug) with the core
+  force-loaded and its bridge symbols checked in the image that holds them, and
   `ios/RunnerTests` on a simulator (re-run once if the first attempt fails, so a
   simulator that fails to boot is not a test failure). Unsigned; no
   provisioning or secrets. The job is not yet required by Merge Ready; it
