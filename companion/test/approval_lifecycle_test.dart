@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:companion_slice/platform/approval_client.dart';
+import 'package:companion_slice/platform/approval_key.dart';
 import 'package:companion_slice/provider/page.dart';
 import 'package:companion_slice/src/rust/frb_generated.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,23 @@ import 'provider_support.dart';
 import 'touch_id_support.dart';
 
 const secondId = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+const thirdId = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
+
+/// A key that also reports which verification it uses, as the native one.
+class VerifyingKeys extends FakeKeys implements UserVerificationPlatform {
+  VerifyingKeys(this.kind);
+  UserVerification kind;
+  @override
+  Future<UserVerification> verification() async =>
+      available ? kind : UserVerification.unavailable;
+}
+
+/// What each system's key reports in these tests, and how it is named.
+const kinds = {
+  'macos': (UserVerification.touchId, 'Touch ID'),
+  'android': (UserVerification.biometric, 'biometrics'),
+  'ios': (UserVerification.faceId, 'Face ID'),
+};
 
 class FakeSignals implements DeviceSignalPlatform {
   void Function(DeviceSignal)? callback;
@@ -42,6 +60,52 @@ void main() {
       expect(provider.state.reviewId, providerId);
       keys.prompt!.complete(); // the platform ignored the cancel
       await approving;
+      expect(decisions(native), isEmpty);
+      touchId.dispose();
+      provider.dispose();
+    },
+  );
+
+  // The Dart gate alone (#60): the review is unchanged, so Rust would accept
+  // the prepared handle and the provider fake would record a decision.
+  test(
+    'a retired attempt sends nothing although the review is unchanged',
+    () async {
+      final native = FixtureProviderPlatform()..approvalBinding = binding;
+      final keys = FakeKeys()..prompt = Completer();
+      final (provider, touchId) = await reviewed(native, keys);
+      final approving = touchId.approve();
+      await pumpEventQueue();
+      expect(keys.signed, hasLength(1), reason: 'the prompt is open');
+      await touchId.retire(); // background, lock or interruption
+      expect(provider.state.reviewId, providerId, reason: 'review unchanged');
+      final sent = native.commands.length;
+      keys.prompt!.complete(); // the platform ignored the cancel
+      await approving;
+      expect(native.commands, hasLength(sent), reason: 'nothing was performed');
+      expect(decisions(native), isEmpty);
+      expect(touchId.message, touchId.notSent);
+      touchId.dispose();
+      provider.dispose();
+    },
+  );
+
+  test(
+    'a retirement while the fresh review loads never opens the prompt',
+    () async {
+      final native = FixtureProviderPlatform()..approvalBinding = binding;
+      final keys = FakeKeys();
+      final (provider, touchId) = await reviewed(native, keys);
+      native.heldReview = Completer();
+      final approving = touchId.approve();
+      await pumpEventQueue();
+      await touchId.retire();
+      final reply = Map<String, dynamic>.of(providerReview())..['version'] = 2;
+      reply['approval_binding'] = binding(reply);
+      native.heldReview!.complete(encoded(reply)); // the same review again
+      await approving;
+      expect(provider.state.reviewId, providerId);
+      expect(keys.signed, isEmpty, reason: 'no prompt after a retirement');
       expect(decisions(native), isEmpty);
       touchId.dispose();
       provider.dispose();
@@ -98,22 +162,33 @@ void main() {
         wide(tester);
         final native = FixtureProviderPlatform()
           ..approvalBinding = binding
-          ..requestIds = [providerId, secondId];
-        final keys = FakeKeys();
+          ..requestIds = [providerId, secondId, thirdId];
+        final (kind, name) = kinds[os]!;
+        final keys = VerifyingKeys(kind);
+        // Foreground, so the page resumes once the approval ends and the
+        // next requests' reviews really load.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
         await tester.pumpWidget(page(native, keys, os: os));
         await open(tester, providerId);
         await touchIdTap(tester);
         await tester.pumpAndSettle();
-        expect(find.text('Approved once with Touch ID.'), findsOneWidget);
+        final approved = 'Approved once with $name.';
+        expect(find.text(approved), findsOneWidget);
         native.reviewReply = reviewOf(secondId);
         await open(tester, secondId);
-        expect(find.text('Approved once with Touch ID.'), findsNothing);
+        expect(find.text(approved), findsNothing);
         expect(
-          find.text(
-            'Earlier request $providerId: Approved once with Touch ID.',
-          ),
+          find.text('Earlier request ("deploy", AAAAAAAA…): $approved'),
           findsOneWidget,
+          reason: 'its operation and the start of its id, as the list shows',
         );
+        // Shown once, with the first other review: the next load clears it.
+        native.reviewReply = reviewOf(thirdId);
+        await open(tester, thirdId);
+        expect(find.textContaining('Earlier request'), findsNothing);
+        expect(find.textContaining(approved), findsNothing);
         await tester.pumpWidget(const SizedBox.shrink());
       });
 
@@ -137,7 +212,10 @@ void main() {
         final shown = tester.widget<Text>(
           find.byKey(const Key('touch-id-message')),
         );
-        expect(shown.data, startsWith('Earlier request $providerId: '));
+        expect(
+          shown.data,
+          startsWith('Earlier request ("deploy", AAAAAAAA…): '),
+        );
         expect(shown.data, contains('Nothing was sent'));
         await tester.pumpWidget(const SizedBox.shrink());
       });
@@ -164,6 +242,89 @@ void main() {
           await tester.pumpWidget(const SizedBox.shrink());
         });
       }
+
+      testWidgets('an unlock during the prompt is not lost', (tester) async {
+        final native = FixtureProviderPlatform()..approvalBinding = binding;
+        final keys = FakeKeys()..prompt = Completer();
+        final signals = FakeSignals();
+        await tester.pumpWidget(page(native, keys, os: os, signals: signals));
+        await open(tester, providerId);
+        await touchIdTap(tester);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        signals.callback!(DeviceSignal.locked); // a real lock
+        // Unlocked while the prompt is still winding down: deferred.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        keys.prompt!.complete();
+        await tester.pumpAndSettle();
+        expect(decisions(native), isEmpty);
+        expect(
+          find.byKey(const Key('approve-start')),
+          findsOneWidget,
+          reason: 'resumed with a fresh review, not left suspended',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+
+      testWidgets('a late lock signal after an unlock never strands the '
+          'phone; a real lock still suspends until resumed', (tester) async {
+        final native = FixtureProviderPlatform()..approvalBinding = binding;
+        final signals = FakeSignals();
+        await tester.pumpWidget(
+          page(native, FakeKeys(), os: os, signals: signals),
+        );
+        await open(tester, providerId);
+        for (final s in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(s);
+        }
+        await tester.pumpAndSettle();
+        signals.callback!(DeviceSignal.locked); // arrives after the unlock
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('approve-start')), findsOneWidget);
+        // A real lock: the lifecycle leaves `resumed` and stays suspended.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        signals.callback!(DeviceSignal.locked);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('approve-start')), findsNothing);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('approve-start')), findsOneWidget);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+
+      testWidgets('phone messages name its verification, not a Mac', (
+        tester,
+      ) async {
+        final native = FixtureProviderPlatform()..approvalBinding = binding;
+        final (kind, name) = kinds[os]!;
+        final keys = VerifyingKeys(kind)..signOutcome = KeyOutcome.cancelled;
+        await tester.pumpWidget(page(native, keys, os: os));
+        await open(tester, providerId);
+        await touchIdTap(tester);
+        await tester.pumpAndSettle();
+        final shown = tester
+            .widget<Text>(find.byKey(const Key('touch-id-message')))
+            .data!;
+        expect(
+          shown,
+          startsWith(
+            '${name[0].toUpperCase()}${name.substring(1)} was cancelled.',
+          ),
+        );
+        expect(shown, isNot(contains('Touch ID')));
+        expect(shown, isNot(contains('Mac')));
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
 
       testWidgets('returning to the foreground re-loads the open review', (
         tester,

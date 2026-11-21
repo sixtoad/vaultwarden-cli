@@ -45,8 +45,11 @@ ever crosses into Dart or Rust.
 | `send` | `Uint8List` body, ≤ 16 KiB | `Uint8List` response, ≤ 1 MiB |
 | `settle` | request id (43 base64url chars) | `null` |
 
-Native → Dart: `invalidate` (argument `close` or `inactive`) whenever the app
-leaves the foreground or the provider session must be retired.
+Native → Dart: `invalidate` whenever the app leaves the foreground or the
+provider session must be retired. The argument is a reason: `close` or
+`inactive` (phones and macOS), and on macOS also `sleep` (system sleep). Dart
+treats every reason alike (it retires the provider session); a phone sends
+`close` or `inactive`.
 
 Transport rules, identical to macOS `PinnedTransport`:
 
@@ -74,26 +77,47 @@ Key attributes (all required):
 
 - ECDSA **P-256**, generated in hardware: the Secure Enclave on iOS; on Android
   the Keystore with StrongBox when present, otherwise the TEE. A software key
-  is `unsafe`, never used.
+  is `unsafe`, never used. Android checks the level after generation (and on
+  every `read`) with `KeyInfo.getSecurityLevel()` (API 31+;
+  `KeyInfo.isInsideSecureHardware()` before): only
+  `SECURITY_LEVEL_STRONGBOX` or `SECURITY_LEVEL_TRUSTED_ENVIRONMENT` is used;
+  anything else (`SOFTWARE`, `UNKNOWN_SECURE`, `UNKNOWN`) is `unsafe`.
 - Non-exportable, this device only, never backed up or synchronized.
-- **User verification for every signature**: no reuse window
-  (Android: `setUserAuthenticationParameters(0, …)`, auth per use through a
-  `BiometricPrompt` `CryptoObject`; iOS: `SecAccessControl` with
-  `.biometryCurrentSet` or `.userPresence` and a fresh `LAContext` per
-  signature).
+- **Biometric user verification for every signature**, with no reuse window
+  and **no passcode-only approval**:
+  - Android: `setUserAuthenticationRequired(true)`,
+    `setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)`
+    (Class 3 biometrics only, never `AUTH_DEVICE_CREDENTIAL`), auth per use
+    through a `BiometricPrompt` `CryptoObject` with
+    `setAllowedAuthenticators(BIOMETRIC_STRONG)`.
+  - iOS: `SecAccessControl` with `.privateKeyUsage` and `.biometryCurrentSet`
+    (never `.userPresence` or `.devicePasscode`, which accept the passcode and
+    survive an enrollment change), and a fresh `LAContext` per signature.
 - Invalidated by a biometric enrollment change (Android
   `setInvalidatedByBiometricEnrollment(true)`, iOS `.biometryCurrentSet`);
   `read` then reports `invalidated`.
 
+**Decision (#60): no passcode-only approval on phones.** macOS has no passcode
+fallback for its approval key (Touch ID only), and a key that the device
+passcode alone unlocks would also outlive a biometric enrollment change, which
+contradicts the invalidation rule above. Phones therefore never accept the
+device credential as the approval verification: `availability` never replies
+`deviceCredential` (Dart parses it as `unavailable` on every system), and a
+device without enrolled strong biometrics approves with the **provider
+password**, which is always offered.
+
 | Method | Arguments | Reply |
 |---|---|---|
-| `availability` | none | macOS `touchID`; iOS `touchID`, `faceID` or `deviceCredential`; Android `biometric` or `deviceCredential`; otherwise `unavailable` |
+| `availability` | none | macOS `touchID`; iOS `touchID` or `faceID`; Android `biometric`; otherwise `unavailable` (no biometrics enrolled, locked out, hardware missing) |
 | `read`, `create`, `delete` | `{providerIdentity, approvalClient}` | key reply |
 | `sign` | `{providerIdentity, approvalClient, session, token, purpose, transcript}` | key reply |
 | `cancel` | `{session, token}` | `null` |
 
 Dart accepts only its own system's `availability` values
-(`verificationReplies`); macOS stays exactly as strict as before.
+(`verificationReplies`); macOS stays exactly as strict as before. The reply
+also names the verification in the approval messages
+(`VerificationWording`: "Face ID", "biometrics", "this device"); macOS keeps
+"Touch ID" and "this Mac".
 
 **Key reply** (closed schema, `parseKeyReply`): exactly
 `{outcome, publicKey, signature}`. `outcome` is one of `KeyOutcome`
@@ -135,7 +159,7 @@ enforces the parts it can see:
 Same methods as macOS: `status`, `armAuthorization`, `requestAuthorization`,
 `enabled`, `setEnabled`, `post {token}`, `withdraw {tokens}`, `watching`,
 `listen`; native → Dart `open` with a 22-character base64url token. The native
-side owns the only notification text ("A request is waiting for review"); no
+side owns the only notification text ("A request needs your review."); no
 request detail is ever placed in a notification. Permission is asked only after
 `armAuthorization` (the Settings toggle), never at launch. On a phone, opening
 a notification brings the app forward and Dart loads a fresh review; the
@@ -156,7 +180,16 @@ loaded by bare name), `staticlib` (iOS: linked into the Runner, loaded with
 `ExternalLibrary.process`) and `rlib`. Targets: `aarch64-linux-android`,
 `aarch64-apple-ios` (and `aarch64-apple-ios-sim` for the simulator). The
 desktop installation module compiles on every target but phones never call it.
-CI job `mobile-rust-core` checks and builds both targets.
+CI job `mobile-rust-core` checks and builds all three targets.
+
+iOS: `ExternalLibrary.process` looks the bridge symbols up in the running
+process at run time, and nothing in the Runner references them at link time,
+so the linker dead-strips an ordinary static library. The Runner must keep
+them: link the archive with `-force_load
+$(PROJECT_DIR)/…/libcompanion_core.a` in `OTHER_LDFLAGS` (per SDK: the device
+and simulator archives differ), or turn dead stripping off
+(`DEAD_CODE_STRIPPING = NO`) for the Runner. Without it the app builds and
+fails at the first Rust call with a missing-symbol error.
 
 ## Lifecycle rules (shared Dart, every platform)
 
@@ -168,14 +201,23 @@ See `companion/lib/provider/approval_attempts.dart`. In short:
   only while that attempt is still the current, unretired attempt for the same
   request id; anything else sends nothing.
 - An approval's result message is shown as-is only with its own request's
-  review; on any other review it is prefixed `Earlier request <id>: `
-  (`TouchIdController.messageFor`).
+  review; on any other review it is prefixed `Earlier request (<operation>,
+  <first 8 id characters>…): ` (`TouchIdController.messageFor`), the way the
+  request list shows it. It is shown with the first other review loaded after
+  the approval ended and cleared by the next review load.
 - On return to the foreground a phone re-loads the open request's review from
   the provider; nothing from before the interruption is reused. (Desktop keeps
   its existing behaviour: the retired review asks for an explicit reload.)
-- A `locked` device signal keeps the client suspended until Flutter reports
-  `resumed`; `interrupted` retires the attempt and review, then resumes at
-  once if the app is still in the foreground.
+- `locked` and `interrupted` retire the attempt and the review at once. A
+  `locked` that arrives while Flutter reports the app out of the foreground
+  keeps the client suspended until the next `resumed`, including a `resumed`
+  that arrives while a system prompt defers lifecycle handling. A `locked`
+  that arrives while Flutter still reports `resumed` (the signal raced ahead
+  of the lifecycle, or came late after an unlock) is handled like
+  `interrupted`: the client resumes at once with a fresh review if it is in
+  the foreground. A real lock always takes the app out of `resumed`, which
+  suspends it, so the lock still fails closed; latching such a signal could
+  leave the phone suspended after an unlock that already happened.
 - Phones never show desktop installation controls in Settings
   (`ProviderSettings.installationControls`).
 
