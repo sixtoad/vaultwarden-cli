@@ -100,13 +100,21 @@ final class MobileApprovalContractTests: XCTestCase {
     }
 
     func testLeavingTheForegroundOrLockingInvalidatesProviderState() {
-        XCTAssertEqual(MobileLifecycle.providerInvalidations.map(\.reason), ["background", "locked", "close"])
+        // docs/mobile-clients.md: the provider `invalidate` argument is `inactive` or `close`.
+        XCTAssertEqual(MobileLifecycle.providerInvalidations.map(\.reason), ["inactive", "inactive", "close"])
         XCTAssertEqual(MobileLifecycle.providerInvalidations.map(\.name),
                        [MobileLifecycle.didEnterBackground, MobileLifecycle.protectedDataWillBecomeUnavailable,
                         MobileLifecycle.willTerminate])
         // Administrative tickets are also dropped on resign-active, as on macOS.
         XCTAssertEqual(Set(MobileLifecycle.managementInvalidations),
                        Set(MobileLifecycle.providerInvalidations.map(\.name) + [MobileLifecycle.willResignActive]))
+    }
+
+    func testDeviceLockIsSignalledOnTheLifecycleChannel() {
+        // `.../lifecycle` `signal`: iOS reports `locked` only. Interruptions
+        // (calls, app switcher) already reach Flutter as `inactive`.
+        XCTAssertEqual(MobileLifecycle.deviceSignals.map(\.name), [MobileLifecycle.protectedDataWillBecomeUnavailable])
+        XCTAssertEqual(MobileLifecycle.deviceSignals.map(\.signal), ["locked"])
     }
 
     func testUIKitNotificationNamesAreSpelledOut() {

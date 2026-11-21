@@ -51,11 +51,17 @@ enum MobileLifecycle {
     /// biometric sheet itself, so that trigger would cancel every prompt.
     static let signerCancelTriggers = [didEnterBackground, protectedDataWillBecomeUnavailable, willTerminate]
 
-    /// Sent to Flutter as `invalidate` with the reason, which retires the open
-    /// review and clears passwords (the shared lifecycle rules decide the rest).
+    /// Sent to Flutter on the provider channel as `invalidate` with the
+    /// argument `docs/mobile-clients.md` names (`inactive` or `close`), which
+    /// retires the open review and clears passwords.
     static let providerInvalidations: [(name: String, reason: String)] = [
-        (didEnterBackground, "background"), (protectedDataWillBecomeUnavailable, "locked"), (willTerminate, "close"),
+        (didEnterBackground, "inactive"), (protectedDataWillBecomeUnavailable, "inactive"), (willTerminate, "close"),
     ]
+
+    /// Sent on `dev.vaultwarden.companionSlice/lifecycle` as `signal`. iOS
+    /// reports only `locked`: calls, the app switcher and the notification
+    /// shade already reach Flutter as `AppLifecycleState.inactive`.
+    static let deviceSignals: [(name: String, signal: String)] = [(protectedDataWillBecomeUnavailable, "locked")]
 
     /// A prepared administrative ticket (`identity_prepare`) is dropped on any
     /// of these, resign-active included, as macOS drops it when inactive.

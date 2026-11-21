@@ -38,7 +38,8 @@ iOS-only code lives in `companion/ios/Runner`:
 - `MobileProviderAdapter.swift`: the `provider` channel; CA and PKCS#12 come
   from the Files picker (copied into the sandbox, size-bounded, then deleted).
 - `MobileReviewNotificationAdapter.swift`: the `notifications` channel.
-- `MobileChannels.swift`, `AppDelegate.swift`: registration on the implicit engine.
+- `MobileChannels.swift`, `AppDelegate.swift`: registration on the implicit
+  engine, plus the `lifecycle` channel's `locked` signal.
 
 ## Approval key
 
@@ -69,15 +70,17 @@ enabled for the same reason as on macOS (Info.plist comment).
 
 | Notification | Effect |
 |---|---|
-| did enter background | cancel an open prompt; `invalidate("background")` to Flutter; drop a prepared admin ticket |
-| protected data will become unavailable (device lock) | cancel prompt; `invalidate("locked")`; drop ticket |
+| did enter background | cancel an open prompt; provider `invalidate("inactive")`; drop a prepared admin ticket |
+| protected data will become unavailable (device lock) | cancel prompt; `invalidate("inactive")`; lifecycle `signal("locked")`; drop ticket |
 | will terminate | cancel prompt; `invalidate("close")`; drop ticket |
 | will resign active | drop a prepared admin ticket only |
 
 Resign-active does NOT cancel the prompt or retire the review: iOS resigns the
-app active to present the Face ID / Touch ID sheet itself. The shared Dart
-lifecycle rules must therefore not retire a review on Flutter's `inactive`
-state while a biometric prompt is open on iOS. A `sign` call is refused while
+app active to present the Face ID / Touch ID sheet itself, exactly like the
+macOS Touch ID sheet, so the shared Dart rule that defers `inactive` while a
+prompt is open (`touchId.lifecycleExempt`) is what keeps a valid prompt alive.
+Calls, the app switcher and the notification shade reach Flutter as
+`inactive`, so iOS sends no `interrupted` signal. A `sign` call is refused while
 the app is in the background.
 
 ## Notifications

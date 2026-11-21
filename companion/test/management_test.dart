@@ -433,7 +433,8 @@ void main() {
         final c = ProviderController(p);
         await c.initialize();
         await prepare(c);
-        final password = TextEditingController(); // secrets-ignore: test UI controller
+        final password =
+            TextEditingController(); // secrets-ignore: test UI controller
         await tester.pumpWidget(
           MaterialApp(
             theme: accessTheme(brightness),

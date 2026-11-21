@@ -243,7 +243,10 @@ void main() {
         find.textContaining('scripts/macos-provider-install.py'),
         findsNothing,
       );
-      expect(find.textContaining('this app does not install it'), findsOneWidget);
+      expect(
+        find.textContaining('this app does not install it'),
+        findsOneWidget,
+      );
       expect(find.textContaining('Development signing only.'), findsOneWidget);
       expect(
         find.textContaining('Intel Macs and Rosetta are unsupported.'),
