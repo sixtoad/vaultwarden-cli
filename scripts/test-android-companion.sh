@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Android approval client (#60 phase 1), on a host with the Android SDK and
-# NDK (GitHub's ubuntu-latest). Builds the Rust core for aarch64-linux-android,
+# NDK (GitHub's ubuntu-latest). Takes the aarch64-linux-android Rust core from
+# ANDROID_COMPANION_CORE (CI: the mobile-rust-core artifact) or builds it,
 # packages it into a debug APK, checks the APK carries it, runs the Kotlin
 # unit tests (transcript/DER/key-policy/pinning rules) and the Dart contract
 # test. Nothing here needs a device; on-device evidence is separate.
@@ -23,10 +24,16 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$bin/aarch64-linux-android30-c
 export CC_aarch64_linux_android="$bin/aarch64-linux-android30-clang"
 export AR_aarch64_linux_android="$bin/llvm-ar"
 
-cargo --version
-cargo build --locked --release -j 2 --target aarch64-linux-android \
-  --manifest-path "$repo/companion/rust/Cargo.toml"
-core="$repo/companion/rust/target/aarch64-linux-android/release/libcompanion_core.so"
+if [ -n "${ANDROID_COMPANION_CORE:-}" ]; then
+  # CI: the library the mobile-rust-core job built and published.
+  core=$ANDROID_COMPANION_CORE
+else
+  cargo --version
+  cargo build --locked --release -j 2 --lib --target aarch64-linux-android \
+    --manifest-path "$repo/companion/rust/Cargo.toml"
+  core="$repo/companion/rust/target/aarch64-linux-android/release/libcompanion_core.so"
+fi
+test -s "$core"
 "$bin/llvm-readelf" -h "$core" | grep -q 'AArch64'
 # The bridge entry points Dart resolves by name must be exported.
 "$bin/llvm-nm" -D --defined-only "$core" | grep -q 'frb_get_rust_content_hash'

@@ -19,6 +19,7 @@ class ProviderSettings extends StatelessWidget {
     required this.notifier,
     required this.touchId,
     this.installation,
+    this.installationControls = true,
     required this.pilotOffered,
     required this.appearance,
     required this.onAppearance,
@@ -37,6 +38,9 @@ class ProviderSettings extends StatelessWidget {
   final ReviewNotifier notifier;
   final TouchIdController touchId;
   final InstallationPlatform? installation;
+
+  /// Desktop installation inspection/enablement; never on a phone (#60).
+  final bool installationControls;
 
   /// The disposable pilot is compiled in and the platform supports it.
   final bool pilotOffered;
@@ -75,7 +79,8 @@ class ProviderSettings extends StatelessWidget {
           const SizedBox(height: 24),
           ReviewNotificationSettings(notifier: notifier),
           const SizedBox(height: 24),
-          InstallationSettings(platform: installation),
+          if (installationControls)
+            InstallationSettings(platform: installation),
           if (config.configured) ...[
             TouchIdKeyPanel(
               touchId: touchId,

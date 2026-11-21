@@ -167,5 +167,17 @@ See `companion/lib/provider/approval_attempts.dart`. In short:
 - A biometric completion is attributed only to the attempt that started it, and
   only while that attempt is still the current, unretired attempt for the same
   request id; anything else sends nothing.
-- On return to the foreground an open request's review is re-loaded from the
-  provider; nothing from before the interruption is reused.
+- An approval's result message is shown as-is only with its own request's
+  review; on any other review it is prefixed `Earlier request <id>: `
+  (`TouchIdController.messageFor`).
+- On return to the foreground a phone re-loads the open request's review from
+  the provider; nothing from before the interruption is reused. (Desktop keeps
+  its existing behaviour: the retired review asks for an explicit reload.)
+- A `locked` device signal keeps the client suspended until Flutter reports
+  `resumed`; `interrupted` retires the attempt and review, then resumes at
+  once if the app is still in the foreground.
+- Phones never show desktop installation controls in Settings
+  (`ProviderSettings.installationControls`).
+
+Tests: `companion/test/approval_lifecycle_test.dart` (macOS, Android and iOS
+variants of each rule).

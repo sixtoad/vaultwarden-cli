@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../platform/approval_key.dart';
 import '../src/rust/api/biometric.dart' as bio;
 import '../src/rust/api/provider.dart' as core;
+import 'approval_attempts.dart';
 import 'controller.dart';
 
 /// Production Touch ID approval and own-device key enrollment (issue 49).
@@ -21,6 +22,28 @@ class TouchIdController extends ChangeNotifier {
   int _token = 0;
   int? _active;
   bool _disposed = false, _exempt = false;
+
+  /// The open request-bound authorization (#60 lifecycle rule).
+  final attempts = ApprovalAttempts();
+
+  /// The request the approval [message] is about ('' for key management).
+  String _messageRequest = '';
+
+  /// The approval message as shown with the review of [requestId]. An
+  /// approval's outcome is never presented as another request's: on any
+  /// other review it names the request it is about.
+  String messageFor(String requestId) =>
+      message.isEmpty || _messageRequest.isEmpty || _messageRequest == requestId
+      ? message
+      : 'Earlier request $_messageRequest: $message';
+
+  /// Retire the open authorization (background, lock, interruption,
+  /// navigation, selection) and cancel its prompt. A signature that still
+  /// arrives afterwards sends nothing.
+  Future<void> retire() async {
+    attempts.retire();
+    await cancel();
+  }
 
   /// Called when an approval or enrollment ends, so the page applies the
   /// window's current lifecycle state (it ignored `inactive`/`resumed`
@@ -123,13 +146,15 @@ class TouchIdController extends ChangeNotifier {
     final id = provider.state.reviewId, shown = provider.state.reviewText;
     final origin = _origin(id);
     final b = binding!;
-    // Selecting another request (or any invalidation) cancels the prompt.
+    // Selecting another request (or any invalidation) retires the attempt
+    // and cancels the prompt.
     void watch() {
-      if (provider.state.reviewId != id) unawaited(cancel());
+      if (provider.state.reviewId != id) unawaited(retire());
     }
 
+    final attempt = attempts.begin(id);
     _start();
-    provider.addListener(watch);
+    _messageRequest = id;
     var recover = false;
     try {
       available = await platform.touchIdAvailable();
@@ -138,13 +163,17 @@ class TouchIdController extends ChangeNotifier {
         return;
       }
       await provider.review(id);
-      if (provider.state.reviewId != id ||
+      if (!attempts.admits(attempt, provider.state.reviewId) ||
+          provider.state.reviewId != id ||
           provider.state.reviewText != shown ||
           _origin(id) != origin ||
           !provider.state.canDecide) {
         message = 'The request changed or is no longer pending. Nothing was approved. Check the refreshed review.';
         return;
       }
+      // From the fresh review on, any change of the shown review retires the
+      // attempt (the fetch above passes through an empty review).
+      provider.addListener(watch);
       final state = review;
       if (state == null || !state.canPrepare || !state.biometricAllowed) {
         message = unavailableReason;
@@ -170,7 +199,8 @@ class TouchIdController extends ChangeNotifier {
         message = _signFailure(reply.outcome);
         return;
       }
-      if (provider.state.reviewId != id || !provider.state.canDecide) {
+      if (!attempts.admits(attempt, provider.state.reviewId) ||
+          !provider.state.canDecide) {
         message = notSent;
         return;
       }
@@ -193,6 +223,7 @@ class TouchIdController extends ChangeNotifier {
       recover = provider.recoveryId.isNotEmpty;
     } finally {
       provider.removeListener(watch);
+      attempts.end(attempt);
       _end();
     }
     if (recover) await provider.refresh();
@@ -230,6 +261,7 @@ class TouchIdController extends ChangeNotifier {
     final b = binding;
     if (b == null || working || !available) return;
     _start();
+    _messageRequest = '';
     try {
       await provider.performKey(
         () => bio.biometricKeyBegin(
@@ -333,6 +365,7 @@ class TouchIdController extends ChangeNotifier {
     if (b == null || working) return;
     working = true;
     message = '';
+    _messageRequest = '';
     _publish();
     try {
       await provider.performKey(
