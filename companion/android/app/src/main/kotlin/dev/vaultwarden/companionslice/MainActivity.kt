@@ -9,6 +9,7 @@ import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
 /**
  * Android approval client (#60 phase 1). A FlutterFragmentActivity because
@@ -25,6 +26,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var provider: ProviderChannel? = null
     private var notifications: ReviewNotifications? = null
     private var screenOffRegistered = false
+    private var lifecycleChannel: MethodChannel? = null
 
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -47,6 +49,8 @@ class MainActivity : FlutterFragmentActivity() {
         approvalKey = ApprovalKeyChannel(this, messenger)
         provider = ProviderChannel(this, messenger)
         notifications = ReviewNotifications(this, messenger).also { it.onIntent(intent) }
+        // Native -> Dart only (`signal`: `locked`); Dart never calls it.
+        lifecycleChannel = MethodChannel(messenger, LIFECYCLE_CHANNEL)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -56,6 +60,7 @@ class MainActivity : FlutterFragmentActivity() {
         approvalKey = null
         provider = null
         notifications = null
+        lifecycleChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -82,6 +87,7 @@ class MainActivity : FlutterFragmentActivity() {
     private fun trigger(trigger: LifecycleTrigger) {
         approvalKey?.cancelActive()
         provider?.invalidate(trigger)
+        trigger.deviceSignal?.let { lifecycleChannel?.invokeMethod("signal", it) }
     }
 
     @Deprecated("Storage Access Framework results for provider setup")
@@ -93,5 +99,9 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         if (notifications?.onPermissionResult(requestCode) == true) return
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    companion object {
+        const val LIFECYCLE_CHANNEL = "dev.vaultwarden.companionSlice/lifecycle"
     }
 }

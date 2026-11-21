@@ -49,14 +49,19 @@ class SignerGate {
 
 /**
  * The Android lifecycle signals that cancel an open prompt and invalidate
- * provider state, and the reason string sent to Dart's `invalidate` handler.
- * `onPause` is deliberately absent: on some devices showing BiometricPrompt
- * itself pauses the activity, which would cancel every prompt. `onStop`
- * (no longer visible: home, recents, another app, the lock screen over it),
- * screen off and destruction all fire before anything else can be shown.
+ * provider state. [reason] is the provider channel's `invalidate` argument
+ * (`docs/mobile-clients.md`: `inactive` or `close`); [deviceSignal] is what
+ * the `.../lifecycle` channel sends Dart (`locked`), if anything.
+ *
+ * `onPause` and window-focus loss are deliberately absent: BiometricPrompt
+ * itself takes window focus (and pauses the activity on some devices), so
+ * either would cancel every prompt. Flutter already reports them as
+ * `AppLifecycleState.inactive`. `onStop` (no longer visible: home, recents,
+ * another app, the lock screen over it), screen off and destruction all fire
+ * before anything else can be shown.
  */
-enum class LifecycleTrigger(val reason: String) {
-    STOP("background"),
-    SCREEN_OFF("sleep"),
-    DESTROY("close"),
+enum class LifecycleTrigger(val reason: String, val deviceSignal: String?) {
+    STOP("inactive", null),
+    SCREEN_OFF("inactive", "locked"),
+    DESTROY("close", null),
 }

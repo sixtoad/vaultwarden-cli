@@ -171,8 +171,12 @@ class ApprovalKeyChannel(private val activity: FragmentActivity, messenger: Bina
     companion object {
         const val NAME = "dev.vaultwarden.companionSlice/approvalKey"
 
-        /** The `availability` reply when a BIOMETRIC_STRONG authenticator is enrolled. */
-        const val AVAILABLE = "biometricStrong"
+        /**
+         * The `availability` reply when a BIOMETRIC_STRONG authenticator is
+         * enrolled. Android never replies `deviceCredential`: the key does not
+         * admit a PIN/pattern (`ApprovalKeySpec`).
+         */
+        const val AVAILABLE = "biometric"
 
         // Generic copy: the request itself is reviewed in the app, never in the prompt.
         const val APPROVE_TITLE = "Approve one provider request"
