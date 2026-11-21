@@ -21,6 +21,8 @@ test -s "$companion/rust/target/aarch64-apple-ios/release/libcompanion_core.a"
 
 cd "$companion"
 flutter pub get
+echo "== Dart iOS channel contract"
+flutter test test/ios_approval_client_test.dart test/approval_client_test.dart 2>&1 | tee "$evidence/flutter-ios-contract.log"
 echo "== Unsigned iPhone build"
 flutter build ios --no-codesign --debug 2>&1 | tee "$evidence/flutter-build-ios.log"
 binary=build/ios/iphoneos/Runner.app/Runner
@@ -38,5 +40,5 @@ ids = [d["udid"] for runtime, entries in sorted(devices.items(), reverse=True) i
 print(ids[0] if ids else "")')
 [ -n "$device" ] || { echo "no available iPhone simulator" >&2; exit 1; }
 xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug \
-  -destination "platform=iOS Simulator,id=$device" -derivedDataPath "$RUNNER_TEMP/ios-derived-data" \
+  -destination "platform=iOS Simulator,id=$device" -derivedDataPath "${RUNNER_TEMP:-$evidence}/ios-derived-data" \
   -resultBundlePath "$evidence/RunnerTests.xcresult" 2>&1 | tee "$evidence/xcodebuild-test.log" | tail -40

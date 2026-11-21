@@ -95,10 +95,14 @@ never approves or denies.
 
 - `swift test --package-path companion` runs the shared and mobile contract
   tests on the macOS host.
-- CI job `ios-companion` (`.github/workflows/ci.yml`, `macos-26`): installs the
-  `aarch64-apple-ios` and `aarch64-apple-ios-sim` Rust targets, builds the
-  core for the device target, `flutter build ios --no-codesign`, and runs
+- CI: the `aarch64-apple-ios` row of `mobile-rust-core` (`.github/workflows/ci.yml`,
+  `macos-26`) also runs `scripts/test-ios-companion.sh`: the Swift contract
+  tests, the Dart iOS channel-contract tests (`test/ios_approval_client_test.dart`),
+  `flutter build ios --no-codesign` with the core force-loaded, and
   `ios/RunnerTests` on a simulator. Unsigned; no provisioning or secrets.
+- Locally (no simulator runtime here): `COMPANION_IOS_CORE=absent flutter build
+  ios --no-codesign --debug` and `xcodebuild build-for-testing -destination
+  'generic/platform=iOS Simulator'` compile the app and the XCTest bundle.
 - The Xcode phase `scripts/build-companion-ios-core.sh` builds
   `libcompanion_core.a`, which the Runner force-loads (Dart uses
   `ExternalLibrary.process`). On a host without the iOS Rust targets,

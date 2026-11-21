@@ -126,9 +126,14 @@ jobs:
     # (jniLibs/<abi>/libcompanion_core.so), staticlib for iOS (linked into the
     # Runner). Built on GitHub-hosted runners: the Android NDK is preinstalled
     # on ubuntu-24.04 and the iOS SDK on macos-26. No phone app is built here.
+    #
+    # The aarch64-apple-ios row also builds and tests the iOS approval client
+    # (#60 phase 2, scripts/test-ios-companion.sh): Swift contract tests, the
+    # unsigned iPhone app with the core force-loaded, and ios/RunnerTests on a
+    # simulator. No signing identity, provisioning profile or secret.
     name: Companion Rust core (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.target == 'aarch64-apple-ios' && 75 || 30 }}
     strategy:
       fail-fast: false
       matrix:
@@ -170,6 +175,26 @@ jobs:
           built="companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}"
           test -s "$built"
           ls -l "$built"
+      - name: Install the iOS simulator library target
+        if: matrix.target == 'aarch64-apple-ios'
+        run: rustup target add aarch64-apple-ios-sim
+      - uses: subosito/flutter-action@v2
+        if: matrix.target == 'aarch64-apple-ios'
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Build and test the unsigned iOS approval client
+        if: matrix.target == 'aarch64-apple-ios'
+        run: bash scripts/test-ios-companion.sh "$RUNNER_TEMP/ios-evidence"
+      - name: Preserve iOS evidence
+        if: always() && matrix.target == 'aarch64-apple-ios'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-approval-client-evidence
+          path: |
+            ${{ runner.temp }}/ios-evidence
+            companion/test/failures
 
   desktop-companion-msrv:
     name: Companion Rust 1.88 and security mutations
@@ -571,7 +596,7 @@ jobs:
   merge-ready:
     name: Merge Ready
     runs-on: ubuntu-latest
-    needs: [check, test, build, browser, agent-transport, systemd-integration, native-protected-provider, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, history-endpoint-security, Lint, Security]
+    needs: [check, test, build, browser, agent-transport, systemd-integration, native-protected-provider, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, history-endpoint-security, mobile-rust-core, Lint, Security]
     if: github.event_name == 'pull_request'
     steps:
       - name: Confirm required CI jobs passed
