@@ -40,10 +40,21 @@ void main() {
       parseUserVerification('android', 'biometric'),
       UserVerification.biometric,
     );
-    expect(
-      parseUserVerification('android', 'deviceCredential'),
-      UserVerification.deviceCredential,
-    );
+    // No system approves with the passcode alone (docs/mobile-clients.md
+    // section 2): a device-credential reply is unavailable everywhere.
+    for (final os in ['macos', 'ios', 'android']) {
+      expect(
+        parseUserVerification(os, 'deviceCredential'),
+        UserVerification.unavailable,
+        reason: os,
+      );
+    }
+    expect(UserVerification.values.map((v) => v.name), [
+      'touchId',
+      'faceId',
+      'biometric',
+      'unavailable',
+    ]);
     expect(
       parseUserVerification('android', 'touchID'),
       UserVerification.unavailable,
@@ -51,6 +62,27 @@ void main() {
     expect(
       parseUserVerification('linux', 'touchID'),
       UserVerification.unavailable,
+    );
+  });
+
+  test('phones word the verification by its label; macOS keeps Touch ID', () {
+    for (final v in UserVerification.values) {
+      final mac = VerificationWording.of('macos', v);
+      expect((mac.method, mac.device), ('Touch ID', 'this Mac'));
+    }
+    final face = VerificationWording.of('ios', UserVerification.faceId);
+    expect((face.method, face.device), ('Face ID', 'this device'));
+    expect(
+      VerificationWording.of('ios', UserVerification.unavailable).method,
+      'Face ID or Touch ID',
+    );
+    final android = VerificationWording.of(
+      'android',
+      UserVerification.biometric,
+    );
+    expect(
+      (android.startMethod, android.startDevice),
+      ('Biometrics', 'This device'),
     );
   });
 

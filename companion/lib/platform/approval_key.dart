@@ -51,8 +51,9 @@ class KeyBinding {
 /// contract each platform meets is `docs/mobile-clients.md`.
 abstract interface class ApprovalKeyPlatform {
   /// A request-bound, user-verified signer is available now (Touch ID on
-  /// macOS; Face ID/Touch ID/passcode on iOS; biometrics/device credential
-  /// on Android). The historical name is kept for every implementation.
+  /// macOS; Face ID or Touch ID on iOS; Class 3 biometrics on Android; never
+  /// the passcode alone). The historical name is kept for every
+  /// implementation.
   Future<bool> touchIdAvailable();
   Future<KeyReply> read(KeyBinding binding);
   Future<KeyReply> create(KeyBinding binding);

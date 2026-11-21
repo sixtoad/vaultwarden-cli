@@ -134,6 +134,8 @@ jobs:
     name: Companion Rust core (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ matrix.target == 'aarch64-apple-ios' && 75 || 30 }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
