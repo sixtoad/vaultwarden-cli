@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
+import '../platform/approval_client.dart';
 import '../platform/approval_key.dart';
 import '../platform/installation.dart';
 import '../platform/notifications.dart';
@@ -35,8 +36,16 @@ class ProviderPage extends StatefulWidget {
     this.notifications,
     this.installation,
     this.clock,
+    this.operatingSystem,
+    this.deviceSignals,
   });
   final ProviderPlatform platform;
+
+  /// `Platform.operatingSystem` unless a test pins another one.
+  final String? operatingSystem;
+
+  /// Native lock/interruption signals; null uses the native ones (phones).
+  final DeviceSignalPlatform? deviceSignals;
 
   /// The wall clock for the review countdown; null reads `DateTime.now`.
   final ReviewClock? clock;
@@ -88,6 +97,14 @@ class _ProviderPageState extends State<ProviderPage>
   /// The request the user (or a notification) last opened; marks its row
   /// while the detail is open, even before its review has loaded.
   String openedRequest = '';
+
+  /// This device's system, and whether it is a phone (#60).
+  String get os => widget.operatingSystem ?? Platform.operatingSystem;
+  bool get mobile => isMobileSystem(os);
+
+  /// A device lock signal arrived; only a lifecycle `resumed` clears it.
+  bool _locked = false;
+  void Function()? _stopSignals;
   AccessDestination destination = AccessDestination.requests;
   ThemeMode appearance = ThemeMode.system;
   @override
@@ -106,6 +123,10 @@ class _ProviderPageState extends State<ProviderPage>
       widget.approvalKeys ?? NativeApprovalKeyPlatform(),
     )..addListener(changed);
     touchId.onExemptionEnded = applyLifecycle;
+    _stopSignals =
+        (widget.deviceSignals ??
+                NativeDeviceSignalPlatform(operatingSystem: os))
+            .listen(onDeviceSignal);
     controller.onInbox = (ids, foreground) =>
         notifier.observe(ids, foreground: foreground);
     controller.watchAllowed = () => notifier.active;
@@ -193,11 +214,39 @@ class _ProviderPageState extends State<ProviderPage>
   /// current state now. Anything but `resumed` suspends.
   void applyLifecycle() {
     if (!mounted) return;
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      if (controller.suspended) controller.resume();
+    if (!_locked &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      if (controller.suspended) {
+        controller.resume();
+        reloadOpenReview();
+      }
     } else {
       controller.suspend();
     }
+  }
+
+  /// A phone locked or was interrupted: retire the authorization and the
+  /// review at once, whatever Flutter's lifecycle says yet (#60).
+  void onDeviceSignal(DeviceSignal signal) {
+    if (!mounted) return;
+    if (signal == DeviceSignal.locked) _locked = true;
+    unawaited(touchId.retire());
+    controller.suspend();
+    if (!touchId.lifecycleExempt) applyLifecycle();
+  }
+
+  /// Phones re-load the open request's review from the provider on return
+  /// to the foreground; nothing from before the interruption is reused.
+  void reloadOpenReview() {
+    if (!mobile ||
+        !detailOpen ||
+        openedRequest.isEmpty ||
+        destination != AccessDestination.requests ||
+        notificationRequest.isNotEmpty) {
+      return;
+    }
+    reviewSession.beginLoad(openedRequest);
+    controller.reviewWhenReady(openedRequest);
   }
 
   String _notifiedProvider = '';
@@ -240,12 +289,14 @@ class _ProviderPageState extends State<ProviderPage>
           state == AppLifecycleState.resumed) {
         return;
       }
-      unawaited(touchId.cancel());
+      unawaited(touchId.retire());
       controller.suspend();
       return;
     }
     if (state == AppLifecycleState.resumed) {
+      _locked = false;
       controller.resume();
+      reloadOpenReview();
       unawaited(touchId.refreshLocal());
       unawaited(notifier.refreshPermission());
     }
@@ -262,6 +313,7 @@ class _ProviderPageState extends State<ProviderPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _stopSignals?.call();
     controller.removeListener(changed);
     enrollment
       ..removeListener(changed)
@@ -301,6 +353,7 @@ class _ProviderPageState extends State<ProviderPage>
 
   void navigate(AccessDestination next) {
     if (next == destination && !detailOpen) return;
+    unawaited(touchId.retire()); // a route change retires the attempt
     controller.cancelPendingReview();
     notificationRequest = '';
     notificationNote = '';
@@ -318,6 +371,7 @@ class _ProviderPageState extends State<ProviderPage>
   }
 
   void backToRequests() {
+    unawaited(touchId.retire());
     controller.cancelPendingReview();
     notificationRequest = '';
     notificationNote = '';
@@ -335,6 +389,7 @@ class _ProviderPageState extends State<ProviderPage>
   }
 
   void openRequest(String id) {
+    unawaited(touchId.retire()); // even reopening the same request
     controller.cancelPendingReview();
     reviewSession.beginLoad(id); // mutation: selection closes step
     notificationRequest = '';
@@ -425,7 +480,7 @@ class _ProviderPageState extends State<ProviderPage>
     ),
     endpoint: controller.configuration.endpoint,
     capabilities: DeviceCapabilities.derive(
-      operatingSystem: Platform.operatingSystem,
+      operatingSystem: os,
       providerTransport: widget.platform.available,
       biometricSigner: touchId.available,
       reviewNotifications: notifier.available,
@@ -497,6 +552,7 @@ class _ProviderPageState extends State<ProviderPage>
         notifier: notifier,
         touchId: touchId,
         installation: widget.installation,
+        installationControls: !mobile,
         pilotOffered:
             disposablePilotEnabled && widget.platform is PilotProviderPlatform,
         appearance: appearance,
