@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:companion_slice/app/capabilities.dart';
 import 'package:companion_slice/platform/approval_client.dart';
 import 'package:companion_slice/platform/approval_key.dart';
 import 'package:companion_slice/platform/provider.dart';
@@ -192,5 +193,19 @@ void main() {
     );
     expect(signals, [DeviceSignal.locked]);
     stop();
+  });
+
+  test('an iPhone approves and never installs a desktop CLI', () {
+    final iphone = DeviceCapabilities.derive(
+      operatingSystem: 'ios',
+      providerTransport: true,
+      biometricSigner: true,
+      reviewNotifications: true,
+    );
+    expect(iphone.canApprove, isTrue);
+    expect(iphone.biometric, isTrue);
+    expect(iphone.canExecute, isFalse);
+    expect(iphone.cliInstall, isFalse);
+    expect(isMobileSystem('ios'), isTrue);
   });
 }
