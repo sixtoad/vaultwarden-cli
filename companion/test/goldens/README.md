@@ -165,3 +165,24 @@ companion holds for a request instead of a fixed "Pending"
 (`light_desktop_review_{running,completed,failed,denied,expired}.png`). The
 `macos-27-arm64` references were regenerated locally and reviewed; the other
 hosts adopt their reviewed CI actuals.
+
+## Review reveal and inbox row status adoption, 2026-11-21 (#50 slice 2)
+
+The `linux`, `windows` and `macos-26-arm64` references for the review reveal
+and inbox row status fixes were adopted from [CI run 44886352824](https://github.com/sixtoad/vaultwarden-cli/actions/runs/44886352824)
+on source `d1ede07`, where each host failed exactly the nine changed captures
+(`{light,dark}_compact_review.png`, `{light,dark}_large_review.png`,
+`light_desktop_review_{completed,denied,expired,failed,running}.png`).
+
+All 27 actual captures were visually compared with the matching
+`macos-27-arm64` reference: the compact and 200% reviews open at the review's
+own top (status, request ID, operation and the whole "who wants what"
+sentence above the navigation bar), and each desktop inbox row shows the
+review's final status (Completed · exit code 0, Denied, Expired, Failed,
+Running · not completed); differences are glyph-edge rasterization only. All
+27 isolated diffs show only the old-to-new scroll position or inbox row
+status. The macOS 26 captures were identical (sha256) in the
+`companion-slice-macOS-arm64-development` and
+`companion-macOS-disposable-pilot` artifacts, and the 47 unchanged shell and
+review state captures in each artifact matched the committed references byte
+for byte. The PNGs are copied byte for byte; comparison stays exact.
