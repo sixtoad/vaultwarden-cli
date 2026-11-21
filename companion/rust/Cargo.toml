@@ -6,6 +6,10 @@ rust-version = "1.88"
 publish = false
 
 [lib]
+# cdylib: desktop bundles and Android (jniLibs/<abi>/libcompanion_core.so).
+# staticlib: iOS, linked into the Runner (ExternalLibrary.process). No
+# dependency below is platform-specific except windows-sys; the core builds
+# for aarch64-linux-android and aarch64-apple-ios(-sim) (CI mobile-rust-core).
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import 'approval_client.dart';
+
 import '../provider/pilot_bundle.dart';
 
 class ProviderConfiguration {
@@ -37,7 +39,7 @@ abstract interface class PilotProviderPlatform {
 class NativeProviderPlatform
     implements ProviderPlatform, PilotProviderPlatform {
   NativeProviderPlatform({bool? macOS, MethodChannel? channel})
-    : available = macOS ?? Platform.isMacOS,
+    : available = macOS ?? isApprovalClientSystem(Platform.operatingSystem),
       _channel =
           channel ??
           const MethodChannel('dev.vaultwarden.companionSlice/provider');
