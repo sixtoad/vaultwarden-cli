@@ -7,6 +7,14 @@ import '../src/rust/frb_generated.dart';
 /// Load only the library packaged with this executable. Development tests use
 /// the generator's explicit rust/target/release path in their own process.
 Future<void> initializePackagedCore() async {
+  if (Platform.isIOS) {
+    // iOS links companion_core statically into the Runner (force_load), so
+    // its symbols are in this process; nothing is loaded from a path.
+    await RustLib.init(
+      externalLibrary: ExternalLibrary.process(iKnowHowToUseIt: true),
+    );
+    return;
+  }
   final executable = File(Platform.resolvedExecutable).parent;
   final String path;
   if (Platform.isMacOS) {

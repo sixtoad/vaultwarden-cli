@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Companion Slice</string>
+	<string>Approval companion</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,17 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID approves one provider request at a time with this device's approval key.</string>
+	<!-- Private CA evaluation is performed by PinnedTransport's mandatory
+	     CA/hostname/validity/leaf-pin checks, as on macOS. ATS otherwise rejects
+	     private roots before that delegate can apply the enrolled trust policy.
+	     HTTPS and TLS 1.2+ remain enforced by ProviderConfiguration and PinnedTransport. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

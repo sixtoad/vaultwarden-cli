@@ -21,7 +21,7 @@ let package = Package(
                 exclude: ["AppDelegate.swift", "SceneDelegate.swift", "MobileChannels.swift", "MobileApprovalKeyChannel.swift",
                           "MobileProviderAdapter.swift", "MobileReviewNotificationAdapter.swift",
                           "Runner-Bridging-Header.h", "GeneratedPluginRegistrant.h", "GeneratedPluginRegistrant.m",
-                          "Assets.xcassets", "Base.lproj", "Info.plist", "Runner.entitlements"],
+                          "Assets.xcassets", "Base.lproj", "Info.plist"],
                 sources: ["MobileApprovalContract.swift"]),
         .testTarget(name: "MobileContractTests", dependencies: ["MobileContract"], path: "mobile_native_tests")
     ]

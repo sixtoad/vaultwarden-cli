@@ -16,6 +16,19 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		C60200000000000000000002 /* MobileApprovalContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000001 /* MobileApprovalContract.swift */; };
+		C60200000000000000000004 /* MobileChannels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000003 /* MobileChannels.swift */; };
+		C60200000000000000000006 /* MobileApprovalKeyChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000005 /* MobileApprovalKeyChannel.swift */; };
+		C60200000000000000000008 /* MobileProviderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000007 /* MobileProviderAdapter.swift */; };
+		C6020000000000000000000A /* MobileReviewNotificationAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000009 /* MobileReviewNotificationAdapter.swift */; };
+		C6020000000000000000000C /* ApprovalContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6020000000000000000000B /* ApprovalContract.swift */; };
+		C6020000000000000000000E /* ProductionApprovalContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6020000000000000000000D /* ProductionApprovalContract.swift */; };
+		C60200000000000000000010 /* ProductionApprovalKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6020000000000000000000F /* ProductionApprovalKey.swift */; };
+		C60200000000000000000012 /* ReviewNotificationContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000011 /* ReviewNotificationContract.swift */; };
+		C60200000000000000000014 /* ProviderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000013 /* ProviderSettings.swift */; };
+		C60200000000000000000016 /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000015 /* Protocol.swift */; };
+		C60200000000000000000018 /* Trust.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000017 /* Trust.swift */; };
+		C6020000000000000000001A /* approval-v2-golden.json in Resources */ = {isa = PBXBuildFile; fileRef = C60200000000000000000019 /* approval-v2-golden.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +72,19 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C60200000000000000000001 /* MobileApprovalContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileApprovalContract.swift; sourceTree = "<group>"; };
+		C60200000000000000000003 /* MobileChannels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChannels.swift; sourceTree = "<group>"; };
+		C60200000000000000000005 /* MobileApprovalKeyChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileApprovalKeyChannel.swift; sourceTree = "<group>"; };
+		C60200000000000000000007 /* MobileProviderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileProviderAdapter.swift; sourceTree = "<group>"; };
+		C60200000000000000000009 /* MobileReviewNotificationAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileReviewNotificationAdapter.swift; sourceTree = "<group>"; };
+		C6020000000000000000000B /* ApprovalContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ApprovalContract.swift; path = ../macos/Runner/ApprovalContract.swift; sourceTree = SOURCE_ROOT; };
+		C6020000000000000000000D /* ProductionApprovalContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProductionApprovalContract.swift; path = ../macos/Runner/ProductionApprovalContract.swift; sourceTree = SOURCE_ROOT; };
+		C6020000000000000000000F /* ProductionApprovalKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProductionApprovalKey.swift; path = ../macos/Runner/ProductionApprovalKey.swift; sourceTree = SOURCE_ROOT; };
+		C60200000000000000000011 /* ReviewNotificationContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReviewNotificationContract.swift; path = ../macos/Runner/ReviewNotificationContract.swift; sourceTree = SOURCE_ROOT; };
+		C60200000000000000000013 /* ProviderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProviderSettings.swift; path = ../macos/Runner/ProviderSettings.swift; sourceTree = SOURCE_ROOT; };
+		C60200000000000000000015 /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Protocol.swift; path = ../../macos/Sources/CompanionCore/Protocol.swift; sourceTree = SOURCE_ROOT; };
+		C60200000000000000000017 /* Trust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Trust.swift; path = ../../macos/Sources/CompanionCore/Trust.swift; sourceTree = SOURCE_ROOT; };
+		C60200000000000000000019 /* approval-v2-golden.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = "approval-v2-golden.json"; path = "../../tests/fixtures/approval-v2-golden.json"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +126,7 @@
 				97C146F01CF9000F007C117D /* Runner */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
+				C6020000000000000000001B /* Shared Apple sources */,
 			);
 			sourceTree = "<group>";
 		};
@@ -124,8 +151,28 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				C60200000000000000000001 /* MobileApprovalContract.swift */,
+				C60200000000000000000003 /* MobileChannels.swift */,
+				C60200000000000000000005 /* MobileApprovalKeyChannel.swift */,
+				C60200000000000000000007 /* MobileProviderAdapter.swift */,
+				C60200000000000000000009 /* MobileReviewNotificationAdapter.swift */,
 			);
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		C6020000000000000000001B /* Shared Apple sources */ = {
+			isa = PBXGroup;
+			children = (
+				C6020000000000000000000B /* ApprovalContract.swift */,
+				C6020000000000000000000D /* ProductionApprovalContract.swift */,
+				C6020000000000000000000F /* ProductionApprovalKey.swift */,
+				C60200000000000000000011 /* ReviewNotificationContract.swift */,
+				C60200000000000000000013 /* ProviderSettings.swift */,
+				C60200000000000000000015 /* Protocol.swift */,
+				C60200000000000000000017 /* Trust.swift */,
+				C60200000000000000000019 /* approval-v2-golden.json */,
+			);
+			name = "Shared Apple sources";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -153,6 +200,7 @@
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				9740EEB61CF901F6004384FC /* Run Script */,
+				C6020000000000000000001C /* Build companion core */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -218,6 +266,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C6020000000000000000001A /* approval-v2-golden.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,6 +315,22 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
+		C6020000000000000000001C /* Build companion core */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Build companion core";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"$PROJECT_DIR/../../scripts/build-companion-ios-core.sh\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -284,6 +349,18 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+				C60200000000000000000002 /* MobileApprovalContract.swift in Sources */,
+				C60200000000000000000004 /* MobileChannels.swift in Sources */,
+				C60200000000000000000006 /* MobileApprovalKeyChannel.swift in Sources */,
+				C60200000000000000000008 /* MobileProviderAdapter.swift in Sources */,
+				C6020000000000000000000A /* MobileReviewNotificationAdapter.swift in Sources */,
+				C6020000000000000000000C /* ApprovalContract.swift in Sources */,
+				C6020000000000000000000E /* ProductionApprovalContract.swift in Sources */,
+				C60200000000000000000010 /* ProductionApprovalKey.swift in Sources */,
+				C60200000000000000000012 /* ReviewNotificationContract.swift in Sources */,
+				C60200000000000000000014 /* ProviderSettings.swift in Sources */,
+				C60200000000000000000016 /* Protocol.swift in Sources */,
+				C60200000000000000000018 /* Trust.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -360,7 +437,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -380,6 +458,12 @@
 				DEVELOPMENT_TEAM = 9884BZY594;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+				);
+				STRIP_STYLE = "non-global";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -488,7 +572,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -540,7 +625,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -562,6 +648,12 @@
 				DEVELOPMENT_TEAM = 9884BZY594;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+				);
+				STRIP_STYLE = "non-global";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -585,6 +677,12 @@
 				DEVELOPMENT_TEAM = 9884BZY594;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(BUILT_PRODUCTS_DIR)/libcompanion_core.a",
+				);
+				STRIP_STYLE = "non-global";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
