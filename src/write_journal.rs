@@ -36,11 +36,30 @@ fn hex(bytes: &[u8]) -> String {
         output
     })
 }
+/// Scheme and host compare case-insensitively; the path and a trailing slash do not matter.
+fn normalized_server(server: &str) -> String {
+    let server = server.trim_end_matches('/');
+    match server.split_once("://") {
+        Some((scheme, rest)) => {
+            let (authority, path) = rest.split_at(rest.find('/').unwrap_or(rest.len()));
+            format!(
+                "{}://{}{path}",
+                scheme.to_ascii_lowercase(),
+                authority.to_ascii_lowercase()
+            )
+        }
+        None => server.to_owned(),
+    }
+}
+/// Held while one update of an item runs; released when dropped.
+pub struct UpdateLock {
+    _file: File,
+}
 impl WriteJournal {
     /// Every update attempt for one server and item shares this file-name prefix.
     #[must_use]
     pub fn update_prefix(server: &str, item_id: &str) -> String {
-        let server = server.trim_end_matches('/');
+        let server = normalized_server(server);
         format!(
             "update-{}-",
             hex(&Sha256::digest(format!("{server}\0{item_id}")))
@@ -66,6 +85,38 @@ impl WriteJournal {
                 );
             }
         }
+        Ok(())
+    }
+    /// Takes the item's exclusive update lock without waiting, then re-checks
+    /// that no earlier attempt is uncertain. Hold it until the receipt is saved.
+    /// # Errors
+    /// Returns an error when another update of the item is running, an earlier
+    /// attempt is uncertain, or the lock file cannot be opened safely.
+    pub fn lock_update(root: &Path, server: &str, item_id: &str) -> Result<UpdateLock> {
+        Self::private_root(root)?;
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)]
+        options
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
+        let file =
+            options.open(root.join(format!("{}.lock", Self::update_prefix(server, item_id))))?;
+        fs4::FileExt::try_lock(&file).map_err(|_error| {
+            anyhow::anyhow!("another update of this item is in progress; nothing was written")
+        })?;
+        Self::ensure_no_uncertain_update(root, server, item_id)?;
+        Ok(UpdateLock { _file: file })
+    }
+    fn private_root(root: &Path) -> Result<()> {
+        fs::create_dir_all(root)?;
+        let metadata = fs::symlink_metadata(root)?;
+        ensure!(
+            metadata.is_dir() && !metadata.file_type().is_symlink(),
+            "unsafe journal directory"
+        );
+        #[cfg(unix)]
+        fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
         Ok(())
     }
     fn slot(&self, root: &Path) -> PathBuf {
@@ -94,14 +145,7 @@ impl WriteJournal {
             self.receipt.status == WriteStatus::Uncertain,
             "invalid initial write state"
         );
-        fs::create_dir_all(root)?;
-        let metadata = fs::symlink_metadata(root)?;
-        ensure!(
-            metadata.is_dir() && !metadata.file_type().is_symlink(),
-            "unsafe journal directory"
-        );
-        #[cfg(unix)]
-        fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
+        Self::private_root(root)?;
         let path = self.slot(root);
         // The complete private file is durable before a no-clobber name is published.
         let temporary = self.write_temporary(root)?;
@@ -287,7 +331,11 @@ mod tests {
             path,
             WriteJournal::path(&directory, &first.server, &first.destination)
         );
-        for server in ["https://vault.example", "https://vault.example/"] {
+        for server in [
+            "https://vault.example",
+            "https://vault.example/",
+            "HTTPS://Vault.EXAMPLE",
+        ] {
             assert!(WriteJournal::ensure_no_uncertain_update(&directory, server, item).is_err());
         }
         WriteJournal::ensure_no_uncertain_update(
@@ -308,6 +356,27 @@ mod tests {
             WriteJournal::ensure_no_uncertain_update(&directory, "https://vault.example", item)
                 .is_err()
         );
+        // The lock is exclusive per item (also across server spellings) and
+        // re-checks the uncertain block after it is taken.
+        let mut second_record = WriteJournal::read(&second).unwrap();
+        second_record.receipt.status = WriteStatus::Failed;
+        second_record.save(&second).unwrap();
+        let held = WriteJournal::lock_update(&directory, "https://vault.example", item).unwrap();
+        assert!(
+            WriteJournal::lock_update(&directory, "https://VAULT.example/", item).is_err(),
+            "a second holder"
+        );
+        WriteJournal::lock_update(
+            &directory,
+            "https://vault.example",
+            "44444444-4444-4444-4444-444444444444",
+        )
+        .unwrap();
+        drop(held);
+        let third = attempt("third").begin(&directory).unwrap();
+        assert!(WriteJournal::lock_update(&directory, "https://vault.example", item).is_err());
+        std::fs::remove_file(third).unwrap();
+        WriteJournal::lock_update(&directory, "https://vault.example", item).unwrap();
         // Create journals serialize exactly as before the update record existed.
         let mut create = attempt("create");
         create.update = None;

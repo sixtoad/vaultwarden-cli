@@ -6,7 +6,9 @@ use super::{
 use crate::{
     crypto::CryptoKeys,
     secret_storage::{Destination, WriteReceipt, WriteStatus, valid_id},
-    secret_update::{ItemSnapshot, plan_update, verify_updated},
+    secret_update::{
+        ItemSnapshot, PASSWORD_HISTORY_LIMIT, history_timestamp, plan_update, verify_updated,
+    },
     write_journal::{UpdateRecord, WriteJournal},
 };
 
@@ -22,6 +24,14 @@ async fn bound_snapshot(
     let raw = ctx.api.cipher_json_by_id(&ctx.access_token, id).await?;
     let snapshot = ItemSnapshot::parse(raw, id)?;
     Ok(snapshot)
+}
+
+/// The current time in the form official clients use for password history.
+fn now() -> Result<String> {
+    let since = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_error| anyhow::anyhow!("system clock unavailable"))?;
+    Ok(history_timestamp(since))
 }
 
 /// Replace selected fields after a fresh terminal decision bound to the exact
@@ -55,17 +65,31 @@ pub async fn update_secret(
         expected_revision.is_none_or(|expected| expected == reviewed.revision()),
         "item revision differs from the expected revision"
     );
+    if prompt {
+        reviewed.check_binding(keys, &destination)?;
+        reviewed.require_password()?;
+    }
     let input = read_secret_input(prompt, true)?;
     // Refuse missing or unsupported fields before asking for a decision.
-    plan_update(keys, &destination, &reviewed, &input)?;
+    let preview = plan_update(keys, &destination, &reviewed, &input, &now()?)?;
     let attempt = fresh_attempt_id()?;
+    let history = if preview.history.is_empty() {
+        "none".to_owned()
+    } else {
+        format!(
+            "old values of {} kept in password history (newest {PASSWORD_HISTORY_LIMIT})",
+            preview.history.join(", ")
+        )
+    };
     let review = format!(
-        "UPDATE personal vault item (no create)\nItem: {id}\nAccount: {account} at {server}\nFolder: {folder} ({})\nReference: {reference}\nExpected revision: {}\nFields replaced: {}",
+        "UPDATE personal vault item (no create)\nItem: {id}\nAccount: {account} at {server}\nFolder: {folder} ({})\nReference: {reference}\nExpected revision: {}\nFields replaced: {}\nPassword history: {history}",
         destination.folder_id,
         reviewed.revision(),
         input.selectors().join(", ")
     );
     authorize_on_terminal(&review, "update", &attempt, "update denied")?;
+    // One update of an item at a time, from the uncertain check to the receipt.
+    let _lock = WriteJournal::lock_update(&root, &server, id)?;
     // The approval covers the reviewed revision only: any edit since then refuses.
     let fresh = bound_snapshot(&ctx, keys, &destination, id)
         .await
@@ -74,7 +98,7 @@ pub async fn update_secret(
         fresh.revision() == reviewed.revision(),
         "item changed since review; nothing was written"
     );
-    let body = plan_update(keys, &destination, &fresh, &input)?;
+    let plan = plan_update(keys, &destination, &fresh, &input, &now()?)?;
     let mut journal = WriteJournal {
         server,
         destination,
@@ -90,12 +114,24 @@ pub async fn update_secret(
         }),
     };
     let path = journal.begin(&root)?;
-    match ctx.api.update_cipher(&ctx.access_token, id, &body).await {
+    match ctx
+        .api
+        .update_cipher(&ctx.access_token, id, &plan.body)
+        .await
+    {
         Ok(_accepted) => {
             journal.receipt.status = WriteStatus::UpdatedUnverified;
             journal.save(&path)?;
             if let Ok(after) = bound_snapshot(&ctx, keys, &journal.destination, id).await
-                && verify_updated(keys, &journal.destination, &fresh, &after, &input).is_ok()
+                && verify_updated(
+                    keys,
+                    &journal.destination,
+                    &fresh,
+                    &plan.body,
+                    &after,
+                    &input,
+                )
+                .is_ok()
             {
                 journal.receipt.status = WriteStatus::Verified;
             }
@@ -112,7 +148,9 @@ pub async fn update_secret(
 }
 
 /// Read-only resolution of an update receipt: an unchanged revision proves the
-/// attempt wrote nothing; a newer one cannot be compared after a restart.
+/// attempt wrote nothing; a newer one cannot be compared after a restart, also
+/// when the item was moved or trashed since. Exits non-zero unless `verified`,
+/// like `update` itself.
 pub(super) async fn reconcile_update(
     journal_path: &std::path::Path,
     mut journal: WriteJournal,
@@ -121,6 +159,7 @@ pub(super) async fn reconcile_update(
 ) -> Result<()> {
     let update = journal.update.clone().context("not an update journal")?;
     if let Some(id) = id {
+        anyhow::ensure!(valid_id(id), "invalid item ID");
         anyhow::ensure!(id == update.item_id, "cannot retarget a receipt");
         let ctx = load_sync_context(opts.allow_insecure_http).await?;
         anyhow::ensure!(
@@ -136,16 +175,22 @@ pub(super) async fn reconcile_update(
             .check_sync(&ctx.sync_response, keys, false)?;
         let raw = ctx.api.cipher_json_by_id(&ctx.access_token, id).await?;
         let current = ItemSnapshot::parse(raw, id)?;
-        current.check_binding(keys, &journal.destination)?;
         if journal.receipt.status == WriteStatus::Uncertain {
             journal.receipt.status = if current.revision() == update.expected_revision {
+                // Unchanged since the attempt: the binding still holds, nothing was written.
+                current.check_binding(keys, &journal.destination)?;
                 WriteStatus::Failed
             } else {
+                // Any later write (including a move or a trash) bumps the revision.
                 WriteStatus::UpdatedUnverified
             };
         }
         journal.save(journal_path)?;
     }
     println!("{}", serde_json::to_string(&journal.receipt)?);
+    anyhow::ensure!(
+        journal.receipt.status == WriteStatus::Verified,
+        "update receipt is not verified; inspect the item before any new update"
+    );
     Ok(())
 }

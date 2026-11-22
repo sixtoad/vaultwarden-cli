@@ -16,6 +16,7 @@ evidence = Path(sys.argv[1]).resolve()
 evidence.mkdir(parents=True, exist_ok=True)
 UPDATE = "src/commands/update.rs"
 CORE = "src/secret_update.rs"
+JOURNAL = "src/write_journal.rs"
 mutations = {
     "challenge-answer": ("src/commands.rs", (
         'anyhow::ensure!(answer == expected, "{denied}");',
@@ -27,34 +28,92 @@ mutations = {
         "fresh.revision() == reviewed.revision(),",
         "!fresh.revision().is_empty(),")),
     "fields-checked-before-decision": (UPDATE, (
-        "    plan_update(keys, &destination, &reviewed, &input)?;\n",
-        "")),
+        "let preview = plan_update(keys, &destination, &reviewed, &input, &now()?)?;",
+        "let preview = crate::secret_update::UpdatePlan::default();")),
+    "prompt-field-checked-before-secret": (UPDATE, (
+        "        reviewed.require_password()?;\n", "")),
     "verified-only-after-comparison": (UPDATE, (
-        "&& verify_updated(keys, &journal.destination, &fresh, &after, &input).is_ok()",
+        "&& verify_updated(\n                    keys,\n                    &journal.destination,\n"
+        "                    &fresh,\n                    &plan.body,\n                    &after,\n"
+        "                    &input,\n                )\n                .is_ok()",
         "&& after.revision() != fresh.revision()")),
+    "update-lock-taken": (UPDATE, (
+        "let _lock = WriteJournal::lock_update(&root, &server, id)?;",
+        "let _lock = ();")),
     "reconcile-unchanged-revision": (UPDATE, (
         "current.revision() == update.expected_revision",
         "current.revision().is_empty()")),
-    "uncertain-blocks-item": ("src/write_journal.rs", (
+    "reconcile-moved-or-trashed": (UPDATE, (
+        "let current = ItemSnapshot::parse(raw, id)?;\n        if journal",
+        "let current = ItemSnapshot::parse(raw, id)?;\n"
+        "        current.check_binding(keys, &journal.destination)?;\n        if journal")),
+    "reconcile-valid-id": (UPDATE, (
+        '        anyhow::ensure!(valid_id(id), "invalid item ID");\n'
+        "        anyhow::ensure!(id == update.item_id",
+        "        anyhow::ensure!(id == update.item_id")),
+    "reconcile-exit-unless-verified": (UPDATE, (
+        "journal.receipt.status == WriteStatus::Verified,\n"
+        '        "update receipt is not verified',
+        'true,\n        "update receipt is not verified')),
+    "uncertain-blocks-item": (JOURNAL, (
         "if name.starts_with(&prefix) && name.ends_with(\".json\")",
         "if name.starts_with(\"never-\") && name.ends_with(\".json\")")),
+    "lock-exclusive": (JOURNAL, (
+        "fs4::FileExt::try_lock(&file).map_err(",
+        "Ok::<(), fs4::TryLockError>(()).map_err(")),
+    "lock-rechecks-uncertain": (JOURNAL, (
+        "        Self::ensure_no_uncertain_update(root, server, item_id)?;\n"
+        "        Ok(UpdateLock",
+        "        Ok(UpdateLock")),
+    "journal-server-normalized": (JOURNAL, (
+        "let server = normalized_server(server);",
+        "let server = server.trim_end_matches('/').to_owned();")),
     "server-revision-precondition": (CORE, (
         "Value::String(snapshot.revision.clone()),",
         "Value::Null,")),
     "replaceable-field-kinds": (CORE, (
         "Some(0 | 1)),", "Some(0..=2)),")),
+    "password-history-entry": (CORE, (
+        "added.insert(0, history_entry(&keys, &old, now)?);",
+        "drop(history_entry(&keys, &old, now)?);")),
+    "password-revision-date": (CORE, (
+        'login.insert("passwordRevisionDate".into(), Value::String(now.to_owned()));',
+        "")),
+    "history-only-for-changed-password": (CORE, (
+        "if !old.is_empty() && *old != *password {",
+        "if !old.is_empty() {")),
+    "hidden-field-history-entry": (CORE, (
+        "added.insert(0, history_entry(&keys, &entry, now)?);",
+        "drop(entry);")),
+    "history-limit": (CORE, (
+        "added.truncate(PASSWORD_HISTORY_LIMIT);",
+        "added.truncate(PASSWORD_HISTORY_LIMIT + 1);")),
     "selected-value-exact": (CORE, (
         "*selected_value(&after.cipher, &keys, selector)? == *expected,",
         "selected_value(&after.cipher, &keys, selector).is_ok(),")),
     "identity-preserved": (CORE, (
-        "before.raw.get(member) == after.raw.get(member),",
-        "before.raw.contains_key(member) || true,")),
+        "sent.get(member) == after.raw.get(member),",
+        "sent.contains_key(member) || true,")),
+    "whole-login-compared": (CORE, (
+        'without(sent.get("login"), skip) == without(after.raw.get("login"), skip),',
+        'without(sent.get("login"), skip).is_some(),')),
+    "selected-field-object-compared": (CORE, (
+        'without(Some(old), &["value"]) == without(Some(new), &["value"]),',
+        "old.is_object(),")),
     "unselected-field-preserved": (CORE, (
-        'old.get("value") == new.get("value"),',
-        'old.get("value").is_some(),')),
+        'None => ensure!(old == new, "preserved component changed"),',
+        'None => ensure!(old.is_object(), "preserved component changed"),')),
+    "attachments-compared": (CORE, (
+        "attachments(before) == attachments(after),",
+        "attachments(before).is_some() || true,")),
     "camel-case-shape-only": (CORE, (
         ".all(|key| !key.starts_with(|c: char| c.is_ascii_uppercase())),",
         ".all(|key| !key.is_empty()),")),
+    "send-error-uncertain": ("src/api.rs", (
+        "            .json(body)\n            .send()\n            .await\n"
+        "            .map_err(|_error| WriteStatus::Uncertain)?;",
+        "            .json(body)\n            .send()\n            .await\n"
+        "            .map_err(|_error| WriteStatus::Failed)?;")),
     "response-identity": ("src/api.rs", (
         "if value.get(\"id\").and_then(serde_json::Value::as_str) != Some(cipher_id) {",
         "if value.get(\"id\").is_none() {")),

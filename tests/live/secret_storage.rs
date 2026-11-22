@@ -284,7 +284,16 @@ async fn trusted_cli_uses_fresh_terminal_authorization_and_durable_receipt() {
 /// exact verification, and must refuse a stale `lastKnownRevisionDate`.
 #[tokio::test]
 async fn update_preserves_unselected_ciphertext_and_refuses_a_stale_revision() {
-    use vaultwarden_cli::secret_update::{ItemSnapshot, plan_update, verify_updated};
+    use vaultwarden_cli::secret_update::{
+        ItemSnapshot, history_timestamp, plan_update, verify_updated,
+    };
+    let now = || {
+        history_timestamp(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap(),
+        )
+    };
     let Some(env) = LiveTestEnv::maybe_create().await else {
         return;
     };
@@ -332,11 +341,20 @@ async fn update_preserves_unselected_ciphertext_and_refuses_a_stale_revision() {
         br#"{"password":"  new-update-sentinel\n","fields":[{"name":"api-key","value":"new\n"}]}"#,
     )
     .unwrap();
-    let body = plan_update(&env.user_keys, &destination, &before, &input).unwrap();
+    let plan = plan_update(&env.user_keys, &destination, &before, &input, &now()).unwrap();
+    let body = plan.body;
     assert!(!body.to_string().contains("update-sentinel"));
+    assert_eq!(plan.history, ["password", "custom:api-key"]);
     api.update_cipher(token, &id, &body).await.unwrap();
-    let after = ItemSnapshot::parse(api.cipher_json_by_id(token, &id).await.unwrap(), &id).unwrap();
-    verify_updated(&env.user_keys, &destination, &before, &after, &input).unwrap();
+    let raw = api.cipher_json_by_id(token, &id).await.unwrap();
+    // Vaultwarden keeps the official-client password history and revision date verbatim.
+    assert_eq!(raw["passwordHistory"], body["passwordHistory"]);
+    assert_eq!(
+        raw["login"]["passwordRevisionDate"],
+        body["login"]["passwordRevisionDate"]
+    );
+    let after = ItemSnapshot::parse(raw, &id).unwrap();
+    verify_updated(&env.user_keys, &destination, &before, &body, &after, &input).unwrap();
     let output = env
         .binary()
         .args(["read-field", "--id", &id, "--field", "password"])
@@ -345,8 +363,8 @@ async fn update_preserves_unselected_ciphertext_and_refuses_a_stale_revision() {
     assert_eq!(output.stdout, b"  new-update-sentinel\n");
     // Vaultwarden compares at one-second granularity: wait past it, then replay the stale body.
     tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
-    let second = plan_update(&env.user_keys, &destination, &after, &input).unwrap();
-    api.update_cipher(token, &id, &second).await.unwrap();
+    let second = plan_update(&env.user_keys, &destination, &after, &input, &now()).unwrap();
+    api.update_cipher(token, &id, &second.body).await.unwrap();
     assert_eq!(
         api.update_cipher(token, &id, &body).await.err(),
         Some(WriteStatus::Failed)

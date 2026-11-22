@@ -2,6 +2,11 @@
 //! pseudo-terminal driver for the human decision. Test-only; synthetic keys.
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 use vaultwarden_cli::crypto::CryptoKeys;
 use vaultwarden_cli::secret_storage::{Destination, SecretImport, encrypt_create};
 use wiremock::{
@@ -27,6 +32,12 @@ pub enum PutMode {
     LoseWithoutApplying,
     /// Apply, but store a different password ciphertext than requested.
     ApplyCorrupted,
+    /// Apply, then close the TCP connection without any response: a transport error.
+    ApplyThenDrop,
+    /// Apply, but silently drop the login's passkeys (`fido2Credentials`).
+    ApplyDroppingPasskey,
+    /// Apply, but change the first URI's `match` setting.
+    ApplyChangingUriMatch,
 }
 
 pub struct State {
@@ -37,6 +48,8 @@ pub struct State {
     pub put_mode: PutMode,
     /// Simulate another writer: bump the revision just before this item GET (1-based).
     pub edit_before_get: Option<usize>,
+    /// Delay every item GET response (the state is read when the request arrives).
+    pub get_delay: Option<Duration>,
     keys: CryptoKeys,
 }
 impl State {
@@ -46,14 +59,18 @@ impl State {
     pub fn current_revision(&self) -> String {
         Self::revision_date(self.revision)
     }
-    fn bump(&mut self) {
+    /// Another writer edits the item (for example a move or a trash).
+    pub fn bump(&mut self) {
         self.revision += 1;
         self.item["revisionDate"] = json!(Self::revision_date(self.revision));
     }
 }
 
 pub struct FakeVault {
-    pub server: MockServer,
+    /// Owns the mock; dropping it stops the server behind the relay.
+    _server: MockServer,
+    /// The URL clients use: a TCP relay in front of `server` that can drop a connection.
+    pub uri: String,
     pub state: Arc<Mutex<State>>,
 }
 
@@ -76,8 +93,17 @@ pub fn initial_item(keys: &CryptoKeys) -> Value {
     item["object"] = json!("cipherDetails");
     item["login"]["username"] = json!(keys.encrypt(b"deploy").unwrap());
     item["login"]["totp"] = Value::Null;
-    item["login"]["uris"] =
-        json!([{"uri": keys.encrypt(b"https://example.invalid").unwrap(), "match": null}]);
+    item["login"]["uris"] = json!([{
+        "uri": keys.encrypt(b"https://example.invalid").unwrap(),
+        "uriChecksum": keys.encrypt(b"uri-checksum").unwrap(),
+        "match": null
+    }]);
+    item["login"]["fido2Credentials"] = json!([{
+        "credentialId": keys.encrypt(b"passkey-id").unwrap(),
+        "keyValue": keys.encrypt(b"passkey-private").unwrap(),
+        "rpId": keys.encrypt(b"example.invalid").unwrap(),
+        "creationDate": "2026-11-01T00:00:00.000Z"
+    }]);
     item["passwordHistory"] = Value::Null;
     item
 }
@@ -91,7 +117,11 @@ impl Respond for ItemRoute {
             if state.edit_before_get == Some(state.item_gets) {
                 state.bump();
             }
-            return ResponseTemplate::new(200).set_body_json(&state.item);
+            let response = ResponseTemplate::new(200).set_body_json(&state.item);
+            return match state.get_delay {
+                Some(delay) => response.set_delay(delay),
+                None => response,
+            };
         }
         let body: Value = serde_json::from_slice(&request.body).unwrap();
         state.puts.push(body.clone());
@@ -112,6 +142,15 @@ impl Respond for ItemRoute {
             let item_keys = state.keys.item_keys(stored["key"].as_str()).unwrap();
             stored["login"]["password"] = json!(item_keys.encrypt(b"corrupted").unwrap());
         }
+        if state.put_mode == PutMode::ApplyDroppingPasskey {
+            stored["login"]
+                .as_object_mut()
+                .unwrap()
+                .remove("fido2Credentials");
+        }
+        if state.put_mode == PutMode::ApplyChangingUriMatch {
+            stored["login"]["uris"][0]["match"] = json!(3);
+        }
         state.item = stored;
         state.bump();
         if state.put_mode == PutMode::ApplyThenLose {
@@ -131,6 +170,7 @@ impl FakeVault {
             puts: Vec::new(),
             put_mode: PutMode::Apply,
             edit_before_get: None,
+            get_delay: None,
             keys: keys.clone(),
         }));
         let sync = json!({
@@ -147,10 +187,77 @@ impl FakeVault {
             .respond_with(ItemRoute(state.clone()))
             .mount(&server)
             .await;
-        Self { server, state }
+        let relay = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let uri = format!("http://{}", relay.local_addr().unwrap());
+        let upstream = *server.address();
+        let relay_state = state.clone();
+        tokio::spawn(async move {
+            while let Ok((client, _peer)) = relay.accept().await {
+                tokio::spawn(relay_connection(client, upstream, relay_state.clone()));
+            }
+        });
+        Self {
+            _server: server,
+            uri,
+            state,
+        }
     }
     pub fn puts(&self) -> usize {
         self.state.lock().unwrap().puts.len()
+    }
+}
+
+fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+/// Relay HTTP/1.1 requests one at a time, each on its own upstream connection
+/// (forced `Connection: close`). In `ApplyThenDrop` mode a PUT is forwarded (so
+/// it applies) and the client connection is then closed with no response.
+async fn relay_connection(
+    mut client: TcpStream,
+    upstream: std::net::SocketAddr,
+    state: Arc<Mutex<State>>,
+) {
+    let mut buffer = Vec::new();
+    loop {
+        let mut chunk = [0u8; 8192];
+        let head_end = loop {
+            if let Some(end) = find(&buffer, b"\r\n\r\n") {
+                break end + 4;
+            }
+            match client.read(&mut chunk).await {
+                Ok(0) | Err(_) => return,
+                Ok(n) => buffer.extend_from_slice(&chunk[..n]),
+            }
+        };
+        let head = String::from_utf8_lossy(&buffer[..head_end]).to_ascii_lowercase();
+        let length = head
+            .lines()
+            .find_map(|line| line.strip_prefix("content-length:"))
+            .map_or(0, |value| value.trim().parse::<usize>().unwrap());
+        while buffer.len() < head_end + length {
+            match client.read(&mut chunk).await {
+                Ok(0) | Err(_) => return,
+                Ok(n) => buffer.extend_from_slice(&chunk[..n]),
+            }
+        }
+        let rest = buffer.split_off(head_end + length);
+        let is_put = buffer.starts_with(b"PUT ");
+        let mut request = buffer[..head_end - 2].to_vec();
+        request.extend_from_slice(b"Connection: close\r\n\r\n");
+        request.extend_from_slice(&buffer[head_end..]);
+        buffer = rest;
+        let mut server = TcpStream::connect(upstream).await.unwrap();
+        server.write_all(&request).await.unwrap();
+        let mut response = Vec::new();
+        server.read_to_end(&mut response).await.unwrap();
+        if is_put && state.lock().unwrap().put_mode == PutMode::ApplyThenDrop {
+            return; // The write applied upstream; the client sees a closed connection.
+        }
+        if client.write_all(&response).await.is_err() {
+            return;
+        }
     }
 }
 
@@ -159,6 +266,10 @@ impl FakeVault {
 pub enum Answer {
     Approve,
     Deny,
+    /// End of input (Ctrl-D) at the challenge.
+    Eof,
+    /// Ctrl-C at the challenge: the terminal sends SIGINT.
+    Interrupt,
     /// Run with no controlling terminal at all.
     NoTerminal,
 }
@@ -263,12 +374,13 @@ pub fn run_cli(
             {
                 let challenge = text.rsplit("typing '").next().unwrap();
                 let challenge = challenge.split('\'').next().unwrap();
-                let reply = if answer == Answer::Approve {
-                    challenge.to_owned()
-                } else {
-                    "deny".to_owned()
+                let reply = match answer {
+                    Answer::Approve => format!("{challenge}\n"),
+                    Answer::Eof => "\u{4}".to_owned(),
+                    Answer::Interrupt => "\u{3}".to_owned(),
+                    _ => "deny\n".to_owned(),
                 };
-                master.write_all(format!("{reply}\n").as_bytes()).unwrap();
+                master.write_all(reply.as_bytes()).unwrap();
                 answered_decision = true;
             }
         }

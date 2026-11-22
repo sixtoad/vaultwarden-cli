@@ -33,7 +33,7 @@ impl Harness {
         let keys = test_crypto_keys();
         let vault = FakeVault::start(&keys).await;
         ctx.write_config(&Config {
-            server: Some(vault.server.uri()),
+            server: Some(vault.uri.clone()),
             access_token: Some("access-token".into()),
             token_expiry: Some(i64::MAX),
             ..Default::default()
@@ -80,6 +80,34 @@ impl Harness {
             .await
             .unwrap()
     }
+    async fn reconcile(&self, journal: &std::path::Path, id: &str) -> std::process::Output {
+        self.plain(&[
+            "reconcile",
+            "--journal",
+            journal.to_str().unwrap(),
+            "--id",
+            id,
+        ])
+        .await
+    }
+    /// The item's effective keys and its decrypted password history, newest first.
+    fn history(&self) -> (Vec<String>, serde_json::Value) {
+        let item = self.vault.state.lock().unwrap().item.clone();
+        let keys = test_crypto_keys().item_keys(item["key"].as_str()).unwrap();
+        let entries = item["passwordHistory"]
+            .as_array()
+            .map(|entries| {
+                entries
+                    .iter()
+                    .map(|e| {
+                        keys.decrypt_authenticated_to_string(e["password"].as_str().unwrap())
+                            .unwrap()
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        (entries, item)
+    }
     async fn plain(&self, args: &[&str]) -> std::process::Output {
         let mut command = self.command(args);
         tokio::task::spawn_blocking(move || command.output().unwrap())
@@ -91,10 +119,8 @@ impl Harness {
             .map(|entries| entries.map(|e| e.unwrap().path()).collect::<Vec<_>>())
             .unwrap_or_default();
         paths.retain(|p| {
-            p.file_name()
-                .unwrap()
-                .to_string_lossy()
-                .starts_with("update-")
+            let name = p.file_name().unwrap().to_string_lossy().into_owned();
+            name.starts_with("update-") && name.ends_with(".json")
         });
         paths.sort_by_key(|p| std::fs::metadata(p).unwrap().modified().unwrap());
         paths
@@ -141,6 +167,7 @@ async fn approved_update_replaces_selected_fields_verifies_and_reads_back_exactl
         &format!("Item: {ITEM}"),
         "Expected revision: 2026-11-21T10:01:00.000000Z",
         "Fields replaced: custom:api-key, password",
+        "Password history: old values of password, custom:api-key kept in password history (newest 5)",
         &format!("typing 'update {}'", receipt.attempt_id),
     ] {
         assert!(run.terminal.contains(line), "review lacks {line}");
@@ -153,6 +180,27 @@ async fn approved_update_replaces_selected_fields_verifies_and_reads_back_exactl
         json!("2026-11-21T10:01:00.000000Z")
     );
     let after = harness.vault.state.lock().unwrap().item.clone();
+    // Like official Bitwarden clients: the replaced password and hidden field
+    // value go to password history (newest first) with one lastUsedDate, and
+    // the password revision date is that time.
+    let (history, _item) = harness.history();
+    assert_eq!(
+        history,
+        ["api-key: old-key-private", "old-password-private"]
+    );
+    let date = after["passwordHistory"][0]["lastUsedDate"].clone();
+    assert_eq!(after["passwordHistory"][1]["lastUsedDate"], date);
+    assert_eq!(after["login"]["passwordRevisionDate"], date);
+    let date = date.as_str().unwrap();
+    assert!(
+        date.len() == 24 && date.starts_with("20") && date.ends_with('Z') && &date[19..20] == ".",
+        "{date}"
+    );
+    assert_eq!(
+        after["login"]["fido2Credentials"],
+        before["login"]["fido2Credentials"]
+    );
+    assert_eq!(after["login"]["uris"], before["login"]["uris"]);
     for preserved in ["key", "name", "notes", "folderId"] {
         assert_eq!(after[preserved], before[preserved], "{preserved}");
     }
@@ -299,16 +347,9 @@ async fn uncertain_update_blocks_the_item_until_reconciled_and_is_never_replayed
     let reconcile = |path: std::path::PathBuf| {
         let harness = &harness;
         async move {
-            let output = harness
-                .plain(&[
-                    "reconcile",
-                    "--journal",
-                    path.to_str().unwrap(),
-                    "--id",
-                    ITEM,
-                ])
-                .await;
-            assert!(output.status.success());
+            let output = harness.reconcile(&path, ITEM).await;
+            // Like `update`, reconcile exits non-zero unless the receipt is verified.
+            assert!(!output.status.success());
             serde_json::from_slice::<WriteReceipt>(&output.stdout)
                 .unwrap()
                 .status
@@ -334,15 +375,20 @@ async fn uncertain_update_blocks_the_item_until_reconciled_and_is_never_replayed
     assert_eq!(harness.vault.puts(), 2);
     let journal = harness.journals()[1].clone();
     let other = harness
-        .plain(&[
-            "reconcile",
-            "--journal",
-            journal.to_str().unwrap(),
-            "--id",
-            "44444444-4444-4444-4444-444444444444",
-        ])
+        .reconcile(&journal, "44444444-4444-4444-4444-444444444444")
         .await;
     assert!(!other.status.success(), "a receipt cannot be retargeted");
+    let gets = harness.vault.state.lock().unwrap().item_gets;
+    for invalid in [
+        "../33333333-3333-3333-3333-333333333333",
+        "33333333-3333-3333-3333-33333333333A",
+    ] {
+        let refused = harness.reconcile(&journal, invalid).await;
+        assert!(!refused.status.success());
+        let stderr = String::from_utf8_lossy(&refused.stderr);
+        assert!(stderr.contains("invalid item ID"), "{invalid}: {stderr}");
+    }
+    assert_eq!(harness.vault.state.lock().unwrap().item_gets, gets);
     assert_eq!(
         reconcile(journal.clone()).await,
         WriteStatus::UpdatedUnverified
@@ -363,4 +409,149 @@ async fn a_stored_value_that_differs_is_updated_unverified() {
     assert_eq!(receipt(&run).status, WriteStatus::UpdatedUnverified);
     assert_eq!(harness.vault.puts(), 1);
     assert_no_plaintext(&run, &harness);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_connection_dropped_after_the_write_applied_is_uncertain() {
+    let harness = Harness::start().await;
+    harness.vault.state.lock().unwrap().put_mode = PutMode::ApplyThenDrop;
+    let run = harness.update(&[], NEW_VALUES, None, Answer::Approve).await;
+    assert!(!run.output.status.success());
+    assert_eq!(receipt(&run).status, WriteStatus::Uncertain);
+    assert_eq!(harness.vault.puts(), 1, "a dropped write is never retried");
+    assert_no_plaintext(&run, &harness);
+    let output = harness.reconcile(&harness.journals()[0], ITEM).await;
+    assert_eq!(
+        serde_json::from_slice::<WriteReceipt>(&output.stdout)
+            .unwrap()
+            .status,
+        WriteStatus::UpdatedUnverified
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn end_of_input_or_interrupt_at_the_challenge_never_writes() {
+    let harness = Harness::start().await;
+    for answer in [Answer::Eof, Answer::Interrupt] {
+        let run = harness.update(&[], NEW_VALUES, None, answer).await;
+        assert!(!run.output.status.success());
+        assert!(run.terminal.contains("Authorize"));
+        assert!(run.output.stdout.is_empty());
+        assert_no_plaintext(&run, &harness);
+    }
+    assert_eq!(harness.vault.puts(), 0);
+    assert!(harness.journals().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_dropped_passkey_or_changed_uri_match_is_updated_unverified() {
+    let harness = Harness::start().await;
+    for mode in [
+        PutMode::ApplyDroppingPasskey,
+        PutMode::ApplyChangingUriMatch,
+    ] {
+        harness.vault.state.lock().unwrap().put_mode = mode;
+        let run = harness.update(&[], NEW_VALUES, None, Answer::Approve).await;
+        assert!(!run.output.status.success());
+        assert_eq!(receipt(&run).status, WriteStatus::UpdatedUnverified);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn prompt_mode_refuses_a_missing_password_before_asking_for_the_secret() {
+    let harness = Harness::start().await;
+    harness.vault.state.lock().unwrap().item["login"]["password"] = serde_json::Value::Null;
+    let run = harness
+        .update(
+            &["--prompt"],
+            b"",
+            Some("new-password-private"),
+            Answer::Approve,
+        )
+        .await;
+    assert!(!run.output.status.success());
+    assert!(String::from_utf8_lossy(&run.output.stderr).contains("selected field missing"));
+    assert!(
+        !run.terminal.contains("Secret password"),
+        "prompted for a missing field"
+    );
+    assert_eq!(harness.vault.puts(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn reconcile_resolves_an_uncertain_update_of_an_item_moved_or_trashed_since() {
+    let harness = Harness::start().await;
+    harness.vault.state.lock().unwrap().put_mode = PutMode::LoseWithoutApplying;
+    let lost = harness.update(&[], NEW_VALUES, None, Answer::Approve).await;
+    assert_eq!(receipt(&lost).status, WriteStatus::Uncertain);
+    {
+        // Someone trashes the item after the uncertain attempt.
+        let mut state = harness.vault.state.lock().unwrap();
+        state.item["deletedDate"] = json!("2026-11-21T11:00:00.000000Z");
+        state.bump();
+    }
+    let output = harness.reconcile(&harness.journals()[0], ITEM).await;
+    assert_eq!(
+        serde_json::from_slice::<WriteReceipt>(&output.stdout)
+            .unwrap()
+            .status,
+        WriteStatus::UpdatedUnverified
+    );
+    assert_eq!(
+        WriteJournal::read(&harness.journals()[0])
+            .unwrap()
+            .receipt
+            .status,
+        WriteStatus::UpdatedUnverified,
+        "the item is no longer blocked"
+    );
+    assert_eq!(harness.vault.puts(), 1);
+}
+
+/// Two approved invocations for one item. `offset` is when the second starts;
+/// every item GET is delayed by `delay`, so the phases overlap predictably.
+async fn concurrent_pair(
+    harness: &Harness,
+    delay: std::time::Duration,
+    offset: std::time::Duration,
+) -> (Run, Run) {
+    harness.vault.state.lock().unwrap().get_delay = Some(delay);
+    let first = harness.update(&[], NEW_VALUES, None, Answer::Approve);
+    let second = async {
+        tokio::time::sleep(offset).await;
+        harness.update(&[], NEW_VALUES, None, Answer::Approve).await
+    };
+    tokio::join!(first, second)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_concurrent_update_of_the_same_item_is_refused_while_the_first_holds_the_lock() {
+    let harness = Harness::start().await;
+    let delay = std::time::Duration::from_secs(3);
+    // The second decision lands while the first is between its fresh read and its PUT.
+    let (first, second) = concurrent_pair(&harness, delay, delay / 2).await;
+    assert_eq!(receipt(&first).status, WriteStatus::Verified);
+    assert!(!second.output.status.success());
+    assert!(
+        String::from_utf8_lossy(&second.output.stderr).contains("in progress"),
+        "{}",
+        String::from_utf8_lossy(&second.output.stderr)
+    );
+    assert!(second.output.stdout.is_empty());
+    assert_eq!(harness.vault.puts(), 1);
+    assert_eq!(harness.journals().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_uncertain_attempt_recorded_during_review_blocks_the_second_decision() {
+    let harness = Harness::start().await;
+    harness.vault.state.lock().unwrap().put_mode = PutMode::LoseWithoutApplying;
+    let delay = std::time::Duration::from_secs(2);
+    // The second passes its first check, then decides after the first ended uncertain.
+    let (first, second) = concurrent_pair(&harness, delay, delay * 3 / 2).await;
+    assert_eq!(receipt(&first).status, WriteStatus::Uncertain);
+    assert!(!second.output.status.success());
+    assert!(String::from_utf8_lossy(&second.output.stderr).contains("uncertain"));
+    assert!(second.terminal.contains("Authorize"));
+    assert_eq!(harness.vault.puts(), 1);
 }
