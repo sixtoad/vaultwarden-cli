@@ -5,8 +5,11 @@
 //!   `VAULTWARDEN_LIVE_TEST_URL`     — URL of a running Vaultwarden instance
 //!   `VAULTWARDEN_LIVE_ADMIN_TOKEN`  — admin token for user teardown
 //!
-//! If both variables are absent tests return early (not a live execution).
-//! Setting only one is an error.
+//! If both variables are absent tests return early (not a live execution),
+//! except under CI (`CI` set to anything but empty, `0` or `false`): there a
+//! missing URL fails every live test, so a CI job can never pass vacuously.
+//! A CI job that deliberately does not run live tests sets
+//! `VAULTWARDEN_LIVE_TESTS=skip`. Setting only one variable is an error.
 #![allow(dead_code)]
 
 use aes::cipher::{BlockModeEncrypt, KeyIvInit, block_padding::Pkcs7};
@@ -401,14 +404,34 @@ pub struct LiveTestEnv {
     pub user_keys: CryptoKeys,
 }
 
+/// Live tests are mandatory under CI unless the job explicitly opts out.
+pub fn live_required(ci: Option<&str>, opt_out: Option<&str>) -> bool {
+    let ci =
+        ci.is_some_and(|value| !matches!(value.trim(), "" | "0" | "false" | "FALSE" | "False"));
+    ci && opt_out != Some("skip")
+}
+
 impl LiveTestEnv {
     /// Returns `None` when live-test env vars are not set (tests skip silently).
     /// Returns `Some(env)` with a fully provisioned environment.
     pub async fn maybe_create() -> Option<Self> {
-        let server_url = std::env::var("VAULTWARDEN_LIVE_TEST_URL").ok();
-        let admin_token = std::env::var("VAULTWARDEN_LIVE_ADMIN_TOKEN").ok();
-        let (server_url, admin_token) = match (server_url, admin_token) {
-            (None, None) => return None,
+        let var = |name: &str| std::env::var(name).ok();
+        let (server_url, admin_token) = match (
+            var("VAULTWARDEN_LIVE_TEST_URL"),
+            var("VAULTWARDEN_LIVE_ADMIN_TOKEN"),
+        ) {
+            (None, None) => {
+                assert!(
+                    !live_required(
+                        var("CI").as_deref(),
+                        var("VAULTWARDEN_LIVE_TESTS").as_deref()
+                    ),
+                    "VAULTWARDEN_LIVE_TEST_URL is unset under CI: live tests would pass without \
+                     running; provide a Vaultwarden or set VAULTWARDEN_LIVE_TESTS=skip in a job \
+                     that does not run them"
+                );
+                return None;
+            }
             (Some(url), Some(token)) => (url, token),
             _ => panic!("set both live-test URL and admin token, or neither"),
         };
@@ -1189,4 +1212,21 @@ fn unix_now() -> i64 {
         .as_secs()
         .try_into()
         .expect("unix time fits i64")
+}
+
+#[test]
+fn live_tests_are_mandatory_under_ci_unless_a_job_opts_out() {
+    for (ci, opt_out, required) in [
+        (None, None, false),
+        (Some(""), None, false),
+        (Some("false"), None, false),
+        (Some("0"), None, false),
+        (Some("true"), None, true),
+        (Some("1"), None, true),
+        (Some("true"), Some("skip"), false),
+        (Some("true"), Some("SKIP"), true),
+        (Some("true"), Some(""), true),
+    ] {
+        assert_eq!(live_required(ci, opt_out), required, "{ci:?} {opt_out:?}");
+    }
 }

@@ -196,6 +196,9 @@ jobs:
           - os: ubuntu-24.04-arm
             rust: "1.88.0"
     runs-on: ${{ matrix.os }}
+    env:
+      # Live tests run in the live-vaultwarden job; under CI they fail without a server.
+      VAULTWARDEN_LIVE_TESTS: skip
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -238,6 +241,47 @@ jobs:
           ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --doc --offline --locked
           ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --doc --all-features --offline --locked
           ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --doc --no-default-features --offline --locked
+
+  # Not in merge-ready yet: add it to `needs` there once it has passed several runs.
+  live-vaultwarden:
+    name: Live Vaultwarden 1.36.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # Throwaway value for this run's disposable container only; not a secret.
+      LIVE_ADMIN_TOKEN: live-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+    services:
+      vaultwarden:
+        # Pinned by tag: no image digest for 1.36.0 is recorded in this repository
+        # (docker-compose.live-test.yml uses the same tag). Pin the digest once verified.
+        image: vaultwarden/server:1.36.0
+        ports:
+          - 127.0.0.1:8080:80
+        env:
+          SIGNUPS_ALLOWED: "true"
+          ADMIN_TOKEN: live-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          I_REALLY_WANT_VOLATILE_STORAGE: "true"
+          LOG_LEVEL: warn
+          LOGIN_RATELIMIT_SECONDS: "1"
+          LOGIN_RATELIMIT_MAX_BURST: "1000"
+          ADMIN_RATELIMIT_SECONDS: "1"
+          ADMIN_RATELIMIT_MAX_BURST: "1000"
+        options: >-
+          --health-cmd "curl -sf http://localhost:80/alive"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install live harness dependencies (private D-Bus and keyring)
+        run: |
+          bash .github/ci/apt-update.sh
+          sudo apt-get install -y libdbus-1-dev pkg-config dbus-daemon gnome-keyring libsecret-tools curl
+      - run: cargo fetch --locked
+      - name: Run live tests against the service container
+        env:
+          VAULTWARDEN_LIVE_TEST_URL: http://127.0.0.1:8080
+          VAULTWARDEN_LIVE_ADMIN_TOKEN: ${{ env.LIVE_ADMIN_TOKEN }}
+        run: ./scripts/ci-live-vaultwarden.sh
 
   agent-transport:
     name: Real agent transport (${{ matrix.os }})
@@ -409,6 +453,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     continue-on-error: true
+    env:
+      VAULTWARDEN_LIVE_TESTS: skip
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
