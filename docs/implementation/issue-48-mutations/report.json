@@ -1,9 +1,9 @@
 {
   "source_sha256": {
     "src/commands.rs": "e11e1119df2b044246b31cb75d8c40faaa892533ce74ba5c8539d412c20914e0",
-    "src/commands/update.rs": "f1c4389f690643b332c0cebbcac0fd367bc27afad077b9dd0f3514c2ac8b1854",
-    "src/write_journal.rs": "61a1e94ee8510ab3addfa18b56ba7c11fbd616f67460c9963d5e1c65766526dc",
-    "src/secret_update.rs": "38d7ef07be29a5d566adc154e524b18360e8dad94cee2505a29252db8bfbea84",
+    "src/commands/update.rs": "c51acf6a1d38624b6477bc726f0ebfcbedb0ed38318208d840c51bf2cce205be",
+    "src/write_journal.rs": "6b81963e696114d3f2e9b1d55ecbf4e7634481720bd67fd6e8b8935933d81213",
+    "src/secret_update.rs": "0b87eb2dfa18edeaa7b29b6fcae3d38ec7a77076304c267b9e7e0a39b328d8f8",
     "src/api.rs": "1a07916b7a5769796bb0edc9a75e193f1f9109fb8e5e2a54ff0242136df989ad"
   },
   "mutations": {
@@ -23,7 +23,15 @@
       "caught_by_test": true,
       "exit_code": 101
     },
+    "prompt-field-checked-before-secret": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
     "verified-only-after-comparison": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "update-lock-taken": {
       "caught_by_test": true,
       "exit_code": 101
     },
@@ -31,7 +39,31 @@
       "caught_by_test": true,
       "exit_code": 101
     },
+    "reconcile-moved-or-trashed": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "reconcile-valid-id": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "reconcile-exit-unless-verified": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
     "uncertain-blocks-item": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "lock-exclusive": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "lock-rechecks-uncertain": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "journal-server-normalized": {
       "caught_by_test": true,
       "exit_code": 101
     },
@@ -43,6 +75,26 @@
       "caught_by_test": true,
       "exit_code": 101
     },
+    "password-history-entry": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "password-revision-date": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "history-only-for-changed-password": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "hidden-field-history-entry": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "history-limit": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
     "selected-value-exact": {
       "caught_by_test": true,
       "exit_code": 101
@@ -51,11 +103,27 @@
       "caught_by_test": true,
       "exit_code": 101
     },
+    "whole-login-compared": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "selected-field-object-compared": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
     "unselected-field-preserved": {
       "caught_by_test": true,
       "exit_code": 101
     },
+    "attachments-compared": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
     "camel-case-shape-only": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "send-error-uncertain": {
       "caught_by_test": true,
       "exit_code": 101
     },
@@ -66,9 +134,9 @@
   },
   "restored_sha256": {
     "src/commands.rs": "e11e1119df2b044246b31cb75d8c40faaa892533ce74ba5c8539d412c20914e0",
-    "src/commands/update.rs": "f1c4389f690643b332c0cebbcac0fd367bc27afad077b9dd0f3514c2ac8b1854",
-    "src/write_journal.rs": "61a1e94ee8510ab3addfa18b56ba7c11fbd616f67460c9963d5e1c65766526dc",
-    "src/secret_update.rs": "38d7ef07be29a5d566adc154e524b18360e8dad94cee2505a29252db8bfbea84",
+    "src/commands/update.rs": "c51acf6a1d38624b6477bc726f0ebfcbedb0ed38318208d840c51bf2cce205be",
+    "src/write_journal.rs": "6b81963e696114d3f2e9b1d55ecbf4e7634481720bd67fd6e8b8935933d81213",
+    "src/secret_update.rs": "0b87eb2dfa18edeaa7b29b6fcae3d38ec7a77076304c267b9e7e0a39b328d8f8",
     "src/api.rs": "1a07916b7a5769796bb0edc9a75e193f1f9109fb8e5e2a54ff0242136df989ad"
   },
   "restored_test_exit": 0

@@ -464,11 +464,16 @@ stores the history and revision date verbatim; CI runs it in the
 `live-vaultwarden` job, where a missing server fails instead of skipping.
 
 `scripts/mutate-secret-update.py EVIDENCE_DIR` weakens each update guard in
-turn (challenge, expected-revision pin, review recheck, pre-decision field check,
-verification gate, reconcile rule, uncertain block, `lastKnownRevisionDate`,
-field kinds, exact value, identity and unselected-field preservation, response
-shape and identity) and requires the focused tests to fail; the last report is
-`issue-48-mutations/report.json` (14 of 14 caught). Two first-run escapes were
+turn (challenge, expected-revision pin, review recheck, pre-decision and
+pre-prompt field checks, verification gate, item lock, its uncertain re-check
+and exclusivity, normalized journal server, reconcile rules (unchanged
+revision, moved/trashed item, ID validation, exit code), uncertain block,
+`lastKnownRevisionDate`, field kinds, password-history entries, revision date,
+changed-only history, hidden-field history, five-entry limit, exact value,
+identity, whole-login, field-object, unselected-field and attachment
+comparison, response shape, send errors as `uncertain`, response identity) and
+requires the focused tests to fail; the last report is
+`issue-48-mutations/report.json` (31 of 31 caught). Two first-run escapes were
 real test weaknesses (tampered values encrypted under the wrong key, so a MAC
 failure masked the comparison; a PascalCase probe that serde already refused)
 and were fixed in the tests.
