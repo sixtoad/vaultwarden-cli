@@ -1,7 +1,10 @@
-# Create and consume secrets
+# Create, update and consume secrets
 
-Storage creates personal Login items. It never updates, rotates, deletes, upserts,
-or issues a token at another service. Vaultwarden **1.36.0** is the verified backend;
+Storage creates personal Login items and, through the trusted terminal only,
+replaces selected values of existing ones. It never deletes, upserts, adds
+fields, or issues or revokes a token at another service. The protected provider
+is still create-only; its update operation is specified in
+[issue-48-spec.md](implementation/issue-48-spec.md) section 7. Vaultwarden **1.36.0** is the verified backend;
 the protected provider remains pinned to that version. The protocol reference is
 [Vaultwarden's cipher routes](https://github.com/dani-garcia/vaultwarden/blob/1.36.0/src/api/core/ciphers.rs).
 Organization reads remain supported, including wrapped item keys; organization
@@ -55,6 +58,66 @@ the controlling terminal. An unlocked vault or an earlier approval does not bypa
 this. No terminal or a denied challenge means no POST. There is no `--yes` switch.
 Stdout contains only a JSON receipt with `attempt_id`, `item_id`, and `status`.
 Only a fresh authenticated GET and exact private comparison can return `verified`.
+
+## Trusted terminal update
+
+Replace selected existing fields of one personal Login item, addressed by its
+immutable ID and the same canonical binding that `create` uses:
+
+```sh
+trusted-local-producer | vaultwarden-cli update \
+  --id 33333333-3333-3333-3333-333333333333 \
+  --account 11111111-1111-1111-1111-111111111111 \
+  --folder homelab/production \
+  --reference homelab/production/github/deploy-token
+```
+
+Input is the create JSON format with the same limits and rules; every key present
+selects that field (`password`, `notes`, `fields[].name` as `custom:NAME`), and
+everything else is preserved exactly: item ID, wrapped item key, name, folder,
+username, URIs, TOTP, unselected fields, field types and order, password history,
+favorite and reprompt. Unlike create, `notes` alone is a valid selection. `--prompt`
+replaces only the password from a hidden prompt. A selected field that does not
+exist is refused (update never adds a field); so are boolean or linked fields,
+`custom:vw-access`, organization items, other item types and duplicate field names.
+
+Every invocation reviews UPDATE, item ID, server/account, folder label/ID,
+reference, the item's current revision (`revisionDate`) and the replaced field
+selectors, never values, then requires a fresh `update <random challenge>` on the
+controlling terminal. There is no `--yes`. `--expected-revision R` additionally
+refuses unless the item's revision is exactly `R`. After the decision a fresh read
+must show the reviewed revision, or nothing is written (`item changed since
+review`); the PUT carries that revision as `lastKnownRevisionDate`, so Vaultwarden
+also refuses a stale write. Vaultwarden's own check tolerates one second, so an
+edit racing the final read by under a second is the documented residual risk.
+New values are encrypted locally with the item's key and fresh IVs.
+
+Before the PUT a metadata-only journal is fsynced as
+`write-attempts/update-<item-hash>-<attempt>.json`. Stdout is only the receipt;
+`verified` requires a fresh read with every new value exactly equal and every
+preserved component unchanged. An `uncertain` update is never retried and blocks
+further updates of that item until reconciled:
+
+```sh
+vaultwarden-cli reconcile --journal JOURNAL_PATH --id ITEM_UUID
+```
+
+Read-only: an unchanged revision yields `failed` (the attempt wrote nothing); a
+newer one yields `updated_unverified` (original values cannot be compared after
+the process ended). Then inspect the item and decide on a new, separately approved
+update.
+
+### Rotation
+
+`update` replaces the stored value; it does not issue or revoke anything at the
+service that accepts the credential. Rotate in this order: issue the new
+credential while the old one still works, store it with `update` and wait for
+`verified`, switch consumers and confirm them, then revoke the old one. On
+`failed`, revoke or retry the new credential; on `uncertain` or
+`updated_unverified`, reconcile and `read-field` it back before revoking anything.
+Values already delivered (environment of a running process, files, copies) are
+not recalled; later reads and protected runs receive the new value, and a run
+that already read keeps the old one.
 
 ## Exact selected reads
 
@@ -172,6 +235,7 @@ reads and recovery to exact immutable item IDs rather than selecting a name matc
 | `failed` | A definite rejection was received; no verified item is claimed. |
 | `uncertain` | A durable attempt exists; whether POST committed is unknown. |
 | `created_unverified` | An ID is known, but comparison with original private values did not succeed. |
+| `updated_unverified` | An update was accepted (or reconcile saw a newer revision), but exact comparison did not succeed. |
 | `verified` | Fresh read matched all original values and bindings. |
 
 Inspect a trusted receipt without mutation:
