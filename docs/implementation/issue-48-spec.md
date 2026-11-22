@@ -189,7 +189,7 @@ Each decision lists context, options, choice, reason and how to reverse it.
 - Choice: (c), mandatory like create's. Reason: an uncertain mutation is never
   replayed automatically, and the human must resolve it before authorizing
   another write to the same item. Reverse: drop the scan in
-  `WriteJournal::pending_update`.
+  `WriteJournal::ensure_no_uncertain_update`.
 
 ### D9. Reconciling an uncertain update
 
@@ -316,6 +316,16 @@ terminal; malformed input; missing field; interrupted write (`uncertain`,
 blocks the next update, reconcile); verification mismatch
 (`updated_unverified`); plaintext absent from stdout, stderr, the review and
 the journal; preservation of unselected components.
+
+`scripts/mutate-secret-update.py EVIDENCE_DIR` weakens each update guard in
+turn (challenge, expected-revision pin, review recheck, pre-decision field check,
+verification gate, reconcile rule, uncertain block, `lastKnownRevisionDate`,
+field kinds, exact value, identity and unselected-field preservation, response
+shape and identity) and requires the focused tests to fail; the last report is
+`issue-48-mutations/report.json` (14 of 14 caught). Two first-run escapes were
+real test weaknesses (tampered values encrypted under the wrong key, so a MAC
+failure masked the comparison; a PascalCase probe that serde already refused)
+and were fixed in the tests.
 
 Phase 2 acceptance (next PR): denial, expiry, cancellation, lock during a
 pending request, stale revision after approval, producer failure, interrupted
