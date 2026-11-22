@@ -137,6 +137,7 @@ impl Respond for ItemRoute {
         object.remove("lastKnownRevisionDate");
         object.insert("id".into(), json!(ITEM));
         object.insert("object".into(), json!("cipherDetails"));
+        vaultwarden_dates(&mut stored);
         if state.put_mode == PutMode::ApplyCorrupted {
             // Authentic under the item key: only an exact value comparison detects it.
             let item_keys = state.keys.item_keys(stored["key"].as_str()).unwrap();
@@ -157,6 +158,28 @@ impl Respond for ItemRoute {
             return ResponseTemplate::new(500);
         }
         ResponseTemplate::new(200).set_body_json(&state.item)
+    }
+}
+
+/// Vaultwarden 1.36 re-serializes the dates it parses (password history
+/// `lastUsedDate`, `login.passwordRevisionDate`) as UTC with six fractional
+/// digits: `2026-11-22T01:02:55.659Z` is stored as `2026-11-22T01:02:55.659000Z`.
+fn vaultwarden_dates(item: &mut Value) {
+    fn six_digits(slot: &mut Value) {
+        let Some(date) = slot.as_str().and_then(|d| d.strip_suffix('Z')) else {
+            return;
+        };
+        let (seconds, fraction) = date.split_once('.').unwrap_or((date, ""));
+        let fraction: String = fraction.chars().chain("000000".chars()).take(6).collect();
+        *slot = json!(format!("{seconds}.{fraction}Z"));
+    }
+    if let Some(history) = item["passwordHistory"].as_array_mut() {
+        for entry in history {
+            six_digits(&mut entry["lastUsedDate"]);
+        }
+    }
+    if let Some(date) = item["login"].get_mut("passwordRevisionDate") {
+        six_digits(date);
     }
 }
 

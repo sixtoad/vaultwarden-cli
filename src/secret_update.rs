@@ -10,6 +10,10 @@ use anyhow::{Result, ensure};
 use serde_json::{Map, Value};
 use zeroize::Zeroizing;
 
+#[path = "secret_update_dates.rs"]
+mod dates;
+pub use dates::same_instant;
+
 /// Members copied verbatim from the fresh read into the update body.
 const PRESERVED: [&str; 11] = [
     "type",
@@ -303,7 +307,9 @@ fn attachments(snapshot: &ItemSnapshot) -> Option<Vec<Option<Map<String, Value>>
 /// Exact comparison after a fresh read against the body that was sent: new
 /// plaintext for selected fields, identical ciphertext and members for
 /// everything else (the whole login object, every field object, password
-/// history, attachments), same bindings.
+/// history, attachments), same bindings. Date members (`lastUsedDate`,
+/// `passwordRevisionDate`, a passkey's `creationDate`) compare as instants,
+/// since Vaultwarden 1.36 re-serializes them with six fractional digits.
 /// # Errors
 /// Returns an error on any difference; callers then report `updated_unverified`.
 pub fn verify_updated(
@@ -320,10 +326,11 @@ pub fn verify_updated(
         .as_object()
         .ok_or_else(|| anyhow::anyhow!("preserved component changed"))?;
     for member in IDENTITY {
-        ensure!(
-            sent.get(member) == after.raw.get(member),
-            "preserved component changed"
-        );
+        let same = match (sent.get(member), after.raw.get(member)) {
+            (Some(sent), Some(stored)) => dates::same_json(sent, stored),
+            (sent, stored) => sent == stored,
+        };
+        ensure!(same, "preserved component changed");
     }
     ensure!(
         attachments(before) == attachments(after),
@@ -334,8 +341,12 @@ pub fn verify_updated(
     } else {
         &[]
     };
+    let login = |item: Option<&Value>| without(item, skip).map(Value::Object);
     ensure!(
-        without(sent.get("login"), skip) == without(after.raw.get("login"), skip),
+        match (login(sent.get("login")), login(after.raw.get("login"))) {
+            (Some(sent), Some(stored)) => dates::same_json(&sent, &stored),
+            (sent, stored) => sent == stored,
+        },
         "preserved component changed"
     );
     let exact = |selector: &str, expected: &str| -> Result<()> {

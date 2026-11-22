@@ -202,7 +202,7 @@ client had edited it.
   anything, the CLI sends it verbatim (official clients never produce more than
   five, so this only differs for histories written by other tools). The review
   says which old values go to history; verification expects the sent history
-  and date exactly (D7).
+  and date exactly, dates as instants (D7, D14).
 - Reason: a rollback path (section 6) that every Bitwarden client already
   shows ("Password history"), and no divergence from what users expect.
 - Consequence: the retired value remains in the vault (encrypted, readable by
@@ -229,7 +229,8 @@ client had edited it.
   attachments unchanged from the pre-write read except their download `url`
   (it carries a per-response token); and exactly the new plaintext for every
   selected field.
-  Reason: Vaultwarden stores strings as sent; ciphertext equality is stronger
+  Date members compare as instants, not strings (D14).
+  Reason: Vaultwarden stores ciphertext as sent; ciphertext equality is stronger
   than plaintext equality and needs no extra decryption. Reverse: compare
   decrypted plaintext instead if a backend re-encrypts.
 
@@ -324,6 +325,36 @@ client had edited it.
   about 4/3 of the plaintext plus roughly 100 characters of type, IV and MAC.
   Reverse: once the limit is confirmed from Vaultwarden's source, refuse
   before the review in `plan_update`.
+
+### D14. Dates are verified as instants; the client millisecond form is still sent
+
+- Context: the live CI job against Vaultwarden 1.36.0 showed that the server
+  parses and re-serializes the dates it stores: a password-history
+  `lastUsedDate` sent as `2026-11-22T01:02:55.659Z` is returned as
+  `2026-11-22T01:02:55.659000Z` (UTC, six fractional digits), and so is
+  `login.passwordRevisionDate`. A string comparison (D7) ended every real
+  update that writes history `updated_unverified`. The fake vault stored
+  dates verbatim, so no offline test saw it; it now re-serializes them
+  exactly like 1.36.
+- Options: (a) compare date members as parsed RFC 3339 instants;
+  (b) send Vaultwarden's own six-digit form so the strings match;
+  (c) both.
+- Choice: (a). `lastUsedDate`, `passwordRevisionDate` and a passkey's
+  `creationDate` (wherever they occur inside `passwordHistory` and `login`)
+  are equal when the strings are identical or both parse as RFC 3339
+  date-times (`T`, 0 to 9 fractional digits, `Z` or `±HH:MM`; no leap second,
+  no impossible date) of the same instant. A different instant, a missing or
+  added member, or a changed value that does not parse fails. Every other
+  member, ciphertext included, stays byte-exact. The CLI keeps sending the
+  official clients' millisecond form (`history_timestamp`).
+- Reason: (b) alone would tie verification to one server version's exact
+  formatting (a precision or offset change would break every update again),
+  and would make the CLI's history entries differ from the official clients';
+  (c) adds nothing once (a) holds. An identical unparsable string (written
+  by another tool and copied verbatim) is accepted: the server did not change
+  it, and refusing would only end a completed write `updated_unverified`.
+- Reverse: compare the strings again (D7) if a backend is found to store
+  dates verbatim and a precision loss must be detected.
 
 ## 4. Value handling
 
@@ -460,7 +491,9 @@ verification mismatch, a dropped passkey and a changed URI `match`
 (`updated_unverified`); plaintext absent from stdout, stderr, the review and
 the journal; preservation of unselected components. The live test against
 Vaultwarden 1.36.0 (`tests/live/secret_storage.rs`) checks that the server
-stores the history and revision date verbatim; CI runs it in the
+stores the history (ciphertext verbatim) and revision date, comparing dates as
+instants because the server re-serializes them (D14); the fake vault
+re-serializes them the same way; CI runs it in the
 `live-vaultwarden` job, where a missing server fails instead of skipping.
 
 `scripts/mutate-secret-update.py EVIDENCE_DIR` weakens each update guard in
@@ -470,10 +503,10 @@ and exclusivity, normalized journal server, reconcile rules (unchanged
 revision, moved/trashed item, ID validation, exit code), uncertain block,
 `lastKnownRevisionDate`, field kinds, password-history entries, revision date,
 changed-only history, hidden-field history, five-entry limit, exact value,
-identity, whole-login, field-object, unselected-field and attachment
+identity, whole-login, date-instant, field-object, unselected-field and attachment
 comparison, response shape, send errors as `uncertain`, response identity) and
 requires the focused tests to fail; the last report is
-`issue-48-mutations/report.json` (31 of 31 caught). Two first-run escapes were
+`issue-48-mutations/report.json` (32 of 32 caught). Two first-run escapes were
 real test weaknesses (tampered values encrypted under the wrong key, so a MAC
 failure masked the comparison; a PascalCase probe that serde already refused)
 and were fixed in the tests.

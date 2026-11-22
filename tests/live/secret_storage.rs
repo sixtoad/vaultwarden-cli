@@ -285,7 +285,7 @@ async fn trusted_cli_uses_fresh_terminal_authorization_and_durable_receipt() {
 #[tokio::test]
 async fn update_preserves_unselected_ciphertext_and_refuses_a_stale_revision() {
     use vaultwarden_cli::secret_update::{
-        ItemSnapshot, history_timestamp, plan_update, verify_updated,
+        ItemSnapshot, history_timestamp, plan_update, same_instant, verify_updated,
     };
     let now = || {
         history_timestamp(
@@ -347,11 +347,29 @@ async fn update_preserves_unselected_ciphertext_and_refuses_a_stale_revision() {
     assert_eq!(plan.history, ["password", "custom:api-key"]);
     api.update_cipher(token, &id, &body).await.unwrap();
     let raw = api.cipher_json_by_id(token, &id).await.unwrap();
-    // Vaultwarden keeps the official-client password history and revision date verbatim.
-    assert_eq!(raw["passwordHistory"], body["passwordHistory"]);
+    // Vaultwarden keeps the official-client password history (ciphertext
+    // verbatim) and revision date; it re-serializes dates with six fractional
+    // digits, so dates are compared as instants.
+    let (stored, sent) = (
+        raw["passwordHistory"].as_array().unwrap(),
+        body["passwordHistory"].as_array().unwrap(),
+    );
+    assert_eq!(stored.len(), sent.len());
+    for (stored, sent) in stored.iter().zip(sent) {
+        assert_eq!(stored["password"], sent["password"]);
+        assert!(
+            same_instant(&sent["lastUsedDate"], &stored["lastUsedDate"]),
+            "{stored}"
+        );
+    }
+    assert!(sent[0]["lastUsedDate"].is_string());
+    assert!(same_instant(
+        &body["login"]["passwordRevisionDate"],
+        &raw["login"]["passwordRevisionDate"]
+    ));
     assert_eq!(
-        raw["login"]["passwordRevisionDate"],
-        body["login"]["passwordRevisionDate"]
+        body["login"]["passwordRevisionDate"],
+        sent[0]["lastUsedDate"]
     );
     let after = ItemSnapshot::parse(raw, &id).unwrap();
     verify_updated(&env.user_keys, &destination, &before, &body, &after, &input).unwrap();

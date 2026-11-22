@@ -191,11 +191,16 @@ async fn approved_update_replaces_selected_fields_verifies_and_reads_back_exactl
     let date = after["passwordHistory"][0]["lastUsedDate"].clone();
     assert_eq!(after["passwordHistory"][1]["lastUsedDate"], date);
     assert_eq!(after["login"]["passwordRevisionDate"], date);
-    let date = date.as_str().unwrap();
+    // Sent in the client form (milliseconds); Vaultwarden 1.36 stores microseconds.
+    let sent = state[0]["passwordHistory"][0]["lastUsedDate"]
+        .as_str()
+        .unwrap();
     assert!(
-        date.len() == 24 && date.starts_with("20") && date.ends_with('Z') && &date[19..20] == ".",
-        "{date}"
+        sent.len() == 24 && sent.starts_with("20") && sent.ends_with('Z') && &sent[19..20] == ".",
+        "{sent}"
     );
+    assert_eq!(state[0]["login"]["passwordRevisionDate"], json!(sent));
+    assert_eq!(date, json!(format!("{}000Z", &sent[..23])));
     assert_eq!(
         after["login"]["fido2Credentials"],
         before["login"]["fido2Credentials"]

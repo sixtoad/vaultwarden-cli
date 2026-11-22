@@ -3,7 +3,8 @@
     "src/commands.rs": "e11e1119df2b044246b31cb75d8c40faaa892533ce74ba5c8539d412c20914e0",
     "src/commands/update.rs": "c51acf6a1d38624b6477bc726f0ebfcbedb0ed38318208d840c51bf2cce205be",
     "src/write_journal.rs": "6b81963e696114d3f2e9b1d55ecbf4e7634481720bd67fd6e8b8935933d81213",
-    "src/secret_update.rs": "0b87eb2dfa18edeaa7b29b6fcae3d38ec7a77076304c267b9e7e0a39b328d8f8",
+    "src/secret_update.rs": "a761ab9a405f09f88baee4f279d21e2d1fb4ec4c287acde62ef7c91a261c9029",
+    "src/secret_update_dates.rs": "490ad843c4985711a85d0063979913a3679d52202e97b36fab2a344b296c0412",
     "src/api.rs": "1a07916b7a5769796bb0edc9a75e193f1f9109fb8e5e2a54ff0242136df989ad"
   },
   "mutations": {
@@ -107,6 +108,10 @@
       "caught_by_test": true,
       "exit_code": 101
     },
+    "dates-compared-as-instants": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
     "selected-field-object-compared": {
       "caught_by_test": true,
       "exit_code": 101
@@ -136,7 +141,8 @@
     "src/commands.rs": "e11e1119df2b044246b31cb75d8c40faaa892533ce74ba5c8539d412c20914e0",
     "src/commands/update.rs": "c51acf6a1d38624b6477bc726f0ebfcbedb0ed38318208d840c51bf2cce205be",
     "src/write_journal.rs": "6b81963e696114d3f2e9b1d55ecbf4e7634481720bd67fd6e8b8935933d81213",
-    "src/secret_update.rs": "0b87eb2dfa18edeaa7b29b6fcae3d38ec7a77076304c267b9e7e0a39b328d8f8",
+    "src/secret_update.rs": "a761ab9a405f09f88baee4f279d21e2d1fb4ec4c287acde62ef7c91a261c9029",
+    "src/secret_update_dates.rs": "490ad843c4985711a85d0063979913a3679d52202e97b36fab2a344b296c0412",
     "src/api.rs": "1a07916b7a5769796bb0edc9a75e193f1f9109fb8e5e2a54ff0242136df989ad"
   },
   "restored_test_exit": 0

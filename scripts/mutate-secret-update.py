@@ -17,6 +17,7 @@ evidence.mkdir(parents=True, exist_ok=True)
 UPDATE = "src/commands/update.rs"
 CORE = "src/secret_update.rs"
 JOURNAL = "src/write_journal.rs"
+DATES = "src/secret_update_dates.rs"
 mutations = {
     "challenge-answer": ("src/commands.rs", (
         'anyhow::ensure!(answer == expected, "{denied}");',
@@ -92,11 +93,14 @@ mutations = {
         "*selected_value(&after.cipher, &keys, selector)? == *expected,",
         "selected_value(&after.cipher, &keys, selector).is_ok(),")),
     "identity-preserved": (CORE, (
-        "sent.get(member) == after.raw.get(member),",
-        "sent.contains_key(member) || true,")),
+        'ensure!(same, "preserved component changed");',
+        'ensure!(same || true, "preserved component changed");')),
     "whole-login-compared": (CORE, (
-        'without(sent.get("login"), skip) == without(after.raw.get("login"), skip),',
-        'without(sent.get("login"), skip).is_some(),')),
+        "(Some(sent), Some(stored)) => dates::same_json(&sent, &stored),",
+        "(Some(_), Some(_)) => true,")),
+    "dates-compared-as-instants": (DATES, (
+        "(Some(sent), Some(stored)) => sent == stored,",
+        "(Some(_), Some(_)) => true,")),
     "selected-field-object-compared": (CORE, (
         'without(Some(old), &["value"]) == without(Some(new), &["value"]),',
         "old.is_object(),")),
