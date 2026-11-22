@@ -75,21 +75,32 @@ trusted-local-producer | vaultwarden-cli update \
 Input is the create JSON format with the same limits and rules; every key present
 selects that field (`password`, `notes`, `fields[].name` as `custom:NAME`), and
 everything else is preserved exactly: item ID, wrapped item key, name, folder,
-username, URIs, TOTP, unselected fields, field types and order, password history,
-favorite and reprompt. Unlike create, `notes` alone is a valid selection. `--prompt`
+username, URIs, TOTP, passkeys, unselected fields, field types and order,
+existing password history, favorite, reprompt and attachments. Like the official
+Bitwarden clients, a replaced non-empty password and a replaced non-empty hidden
+field value are added to the item's password history (newest first, at most
+five entries; a field entry reads `NAME: old value`), and a changed password
+sets `passwordRevisionDate`, so the previous value stays recoverable in any
+Bitwarden client. Unlike create, `notes` alone is a valid selection. `--prompt`
 replaces only the password from a hidden prompt. A selected field that does not
 exist is refused (update never adds a field); so are boolean or linked fields,
 `custom:vw-access`, organization items, other item types and duplicate field names.
 
 Every invocation reviews UPDATE, item ID, server/account, folder label/ID,
 reference, the item's current revision (`revisionDate`) and the replaced field
-selectors, never values, then requires a fresh `update <random challenge>` on the
+selectors and which old values go to password history, never values, then requires a fresh `update <random challenge>` on the
 controlling terminal. There is no `--yes`. `--expected-revision R` additionally
 refuses unless the item's revision is exactly `R`. After the decision a fresh read
 must show the reviewed revision, or nothing is written (`item changed since
 review`); the PUT carries that revision as `lastKnownRevisionDate`, so Vaultwarden
-also refuses a stale write. Vaultwarden's own check tolerates one second, so an
-edit racing the final read by under a second is the documented residual risk.
+also refuses a stale write. Vaultwarden's own check refuses only a stored
+revision at least two whole seconds newer (`num_seconds() > 1`, truncating), so
+an edit racing the final read by under two seconds is the documented residual
+risk. The challenge has no expiry: the fresh read after the answer is the guard.
+EOF or Ctrl-C at the challenge writes nothing. After the answer the CLI takes an
+exclusive per-item lock (a second concurrent update of the item is refused) and
+holds it until the receipt is saved. An encrypted notes value over Vaultwarden's
+size limit is refused by the server (HTTP 400, `failed`).
 New values are encrypted locally with the item's key and fresh IVs.
 
 Before the PUT a metadata-only journal is fsynced as
@@ -103,9 +114,12 @@ vaultwarden-cli reconcile --journal JOURNAL_PATH --id ITEM_UUID
 ```
 
 Read-only: an unchanged revision yields `failed` (the attempt wrote nothing); a
-newer one yields `updated_unverified` (original values cannot be compared after
-the process ended). Then inspect the item and decide on a new, separately approved
-update.
+newer one, also after the item was moved or trashed, yields `updated_unverified`
+(original values cannot be compared after the process ended). Like `update`, it
+exits non-zero unless the receipt is `verified`. Then inspect the item and decide
+on a new, separately approved update. If the item was deleted permanently,
+confirm that in a Bitwarden client and move the journal file out of
+`write-attempts/` to lift the block.
 
 ### Rotation
 
@@ -118,6 +132,10 @@ credential while the old one still works, store it with `update` and wait for
 Values already delivered (environment of a running process, files, copies) are
 not recalled; later reads and protected runs receive the new value, and a run
 that already read keeps the old one.
+
+To roll back before the old credential is revoked, read the previous value from
+the item's password history in a Bitwarden client, store it again with a new,
+approved `update`, wait for `verified` and switch consumers back.
 
 ## Exact selected reads
 
