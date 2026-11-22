@@ -1,0 +1,75 @@
+{
+  "source_sha256": {
+    "src/commands.rs": "e11e1119df2b044246b31cb75d8c40faaa892533ce74ba5c8539d412c20914e0",
+    "src/commands/update.rs": "f1c4389f690643b332c0cebbcac0fd367bc27afad077b9dd0f3514c2ac8b1854",
+    "src/write_journal.rs": "61a1e94ee8510ab3addfa18b56ba7c11fbd616f67460c9963d5e1c65766526dc",
+    "src/secret_update.rs": "38d7ef07be29a5d566adc154e524b18360e8dad94cee2505a29252db8bfbea84",
+    "src/api.rs": "1a07916b7a5769796bb0edc9a75e193f1f9109fb8e5e2a54ff0242136df989ad"
+  },
+  "mutations": {
+    "challenge-answer": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "expected-revision-pin": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "review-revision-recheck": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "fields-checked-before-decision": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "verified-only-after-comparison": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "reconcile-unchanged-revision": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "uncertain-blocks-item": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "server-revision-precondition": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "replaceable-field-kinds": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "selected-value-exact": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "identity-preserved": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "unselected-field-preserved": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "camel-case-shape-only": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "response-identity": {
+      "caught_by_test": true,
+      "exit_code": 101
+    }
+  },
+  "restored_sha256": {
+    "src/commands.rs": "e11e1119df2b044246b31cb75d8c40faaa892533ce74ba5c8539d412c20914e0",
+    "src/commands/update.rs": "f1c4389f690643b332c0cebbcac0fd367bc27afad077b9dd0f3514c2ac8b1854",
+    "src/write_journal.rs": "61a1e94ee8510ab3addfa18b56ba7c11fbd616f67460c9963d5e1c65766526dc",
+    "src/secret_update.rs": "38d7ef07be29a5d566adc154e524b18360e8dad94cee2505a29252db8bfbea84",
+    "src/api.rs": "1a07916b7a5769796bb0edc9a75e193f1f9109fb8e5e2a54ff0242136df989ad"
+  },
+  "restored_test_exit": 0
+}

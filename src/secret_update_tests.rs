@@ -125,7 +125,8 @@ fn missing_unsupported_and_rebound_items_are_refused_before_any_write() {
         br#"{"fields":[{"name":"other","value":"x"}]}"#
     ));
     let mut pascal = item.clone();
-    pascal["Name"] = pascal["name"].clone();
+    // A PascalCase member serde would ignore: only the shape guard refuses it.
+    pascal["Edit"] = json!(true);
     assert!(ItemSnapshot::parse(pascal, ID).is_err());
     let mut no_revision = item.clone();
     no_revision["revisionDate"] = Value::Null;
@@ -156,10 +157,12 @@ fn verification_fails_closed_on_any_changed_or_wrong_component() {
         *slot = value;
         verify_updated(&parent, &destination(), &before, &snapshot(item), &input).is_err()
     };
-    let other = parent.encrypt(b"other").unwrap();
+    // Authentic ciphertext under the item's own key, so only value comparison can catch it.
+    let item_keys = parent.item_keys(before.cipher.item_key.as_deref()).unwrap();
+    let other = item_keys.encrypt(b"other").unwrap();
     assert!(tampered(
         &["fields", "0", "value"],
-        json!(parent.encrypt(b"wrong").unwrap())
+        json!(item_keys.encrypt(b"wrong").unwrap())
     ));
     assert!(tampered(&["fields", "1", "value"], json!(other)));
     assert!(tampered(&["fields", "1", "type"], json!(0)));

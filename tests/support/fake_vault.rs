@@ -108,7 +108,9 @@ impl Respond for ItemRoute {
         object.insert("id".into(), json!(ITEM));
         object.insert("object".into(), json!("cipherDetails"));
         if state.put_mode == PutMode::ApplyCorrupted {
-            stored["login"]["password"] = json!(state.keys.encrypt(b"corrupted").unwrap());
+            // Authentic under the item key: only an exact value comparison detects it.
+            let item_keys = state.keys.item_keys(stored["key"].as_str()).unwrap();
+            stored["login"]["password"] = json!(item_keys.encrypt(b"corrupted").unwrap());
         }
         state.item = stored;
         state.bump();
