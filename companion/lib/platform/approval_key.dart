@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/services.dart';
 
+import 'approval_client.dart';
+
 /// Outcomes of the production approval key channel. Anything unknown is
 /// `failed`; no outcome grants authority: Rust and the provider verify.
 enum KeyOutcome {
@@ -42,9 +44,16 @@ class KeyBinding {
   };
 }
 
-/// The macOS Secure Enclave approval key (one per provider and client). The
-/// synthetic demonstration key lives on a different channel and tag.
+/// The hardware-backed approval key (one per provider and client): the
+/// macOS Secure Enclave, the iOS Secure Enclave or an Android StrongBox/TEE
+/// Keystore key. Every signature needs its own user verification. The
+/// synthetic demonstration key lives on a different channel and tag. The
+/// contract each platform meets is `docs/mobile-clients.md`.
 abstract interface class ApprovalKeyPlatform {
+  /// A request-bound, user-verified signer is available now (Touch ID on
+  /// macOS; Face ID or Touch ID on iOS; Class 3 biometrics on Android; never
+  /// the passcode alone). The historical name is kept for every
+  /// implementation.
   Future<bool> touchIdAvailable();
   Future<KeyReply> read(KeyBinding binding);
   Future<KeyReply> create(KeyBinding binding);
@@ -58,14 +67,28 @@ abstract interface class ApprovalKeyPlatform {
   Future<void> cancel(int token);
 }
 
-class NativeApprovalKeyPlatform implements ApprovalKeyPlatform {
-  NativeApprovalKeyPlatform({bool? macOS, MethodChannel? channel})
-    : _macOS = macOS ?? Platform.isMacOS,
-      _channel =
-          channel ??
-          const MethodChannel('dev.vaultwarden.companionSlice/approvalKey'),
-      _session = _nonce();
+class NativeApprovalKeyPlatform
+    implements ApprovalKeyPlatform, UserVerificationPlatform {
+  /// [macOS] overrides whether the native channel exists here (default: an
+  /// approval-client system; `true` alone means the macOS contract, as it
+  /// always did); [operatingSystem] selects which `availability` replies
+  /// are accepted (default: this system).
+  NativeApprovalKeyPlatform({
+    bool? macOS,
+    MethodChannel? channel,
+    String? operatingSystem,
+  }) : _system =
+           operatingSystem ??
+           (macOS == true ? 'macos' : Platform.operatingSystem),
+       _macOS =
+           macOS ??
+           isApprovalClientSystem(operatingSystem ?? Platform.operatingSystem),
+       _channel =
+           channel ??
+           const MethodChannel('dev.vaultwarden.companionSlice/approvalKey'),
+       _session = _nonce();
   final bool _macOS;
+  final String _system;
   final MethodChannel _channel;
 
   /// Signature numbers are per session: the native side restarts its
@@ -82,14 +105,21 @@ class NativeApprovalKeyPlatform implements ApprovalKeyPlatform {
   }
 
   @override
-  Future<bool> touchIdAvailable() async {
-    if (!_macOS) return false;
+  Future<bool> touchIdAvailable() async =>
+      await verification() != UserVerification.unavailable;
+
+  @override
+  Future<UserVerification> verification() async {
+    if (!_macOS) return UserVerification.unavailable;
     try {
-      return await _channel.invokeMethod<Object?>('availability') == 'touchID';
+      return parseUserVerification(
+        _system,
+        await _channel.invokeMethod<Object?>('availability'),
+      );
     } on PlatformException {
-      return false;
+      return UserVerification.unavailable;
     } on MissingPluginException {
-      return false;
+      return UserVerification.unavailable;
     }
   }
 

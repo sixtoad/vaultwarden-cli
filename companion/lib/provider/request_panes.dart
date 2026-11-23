@@ -235,7 +235,7 @@ class RequestDetailPane extends StatelessWidget {
       touchIdOffered: touchId.available,
       onTouchId: touchId.canApprove ? () => unawaited(touchId.approve()) : null,
       touchIdNote: touchId.working ? '' : touchId.unavailableReason,
-      touchIdMessage: touchId.message,
+      touchIdMessage: touchId.messageFor(state.reviewId),
     );
     if (!revealOnOpen) return detail;
     return _RevealOnOpen(key: ValueKey(state.reviewId), child: detail);
@@ -287,9 +287,12 @@ class RequestDetailPane extends StatelessWidget {
             const Text(
               'No active review. Select a pending request to load its complete scope. Expired or retired reviews cannot authorize an operation.',
             ),
-          if (touchId.message.isNotEmpty) ...[
+          if (touchId.messageFor(openedRequest).isNotEmpty) ...[
             const SizedBox(height: 16),
-            Text(touchId.message, key: const Key('touch-id-message')),
+            Text(
+              touchId.messageFor(openedRequest),
+              key: const Key('touch-id-message'),
+            ),
           ],
           if (state.statusId.isNotEmpty) ...[
             const SizedBox(height: 16),
