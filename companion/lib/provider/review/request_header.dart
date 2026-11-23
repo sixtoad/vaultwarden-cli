@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../design/access_theme.dart';
+import '../../design/metrics.dart';
 import '../../design/typography.dart';
 import '../../src/rust/api/provider.dart' as core;
 import 'review_status.dart';
@@ -47,7 +48,15 @@ class RequestHeader extends StatelessWidget {
         const SizedBox(height: 16),
         Semantics(
           header: true,
-          child: Text(review.operation, style: text.headlineSmall),
+          child: Text(
+            review.operation,
+            // The prototype's mobile request title is 27 px (25 elsewhere).
+            style:
+                MediaQuery.sizeOf(context).width <
+                    AccessMetrics.of(context).sidebarBreakpoint
+                ? text.headlineSmall!.copyWith(fontSize: 27)
+                : text.headlineSmall,
+          ),
         ),
         const SizedBox(height: 8),
         Text(

@@ -27,7 +27,7 @@ Do not bypass Gatekeeper, remove quarantine or modify an installed application.
 | Windows | `vaultwarden-cli.exe`, command launcher | Vault CLI works. Protected requesting/provider execution and Flutter approval transport are unavailable. |
 
 The manifest records the actual app, core and CLI versions separately: currently
-0.1.0+1, 0.1.0 and 0.5.4. Equal version strings are not the compatibility rule.
+0.1.0+1, 0.1.0 and 0.6.0. Equal version strings are not the compatibility rule.
 Bundle schema 1, launcher ABI 1, the expected runtime platform/architecture and
 running app/core versions are checked. Old ABI-1 command launchers can select
 new compatible app/core versions. A bundle records its host command architecture;

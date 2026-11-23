@@ -92,6 +92,17 @@ class ProviderController extends ChangeNotifier {
       _operation;
   String get recoveryId =>
       _settlementId.isNotEmpty ? _settlementId : state.uncertainId;
+
+  /// The provider command in flight, if any.
+  core.ProviderCommand? _flight;
+
+  /// A review or a decision is in flight. Automatic reads (session, inbox,
+  /// history, status) are busy too, but never load or finish a review.
+  bool get reviewWorking => const [
+    core.ProviderCommand.review,
+    core.ProviderCommand.approve,
+    core.ProviderCommand.deny,
+  ].contains(_flight);
   bool get canSetup =>
       platform.available &&
       eligible &&
@@ -515,6 +526,7 @@ class ProviderController extends ChangeNotifier {
     }
     diagnostic = '';
     _operation = true;
+    _flight = command;
     state = core.providerSnapshot();
     final pendingId = recoveryId;
     _publish();
@@ -563,6 +575,7 @@ class ProviderController extends ChangeNotifier {
       }
     }
     _operation = false;
+    _flight = null;
     _publish();
     return accepted && _settlementId.isEmpty;
   }

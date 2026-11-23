@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:companion_slice/platform/approval_client.dart';
 import 'package:companion_slice/platform/approval_key.dart';
 import 'package:companion_slice/provider/page.dart';
+import 'package:companion_slice/provider/review/review_session.dart';
 import 'package:companion_slice/src/rust/frb_generated.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -156,6 +157,34 @@ void main() {
 
   for (final os in ['macos', 'android', 'ios']) {
     group('on $os', () {
+      testWidgets('backgrounding a prompt retires the authorization step', (
+        tester,
+      ) async {
+        final native = FixtureProviderPlatform()..approvalBinding = binding;
+        final keys = FakeKeys()..prompt = Completer();
+        await tester.pumpWidget(page(native, keys, os: os));
+        await open(tester, providerId);
+        await touchIdTap(tester);
+        final dynamic state = tester.state(find.byType(ProviderPage));
+        final session = state.reviewSession as ReviewSession;
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        expect(session.step(providerId), ReviewStep.authorize);
+        expect(keys.cancelled, isEmpty, reason: 'the system prompt is exempt');
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        expect(session.step(providerId), ReviewStep.review);
+        expect(keys.cancelled, hasLength(1));
+        keys.prompt!.complete();
+        await tester.pumpAndSettle();
+        expect(decisions(native), isEmpty);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+
       testWidgets('a Touch ID result is never presented as another request', (
         tester,
       ) async {
@@ -225,6 +254,31 @@ void main() {
   for (final os in ['android', 'ios']) {
     group('phone $os', () {
       for (final signal in DeviceSignal.values) {
+        testWidgets('${signal.name} closes authorization and clears secrets', (
+          tester,
+        ) async {
+          final native = FixtureProviderPlatform()..approvalBinding = binding;
+          final signals = FakeSignals();
+          final keys = FakeKeys()..prompt = Completer();
+          await tester.pumpWidget(page(native, keys, os: os, signals: signals));
+          await open(tester, providerId);
+          await touchIdTap(tester);
+          final dynamic state = tester.state(find.byType(ProviderPage));
+          final session = state.reviewSession as ReviewSession;
+          final password = state.approvalPassword as TextEditingController;
+          password.text = 'synthetic-interrupted-password';
+          expect(session.step(providerId), ReviewStep.authorize);
+          signals.callback!(signal);
+          final stepAfterSignal = session.step(providerId);
+          final passwordAfterSignal = password.text;
+          keys.prompt!.complete();
+          await tester.pumpAndSettle();
+          expect(decisions(native), isEmpty);
+          await tester.pumpWidget(const SizedBox.shrink());
+          expect(stepAfterSignal, ReviewStep.review);
+          expect(passwordAfterSignal, isEmpty);
+        });
+
         testWidgets('${signal.name} during the prompt cancels it; '
             'nothing is sent', (tester) async {
           final native = FixtureProviderPlatform()..approvalBinding = binding;

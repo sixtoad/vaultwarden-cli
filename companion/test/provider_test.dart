@@ -750,7 +750,7 @@ void main() {
       await tester.tap(requestRow(providerId));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('provider-review')), findsOneWidget);
-      expect(find.text('Arguments (1 separate values)'), findsOneWidget);
+      expect(find.text('Arguments (1 separate value)'), findsOneWidget);
       expect(find.text('Credentials (1)'), findsOneWidget);
       expect(reviewFact(tester, 'review-id'), '"$providerId"');
       expect(reviewFact(tester, 'review-argument-0'), '"staging"');
