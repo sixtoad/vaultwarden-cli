@@ -40,11 +40,36 @@ impl SecretImport {
     /// # Errors
     /// Returns an error when validation, authorization, cryptography or backend access fails.
     pub fn validate(&self) -> Result<()> {
-        let mut names = HashSet::new();
         ensure!(
             self.password.is_some() || !self.fields.is_empty(),
             "secret input is empty"
         );
+        self.validate_limits()
+    }
+    /// Update selections may replace notes alone; every other create rule applies.
+    /// # Errors
+    /// Returns an error when the selection is empty, invalid or over the limits.
+    pub fn validate_update(&self) -> Result<()> {
+        ensure!(
+            self.password.is_some() || self.notes.is_some() || !self.fields.is_empty(),
+            "secret input is empty"
+        );
+        self.validate_limits()
+    }
+    /// # Errors
+    /// Returns an error when validation fails; the error never contains a value.
+    pub fn parse_update(bytes: &[u8]) -> Result<Self> {
+        ensure!(
+            bytes.len() <= MAX_IMPORT_BYTES,
+            "secret input exceeds limit"
+        );
+        let input: Self = serde_json::from_slice(bytes)
+            .map_err(|_error| anyhow::anyhow!("invalid secret input"))?;
+        input.validate_update()?;
+        Ok(input)
+    }
+    fn validate_limits(&self) -> Result<()> {
+        let mut names = HashSet::new();
         ensure!(
             self.fields.len() <= 32
                 && self.fields.iter().all(|f| valid_field_name(&f.name)
@@ -384,6 +409,8 @@ pub enum WriteStatus {
     Failed,
     Uncertain,
     CreatedUnverified,
+    /// The server accepted an update, but exact comparison did not succeed.
+    UpdatedUnverified,
     Verified,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

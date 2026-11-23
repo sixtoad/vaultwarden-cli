@@ -43,6 +43,18 @@ async fn bounded_error_body_snippet(mut response: Response) -> String {
     }
 }
 
+/// Read at most 1 MiB of a success body; `None` on a transport error or overflow.
+async fn bounded_body(mut response: Response) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.ok()? {
+        if bytes.len() + chunk.len() > 1_048_576 {
+            return None;
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Some(bytes)
+}
+
 pub struct ApiClient {
     client: Client,
     base_url: String,
@@ -307,6 +319,70 @@ impl ApiClient {
             return Err(WriteStatus::Uncertain);
         }
         Ok(cipher)
+    }
+
+    /// Fetch one item as raw JSON, bounded, so an update can preserve every member verbatim.
+    /// # Errors
+    /// Returns an error when the request fails, the status is not success, the body
+    /// exceeds 1 MiB or is not a JSON object. Errors never include the body.
+    pub async fn cipher_json_by_id(
+        &self,
+        token: &str,
+        cipher_id: &str,
+    ) -> Result<serde_json::Value> {
+        let response = self
+            .client
+            .get(format!("{}/api/ciphers/{cipher_id}", self.base_url))
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|_error| anyhow::anyhow!("item read failed"))?;
+        anyhow::ensure!(response.status().is_success(), "item read failed");
+        let bytes = bounded_body(response)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("item read failed"))?;
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_error| anyhow::anyhow!("item read failed"))?;
+        anyhow::ensure!(value.is_object(), "item read failed");
+        Ok(value)
+    }
+
+    /// Update exactly once. Errors never include a server body or request payload.
+    /// # Errors
+    /// Returns the receipt status a failure establishes: `Failed` for a definite
+    /// rejection, `Uncertain` when the outcome is unknown.
+    pub async fn update_cipher(
+        &self,
+        token: &str,
+        cipher_id: &str,
+        body: &serde_json::Value,
+    ) -> std::result::Result<serde_json::Value, crate::secret_storage::WriteStatus> {
+        use crate::secret_storage::WriteStatus;
+        let response = self
+            .client
+            .put(format!("{}/api/ciphers/{cipher_id}", self.base_url))
+            .bearer_auth(token)
+            .json(body)
+            .send()
+            .await
+            .map_err(|_error| WriteStatus::Uncertain)?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(
+                if matches!(status.as_u16(), 400 | 401 | 403 | 404 | 405 | 422) {
+                    WriteStatus::Failed
+                } else {
+                    WriteStatus::Uncertain
+                },
+            );
+        }
+        let bytes = bounded_body(response).await.ok_or(WriteStatus::Uncertain)?;
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_error| WriteStatus::Uncertain)?;
+        if value.get("id").and_then(serde_json::Value::as_str) != Some(cipher_id) {
+            return Err(WriteStatus::Uncertain);
+        }
+        Ok(value)
     }
 
     /// List ciphers filtered by organization, collection, and/or cipher type.

@@ -11,6 +11,7 @@ pub mod config;
 pub mod crypto;
 pub mod models;
 pub mod secret_storage;
+pub mod secret_update;
 mod totp;
 pub mod write_journal;
 
