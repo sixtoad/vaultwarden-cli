@@ -71,7 +71,52 @@ class AccessMetrics extends ThemeExtension<AccessMetrics> {
   }
 
   @override
-  AccessMetrics copyWith() => this;
+  AccessMetrics copyWith({
+    List<double>? space,
+    double? sidebarWidth,
+    double? sidebarCompressedWidth,
+    double? sidebarBreakpoint,
+    double? fullBreakpoint,
+    double? listWidth,
+    double? listCompressedWidth,
+    double? detailMinWidth,
+    double? detailMaxWidth,
+    double? workpageMaxWidth,
+    double? factLabelWidth,
+    double? factLabelCompactWidth,
+    double? factGap,
+    double? factCompactGap,
+    double? target,
+    double? radius,
+    double? badgeRadius,
+    double? tileRadius,
+    double? selectedRule,
+    double? noticeRule,
+    double? largeTextBody,
+  }) => AccessMetrics(
+    space: space ?? this.space,
+    sidebarWidth: sidebarWidth ?? this.sidebarWidth,
+    sidebarCompressedWidth:
+        sidebarCompressedWidth ?? this.sidebarCompressedWidth,
+    sidebarBreakpoint: sidebarBreakpoint ?? this.sidebarBreakpoint,
+    fullBreakpoint: fullBreakpoint ?? this.fullBreakpoint,
+    listWidth: listWidth ?? this.listWidth,
+    listCompressedWidth: listCompressedWidth ?? this.listCompressedWidth,
+    detailMinWidth: detailMinWidth ?? this.detailMinWidth,
+    detailMaxWidth: detailMaxWidth ?? this.detailMaxWidth,
+    workpageMaxWidth: workpageMaxWidth ?? this.workpageMaxWidth,
+    factLabelWidth: factLabelWidth ?? this.factLabelWidth,
+    factLabelCompactWidth: factLabelCompactWidth ?? this.factLabelCompactWidth,
+    factGap: factGap ?? this.factGap,
+    factCompactGap: factCompactGap ?? this.factCompactGap,
+    target: target ?? this.target,
+    radius: radius ?? this.radius,
+    badgeRadius: badgeRadius ?? this.badgeRadius,
+    tileRadius: tileRadius ?? this.tileRadius,
+    selectedRule: selectedRule ?? this.selectedRule,
+    noticeRule: noticeRule ?? this.noticeRule,
+    largeTextBody: largeTextBody ?? this.largeTextBody,
+  );
 
   @override
   AccessMetrics lerp(AccessMetrics? other, double t) => this;

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,9 +10,45 @@ import 'golden_support.dart';
 import 'installation_settings_test.dart' show FakeInstallation;
 import 'provider_support.dart';
 
-/// Shell captures (#50 slice 1): the Requests list in four states, and the
-/// first Devices and Settings references, light/dark, desktop/compact. Only
-/// the synthetic provider fixture is rendered.
+/// Answers the identity list with this approval client and one requester
+/// agent, so Devices shows a populated inventory.
+class InventoryProvider extends FixtureProviderPlatform {
+  Map<String, dynamic> identity(String kind, String id, String label) => {
+    'kind': kind,
+    'id': id,
+    'label': label,
+    'fingerprint': (kind == 'approval_client' ? 'd' : 'e') * 64,
+    'roles': [kind == 'approval_client' ? 'approve' : 'request'],
+    'trust': 'enabled',
+    'this_client': kind == 'approval_client',
+  };
+
+  @override
+  Future<Uint8List> send(Uint8List body) async {
+    final command = jsonDecode(utf8.decode(body)) as Map<String, dynamic>;
+    if (command['command'] != 'identity_list') return super.send(body);
+    commands.add(command);
+    return encoded({
+      'version': 2,
+      'identities': [
+        identity('approval_client', 'd' * 64, 'Synthetic desktop'),
+        identity('requester_agent', providerId, 'agent synthetic'),
+      ],
+      'next_cursor': null,
+      'generation': 1,
+      'provider': {
+        'fingerprint': 'f' * 64,
+        'execution_configured': true,
+        'execution_available': true,
+      },
+    });
+  }
+}
+
+/// Shell captures (#50 slice 1, cleanup): the Requests list in five states
+/// (disconnected included), Devices (unavailable and populated inventory)
+/// and Settings, light/dark, desktop/compact; Devices and Settings also at
+/// 200% text. Only the synthetic provider fixture is rendered.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final host = goldenHost();
@@ -46,19 +83,24 @@ void main() {
       'requests',
       () => FixtureProviderPlatform()..savePending(providerId),
     ),
+    'disconnected': ('requests', UnreachableProvider.new),
     'devices': ('devices', FixtureProviderPlatform.new),
+    'inventory': ('devices', InventoryProvider.new),
     'settings': ('settings', FixtureProviderPlatform.new),
   };
+  // 200% text (compact window) for the workpages only.
+  const largeScenes = {'devices', 'inventory', 'settings'};
 
   for (final brightness in Brightness.values) {
-    for (final layout in ['desktop', 'compact']) {
+    for (final layout in ['desktop', 'compact', 'large']) {
       for (final scene in scenes.entries) {
+        if (layout == 'large' && !largeScenes.contains(scene.key)) continue;
         testWidgets('shell ${scene.key} ${brightness.name} $layout', (
           tester,
         ) async {
-          tester.view.physicalSize = layout == 'compact'
-              ? const Size(390, 844)
-              : const Size(1440, 900);
+          tester.view.physicalSize = layout == 'desktop'
+              ? const Size(1440, 900)
+              : const Size(390, 844);
           tester.view.devicePixelRatio = 1;
           tester.platformDispatcher.platformBrightnessTestValue = brightness;
           addTearDown(tester.view.resetPhysicalSize);
@@ -69,6 +111,12 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               locale: const Locale('en', 'US'),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(layout == 'large' ? 2 : 1),
+                ),
+                child: child!,
+              ),
               home: RepaintBoundary(
                 key: const Key('golden'),
                 child: ProviderPage(
@@ -83,6 +131,14 @@ void main() {
           final destination = scene.value.$1;
           if (destination != 'requests') {
             await tester.tap(find.byKey(Key('destination-$destination')));
+            await tester.pumpAndSettle();
+          }
+          if (scene.key == 'inventory') {
+            // Bring the identity list itself into view.
+            await Scrollable.ensureVisible(
+              tester.element(find.text('Refresh provider identities')),
+              alignment: 0.05,
+            );
             await tester.pumpAndSettle();
           }
           // Hide the text caret of any focused field.

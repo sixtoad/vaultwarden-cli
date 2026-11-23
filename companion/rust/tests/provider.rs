@@ -498,7 +498,8 @@ fn decision_completion_survives_invalidation_but_duplicate_cannot_change_outcome
     session.finish(work.token, br#"{"version":1,"status":{"status":"denied"}}"#);
     let state = session.snapshot();
     assert!(state.uncertain_id.is_empty());
-    assert!(state.message.contains("denied"));
+    assert!(state.message.contains("Denied"));
+    assert!(state.status_text.contains("denied"));
     session.finish(
         work.token,
         br#"{"version":1,"status":{"status":"approved"}}"#,
@@ -904,4 +905,59 @@ fn history_retirement_compatibility_lock_and_uncertainty_never_restore_authority
     assert_eq!(session.snapshot().uncertain_id, ID);
     assert!(!session.snapshot().can_decide);
     assert!(session.snapshot().history.is_empty());
+}
+
+#[test]
+fn inbox_refresh_replaces_the_contacting_message() {
+    let mut session = connected();
+    reply(
+        &mut session,
+        Command::List,
+        "",
+        json!({"version":1,"requests":[ID]}),
+    );
+    assert_eq!(session.snapshot().message, "Inbox refreshed: 1 pending");
+    reply(
+        &mut session,
+        Command::List,
+        "",
+        json!({"version":1,"requests":[]}),
+    );
+    assert_eq!(session.snapshot().message, "Inbox refreshed: 0 pending");
+}
+
+#[test]
+fn status_line_reads_plainly_while_status_text_keeps_the_exact_value() {
+    let mut session = reviewed();
+    assert_eq!(
+        session.snapshot().message,
+        "Request status: Awaiting your approval"
+    );
+    for (status, label) in [
+        (json!({"status":"approved"}), "Approved · not completed"),
+        (json!({"status":"running"}), "Running · not completed"),
+        (
+            json!({"status":"completed","exit_code":3}),
+            "Completed · exit code 3",
+        ),
+        (
+            json!({"status":"failed","reason":"execution_nonzero"}),
+            "Failed",
+        ),
+        (json!({"status":"denied"}), "Denied"),
+        (json!({"status":"expired"}), "Expired"),
+        (json!({"status":"pending"}), "Awaiting your approval"),
+    ] {
+        reply(
+            &mut session,
+            Command::Status,
+            ID,
+            json!({"version":1,"status":status.clone()}),
+        );
+        let state = session.snapshot();
+        assert_eq!(state.message, format!("Request status: {label}"));
+        assert!(!state.message.contains('{'));
+        let exact: Value = serde_json::from_str(&state.status_text).unwrap();
+        assert_eq!(exact, status);
+    }
 }

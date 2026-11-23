@@ -31,7 +31,7 @@ class FactRow extends StatelessWidget {
       style: text.bodySmall!.copyWith(color: c.secondary),
     );
     final valueStyle = mono
-        ? AccessType.of(context).mono
+        ? AccessType.of(context).factMono
         : text.bodySmall!.copyWith(fontWeight: FontWeight.w500);
     final valueText = Column(
       crossAxisAlignment: CrossAxisAlignment.start,

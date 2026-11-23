@@ -224,3 +224,16 @@ Future<void> denyRequest(WidgetTester tester, {bool settle = true}) async {
     await tester.pump();
   }
 }
+
+/// Fails every session read: the provider cannot be reached.
+class UnreachableProvider extends FixtureProviderPlatform {
+  @override
+  Future<Uint8List> send(Uint8List body) async {
+    final command = jsonDecode(utf8.decode(body)) as Map<String, dynamic>;
+    if (command['command'] == 'session') {
+      commands.add(command);
+      throw StateError('Synthetic unreachable provider');
+    }
+    return super.send(body);
+  }
+}

@@ -539,6 +539,7 @@ impl ProviderSession {
                     self.invalidate();
                 }
                 self.requests = reply.requests;
+                self.message = format!("Inbox refreshed: {} pending", self.requests.len());
             }
             Command::Review => {
                 let (reply, signed) = if flight.v2 {
@@ -556,7 +557,7 @@ impl ProviderSession {
                 {
                     return Err("review");
                 }
-                self.message = reply.review.status.summary();
+                self.message = format!("Request status: {}", reply.review.status.label());
                 // A new review starts with no Touch ID result on display.
                 self.biometric = Biometric::None;
                 self.proof_id = None;
@@ -593,13 +594,15 @@ impl ProviderSession {
                     && self.unresolved.as_deref() == Some(&flight.id)
                 {
                     self.message = "Outcome uncertain: still pending. Only status recovery is allowed; no decision was resent.".into();
+                    self.status_text = self.message.clone();
                 } else {
                     if self.unresolved.as_deref() == Some(&flight.id) {
                         self.unresolved = None;
                     }
-                    self.message = reply.status.summary();
+                    // The exact value for the review; a readable status line.
+                    self.status_text = reply.status.summary();
+                    self.message = format!("Request status: {}", reply.status.label());
                 }
-                self.status_text = self.message.clone();
             }
         }
         Ok(())
