@@ -19,12 +19,17 @@ env:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   native-protected-provider:
     name: Native Apple Silicon provider (disposable qualification)
-    runs-on: macos-26
+    # Fork approvals are enforced in repository settings. A reviewed fork still uses hosted CI.
+    runs-on: &macos-ci >-
+      ${{ vars.VW_MACOS_CI == 'self-hosted' &&
+          (github.event_name == 'push' ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.user.login != 'dependabot[bot]')) &&
+          'vw-ci-macos-arm64' || 'macos-26' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -41,7 +46,7 @@ jobs:
 
   disposable-companion-pilot:
     name: Disposable Mac companion pilot (opt-in build)
-    # Apple Silicon only: Intel (x86_64) macOS is no longer supported or built.
+    # test-pilot-packaged.py requires a disposable GitHub-hosted default Keychain.
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -81,6 +86,7 @@ jobs:
         include:
           - os: ubuntu-24.04
             architecture: x86_64
+          # Packaged GUI tests change the Keychain search list and app container.
           - os: macos-26
             architecture: arm64
           - os: windows-latest
@@ -124,8 +130,7 @@ jobs:
     # Issue 60: the companion Rust core (FRB bridge, approval v2, enrollment)
     # for the Android and iOS approval clients. cdylib for Android
     # (jniLibs/<abi>/libcompanion_core.so), staticlib for iOS (linked into the
-    # Runner). Built on GitHub-hosted runners: the Android NDK is preinstalled
-    # on ubuntu-24.04 and the iOS SDK on macos-26. No phone app is built here.
+    # Runner). Android uses the hosted NDK. The iOS targets require full Xcode.
     name: Companion Rust core (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -138,10 +143,10 @@ jobs:
           - os: ubuntu-24.04
             target: aarch64-linux-android
             artifact: libcompanion_core.so
-          - os: macos-26
+          - os: *macos-ci
             target: aarch64-apple-ios
             artifact: libcompanion_core.a
-          - os: macos-26
+          - os: *macos-ci
             target: aarch64-apple-ios-sim
             artifact: libcompanion_core.a
     defaults:
@@ -208,8 +213,7 @@ jobs:
 
   macos-companion:
     name: Native macOS approval companion
-    # Apple Silicon: Intel (x86_64) macOS is no longer supported or built.
-    runs-on: macos-26
+    runs-on: *macos-ci
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -242,13 +246,15 @@ jobs:
         os: ["ubuntu-24.04", "macos-26"]
         rust: ["stable", "beta"]
         include:
+          - os: macos-26
+            runner: *macos-ci
           - os: ubuntu-24.04
             rust: "1.88.0"
           - os: ubuntu-24.04-arm
             rust: "stable"
           - os: ubuntu-24.04-arm
             rust: "1.88.0"
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner || matrix.os }}
     env:
       # Live tests run in the live-vaultwarden job; under CI they fail without a server.
       VAULTWARDEN_LIVE_TESTS: skip
@@ -477,7 +483,7 @@ jobs:
             cross: true
           # Intel (x86_64) macOS is no longer supported or built.
           - target: aarch64-apple-darwin
-            os: macos-26
+            os: *macos-ci
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-pc-windows-msvc
@@ -502,6 +508,9 @@ jobs:
         run: cargo test --locked --target x86_64-pc-windows-msvc --test unsupported_provider_platform
 
   coverage:
+    permissions:
+      contents: read
+      pull-requests: write
     name: Coverage (Tarpaulin)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
