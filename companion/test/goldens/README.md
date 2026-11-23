@@ -186,3 +186,65 @@ status. The macOS 26 captures were identical (sha256) in the
 `companion-macOS-disposable-pilot` artifacts, and the 47 unchanged shell and
 review state captures in each artifact matched the committed references byte
 for byte. The PNGs are copied byte for byte; comparison stays exact.
+
+## Clean-up, 2026-11-21 (#50)
+
+The slice 1/2 follow-ups change 44 captures per host and add 18.
+
+Changed: fact values in monospace are 11 px (plan §1.2), "Arguments (1
+separate value)", the review's "Provider status" fact gains "Reads as: …",
+the origin heading reads "Request origin", the Touch ID note says
+"dismissed", and compact layouts use the 28 px section title and 27 px
+request title (large text keeps its previous title size). Files: every
+`*_review_*.png` of `review_states_golden_test.dart` (18), the eight
+`{light,dark}_{desktop,compact}_{review,actions}.png` plus
+`{light,dark}_large_review.png` and `{light,dark}_compact_activity.png`, and
+the compact shell captures `{light,dark}_compact_shell_{empty,two,locked,recovery,devices,settings}.png`
+plus `{light,dark}_desktop_shell_recovery.png`.
+
+New: `shell_golden_test.dart` adds the Requests list when disconnected
+(`*_{desktop,compact}_shell_disconnected.png`), a populated Devices
+inventory (`*_{desktop,compact,large}_shell_inventory.png`) and Devices and
+Settings at 200% text (`*_large_shell_{devices,settings}.png`), light and
+dark; `review_states_golden_test.dart` adds `expired_ticket` (the ticket ran
+out, "Reload review") and `origin` (an authenticated requester-agent
+binding), light desktop and dark compact.
+
+The `macos-27-arm64` references were rendered locally with pinned Flutter
+3.47.7 on macOS 27 and visually reviewed. The `linux`, `windows` and
+`macos-26-arm64` references were NOT regenerated: CI on those hosts fails on
+the same 44 changed and 18 missing references until each host's captures are
+reviewed and adopted from the CI artifacts.
+
+## Clean-up adoption, 2026-11-21 (#50)
+
+The `linux`, `windows` and `macos-26-arm64` references for the #50
+clean-up were adopted from [CI run 44919123214](https://github.com/sixtoad/vaultwarden-cli/actions/runs/44919123214)
+on source `62f4268`. On each host the Flutter suite passed 248 tests and
+failed 64, all of them golden comparisons (the Rust tests passed): 52
+changed captures and the 18 new ones listed above. The 52 changed captures
+are exactly the `macos-27-arm64` references this clean-up regenerated; the
+list above names 44 of them, and the other eight are
+`{light,dark}_desktop_shell_{empty,two,devices,settings}.png`, whose status
+line now reads "Inbox refreshed: N pending".
+
+All 70 actual captures per host were visually compared with the matching
+`macos-27-arm64` reference: same content, wrapping, status lines ("Request
+status: Awaiting your approval", "Inbox refreshed: N pending"), facts
+("Arguments (1 separate value)", "Reads as: …", "Request origin"), notices
+and visible actions (Approve…/Deny…, Close review, Cancel authorization,
+Approve once with Touch ID or password, Reload review, Back to requests,
+View activity, Check status, Refresh authority and inbox, Refresh provider
+identities, Review "…", Add a device or agent, Join this device to a
+provider); differences are glyph-edge rasterization only. The 200%
+captures clip at the navigation bar by scrolling, as the macOS 27
+references do. All 52 isolated diffs per host show only the old-to-new
+text changes. For the changed captures the actual is
+`<name>_testImage.png` (the access test writes no host-prefixed copy of its
+review/actions captures); for the new ones it is the host-prefixed capture.
+The macOS 26 actuals were identical (sha256) in the
+`companion-slice-macOS-arm64-development` and
+`companion-macOS-disposable-pilot` artifacts; in every artifact the 10
+unchanged Activity, enrollment and desktop locked-shell captures and all
+52 master images matched the committed references byte for byte. The PNGs
+are copied byte for byte; comparison stays exact.

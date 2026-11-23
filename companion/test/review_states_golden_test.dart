@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:companion_slice/provider/page.dart';
+import 'package:companion_slice/src/rust/api/provider.dart' as core;
 import 'package:companion_slice/src/rust/frb_generated.dart';
 
 import 'golden_support.dart';
 import 'provider_support.dart';
+import 'touch_id_review_test.dart' show OriginFixture;
 import 'touch_id_support.dart';
 
 /// Review state captures (#50 slice 2): the authorization step three ways,
-/// each final status and an unknown outcome; light desktop and dark compact.
-/// Only the synthetic provider fixture is rendered.
+/// each final status and an unknown outcome, the ticket running out before a
+/// decision and an authenticated request origin; light desktop and dark
+/// compact. Only the synthetic provider fixture is rendered.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final host = goldenHost();
@@ -60,6 +63,9 @@ void main() {
       false,
       null,
     ),
+    // The review's ticket ran out and Rust retired it ("Reload review").
+    'expired_ticket': (FixtureProviderPlatform.new, false, 'expired'),
+    'origin': (OriginFixture.new, false, 'origin'),
   };
 
   for (final (brightness, layout) in [
@@ -79,6 +85,7 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         final (platform, touchId, view) = scene.value;
+        var now = DateTime.utc(2030, 1, 1, 12);
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('en', 'US'),
@@ -87,7 +94,7 @@ void main() {
               child: ProviderPage(
                 platform: platform(),
                 approvalKeys: FakeKeys()..available = touchId,
-                clock: () => DateTime.utc(2030, 1, 1, 12),
+                clock: () => now,
                 syntheticBuilder: (_) => const Text('Synthetic only'),
               ),
             ),
@@ -104,6 +111,23 @@ void main() {
           await Scrollable.ensureVisible(
             tester.element(find.byKey(const Key('authorization-step'))),
             alignment: 0.1,
+          );
+          await tester.pumpAndSettle();
+        }
+        if (view == 'expired') {
+          now = now.add(const Duration(seconds: 56));
+          core.providerInvalidate();
+          await tester.pump(const Duration(milliseconds: 300));
+          await Scrollable.ensureVisible(
+            tester.element(find.byKey(const Key('review-expired'))),
+            alignment: 0.1,
+          );
+          await tester.pumpAndSettle();
+        }
+        if (view == 'origin') {
+          await Scrollable.ensureVisible(
+            tester.element(find.byKey(const Key('review-origin'))),
+            alignment: 0.3,
           );
           await tester.pumpAndSettle();
         }

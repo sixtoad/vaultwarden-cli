@@ -51,6 +51,20 @@ impl Status {
         // Only closed enum values and exit codes, never provider detail.
         serde_json::to_string(self).expect("status serialization")
     }
+    /// The readable status for the page status line: the same closed labels
+    /// as the companion's `ReviewStatus.label`. The exact value stays in the
+    /// review and in `status_text`.
+    pub fn label(&self) -> String {
+        match self {
+            Status::Pending {} => "Awaiting your approval".into(),
+            Status::Approved {} => "Approved · not completed".into(),
+            Status::Running {} => "Running · not completed".into(),
+            Status::Completed { exit_code } => format!("Completed · exit code {exit_code}"),
+            Status::Failed { .. } => "Failed".into(),
+            Status::Denied {} => "Denied".into(),
+            Status::Expired {} => "Expired".into(),
+        }
+    }
 }
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

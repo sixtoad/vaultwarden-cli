@@ -224,7 +224,7 @@ class _ProviderPageState extends State<ProviderPage>
         reloadOpenReview();
       }
     } else {
-      controller.suspend();
+      suspend();
     }
   }
 
@@ -243,7 +243,7 @@ class _ProviderPageState extends State<ProviderPage>
       _locked = true;
     }
     unawaited(touchId.retire());
-    controller.suspend();
+    suspend();
     if (!touchId.lifecycleExempt) applyLifecycle();
   }
 
@@ -257,7 +257,7 @@ class _ProviderPageState extends State<ProviderPage>
         notificationRequest.isNotEmpty) {
       return;
     }
-    reviewSession.beginLoad(openedRequest);
+    reviewSession.beginLoad(openedRequest, now());
     controller.reviewWhenReady(openedRequest);
   }
 
@@ -305,7 +305,7 @@ class _ProviderPageState extends State<ProviderPage>
       }
       if (state == AppLifecycleState.inactive) return;
       unawaited(touchId.retire());
-      controller.suspend();
+      suspend();
       return;
     }
     if (state == AppLifecycleState.resumed) {
@@ -321,8 +321,16 @@ class _ProviderPageState extends State<ProviderPage>
       AppLifecycleState.paused,
       AppLifecycleState.detached,
     ].contains(state)) {
-      controller.suspend();
+      suspend();
     }
+  }
+
+  /// Suspending retires Rust authority; the step bound to the retired review
+  /// closes too and typed secrets are cleared, whatever reloads next.
+  void suspend() {
+    reviewSession.closeStep(); // mutation: suspend closes step
+    clearPasswords();
+    controller.suspend();
   }
 
   @override
@@ -406,7 +414,7 @@ class _ProviderPageState extends State<ProviderPage>
   void openRequest(String id) {
     unawaited(touchId.retire()); // even reopening the same request
     controller.cancelPendingReview();
-    reviewSession.beginLoad(id); // mutation: selection closes step
+    reviewSession.beginLoad(id, now()); // mutation: selection closes step
     notificationRequest = '';
     notificationNote = '';
     controller.devicesVisible = false;

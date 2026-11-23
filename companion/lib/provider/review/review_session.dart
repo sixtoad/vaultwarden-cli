@@ -16,6 +16,10 @@ class ReviewSession {
   String _loadedId = '', _loadedText = '';
   ReviewDeadline? _deadline;
 
+  /// The request last asked for and when: its ticket started no later.
+  String _askedId = '';
+  DateTime? _askedAt;
+
   /// The step for the review of [requestId]; any other request reads as the
   /// plain review (the step never follows a selection).
   ReviewStep step(String requestId) {
@@ -28,16 +32,25 @@ class ReviewSession {
     _step = step;
   }
 
-  /// Selection, navigation, notification and back close any open step.
+  /// Selection, navigation, notification, back and suspension close any open
+  /// step and forget the last ask: a review loaded afterwards without a new
+  /// ask (a notification's) counts from its own flight, never from an older
+  /// ask that failed (which would read as expired at once).
   void closeStep() {
     _stepId = '';
     _step = ReviewStep.review;
+    _askedId = '';
+    _askedAt = null;
   }
 
-  /// A review of [requestId] was asked for: forget the previous load, so an
-  /// expiry latched for it never stands for a load that did not arrive.
-  void beginLoad(String requestId) {
+  /// A review of [requestId] was asked for at [now]: forget the previous
+  /// load, so an expiry latched for it never stands for a load that did not
+  /// arrive. Its countdown starts at [now] even when its review replaces
+  /// another with no empty snapshot in between.
+  void beginLoad(String requestId, DateTime now) {
     closeStep();
+    _askedId = requestId;
+    _askedAt = now;
     _loadedId = '';
     _loadedText = '';
     _deadline = null;
@@ -65,14 +78,19 @@ class ReviewSession {
     }
     var clear = false;
     if (!_seenReview || state.reviewId != _loadedId) {
+      final asked = state.reviewId == _askedId
+          ? _askedAt
+          : null; // mutation: countdown from request
       if (state.reviewId == _loadedId && state.reviewText != _loadedText) {
         clear = _stepId.isNotEmpty;
         closeStep(); // mutation: changed scope closes step
       }
       _loadedId = state.reviewId;
       _loadedText = state.reviewText;
+      _askedId = '';
+      _askedAt = null;
       _deadline = ReviewDeadline(
-        loadedAt: _flightAt ?? now,
+        loadedAt: asked ?? _flightAt ?? now,
         expiresAtUnixSeconds: review.expiresAtUnixSeconds,
       );
       _expired = false;
