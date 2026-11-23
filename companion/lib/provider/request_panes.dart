@@ -34,6 +34,16 @@ class RequestListPane extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = controller.state, config = controller.configuration;
     final kicker = AccessType.of(context).kicker;
+    // Configured but without current authority (unreachable provider, or a
+    // suspended app): lock state and inbox are unknown, so neither is shown.
+    // An unknown outcome keeps its own recovery view.
+    final disconnected =
+        config.configured &&
+        controller.platform.available &&
+        controller.recoveryId.isEmpty &&
+        !controller.connected &&
+        !controller.busy;
+    if (disconnected) return _disconnected();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -114,6 +124,39 @@ class RequestListPane extends StatelessWidget {
       ],
     );
   }
+
+  // Suspended (the window lost focus or the app went to the background) is
+  // not an unanswered read: say the page paused and re-reads on return.
+  Widget _disconnected() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const StatusLabel(
+        'Disconnected · no current provider authority',
+        icon: Icons.cloud_off_outlined,
+        key: Key('requests-disconnected'),
+      ),
+      const SizedBox(height: 12),
+      AccessNotice(
+        child: controller.suspended
+            ? const Text(
+                'Paused while the app is in the background; the provider is re-read on return. Nothing can be reviewed or approved meanwhile.',
+                key: Key('requests-paused'),
+              )
+            : const Text(
+                'The provider has not answered a fresh authority read. Its lock state and pending requests are unknown until it does; nothing can be reviewed or approved meanwhile.',
+              ),
+      ),
+      const SizedBox(height: 16),
+      OutlinedButton(
+        onPressed: controller.busy ? null : controller.refresh,
+        child: const Text('Refresh authority and inbox'),
+      ),
+      if (notificationNote.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text(notificationNote, key: const Key('notification-note')),
+      ],
+    ],
+  );
 
   /// The freshest final status the companion holds for an inbox ID: the open
   /// review's, else the latest status after a decision or status check. The
@@ -201,7 +244,7 @@ class RequestDetailPane extends StatelessWidget {
   Widget _absent(BuildContext context) {
     final state = controller.state;
     final loading =
-        controller.busy ||
+        controller.reviewWorking || // mutation: only reviews load
         controller.pendingReview == notificationRequest &&
             notificationRequest.isNotEmpty;
     // The review of the opened request ran out and Rust retired it.

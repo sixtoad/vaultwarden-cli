@@ -14,6 +14,7 @@ page_original = page.read_bytes()
 review_files = {
     "session": root / "companion/lib/provider/review/review_session.dart",
     "review": root / "companion/lib/provider/request_review.dart",
+    "panes": root / "companion/lib/provider/request_panes.dart",
 }
 review_originals = {key: path.read_bytes() for key, path in review_files.items()}
 evidence = Path(sys.argv[1]).resolve()
@@ -40,15 +41,20 @@ page_mutations = {
 
 # Review step and countdown (#50 slice 2): (file, anchor, replacement).
 review_mutations = {
-    "selection-closes-step": ("page", "reviewSession.beginLoad(id); // mutation: selection closes step", "// mutation: selection step close removed"),
+    "selection-closes-step": ("page", "reviewSession.beginLoad(id, now()); // mutation: selection closes step", "// mutation: selection step close removed"),
     "changed-scope-closes-step": ("session", "closeStep(); // mutation: changed scope closes step", "// mutation: changed scope step close removed"),
     "step-clears-secrets": ("page", "clearPasswords(); // mutation: step change clears secrets", "// mutation: step secret clear removed"),
     "step-binding": ("session", "return bound ? _step : ReviewStep.review; // mutation: step binding", "return _step; // mutation: step binding removed"),
     "expiry-reached": ("session", "if (reached) _expired = true; // mutation: expiry reached", "// mutation: expiry never reached"),
     "expiry-latch": ("session", "return _expired; // mutation: expiry latch", "return reached; // mutation: expiry not latched"),
     "expired-view": ("review", "if (expired) {\n      // mutation: expired view", "if (false) {\n      // mutation: expired view removed"),
+    # #50 cleanup: suspend closes the step, a load counts from its request,
+    # and only a review or decision in flight reads as loading.
+    "suspend-closes-step": ("page", "reviewSession.closeStep(); // mutation: suspend closes step", "// mutation: suspend step close removed"),
+    "countdown-from-request": ("session", "? _askedAt\n          : null; // mutation: countdown from request", "? null\n          : null; // mutation: countdown from reply"),
+    "only-reviews-load": ("panes", "controller.reviewWorking || // mutation: only reviews load", "controller.busy || // mutation: every poll loads"),
 }
-review_tests = ["test/review_authorization_test.dart", "test/review_states_test.dart"]
+review_tests = ["test/review_authorization_test.dart", "test/review_states_test.dart", "test/review_followups_test.dart"]
 
 def run(name, tests=("test/provider_test.dart", "test/access_shell_test.dart")):
     with (evidence / f"{name}.log").open("wb") as log:

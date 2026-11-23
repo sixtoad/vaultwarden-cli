@@ -6,6 +6,7 @@ class AccessType extends ThemeExtension<AccessType> {
   const AccessType({
     required this.kicker,
     required this.mono,
+    required this.factMono,
     required this.code,
     required this.brand,
   });
@@ -15,6 +16,9 @@ class AccessType extends ThemeExtension<AccessType> {
 
   /// 12 px monospace for request IDs, targets and digests.
   final TextStyle mono;
+
+  /// 11 px monospace for values inside fact rows (#50 §1.2: "fact 11").
+  final TextStyle factMono;
 
   /// 28 px monospace verification code, widely tracked.
   final TextStyle code;
@@ -59,6 +63,7 @@ class AccessType extends ThemeExtension<AccessType> {
         color: secondary,
       ),
       mono: mono.copyWith(color: text),
+      factMono: mono.copyWith(fontSize: 11, color: text),
       code: mono.copyWith(
         fontSize: 28,
         height: 1.3,
@@ -79,11 +84,13 @@ class AccessType extends ThemeExtension<AccessType> {
   AccessType copyWith({
     TextStyle? kicker,
     TextStyle? mono,
+    TextStyle? factMono,
     TextStyle? code,
     TextStyle? brand,
   }) => AccessType(
     kicker: kicker ?? this.kicker,
     mono: mono ?? this.mono,
+    factMono: factMono ?? this.factMono,
     code: code ?? this.code,
     brand: brand ?? this.brand,
   );
@@ -94,6 +101,7 @@ class AccessType extends ThemeExtension<AccessType> {
       : AccessType(
           kicker: TextStyle.lerp(kicker, other.kicker, t)!,
           mono: TextStyle.lerp(mono, other.mono, t)!,
+          factMono: TextStyle.lerp(factMono, other.factMono, t)!,
           code: TextStyle.lerp(code, other.code, t)!,
           brand: TextStyle.lerp(brand, other.brand, t)!,
         );
