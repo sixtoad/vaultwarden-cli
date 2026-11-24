@@ -118,8 +118,8 @@ never approves or denies.
 
 - `swift test --package-path companion` runs the shared and mobile contract
   tests on the macOS host.
-- CI: the `aarch64-apple-ios` row of `mobile-rust-core` (`.github/workflows/ci.yml`,
-  `macos-26`) also runs `scripts/test-ios-companion.sh`: the Swift contract
+- The `ios-approval-client` job runs `scripts/test-ios-companion.sh` on a
+  GitHub-hosted `macos-26` runner with an iPhone simulator. It runs the Swift contract
   tests, the Dart iOS channel-contract tests (`test/ios_approval_client_test.dart`),
   `flutter build ios --no-codesign` (release and debug) with the core
   force-loaded and its bridge symbols checked in the image that holds them, and

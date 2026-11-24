@@ -19,12 +19,17 @@ env:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   native-protected-provider:
     name: Native Apple Silicon provider (disposable qualification)
-    runs-on: macos-26
+    # Fork approvals are enforced in repository settings. A reviewed fork still uses hosted CI.
+    runs-on: &macos-ci >-
+      ${{ vars.VW_MACOS_CI == 'self-hosted' &&
+          (github.event_name == 'push' ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.user.login != 'dependabot[bot]')) &&
+          'vw-ci-macos-arm64' || 'macos-26' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -41,7 +46,7 @@ jobs:
 
   disposable-companion-pilot:
     name: Disposable Mac companion pilot (opt-in build)
-    # Apple Silicon only: Intel (x86_64) macOS is no longer supported or built.
+    # test-pilot-packaged.py requires a disposable GitHub-hosted default Keychain.
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -81,6 +86,7 @@ jobs:
         include:
           - os: ubuntu-24.04
             architecture: x86_64
+          # Packaged GUI tests change the Keychain search list and app container.
           - os: macos-26
             architecture: arm64
           - os: windows-latest
@@ -124,16 +130,10 @@ jobs:
     # Issue 60: the companion Rust core (FRB bridge, approval v2, enrollment)
     # for the Android and iOS approval clients. cdylib for Android
     # (jniLibs/<abi>/libcompanion_core.so), staticlib for iOS (linked into the
-    # Runner). Built on GitHub-hosted runners: the Android NDK is preinstalled
-    # on ubuntu-24.04 and the iOS SDK on macos-26. No phone app is built here.
-    #
-    # The aarch64-apple-ios row also builds and tests the iOS approval client
-    # (#60 phase 2, scripts/test-ios-companion.sh): Swift contract tests, the
-    # unsigned iPhone app with the core force-loaded, and ios/RunnerTests on a
-    # simulator. No signing identity, provisioning profile or secret.
+    # Runner). Android uses the hosted NDK. The iOS targets require full Xcode.
     name: Companion Rust core (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.target == 'aarch64-apple-ios' && 75 || 30 }}
+    timeout-minutes: 30
     permissions:
       contents: read
     strategy:
@@ -143,10 +143,10 @@ jobs:
           - os: ubuntu-24.04
             target: aarch64-linux-android
             artifact: libcompanion_core.so
-          - os: macos-26
+          - os: *macos-ci
             target: aarch64-apple-ios
             artifact: libcompanion_core.a
-          - os: macos-26
+          - os: *macos-ci
             target: aarch64-apple-ios-sim
             artifact: libcompanion_core.a
     defaults:
@@ -177,20 +177,28 @@ jobs:
           built="companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}"
           test -s "$built"
           ls -l "$built"
-      - name: Install the iOS simulator library target
-        if: matrix.target == 'aarch64-apple-ios'
-        run: rustup target add aarch64-apple-ios-sim
+
+  ios-approval-client:
+    # RunnerTests boots an iPhone simulator on the hosted ARM64 image.
+    name: Unsigned iOS approval client
+    runs-on: macos-26
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
       - uses: subosito/flutter-action@v2
-        if: matrix.target == 'aarch64-apple-ios'
         with:
           flutter-version: '3.47.7'
           channel: stable
           cache: true
       - name: Build and test the unsigned iOS approval client
-        if: matrix.target == 'aarch64-apple-ios'
         run: bash scripts/test-ios-companion.sh "$RUNNER_TEMP/ios-evidence"
       - name: Preserve iOS evidence
-        if: always() && matrix.target == 'aarch64-apple-ios'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ios-approval-client-evidence
@@ -233,11 +241,13 @@ jobs:
 
   macos-companion:
     name: Native macOS approval companion
-    # Apple Silicon: Intel (x86_64) macOS is no longer supported or built.
-    runs-on: macos-26
+    runs-on: *macos-ci
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - name: Prepare the dedicated runner's user Keychain
+        if: runner.environment == 'self-hosted'
+        run: swift -suppress-warnings .github/ci/prepare-macos-keychain.swift
       - name: Run Swift contract, Keychain and real URLSession TLS tests, then bundle
         run: ./scripts/test-macos-companion.sh "$RUNNER_TEMP/companion-evidence"
       - name: Preserve native evidence
@@ -267,13 +277,21 @@ jobs:
         os: ["ubuntu-24.04", "macos-26"]
         rust: ["stable", "beta"]
         include:
+          - os: macos-26
+            runner: *macos-ci
           - os: ubuntu-24.04
             rust: "1.88.0"
           - os: ubuntu-24.04-arm
             rust: "stable"
           - os: ubuntu-24.04-arm
             rust: "1.88.0"
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner || matrix.os }}
+    env:
+      # The native process-list test expects to be the only copy of the test
+      # binary under this UID. Other tests fork helpers under the same UID.
+      RUST_TEST_THREADS: ${{ matrix.runner == 'vw-ci-macos-arm64' && '1' || '4' }}
+      # Live tests run in the live-vaultwarden job; under CI they fail without a server.
+      VAULTWARDEN_LIVE_TESTS: skip
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -316,6 +334,47 @@ jobs:
           ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --doc --offline --locked
           ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --doc --all-features --offline --locked
           ./scripts/with-secure-test-tmpdir.sh cargo test --workspace --doc --no-default-features --offline --locked
+
+  # Not in merge-ready yet: add it to `needs` there once it has passed several runs.
+  live-vaultwarden:
+    name: Live Vaultwarden 1.36.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # Throwaway value for this run's disposable container only; not a secret.
+      LIVE_ADMIN_TOKEN: live-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+    services:
+      vaultwarden:
+        # Pinned by tag: no image digest for 1.36.0 is recorded in this repository
+        # (docker-compose.live-test.yml uses the same tag). Pin the digest once verified.
+        image: vaultwarden/server:1.36.0
+        ports:
+          - 127.0.0.1:8080:80
+        env:
+          SIGNUPS_ALLOWED: "true"
+          ADMIN_TOKEN: live-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          I_REALLY_WANT_VOLATILE_STORAGE: "true"
+          LOG_LEVEL: warn
+          LOGIN_RATELIMIT_SECONDS: "1"
+          LOGIN_RATELIMIT_MAX_BURST: "1000"
+          ADMIN_RATELIMIT_SECONDS: "1"
+          ADMIN_RATELIMIT_MAX_BURST: "1000"
+        options: >-
+          --health-cmd "curl -sf http://localhost:80/alive"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install live harness dependencies (private D-Bus and keyring)
+        run: |
+          bash .github/ci/apt-update.sh
+          sudo apt-get install -y libdbus-1-dev pkg-config dbus-daemon gnome-keyring libsecret-tools curl
+      - run: cargo fetch --locked
+      - name: Run live tests against the service container
+        env:
+          VAULTWARDEN_LIVE_TEST_URL: http://127.0.0.1:8080
+          VAULTWARDEN_LIVE_ADMIN_TOKEN: ${{ env.LIVE_ADMIN_TOKEN }}
+        run: ./scripts/ci-live-vaultwarden.sh
 
   agent-transport:
     name: Real agent transport (${{ matrix.os }})
@@ -458,7 +517,7 @@ jobs:
             cross: true
           # Intel (x86_64) macOS is no longer supported or built.
           - target: aarch64-apple-darwin
-            os: macos-26
+            os: *macos-ci
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-pc-windows-msvc
@@ -483,10 +542,15 @@ jobs:
         run: cargo test --locked --target x86_64-pc-windows-msvc --test unsupported_provider_platform
 
   coverage:
+    permissions:
+      contents: read
+      pull-requests: write
     name: Coverage (Tarpaulin)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     continue-on-error: true
+    env:
+      VAULTWARDEN_LIVE_TESTS: skip
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -598,9 +662,7 @@ jobs:
   merge-ready:
     name: Merge Ready
     runs-on: ubuntu-latest
-    # mobile-rust-core (#60), whose aarch64-apple-ios row builds the iOS
-    # approval client and runs its simulator tests, is not required yet: the
-    # iOS row has never run green. It joins this list after a few green runs.
+    # Add ios-approval-client to this list after several successful simulator runs.
     needs: [check, test, build, browser, agent-transport, systemd-integration, native-protected-provider, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, history-endpoint-security, Lint, Security]
     if: github.event_name == 'pull_request'
     steps:
