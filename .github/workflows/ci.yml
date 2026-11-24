@@ -66,7 +66,8 @@ jobs:
         with:
           flutter-version: '3.47.7'
           channel: stable
-          cache: true
+          # Each GUI clone already has the pinned SDK with the framework's original modes.
+          cache: ${{ runner.os != 'macOS' || runner.environment != 'self-hosted' }}
       - name: Build separately named disposable test app without installing it
         run: |
           source .github/ci/disposable-gui-build.sh
@@ -128,7 +129,8 @@ jobs:
         with:
           flutter-version: '3.47.7'
           channel: stable
-          cache: true
+          # Each GUI clone already has the pinned SDK with the framework's original modes.
+          cache: ${{ runner.os != 'macOS' || runner.environment != 'self-hosted' }}
       - name: Verify independent core and actual packaged desktop bridge
         run: |
           source .github/ci/disposable-gui-build.sh
