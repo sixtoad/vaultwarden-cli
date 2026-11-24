@@ -259,6 +259,9 @@ jobs:
             rust: "1.88.0"
     runs-on: ${{ matrix.runner || matrix.os }}
     env:
+      # The native process-list test expects to be the only copy of the test
+      # binary under this UID. Other tests fork helpers under the same UID.
+      RUST_TEST_THREADS: ${{ matrix.runner == 'vw-ci-macos-arm64' && '1' || '4' }}
       # Live tests run in the live-vaultwarden job; under CI they fail without a server.
       VAULTWARDEN_LIVE_TESTS: skip
     steps:
