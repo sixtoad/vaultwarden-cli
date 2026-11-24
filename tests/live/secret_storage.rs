@@ -279,3 +279,112 @@ async fn trusted_cli_uses_fresh_terminal_authorization_and_durable_receipt() {
     );
     assert_eq!(api.sync(token).await.unwrap().ciphers.len(), before + 1);
 }
+
+/// Issue 48: Vaultwarden 1.36 must store an update body verbatim enough for
+/// exact verification, and must refuse a stale `lastKnownRevisionDate`.
+#[tokio::test]
+async fn update_preserves_unselected_ciphertext_and_refuses_a_stale_revision() {
+    use vaultwarden_cli::secret_update::{
+        ItemSnapshot, history_timestamp, plan_update, same_instant, verify_updated,
+    };
+    let now = || {
+        history_timestamp(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap(),
+        )
+    };
+    let Some(env) = LiveTestEnv::maybe_create().await else {
+        return;
+    };
+    let tokens: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(env.config_dir.join("tokens.json")).unwrap())
+            .unwrap();
+    let token = tokens["access_token"].as_str().unwrap();
+    let api = ApiClient::new_with_flags(&env.server_url, true).unwrap();
+    let sync = api.sync(token).await.unwrap();
+    let folder_label = "homelab/updates";
+    let response: serde_json::Value = reqwest::Client::new()
+        .post(format!("{}/api/folders", env.server_url))
+        .bearer_auth(token)
+        .json(&serde_json::json!({"name": env.user_keys.encrypt(folder_label.as_bytes()).unwrap()}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let folder_id = response["id"]
+        .as_str()
+        .or_else(|| response["Id"].as_str())
+        .unwrap();
+    let destination = Destination {
+        account_id: sync.profile.id.to_string(),
+        folder: folder_label.into(),
+        folder_id: folder_id.into(),
+        reference: format!("{folder_label}/github/rotated"),
+    };
+    let original = SecretImport::parse(
+        br#"{"password":"old-update-sentinel","notes":"kept\n","fields":[{"name":"api-key","value":"old"},{"name":"other","value":"kept"}]}"#,
+    )
+    .unwrap();
+    let encrypted = encrypt_create(&env.user_keys, &destination, &original, None).unwrap();
+    let id = api
+        .create_cipher(token, &encrypted)
+        .await
+        .unwrap()
+        .id
+        .to_string();
+    let before =
+        ItemSnapshot::parse(api.cipher_json_by_id(token, &id).await.unwrap(), &id).unwrap();
+    let input = SecretImport::parse_update(
+        br#"{"password":"  new-update-sentinel\n","fields":[{"name":"api-key","value":"new\n"}]}"#,
+    )
+    .unwrap();
+    let plan = plan_update(&env.user_keys, &destination, &before, &input, &now()).unwrap();
+    let body = plan.body;
+    assert!(!body.to_string().contains("update-sentinel"));
+    assert_eq!(plan.history, ["password", "custom:api-key"]);
+    api.update_cipher(token, &id, &body).await.unwrap();
+    let raw = api.cipher_json_by_id(token, &id).await.unwrap();
+    // Vaultwarden keeps the official-client password history (ciphertext
+    // verbatim) and revision date; it re-serializes dates with six fractional
+    // digits, so dates are compared as instants.
+    let (stored, sent) = (
+        raw["passwordHistory"].as_array().unwrap(),
+        body["passwordHistory"].as_array().unwrap(),
+    );
+    assert_eq!(stored.len(), sent.len());
+    for (stored, sent) in stored.iter().zip(sent) {
+        assert_eq!(stored["password"], sent["password"]);
+        assert!(
+            same_instant(&sent["lastUsedDate"], &stored["lastUsedDate"]),
+            "{stored}"
+        );
+    }
+    assert!(sent[0]["lastUsedDate"].is_string());
+    assert!(same_instant(
+        &body["login"]["passwordRevisionDate"],
+        &raw["login"]["passwordRevisionDate"]
+    ));
+    assert_eq!(
+        body["login"]["passwordRevisionDate"],
+        sent[0]["lastUsedDate"]
+    );
+    let after = ItemSnapshot::parse(raw, &id).unwrap();
+    verify_updated(&env.user_keys, &destination, &before, &body, &after, &input).unwrap();
+    let output = env
+        .binary()
+        .args(["read-field", "--id", &id, "--field", "password"])
+        .output()
+        .unwrap();
+    assert_eq!(output.stdout, b"  new-update-sentinel\n");
+    // Vaultwarden compares at one-second granularity: wait past it, then replay the stale body.
+    tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
+    let second = plan_update(&env.user_keys, &destination, &after, &input, &now()).unwrap();
+    api.update_cipher(token, &id, &second.body).await.unwrap();
+    assert_eq!(
+        api.update_cipher(token, &id, &body).await.err(),
+        Some(WriteStatus::Failed)
+    );
+}

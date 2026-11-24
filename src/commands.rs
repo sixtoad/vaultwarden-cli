@@ -2344,10 +2344,87 @@ fn logout_loaded_config(mut config: Config) -> Result<()> {
     Ok(())
 }
 
+mod update;
+pub use update::update_secret;
+
+/// Resolve a canonical destination whose folder label matches exactly one folder.
+fn resolve_destination(
+    sync: &crate::models::SyncResponse,
+    keys: &CryptoKeys,
+    account: &str,
+    folder: &str,
+    reference: &str,
+) -> Result<crate::secret_storage::Destination> {
+    use crate::secret_storage::{canonical_path, valid_id};
+    anyhow::ensure!(
+        valid_id(account) && canonical_path(folder) && canonical_path(reference),
+        "noncanonical storage destination"
+    );
+    let mut folder_ids = Vec::new();
+    for f in &sync.folders {
+        if keys.decrypt_to_string(&f.name)? == folder {
+            folder_ids.push(f.id.to_string());
+        }
+    }
+    anyhow::ensure!(folder_ids.len() == 1, "folder is missing or ambiguous");
+    Ok(crate::secret_storage::Destination {
+        account_id: account.to_owned(),
+        folder: folder.to_owned(),
+        folder_id: folder_ids.remove(0),
+        reference: reference.to_owned(),
+    })
+}
+
+/// Values from one hidden prompt, or bounded JSON stdin in the create format.
+fn read_secret_input(prompt: bool, update: bool) -> Result<crate::secret_storage::SecretImport> {
+    use crate::secret_storage::{MAX_IMPORT_BYTES, SecretImport};
+    use std::io::Read;
+    if prompt {
+        let password = rpassword::prompt_password("Secret password: ")
+            .map_err(|_error| anyhow::anyhow!("secret prompt unavailable"))?;
+        return Ok(SecretImport {
+            password: Some(password),
+            notes: None,
+            fields: Vec::new(),
+        });
+    }
+    let mut bytes = zeroize::Zeroizing::new(Vec::new());
+    std::io::stdin()
+        .take((MAX_IMPORT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|_error| anyhow::anyhow!("secret input unavailable"))?;
+    if update {
+        SecretImport::parse_update(&bytes)
+    } else {
+        SecretImport::parse(&bytes)
+    }
+}
+
+/// A fresh random 128-bit attempt ID, also used as the terminal challenge.
+fn fresh_attempt_id() -> Result<String> {
+    let mut nonce = [0u8; 16];
+    getrandom::fill(&mut nonce).map_err(|_error| anyhow::anyhow!("randomness unavailable"))?;
+    Ok(nonce.iter().fold(String::new(), |mut output, byte| {
+        use std::fmt::Write;
+        write!(output, "{byte:02x}").expect("writing to String cannot fail");
+        output
+    }))
+}
+
+/// Show the review on the controlling terminal and require `<verb> <attempt>`.
+fn authorize_on_terminal(review: &str, verb: &str, attempt: &str, denied: &str) -> Result<()> {
+    let expected = format!("{verb} {attempt}");
+    let answer = rpassword::prompt_password(format!(
+        "{review}\nAuthorize this single attempt by typing '{expected}': "
+    ))
+    .map_err(|_error| anyhow::anyhow!("human write authorization unavailable"))?;
+    anyhow::ensure!(answer == expected, "{denied}");
+    Ok(())
+}
+
 /// Trusted terminal import; every invocation requires a fresh interactive decision.
 /// # Errors
 /// Returns an error when validation, authorization, cryptography or backend access fails.
-#[allow(clippy::too_many_lines)] // Keep the single-attempt authorization and durable write sequence together.
 pub async fn create_secret(
     account: &str,
     folder: &str,
@@ -2355,15 +2432,12 @@ pub async fn create_secret(
     prompt: bool,
     opts: &CommandOptions,
 ) -> Result<()> {
-    use crate::secret_storage::{
-        Destination, MAX_IMPORT_BYTES, SecretImport, WriteReceipt, WriteStatus, canonical_path,
-        encrypt_create, valid_id, verify_created,
-    };
+    use crate::secret_storage::{WriteReceipt, WriteStatus, encrypt_create, verify_created};
     use crate::write_journal::WriteJournal;
-    use std::io::Read;
-    use zeroize::Zeroizing;
     anyhow::ensure!(
-        valid_id(account) && canonical_path(folder) && canonical_path(reference),
+        crate::secret_storage::valid_id(account)
+            && crate::secret_storage::canonical_path(folder)
+            && crate::secret_storage::canonical_path(reference),
         "noncanonical storage destination"
     );
     let ctx = load_sync_context(opts.allow_insecure_http).await?;
@@ -2371,56 +2445,18 @@ pub async fn create_secret(
         .config
         .get_keys_for_cipher(None)
         .context("vault locked")?;
-    let mut folder_ids = Vec::new();
-    for f in &ctx.sync_response.folders {
-        if keys.decrypt_to_string(&f.name)? == folder {
-            folder_ids.push(f.id.to_string());
-        }
-    }
-    anyhow::ensure!(folder_ids.len() == 1, "folder is missing or ambiguous");
-    let destination = Destination {
-        account_id: account.to_owned(),
-        folder: folder.to_owned(),
-        folder_id: folder_ids.remove(0),
-        reference: reference.to_owned(),
-    };
+    let destination = resolve_destination(&ctx.sync_response, keys, account, folder, reference)?;
     destination.check_sync(&ctx.sync_response, keys, true)?;
-    let input = if prompt {
-        let password = rpassword::prompt_password("Secret password: ")
-            .map_err(|_error| anyhow::anyhow!("secret prompt unavailable"))?;
-        SecretImport {
-            password: Some(password),
-            notes: None,
-            fields: Vec::new(),
-        }
-    } else {
-        let mut bytes = Zeroizing::new(Vec::new());
-        std::io::stdin()
-            .take((MAX_IMPORT_BYTES + 1) as u64)
-            .read_to_end(&mut bytes)
-            .map_err(|_error| anyhow::anyhow!("secret input unavailable"))?;
-        SecretImport::parse(&bytes)?
-    };
+    let input = read_secret_input(prompt, false)?;
     input.validate()?;
-    let mut nonce = [0u8; 16];
-    getrandom::fill(&mut nonce).map_err(|_error| anyhow::anyhow!("randomness unavailable"))?;
-    let attempt = nonce.iter().fold(String::new(), |mut output, byte| {
-        use std::fmt::Write;
-        write!(output, "{byte:02x}").expect("writing to String cannot fail");
-        output
-    });
+    let attempt = fresh_attempt_id()?;
     let server = ctx.config.server.clone().context("server unavailable")?;
     let review = format!(
         "CREATE personal vault item\nAccount: {account} at {server}\nFolder: {folder} ({})\nReference: {reference}\nFields: {}",
         destination.folder_id,
         input.selectors().join(", ")
     );
-    let expected = format!("create {attempt}");
-    let answer = rpassword::prompt_password(format!(
-        "{review}\nAuthorize this single attempt by typing '{expected}': "
-    ))
-    .map_err(|_error| anyhow::anyhow!("human write authorization unavailable"))?;
-    anyhow::ensure!(answer == expected, "creation denied");
+    authorize_on_terminal(&review, "create", &attempt, "creation denied")?;
     // Recheck the namespace after human review and before recording/sending the attempt.
     let fresh = ctx
         .api
@@ -2438,6 +2474,7 @@ pub async fn create_secret(
             item_id: None,
             status: WriteStatus::Uncertain,
         },
+        update: None,
     };
     let path = journal.begin(&Config::config_dir()?.join("write-attempts"))?;
     match ctx.api.create_cipher(&ctx.access_token, &encrypted).await {
@@ -2531,6 +2568,9 @@ pub async fn reconcile_secret(
         write_journal::WriteJournal,
     };
     let mut journal = WriteJournal::read(journal_path)?;
+    if journal.update.is_some() {
+        return update::reconcile_update(journal_path, journal, id, opts).await;
+    }
     if let Some(id) = id {
         anyhow::ensure!(valid_id(id), "invalid item ID");
         anyhow::ensure!(
