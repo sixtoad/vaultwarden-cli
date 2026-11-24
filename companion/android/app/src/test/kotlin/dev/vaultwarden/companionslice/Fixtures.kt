@@ -1,0 +1,28 @@
+package dev.vaultwarden.companionslice
+
+import org.json.JSONObject
+import java.io.File
+import java.security.KeyFactory
+import java.security.PrivateKey
+import java.security.cert.X509Certificate
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.Base64
+
+/** Repository fixtures shared with the Rust, Swift and Dart tests. */
+object Fixtures {
+    val root: File = File(System.getProperty("vw.repoRoot") ?: "../../..")
+
+    val golden: JSONObject by lazy { JSONObject(File(root, "tests/fixtures/approval-v2-golden.json").readText()) }
+
+    fun hex(value: String): ByteArray = Wire.lowerHex(value)!!
+
+    fun base64url(value: String): ByteArray = Base64.getUrlDecoder().decode(value)
+
+    private fun pem(path: String): ByteArray = Base64.getMimeDecoder().decode(
+        File(root, path).readText().lines().filter { !it.startsWith("-----") }.joinToString(""),
+    )
+
+    fun certificate(path: String): X509Certificate = PinnedTrustManager.certificate(pem(path))
+
+    fun rsaKey(path: String): PrivateKey = KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(pem(path)))
+}

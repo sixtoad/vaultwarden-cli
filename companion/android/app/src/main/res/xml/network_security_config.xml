@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No cleartext and no user-installed CAs. The provider transport does not use
+     the platform trust store at all: PinnedTrustManager anchors only the
+     configured provider CA and then requires the pinned leaf SHA-256. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -46,11 +46,19 @@ jobs:
 
   disposable-companion-pilot:
     name: Disposable Mac companion pilot (opt-in build)
-    # test-pilot-packaged.py requires a disposable GitHub-hosted default Keychain.
-    runs-on: macos-26
+    # The packaged pilot needs a fresh GUI session and default Keychain for each job.
+    runs-on: &macos-gui >-
+      ${{ vars.VW_MACOS_GUI_CI == 'self-hosted' &&
+          (github.event_name == 'push' ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.user.login != 'dependabot[bot]')) &&
+          'vw-ci-macos-gui-ephemeral' || 'macos-26' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+      - name: Verify disposable macOS guest and GUI session
+        if: runner.os == 'macOS' && runner.environment == 'self-hosted'
+        run: python3 scripts/disposable_macos_ci.py
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
@@ -58,9 +66,12 @@ jobs:
         with:
           flutter-version: '3.47.7'
           channel: stable
-          cache: true
+          # Each GUI clone already has the pinned SDK with the framework's original modes.
+          cache: ${{ runner.os != 'macOS' || runner.environment != 'self-hosted' }}
       - name: Build separately named disposable test app without installing it
-        run: bash scripts/build-disposable-pilot.sh "$RUNNER_TEMP/disposable-pilot-evidence"
+        run: |
+          source .github/ci/disposable-gui-build.sh
+          bash scripts/build-disposable-pilot.sh "$RUNNER_TEMP/disposable-pilot-evidence"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -71,7 +82,7 @@ jobs:
 
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner || matrix.os }}
     timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 90 || 45 }}
     strategy:
       fail-fast: false
@@ -88,6 +99,7 @@ jobs:
             architecture: x86_64
           # Packaged GUI tests change the Keychain search list and app container.
           - os: macos-26
+            runner: *macos-gui
             architecture: arm64
           - os: windows-latest
             architecture: x86_64
@@ -98,6 +110,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+      - name: Verify disposable macOS guest and GUI session
+        if: runner.os == 'macOS' && runner.environment == 'self-hosted'
+        run: python3 scripts/disposable_macos_ci.py
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -114,9 +129,12 @@ jobs:
         with:
           flutter-version: '3.47.7'
           channel: stable
-          cache: true
+          # Each GUI clone already has the pinned SDK with the framework's original modes.
+          cache: ${{ runner.os != 'macOS' || runner.environment != 'self-hosted' }}
       - name: Verify independent core and actual packaged desktop bridge
-        run: bash scripts/test-desktop-companion.sh "$RUNNER_TEMP/desktop-evidence"
+        run: |
+          source .github/ci/disposable-gui-build.sh
+          bash scripts/test-desktop-companion.sh "$RUNNER_TEMP/desktop-evidence"
       - name: Preserve development artifacts and test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -177,6 +195,90 @@ jobs:
           built="companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}"
           test -s "$built"
           ls -l "$built"
+      - name: Publish the library for the phone app jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-core-${{ matrix.target }}
+          path: companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  android-rust-core:
+    # The Android app's own aarch64-linux-android core (#60), built apart from
+    # the mobile-rust-core matrix so that its macOS/iOS legs (failures or
+    # runner queues) never hold up the Android job. Linked for API 30, the
+    # app's minSdk. The artifact name differs from mobile-rust-core's
+    # (artifact names are unique per run).
+    name: Android companion Rust core
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Point Cargo at the preinstalled Android NDK (API 30)
+        run: |
+          ndk="${ANDROID_NDK_LATEST_HOME:?Android NDK not preinstalled}"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$bin/aarch64-linux-android30-clang"
+          {
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android30-clang"
+            echo "CC_aarch64_linux_android=$bin/aarch64-linux-android30-clang"
+            echo "AR_aarch64_linux_android=$bin/llvm-ar"
+          } >> "$GITHUB_ENV"
+      - name: Build the release library
+        run: cargo build --release --locked --lib --manifest-path companion/rust/Cargo.toml --target aarch64-linux-android
+      - name: Publish the library for the Android job
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-android-app-core
+          path: companion/rust/target/aarch64-linux-android/release/libcompanion_core.so
+          if-no-files-found: error
+
+  android-companion:
+    # Android approval client (#60 phase 1). GitHub's ubuntu-latest image
+    # carries the Android SDK, NDK and accepted licences; nothing Android is
+    # installed on the development Mac, so this job is the only build of the
+    # APK and the only run of the Kotlin unit tests.
+    name: Android approval client
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # Packages the core android-rust-core built; depends on nothing iOS.
+    needs: android-rust-core
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: companion-android-app-core
+          path: ${{ runner.temp }}/android-core
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Debug APK with the core, and Kotlin unit tests
+        env:
+          ANDROID_COMPANION_CORE: ${{ runner.temp }}/android-core/libcompanion_core.so
+        run: bash scripts/test-android-companion.sh "$RUNNER_TEMP/android-evidence"
+      - name: Preserve APK and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-android-development
+          path: |
+            ${{ runner.temp }}/android-evidence
+            companion/build/app/reports/tests
 
   desktop-companion-msrv:
     name: Companion Rust 1.88 and security mutations
@@ -634,6 +736,8 @@ jobs:
   merge-ready:
     name: Merge Ready
     runs-on: ubuntu-latest
+    # android-companion (#60) is not required yet: it has never run green. It
+    # joins this list after a few green runs.
     needs: [check, test, build, browser, agent-transport, systemd-integration, native-protected-provider, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, history-endpoint-security, Lint, Security]
     if: github.event_name == 'pull_request'
     steps:

@@ -8,6 +8,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+
+import disposable_macos_ci as guest
 
 sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location("pilot", Path(__file__).with_name("test-pilot-packaged.py"))
@@ -61,6 +64,14 @@ class PilotFixtureTests(unittest.TestCase):
             finally:
                 child.wait(timeout=5)
                 child.stdout.close()
+
+    def test_self_hosted_job_needs_provisioner_marker(self):
+        env = {"CI": "true", "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "self-hosted",
+               "RUNNER_NAME": "vw-ci-gui-test"}
+        with mock.patch.dict(guest.os.environ, env, clear=True), mock.patch.object(guest.sys, "platform", "darwin"), \
+                mock.patch.object(guest.os, "geteuid", return_value=501), \
+                mock.patch.object(guest.Path, "lstat", side_effect=FileNotFoundError):
+            self.assertFalse(guest.disposable_macos_ci())
 
     def test_fixture_refuses_non_ci_execution_before_provisioning(self):
         result = subprocess.run([sys.executable, str(Path(__file__).with_name("test-pilot-packaged.py")),
