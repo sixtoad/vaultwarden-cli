@@ -20,6 +20,8 @@ import tempfile
 import time
 
 sys.dont_write_bytecode = True
+from disposable_macos_ci import disposable_macos_ci
+
 SPEC = importlib.util.spec_from_file_location("packaged", Path(__file__).with_name("test-provider-packaged.py"))
 PROBE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PROBE)
@@ -79,8 +81,7 @@ def main():
     parser.add_argument("app", type=Path)
     parser.add_argument("evidence", type=Path)
     args = parser.parse_args()
-    if (sys.platform != "darwin" or os.environ.get("CI") != "true"
-            or os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"):
+    if not disposable_macos_ci():
         raise SystemExit("Pilot channel provisioning requires a disposable macOS CI runner.")
     executable = args.app.resolve() / "Contents/MacOS/companion_slice"
     if not executable.is_file():

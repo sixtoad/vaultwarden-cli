@@ -2,7 +2,9 @@
 
 `ci.yml` uses the repository variable `VW_MACOS_CI` to route seven Apple Silicon jobs. Set it to `self-hosted` to select the repo-only label `vw-ci-macos-arm64` for the native provider, Swift companion, stable and beta tests, macOS CLI build, and both iOS Rust targets. Matrix display names retain their original OS and target strings. GitHub's job page shows the runner that actually took the job.
 
-The Flutter desktop job launches a packaged app, changes the Keychain search list and uses an app container. The disposable pilot also changes the default Keychain and explicitly checks for a GitHub-hosted image. Both use hosted ARM64 machines. Release signing and the separate manual mutation campaign use their existing runners.
+The Flutter desktop job launches a packaged app, changes the Keychain search list and uses an app container. The disposable pilot also changes the default Keychain and checks that it is running in a disposable environment. Both default to hosted ARM64 machines. Set the separate repository variable `VW_MACOS_GUI_CI=self-hosted` only after provisioning a disposable GUI runner. Set it to `hosted` to send future GUI jobs back to GitHub.
+
+The label `vw-ci-macos-gui-ephemeral` is for a fresh macOS 26 ARM64 VM per job. The guest needs a logged-in standard user, a default user keychain, Xcode and the CI tool dependencies. The template must contain no runner credentials, operator data or host mounts. After cloning, the provisioner writes the unique `vw-ci-gui-…` registration name and a newline to the root-owned, mode-0444 file `/private/var/run/vw-ci-gui-runner` inside the guest. It registers the runner for one job, starts it in that user's GUI session and destroys the clone after the job, including on failure. Use an out-of-band watchdog for abandoned guests. The registration and fork approval rules also apply to this label. The guest runner connects to GitHub over outbound HTTPS. Release signing and the separate manual mutation campaign use their existing runners.
 
 ## Before registration
 
