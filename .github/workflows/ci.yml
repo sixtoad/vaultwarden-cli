@@ -69,8 +69,7 @@ jobs:
           cache: true
       - name: Build separately named disposable test app without installing it
         run: |
-          # Match the permissions on Flutter's prebuilt framework links during build and archive verification.
-          if [[ "$RUNNER_OS" == macOS && "$RUNNER_ENVIRONMENT" == self-hosted ]]; then umask 022; fi
+          source .github/ci/disposable-gui-build.sh
           bash scripts/build-disposable-pilot.sh "$RUNNER_TEMP/disposable-pilot-evidence"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -132,8 +131,7 @@ jobs:
           cache: true
       - name: Verify independent core and actual packaged desktop bridge
         run: |
-          # Match the permissions on Flutter's prebuilt framework links during build and archive verification.
-          if [[ "$RUNNER_OS" == macOS && "$RUNNER_ENVIRONMENT" == self-hosted ]]; then umask 022; fi
+          source .github/ci/disposable-gui-build.sh
           bash scripts/test-desktop-companion.sh "$RUNNER_TEMP/desktop-evidence"
       - name: Preserve development artifacts and test evidence
         if: always()
