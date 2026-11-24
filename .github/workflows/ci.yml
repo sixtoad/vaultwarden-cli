@@ -217,6 +217,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - name: Prepare the dedicated runner's user Keychain
+        if: runner.environment == 'self-hosted'
+        run: swift -suppress-warnings .github/ci/prepare-macos-keychain.swift
       - name: Run Swift contract, Keychain and real URLSession TLS tests, then bundle
         run: ./scripts/test-macos-companion.sh "$RUNNER_TEMP/companion-evidence"
       - name: Preserve native evidence
