@@ -195,6 +195,90 @@ jobs:
           built="companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}"
           test -s "$built"
           ls -l "$built"
+      - name: Publish the library for the phone app jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-core-${{ matrix.target }}
+          path: companion/rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  android-rust-core:
+    # The Android app's own aarch64-linux-android core (#60), built apart from
+    # the mobile-rust-core matrix so that its macOS/iOS legs (failures or
+    # runner queues) never hold up the Android job. Linked for API 30, the
+    # app's minSdk. The artifact name differs from mobile-rust-core's
+    # (artifact names are unique per run).
+    name: Android companion Rust core
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Point Cargo at the preinstalled Android NDK (API 30)
+        run: |
+          ndk="${ANDROID_NDK_LATEST_HOME:?Android NDK not preinstalled}"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$bin/aarch64-linux-android30-clang"
+          {
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android30-clang"
+            echo "CC_aarch64_linux_android=$bin/aarch64-linux-android30-clang"
+            echo "AR_aarch64_linux_android=$bin/llvm-ar"
+          } >> "$GITHUB_ENV"
+      - name: Build the release library
+        run: cargo build --release --locked --lib --manifest-path companion/rust/Cargo.toml --target aarch64-linux-android
+      - name: Publish the library for the Android job
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-android-app-core
+          path: companion/rust/target/aarch64-linux-android/release/libcompanion_core.so
+          if-no-files-found: error
+
+  android-companion:
+    # Android approval client (#60 phase 1). GitHub's ubuntu-latest image
+    # carries the Android SDK, NDK and accepted licences; nothing Android is
+    # installed on the development Mac, so this job is the only build of the
+    # APK and the only run of the Kotlin unit tests.
+    name: Android approval client
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # Packages the core android-rust-core built; depends on nothing iOS.
+    needs: android-rust-core
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: companion-android-app-core
+          path: ${{ runner.temp }}/android-core
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Debug APK with the core, and Kotlin unit tests
+        env:
+          ANDROID_COMPANION_CORE: ${{ runner.temp }}/android-core/libcompanion_core.so
+        run: bash scripts/test-android-companion.sh "$RUNNER_TEMP/android-evidence"
+      - name: Preserve APK and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-android-development
+          path: |
+            ${{ runner.temp }}/android-evidence
+            companion/build/app/reports/tests
 
   ios-approval-client:
     # RunnerTests boots an iPhone simulator on the hosted ARM64 image.
@@ -680,7 +764,8 @@ jobs:
   merge-ready:
     name: Merge Ready
     runs-on: ubuntu-latest
-    # Add ios-approval-client to this list after several successful simulator runs.
+    # Add android-companion and ios-approval-client after several successful
+    # native build and test runs for each client.
     needs: [check, test, build, browser, agent-transport, systemd-integration, native-protected-provider, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, history-endpoint-security, Lint, Security]
     if: github.event_name == 'pull_request'
     steps:
