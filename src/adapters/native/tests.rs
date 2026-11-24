@@ -812,8 +812,35 @@ fn native_reaper_capacity_denies_execution_before_backend_resolution() {
     assert!(super::reaper::reserve().is_ok());
 }
 
-/// Real kernel listing: the caller is excluded, and a copied system binary
-/// running under the provider file name is observed until it exits.
+/// Build at the final path: macOS launch constraints can reject a relocated
+/// platform binary. The ready byte confirms that the named process is running.
+pub(super) fn spawn_named_listing_probe(path: &Path) -> std::process::Child {
+    assert!(
+        std::process::Command::new("/usr/bin/clang")
+            .arg(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/native-listing-probe.c"
+            ))
+            .arg("-o")
+            .arg(path)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let mut child = std::process::Command::new(path)
+        .env_clear()
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut ready = [0u8; 1];
+    std::io::Read::read_exact(&mut child.stdout.take().unwrap(), &mut ready)
+        .expect("the named process-list probe must start");
+    assert_eq!(&ready, b"R");
+    child
+}
+
+/// Real kernel listing: the caller is excluded, and a process running under
+/// the provider file name is observed until it exits.
 #[test]
 fn native_stopped_provider_proof_observes_other_provider_processes() {
     use std::ffi::OsStr;
@@ -821,9 +848,7 @@ fn native_stopped_provider_proof_observes_other_provider_processes() {
     let name = OsStr::new(PROVIDER_EXECUTABLE);
     assert!(!platform::other_process_named(uid, name).unwrap());
     let dir = tempfile::tempdir().unwrap();
-    let copy = dir.path().join(PROVIDER_EXECUTABLE);
-    std::fs::copy("/bin/sleep", &copy).unwrap();
-    let mut running = std::process::Command::new(&copy).arg("30").spawn().unwrap();
+    let mut running = spawn_named_listing_probe(&dir.path().join(PROVIDER_EXECUTABLE));
     let observed = platform::other_process_named(uid, name);
     let elsewhere = platform::other_process_named(uid.wrapping_add(1), name);
     let state_root = tempfile::tempdir().unwrap();

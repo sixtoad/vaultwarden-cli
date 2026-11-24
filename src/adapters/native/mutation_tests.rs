@@ -710,17 +710,10 @@ fn native_process_listing_skips_the_caller_and_holds_every_listed_process() {
     let dir = tempfile::tempdir().unwrap();
     let probe_name = format!("vw-listing-probe-{}", std::process::id());
     let probe_path = dir.path().join(&probe_name);
-    std::fs::copy("/bin/sleep", &probe_path).unwrap();
     let older = unsafe { libc::proc_listpids(4, euid, std::ptr::null_mut(), 0) } as usize
         / std::mem::size_of::<libc::pid_t>();
     let newer = (older / 3 + 64).max(48);
-    let mut children = vec![
-        std::process::Command::new(&probe_path)
-            .arg("60")
-            .env_clear()
-            .spawn()
-            .unwrap(),
-    ];
+    let mut children = vec![super::tests::spawn_named_listing_probe(&probe_path)];
     children.extend((0..newer).map(|_| {
         std::process::Command::new("/bin/sleep")
             .arg("60")
