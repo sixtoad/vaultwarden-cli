@@ -27,7 +27,10 @@ def disposable_macos_ci():
         if marker.read_text() != name + "\n" or Path("/dev/console").stat().st_uid != os.geteuid():
             return False
         model = subprocess.check_output(["/usr/sbin/sysctl", "-n", "hw.model"], text=True)
-        return model.strip().startswith("VirtualMac")
+        if not model.strip().startswith("VirtualMac"):
+            return False
+        sip = subprocess.check_output(["/usr/bin/csrutil", "status"], text=True, env={"LC_ALL": "C"})
+        return sip.strip() == "System Integrity Protection status: enabled."
     except (OSError, UnicodeError, subprocess.CalledProcessError):
         return False
 
