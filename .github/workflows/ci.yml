@@ -46,11 +46,19 @@ jobs:
 
   disposable-companion-pilot:
     name: Disposable Mac companion pilot (opt-in build)
-    # test-pilot-packaged.py requires a disposable GitHub-hosted default Keychain.
-    runs-on: macos-26
+    # The packaged pilot needs a fresh GUI session and default Keychain for each job.
+    runs-on: &macos-gui >-
+      ${{ vars.VW_MACOS_GUI_CI == 'self-hosted' &&
+          (github.event_name == 'push' ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.user.login != 'dependabot[bot]')) &&
+          'vw-ci-macos-gui-ephemeral' || 'macos-26' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+      - name: Verify disposable macOS guest and GUI session
+        if: runner.os == 'macOS' && runner.environment == 'self-hosted'
+        run: python3 scripts/disposable_macos_ci.py
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
@@ -71,7 +79,7 @@ jobs:
 
   desktop-companion:
     name: Flutter Rust companion (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner || matrix.os }}
     timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 90 || 45 }}
     strategy:
       fail-fast: false
@@ -88,6 +96,7 @@ jobs:
             architecture: x86_64
           # Packaged GUI tests change the Keychain search list and app container.
           - os: macos-26
+            runner: *macos-gui
             architecture: arm64
           - os: windows-latest
             architecture: x86_64
@@ -98,6 +107,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+      - name: Verify disposable macOS guest and GUI session
+        if: runner.os == 'macOS' && runner.environment == 'self-hosted'
+        run: python3 scripts/disposable_macos_ci.py
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
