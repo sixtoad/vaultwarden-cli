@@ -184,12 +184,17 @@ CI job `mobile-rust-core` checks and builds all three targets.
 
 iOS: `ExternalLibrary.process` looks the bridge symbols up in the running
 process at run time, and nothing in the Runner references them at link time,
-so the linker dead-strips an ordinary static library. The Runner must keep
-them: link the archive with `-force_load
-$(PROJECT_DIR)/…/libcompanion_core.a` in `OTHER_LDFLAGS` (per SDK: the device
-and simulator archives differ), or turn dead stripping off
-(`DEAD_CODE_STRIPPING = NO`) for the Runner. Without it the app builds and
-fails at the first Rust call with a missing-symbol error.
+so the linker drops an ordinary static library. The Runner keeps them with
+`-force_load $(BUILT_PRODUCTS_DIR)/libcompanion_core.a` (the build phase puts
+the archive of the SDK being built there) plus `-Wl,-export_dynamic` in
+`OTHER_LDFLAGS` for every configuration: `-force_load` alone loads the
+objects, but a Release executable's `-dead_strip` still removes globals that
+only `dlsym` reaches. Without both the app builds and fails at the first Rust
+call with a missing-symbol error. A Debug build (Xcode 16+,
+`ENABLE_DEBUG_DYLIB`) links the app code and the core into
+`Runner.app/Runner.debug.dylib`, not the `Runner` stub; `dlsym` finds them
+there, and `scripts/test-ios-companion.sh` checks that image in Debug and
+`Runner` in Release.
 
 ## Lifecycle rules (shared Dart, every platform)
 

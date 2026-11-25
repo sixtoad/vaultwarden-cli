@@ -6,4 +6,5 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - ios/**
     - android/**

@@ -280,6 +280,34 @@ jobs:
             ${{ runner.temp }}/android-evidence
             companion/build/app/reports/tests
 
+  ios-approval-client:
+    # RunnerTests boots an iPhone simulator on the hosted ARM64 image.
+    name: Unsigned iOS approval client
+    runs-on: macos-26
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Build and test the unsigned iOS approval client
+        run: bash scripts/test-ios-companion.sh "$RUNNER_TEMP/ios-evidence"
+      - name: Preserve iOS evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-approval-client-evidence
+          path: |
+            ${{ runner.temp }}/ios-evidence
+            companion/test/failures
+
   desktop-companion-msrv:
     name: Companion Rust 1.88 and security mutations
     runs-on: ubuntu-24.04
@@ -736,8 +764,8 @@ jobs:
   merge-ready:
     name: Merge Ready
     runs-on: ubuntu-latest
-    # android-companion (#60) is not required yet: it has never run green. It
-    # joins this list after a few green runs.
+    # Add android-companion and ios-approval-client after several successful
+    # native build and test runs for each client.
     needs: [check, test, build, browser, agent-transport, systemd-integration, native-protected-provider, macos-companion, desktop-companion, desktop-companion-msrv, disposable-companion-pilot, history-endpoint-security, Lint, Security]
     if: github.event_name == 'pull_request'
     steps:

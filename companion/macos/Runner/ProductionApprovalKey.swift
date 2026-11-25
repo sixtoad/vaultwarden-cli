@@ -3,6 +3,23 @@ import Foundation
 import LocalAuthentication
 import Security
 
+/// The sensor names shared with Flutter's `availability` reply.
+enum ProductionBiometry: String {
+    case touchID, faceID
+
+    static func admitted(_ type: LABiometryType) -> ProductionBiometry? {
+        #if os(macOS)
+        return type == .touchID ? .touchID : nil
+        #else
+        switch type {
+        case .touchID: return .touchID
+        case .faceID: return .faceID
+        default: return nil // .none, .opticID and future sensors are not admitted
+        }
+        #endif
+    }
+}
+
 enum ProductionOutcome: String {
     case present, absent, created, deleted, signed
     /// The key exists but `.biometryCurrentSet` no longer admits it: the
@@ -25,7 +42,17 @@ struct ProductionReply {
 /// each approval needs its own touch. There is no device-passcode fallback in
 /// the prompt; the companion's explicit password approval is the fallback.
 enum ProductionApprovalKey {
-    static func availability() -> Bool { NativeTestKey.availability() }
+    /// The biometric sensor that would gate the key, or nil when none can.
+    /// macOS admits Touch ID only (unchanged); iOS admits Face ID or Touch ID.
+    /// Both feed the same `.biometryCurrentSet` key; the name is only shown.
+    static func biometry() -> ProductionBiometry? {
+        let context = LAContext()
+        defer { context.invalidate() }
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else { return nil }
+        return ProductionBiometry.admitted(context.biometryType)
+    }
+
+    static func availability() -> Bool { biometry() != nil }
 
     static func context() -> LAContext {
         let context = LAContext()
@@ -52,7 +79,7 @@ enum ProductionApprovalKey {
         let context = LAContext()
         defer { context.invalidate() }
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else { return nil }
-        if #available(macOS 15, *) { return context.domainState.biometry.stateHash }
+        if #available(macOS 15, iOS 18, *) { return context.domainState.biometry.stateHash }
         return context.evaluatedPolicyDomainState
     }
 

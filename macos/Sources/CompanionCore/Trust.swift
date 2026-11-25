@@ -25,20 +25,61 @@ public struct ProviderConfiguration: Codable, Sendable {
 
 public enum KeychainIdentity {
     /// PKCS#12 is imported into the operator's Keychain; only its opaque persistent reference is saved in preferences.
+    #if os(macOS)
     public static func importPKCS12(_ data: Data, passphrase: String, keychain: SecKeychain? = nil) throws -> Data {
         var options: [String: Any] = [kSecImportExportPassphrase as String: passphrase]
         if let keychain { options[kSecImportExportKeychain as String] = keychain }
+        return try importPKCS12(data, options: options)
+    }
+    #else
+    /// iOS: `SecPKCS12Import` only decodes. The identity is added explicitly,
+    /// readable only while this device is unlocked and never migrated to
+    /// another device or backup (`...ThisDeviceOnly`). The key stays in the
+    /// app's Keychain; Dart and Rust only ever see the persistent reference.
+    public static func importPKCS12(_ data: Data, passphrase: String) throws -> Data {
+        try importPKCS12(data, options: [kSecImportExportPassphrase as String: passphrase])
+    }
+    #endif
+    private static func importPKCS12(_ data: Data, options: [String: Any]) throws -> Data {
         var items: CFArray?
         guard SecPKCS12Import(data as CFData, options as CFDictionary, &items) == errSecSuccess,
               let first = (items as? [[String: Any]])?.first,
               let identityValue = first[kSecImportItemIdentity as String] else { throw CompanionError.configuration }
         let identity = identityValue as! SecIdentity
         var reference: CFTypeRef?
+        #if os(macOS)
         let query: [String: Any] = [kSecClass as String: kSecClassIdentity,
                                    kSecMatchItemList as String: [identity],
                                    kSecReturnPersistentRef as String: true]
         guard SecItemCopyMatching(query as CFDictionary, &reference) == errSecSuccess,
               let reference = reference as? Data else { throw CompanionError.configuration }
+        #else
+        let add: [String: Any] = [kSecValueRef as String: identity,
+                                  kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                                  kSecReturnPersistentRef as String: true]
+        var status = SecItemAdd(add as CFDictionary, &reference)
+        if status == errSecDuplicateItem {
+            // Keychain items outlive an app reinstall. Re-importing the same
+            // package finds that identity. Anything else on this key (a renewed
+            // certificate, a stale identity from an earlier install) is the
+            // replaced identity: delete it and add the imported one once. The
+            // certificate check below still refuses anything not byte-identical.
+            status = SecItemCopyMatching(IOSIdentityQueries.lookup(identity) as CFDictionary, &reference)
+            if status != errSecSuccess || !persistedCertificateMatches(reference, identity) {
+                var key: SecKey?
+                guard SecIdentityCopyPrivateKey(identity, &key) == errSecSuccess, let key,
+                      let publicKey = SecKeyCopyPublicKey(key),
+                      let hash = IOSIdentityQueries.publicKeyHash(publicKey) else { throw CompanionError.configuration }
+                for query in IOSIdentityQueries.replaced(publicKeyHash: hash) {
+                    let deleted = SecItemDelete(query as CFDictionary)
+                    guard deleted == errSecSuccess || deleted == errSecItemNotFound else { throw CompanionError.configuration }
+                }
+                reference = nil
+                status = SecItemAdd(add as CFDictionary, &reference)
+            }
+        }
+        guard status == errSecSuccess, let reference = reference as? Data else { throw CompanionError.configuration }
+        #endif
         // Keychain certificate uniqueness can reject a renewed certificate that
         // collides with an older issuer/serial. Never return that older identity.
         var importedCertificate: SecCertificate?
@@ -59,6 +100,17 @@ public enum KeychainIdentity {
               let result, CFGetTypeID(result) == SecIdentityGetTypeID() else { throw CompanionError.configuration }
         return (result as! SecIdentity)
     }
+    #if os(iOS)
+    private static func persistedCertificateMatches(_ reference: CFTypeRef?, _ identity: SecIdentity) -> Bool {
+        var imported: SecCertificate?
+        var persisted: SecCertificate?
+        guard let reference = reference as? Data, let persistedIdentity = try? resolve(reference),
+              SecIdentityCopyCertificate(identity, &imported) == errSecSuccess,
+              SecIdentityCopyCertificate(persistedIdentity, &persisted) == errSecSuccess,
+              let imported, let persisted else { return false }
+        return SecCertificateCopyData(imported) as Data == SecCertificateCopyData(persisted) as Data
+    }
+    #endif
     public static func fingerprint(_ reference: Data) throws -> String {
         let identity = try resolve(reference)
         var certificate: SecCertificate?
@@ -66,6 +118,31 @@ public enum KeychainIdentity {
         return fingerprintDER(SecCertificateCopyData(certificate) as Data)
     }
     static func fingerprintDER(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+}
+
+/// Keychain queries of the iOS identity import (#60). Pure, so the macOS host
+/// tests them; only the iOS branch of `KeychainIdentity` calls them, and the
+/// macOS import never does.
+enum IOSIdentityQueries {
+    /// The persisted identity that matches the imported one.
+    static func lookup(_ identity: CFTypeRef) -> [String: Any] {
+        [kSecClass as String: kSecClassIdentity,
+         kSecValueRef as String: identity,
+         kSecReturnPersistentRef as String: true]
+    }
+    /// The Keychain's key identity: SHA-1 of the public key's external
+    /// representation, stored as a key's `kSecAttrApplicationLabel` and a
+    /// certificate's `kSecAttrPublicKeyHash`.
+    static func publicKeyHash(_ publicKey: SecKey) -> Data? {
+        guard let bytes = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else { return nil }
+        return Data(Insecure.SHA1.hash(data: bytes))
+    }
+    /// Everything an identity on this key left behind: the old certificate
+    /// (a renewal on the same key) and the private key itself.
+    static func replaced(publicKeyHash: Data) -> [[String: Any]] {
+        [[kSecClass as String: kSecClassCertificate, kSecAttrPublicKeyHash as String: publicKeyHash],
+         [kSecClass as String: kSecClassKey, kSecAttrApplicationLabel as String: publicKeyHash]]
+    }
 }
 
 public actor PinnedTransport: CompanionTransport {
