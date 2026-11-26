@@ -252,9 +252,12 @@ platforms, and without calling an approval `biometric` when it is not.
 
 ### D-10. Wording
 
-- Windows: "Windows Hello", "this PC", invalidated by "a Windows Hello sign-in
-  change". Linux: key approval is never offered; the messages that name a
-  method use "a device key" (never "Touch ID"). macOS and phones unchanged.
+- The approval messages name the verification the key reports: a Windows
+  Hello key says "Windows Hello" and "this PC" (invalidated by "a Windows
+  Hello sign-in change"); macOS keeps "Touch ID" and "this Mac"; phones are
+  unchanged. Linux never offers a key, so no key wording is ever shown there:
+  Settings shows a password-only note instead of the key panel. The Windows
+  key panel names Windows Hello whenever the app runs on Windows.
 
 ## Contract summary (what each side checks)
 

@@ -55,7 +55,7 @@ mutations = {
     "v2-proof-handle": ("session.rs", [("if self.prepared != Some(handle) || handle != self.epoch {", "if false {")]),
     "v2-proof-key": ("session.rs", [("if key_id != signing.key_id {", "if false {")]),
     "v2-enroll-provider-pin": ("biometric.rs", [("|| r.provider_identity != pin.provider_identity", "|| false")]),
-    "v2-enroll-local-proof": ("biometric.rs", [("if !v2::verify(public_key, &transcript, signature) {", "if false {")]),
+    "v2-enroll-local-proof": ("biometric.rs", [("if !message.is_some_and(|message| v2::verify(public_key, &message, signature)) {", "if false {")]),
     # PR B patch round: sticky fallback, result lifetime, pin rule, ticket kept.
     "v2-sticky-fallback": ("session.rs", [("if self.unsupported_provider.as_deref() == Some(pin.provider_identity.as_str()) {", "if false {")]),
     "v2-review-clears-result": ("session.rs", [("// A new review starts with no Touch ID result on display.\n                self.biometric = Biometric::None;", "")]),

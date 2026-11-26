@@ -248,3 +248,15 @@ The macOS 26 actuals were identical (sha256) in the
 unchanged Activity, enrollment and desktop locked-shell captures and all
 52 master images matched the committed references byte for byte. The PNGs
 are copied byte for byte; comparison stays exact.
+
+## Windows/Linux file-path setup, 2026-11-26 (desktop approval, PR #94)
+
+`{light,dark}_{desktop,compact}_shell_filesetup.png` show the unconfigured
+Settings screen of a transport that reads the CA and PKCS#12 by path
+(Windows and Linux; spec `docs/implementation/desktop-approval-spec.md` D-4).
+The macOS 27 arm64 captures were rendered locally with the pinned SDK and
+reviewed. The Linux and Windows captures are the actual images of
+[CI run 45796191596](https://github.com/sixtoad/vaultwarden-cli/actions/runs/45796191596),
+each visually reviewed (same fields, labels, wrapping and disabled import
+button as macOS; only glyph-edge rasterization differs) and copied
+byte-for-byte. No existing reference changed.

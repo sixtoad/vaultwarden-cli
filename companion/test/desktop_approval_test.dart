@@ -305,14 +305,16 @@ void main() {
     });
   });
 
-  test('Windows and Linux never say Touch ID', () {
-    for (final v in UserVerification.values) {
-      final windows = VerificationWording.of('windows', v);
-      expect((windows.method, windows.device), ('Windows Hello', 'this PC'));
-      final linux = VerificationWording.of('linux', v);
-      expect(linux.method, isNot(contains('Touch ID')));
-      expect(linux.device, 'this computer');
-    }
+  test('a Windows Hello key is named Windows Hello, never Touch ID', () {
+    final windows = VerificationWording.of(
+      'windows',
+      UserVerification.windowsHello,
+    );
+    expect((windows.method, windows.device), ('Windows Hello', 'this PC'));
+    expect(
+      VerificationWording.of('macos', UserVerification.touchId).method,
+      'Touch ID',
+    );
     expect(UserVerification.windowsHello.label, 'Windows Hello');
     expect(
       parseUserVerification('macos', 'windowsHello'),

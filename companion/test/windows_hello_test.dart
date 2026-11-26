@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:companion_slice/platform/approval_client.dart';
 import 'package:companion_slice/platform/approval_key.dart';
 import 'package:companion_slice/provider/page.dart';
 import 'package:companion_slice/provider/touch_id.dart';
@@ -31,7 +32,11 @@ Uint8List authenticatorData(int flags) => Uint8List.fromList([
 ]);
 
 /// A Windows Hello key: signatures come with WebAuthn authenticator data.
-class HelloKeys extends FakeKeys {
+class HelloKeys extends FakeKeys implements UserVerificationPlatform {
+  @override
+  Future<UserVerification> verification() async =>
+      available ? UserVerification.windowsHello : UserVerification.unavailable;
+
   Uint8List data = authenticatorData(0x05);
   @override
   Future<KeyReply> sign(

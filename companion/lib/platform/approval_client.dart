@@ -67,8 +67,12 @@ class VerificationWording {
     String operatingSystem,
     UserVerification verification,
   ) {
-    if (operatingSystem == 'windows') return windows;
-    if (operatingSystem == 'linux') return linux;
+    // A desktop names the verification its key reports: only a Windows
+    // Hello key says Windows Hello. Linux never offers a key (spec D-9).
+    if (operatingSystem == 'windows' &&
+        verification == UserVerification.windowsHello) {
+      return windows;
+    }
     if (!isMobileSystem(operatingSystem)) return macOS;
     final method = verification != UserVerification.unavailable
         ? verification.label
@@ -89,13 +93,6 @@ class VerificationWording {
     'Windows Hello',
     'this PC',
     'Windows Hello sign-in',
-  );
-
-  /// Linux never offers key approval (D-9); messages never say Touch ID.
-  static const linux = VerificationWording._(
-    'a device key',
-    'this computer',
-    'device key',
   );
 
   /// The verification as written mid-sentence ("Touch ID", "biometrics").
