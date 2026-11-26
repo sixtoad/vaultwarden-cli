@@ -10,7 +10,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'provider.dart';
 
 // These functions are ignored because they are not marked as `pub`: `keys`, `pinned_keys`, `provider`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Pin the provider leaf SHA-256 and this device's client leaf SHA-256 (both
 /// 64 lowercase hex). Call after every `provider_configure`; configuration
@@ -43,6 +43,21 @@ ProviderWork providerBiometricBegin({
   handle: handle,
   keyId: keyId,
   signature: signature,
+);
+
+/// `provider_biometric_begin` for a Windows Hello key (desktop-approval-spec
+/// D-8): the signature is over the WebAuthn authenticator data and the
+/// client data built from the transcript; the proof carries the data.
+ProviderWork providerBiometricBeginWrapped({
+  required BigInt handle,
+  required String keyId,
+  required List<int> signature,
+  required List<int> authenticatorData,
+}) => RustLib.instance.api.crateApiBiometricProviderBiometricBeginWrapped(
+  handle: handle,
+  keyId: keyId,
+  signature: signature,
+  authenticatorData: authenticatorData,
 );
 
 /// Pin the key session with the SAME values just given to
@@ -78,6 +93,20 @@ ProviderWork biometricKeyBeginEnroll({
   password: password,
   publicKey: publicKey,
   signature: signature,
+);
+
+/// `biometric_key_begin_enroll` for a Windows Hello key: version 3,
+/// `key_class: "windows_hello"`, proof wrapped as in D-8.
+ProviderWork biometricKeyBeginEnrollWrapped({
+  required String password,
+  required List<int> publicKey,
+  required List<int> signature,
+  required List<int> authenticatorData,
+}) => RustLib.instance.api.crateApiBiometricBiometricKeyBeginEnrollWrapped(
+  password: password,
+  publicKey: publicKey,
+  signature: signature,
+  authenticatorData: authenticatorData,
 );
 
 ProviderWork biometricKeyBeginRevoke({required String password}) => RustLib

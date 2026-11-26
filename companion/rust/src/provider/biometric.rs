@@ -253,6 +253,26 @@ impl BiometricKeySession {
         public_key: &[u8],
         signature: &[u8],
     ) -> Result<ProviderWork, Refusal> {
+        self.begin_enroll_class(password, public_key, signature, None)
+    }
+    /// Enroll a Windows Hello key: `biometric_enroll` version 3 with
+    /// `key_class: "windows_hello"` and the assertion's authenticator data.
+    pub fn begin_enroll_wrapped(
+        &mut self,
+        password: String,
+        public_key: &[u8],
+        signature: &[u8],
+        authenticator_data: &[u8],
+    ) -> Result<ProviderWork, Refusal> {
+        self.begin_enroll_class(password, public_key, signature, Some(authenticator_data))
+    }
+    fn begin_enroll_class(
+        &mut self,
+        password: String,
+        public_key: &[u8],
+        signature: &[u8],
+        authenticator_data: Option<&[u8]>,
+    ) -> Result<ProviderWork, Refusal> {
         let password = Zeroizing::new(password);
         let pin = self.pin.clone().ok_or(Refusal::NotPinned)?;
         if !self.can(Operation::Enroll) {
@@ -273,7 +293,11 @@ impl BiometricKeySession {
             &prepared.action_id,
         )
         .ok_or(Refusal::MalformedBinding)?;
-        if !v2::verify(public_key, &transcript, signature) {
+        let message = match authenticator_data {
+            None => Some(transcript),
+            Some(data) => super::key_class::signed_message(&transcript, data),
+        };
+        if !message.is_some_and(|message| v2::verify(public_key, &message, signature)) {
             return Err(Refusal::InvalidSignature);
         }
         let mut body = serde_json::json!({
@@ -285,6 +309,11 @@ impl BiometricKeySession {
             "public_key": v2::base64url(public_key),
             "enroll_signature": v2::base64url(signature),
         });
+        if let Some(data) = authenticator_data {
+            body["version"] = 3.into();
+            body["key_class"] = "windows_hello".into();
+            body["enroll_authenticator_data"] = v2::base64url(data).into();
+        }
         let action_id = prepared.action_id.clone();
         self.send_mutation(Sent::Enroll, action_id, public_key.to_vec(), &mut body)
     }

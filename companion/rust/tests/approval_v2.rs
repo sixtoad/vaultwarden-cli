@@ -1094,3 +1094,97 @@ fn an_oversize_key_mutation_is_refused_locally_and_keeps_its_ticket() {
     assert!(s.snapshot().can_revoke, "nothing sent, ticket kept");
     assert!(s.begin_revoke("fresh".into()).is_ok());
 }
+
+// ---- Windows Hello key class (desktop-approval-spec D-7/D-8) ---------------
+
+fn hello_data(flags: u8) -> Vec<u8> {
+    let mut data = companion_core::provider::key_class::rp_id_hash().to_vec();
+    data.push(flags);
+    data.extend_from_slice(&[0, 0, 0, 1]);
+    data
+}
+fn hello_sign(key: &SigningKey, transcript: &[u8], data: &[u8]) -> Vec<u8> {
+    let message = companion_core::provider::key_class::signed_message(transcript, data).unwrap();
+    sign(key, &message)
+}
+
+#[test]
+fn windows_hello_proof_carries_the_authenticator_data_and_refuses_bad_flags() {
+    let mut session = reviewed_with(&review_v2());
+    let request = session.prepare_biometric().unwrap();
+    let data = hello_data(0x05);
+    let signature = hello_sign(&key(), &request.transcript, &data);
+    for flags in [0x01, 0x04, 0x0d, 0x15] {
+        assert_eq!(
+            session
+                .begin_biometric_wrapped(
+                    request.handle,
+                    &request.key_id,
+                    &signature,
+                    &hello_data(flags)
+                )
+                .err(),
+            Some(Refusal::InvalidSignature),
+            "{flags:#x}"
+        );
+    }
+    assert_eq!(
+        session
+            .begin_biometric_wrapped(request.handle, &request.key_id, &signature, &data[..36])
+            .err(),
+        Some(Refusal::InvalidSignature)
+    );
+    let work = session
+        .begin_biometric_wrapped(request.handle, &request.key_id, &signature, &data)
+        .unwrap();
+    let body: Value = serde_json::from_slice(&work.body).unwrap();
+    assert_eq!(
+        body,
+        json!({"version":2,"command":"decision","request_id":ID,"ticket":TICKET,"decision":"approve",
+               "proof":{"key_id":request.key_id,"signature":v2::base64url(&signature),
+                        "authenticator_data":v2::base64url(&data)}})
+    );
+    assert_eq!(session.biometric_state().result, Biometric::InFlight);
+}
+
+#[test]
+fn windows_hello_enrollment_sends_version_3_with_its_class() {
+    let mut s = keys();
+    key_exchange(
+        &mut s,
+        KeyCommand::PrepareEnroll,
+        prepared("enroll", TICKET, ID),
+    );
+    let public_key = pk_of(&key());
+    let request = s.enroll_transcript(&public_key).unwrap();
+    let data = hello_data(0x05);
+    let signature = hello_sign(&key(), &request.transcript, &data);
+    // A raw transcript signature, or data without user verification, is refused.
+    let raw = sign(&key(), &request.transcript);
+    assert_eq!(
+        s.begin_enroll_wrapped("fresh".into(), &public_key, &raw, &data)
+            .err(),
+        Some(Refusal::InvalidSignature)
+    );
+    assert_eq!(
+        s.begin_enroll_wrapped("fresh".into(), &public_key, &signature, &hello_data(0x01))
+            .err(),
+        Some(Refusal::InvalidSignature)
+    );
+    // The wrapped signature is not a raw (version 2) proof either.
+    assert_eq!(
+        s.begin_enroll("fresh".into(), &public_key, &signature)
+            .err(),
+        Some(Refusal::InvalidSignature)
+    );
+    let work = s
+        .begin_enroll_wrapped("fresh".into(), &public_key, &signature, &data)
+        .unwrap();
+    let body: Value = serde_json::from_slice(&work.body).unwrap();
+    assert_eq!(
+        body,
+        json!({"version":3,"command":"biometric_enroll","action_id":ID,"ticket":TICKET,"password":"fresh",
+               "public_key":v2::base64url(&public_key),"enroll_signature":v2::base64url(&signature),
+               "key_class":"windows_hello","enroll_authenticator_data":v2::base64url(&data)})
+    );
+}

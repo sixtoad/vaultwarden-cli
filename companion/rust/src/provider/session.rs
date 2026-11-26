@@ -353,6 +353,26 @@ impl ProviderSession {
         key_id: &str,
         signature: &[u8],
     ) -> Result<ProviderWork, Refusal> {
+        self.begin_proof(handle, key_id, signature, None)
+    }
+    /// A Windows Hello (`windows_hello` key class) proof: the signature is
+    /// over `authenticator_data || SHA-256(clientData)` (desktop-approval-spec D-8).
+    pub fn begin_biometric_wrapped(
+        &mut self,
+        handle: u64,
+        key_id: &str,
+        signature: &[u8],
+        authenticator_data: &[u8],
+    ) -> Result<ProviderWork, Refusal> {
+        self.begin_proof(handle, key_id, signature, Some(authenticator_data))
+    }
+    fn begin_proof(
+        &mut self,
+        handle: u64,
+        key_id: &str,
+        signature: &[u8],
+        authenticator_data: Option<&[u8]>,
+    ) -> Result<ProviderWork, Refusal> {
         if self.prepared != Some(handle) || handle != self.epoch {
             if self.flight.is_some() {
                 return Err(Refusal::Busy);
@@ -364,18 +384,25 @@ impl ProviderSession {
         if key_id != signing.key_id {
             return Err(Refusal::KeyMismatch);
         }
-        if !v2::valid_signature(signature) {
+        if !v2::valid_signature(signature)
+            || authenticator_data.is_some_and(|d| !super::key_class::valid_authenticator_data(d))
+        {
             return Err(Refusal::InvalidSignature);
         }
         let serial = self.serial.checked_add(1).ok_or(Refusal::Busy)?;
         let review = self.reviewed.take().ok_or(Refusal::NoDecidableReview)?;
+        let mut proof =
+            serde_json::json!({"key_id": signing.key_id, "signature": v2::base64url(signature)});
+        if let Some(data) = authenticator_data {
+            proof["authenticator_data"] = v2::base64url(data).into();
+        }
         let request = serde_json::json!({
             "version": 2,
             "command": "decision",
             "request_id": request_id,
             "ticket": review.response.ticket,
             "decision": "approve",
-            "proof": {"key_id": signing.key_id, "signature": v2::base64url(signature)},
+            "proof": proof,
         });
         let body = serde_json::to_vec(&request).map_err(|_| Refusal::RequestTooLarge)?;
         self.invalidate();

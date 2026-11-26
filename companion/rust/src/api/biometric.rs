@@ -213,6 +213,19 @@ pub fn provider_biometric_begin(
     provider(|s| s.begin_biometric(handle, &key_id, &signature))?
 }
 
+/// `provider_biometric_begin` for a Windows Hello key (desktop-approval-spec
+/// D-8): the signature is over the WebAuthn authenticator data and the
+/// client data built from the transcript; the proof carries the data.
+#[flutter_rust_bridge::frb(sync)]
+pub fn provider_biometric_begin_wrapped(
+    handle: u64,
+    key_id: String,
+    signature: Vec<u8>,
+    authenticator_data: Vec<u8>,
+) -> Result<ProviderWork, BiometricRefusal> {
+    provider(|s| s.begin_biometric_wrapped(handle, &key_id, &signature, &authenticator_data))?
+}
+
 /// Pin the key session with the SAME values just given to
 /// `provider_biometric_pin` (refused `NotPinned` otherwise). Every key call
 /// re-checks that rule; `provider_configure` resets the key session.
@@ -254,6 +267,17 @@ pub fn biometric_key_begin_enroll(
     signature: Vec<u8>,
 ) -> Result<ProviderWork, BiometricRefusal> {
     pinned_keys()?.begin_enroll(password, &public_key, &signature)
+}
+/// `biometric_key_begin_enroll` for a Windows Hello key: version 3,
+/// `key_class: "windows_hello"`, proof wrapped as in D-8.
+#[flutter_rust_bridge::frb(sync)]
+pub fn biometric_key_begin_enroll_wrapped(
+    password: String,
+    public_key: Vec<u8>,
+    signature: Vec<u8>,
+    authenticator_data: Vec<u8>,
+) -> Result<ProviderWork, BiometricRefusal> {
+    pinned_keys()?.begin_enroll_wrapped(password, &public_key, &signature, &authenticator_data)
 }
 #[flutter_rust_bridge::frb(sync)]
 pub fn biometric_key_begin_revoke(password: String) -> Result<ProviderWork, BiometricRefusal> {
