@@ -259,4 +259,6 @@ reviewed. The Linux and Windows captures are the actual images of
 [CI run 45796191596](https://github.com/sixtoad/vaultwarden-cli/actions/runs/45796191596),
 each visually reviewed (same fields, labels, wrapping and disabled import
 button as macOS; only glyph-edge rasterization differs) and copied
-byte-for-byte. No existing reference changed.
+byte-for-byte. The macOS 26 arm64 captures are the reviewed actuals of
+[CI run 45798793999](https://github.com/sixtoad/vaultwarden-cli/actions/runs/45798793999).
+No existing reference changed.

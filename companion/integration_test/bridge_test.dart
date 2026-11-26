@@ -8,6 +8,7 @@ import 'package:companion_slice/main.dart';
 import 'package:companion_slice/platform/signer.dart';
 import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/src/rust/api.dart' as core;
+import 'package:companion_slice/src/rust/frb_generated.dart';
 import 'package:companion_slice/platform/approval_client.dart';
 import 'package:companion_slice/platform/approval_key.dart';
 import 'package:companion_slice/platform/core_approval_key.dart';
@@ -88,7 +89,8 @@ void main() {
   testWidgets(
     'Windows and Linux reach the Rust-core transport and key through the packaged bridge',
     (tester) async {
-      await initializePackagedCore();
+      // The first test of this file already loaded the packaged core.
+      if (!RustLib.instance.initialized) await initializePackagedCore();
       final os = Platform.operatingSystem;
       final transport = CoreProviderPlatform();
       expect(transport.available, isCoreTransportSystem(os));
