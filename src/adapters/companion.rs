@@ -29,6 +29,11 @@ mod management;
 const MAX_BODY: usize = 16384;
 const MAX_TICKETS: usize = 256;
 const TICKET_LIFETIME: Duration = Duration::from_secs(60);
+/// Companion capability (issue 48 phase 2): the approving client renders the
+/// review's `update` block (item, binding, fields, expected revision). An
+/// update review is approved from a companion only with this capability.
+pub const UPDATE_REVIEW_CAPABILITY: &str = "update-review.v1";
+const MAX_CAPABILITIES: usize = 16;
 
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
@@ -116,6 +121,10 @@ enum Command {
         /// Version 2 only: production Touch ID proof instead of a password.
         #[serde(default)]
         proof: Option<ProofWire>,
+        /// Version 2 approvals only: capabilities the approving client asserts
+        /// for the review it decides on. Unknown well-formed names are ignored.
+        #[serde(default)]
+        capabilities: Option<Vec<String>>,
     },
     Unlock {
         version: u8,
@@ -253,11 +262,17 @@ impl Command {
                 decision,
                 password,
                 proof,
+                capabilities,
             } => {
                 // Approve takes exactly one authenticator; v1 has only password.
                 // Deny is never signed and carries neither.
                 return matches!(version, 1 | 2)
                     && (*version == 2 || proof.is_none())
+                    && capabilities.as_ref().is_none_or(|names| {
+                        *version == 2
+                            && matches!(decision, Decision::Approve)
+                            && valid_capabilities(names)
+                    })
                     && identity::valid_fingerprint(ticket)
                     && valid_request_id(request_id)
                     && match (decision, password, proof) {
@@ -270,6 +285,27 @@ impl Command {
         };
         version == 1 && id.is_none_or(|id| valid_request_id(id))
     }
+}
+/// 1 to 16 distinct names shaped `lowercase-words.vN` (at most 64 bytes).
+fn valid_capabilities(names: &[String]) -> bool {
+    let mut seen = std::collections::HashSet::new();
+    !names.is_empty()
+        && names.len() <= MAX_CAPABILITIES
+        && names.iter().all(|name| {
+            seen.insert(name.as_str())
+                && name.len() <= 64
+                && name.rsplit_once(".v").is_some_and(|(stem, number)| {
+                    !stem.is_empty()
+                        && !stem.starts_with('-')
+                        && !stem.ends_with('-')
+                        && stem
+                            .bytes()
+                            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                        && !number.is_empty()
+                        && !number.starts_with('0')
+                        && number.bytes().all(|b| b.is_ascii_digit())
+                })
+        })
 }
 fn valid_password(value: &SensitiveString) -> bool {
     !value.expose().is_empty() && value.expose().len() <= 4096
@@ -682,6 +718,7 @@ impl Companion {
                 decision,
                 password,
                 proof,
+                capabilities,
             } => {
                 let consumed = self.state.lock().ok().and_then(|mut state| {
                     state.consume(device, &request_id, &ticket, app.companion_now())
@@ -716,6 +753,17 @@ impl Companion {
                         };
                         if !self.attempt(device, app.companion_now()) {
                             return Response::error(Error::RateLimited);
+                        }
+                        // Issue 48 phase 2: an update review is approved from a
+                        // companion only when the client asserts it rendered the
+                        // update block; otherwise use the loopback review.
+                        if ticket.review.update.is_some()
+                            && !capabilities
+                                .iter()
+                                .flatten()
+                                .any(|name| name == UPDATE_REVIEW_CAPABILITY)
+                        {
+                            return Response::error(Error::Authentication);
                         }
                         let (authenticated, key_id) = match (password, proof) {
                             (Some(password), None) => {
@@ -1230,6 +1278,7 @@ mod tests {
     }
     fn decision(id: &str, token: &str, password: &str) -> Command {
         Command::Decision {
+            capabilities: None,
             version: 1,
             request_id: id.into(),
             ticket: token.into(),
@@ -1440,6 +1489,7 @@ mod tests {
                 .dispatch(
                     &leaf_fingerprint(CLIENT),
                     Command::Decision {
+                        capabilities: None,
                         version: 1,
                         request_id: id.clone(),
                         ticket: new,

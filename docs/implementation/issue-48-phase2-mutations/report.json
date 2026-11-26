@@ -1,0 +1,142 @@
+{
+  "source_sha256": {
+    "src/access/policy.rs": "e4bfe89801f4664c6cc4222a493d087036d3ef9e716d2898d494b90c99cb1440",
+    "src/access/policy/update.rs": "65bc5e7be52553fae8988b5c2b4f1d8abf1a39234473bc6b500bfb8856060531",
+    "src/access/application.rs": "9c8af0882fbfb77be02b79dcbf99a8656fd4ba39903a5307ee8665d80ba3678d",
+    "src/access/application/update.rs": "0614eeb7d3b02bbcfe6b877cf7b5868ae693d3c793e5d5bc50bce65012f54def",
+    "src/access/provider.rs": "af23eb3821edcb23227a8b69c265933828bcadfd51bcfd38042c6fc2f7b748da",
+    "src/adapters/vaultwarden/update.rs": "8ec06ad5eaa69797ffed84e3c66120ff8de8fb907d79675937c245d5d01169af",
+    "src/adapters/companion.rs": "9397b3eebcef52bd379f85fff6ddff4b669f8a843aafc125c30a0cdd9daeac5b",
+    "companion/rust/src/provider/protocol.rs": "dce285a0b5eed6fd4017c3e57df6e412ab07133c9cf8ee84ca372bb451297d2e",
+    "companion/rust/src/provider/session.rs": "d513f847fb2bf1b6886ab1ed17b0b52b2b0369eec22f16f69849521935ac408f"
+  },
+  "mutations": {
+    "policy-exclusive-with-create": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "policy-refuses-marker-field": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "policy-notes-only-allowed": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "review-revision-bounded": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "stale-before-producer": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "stale-before-approval": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "producer-schema-exact": {
+      "caught_by_test": true,
+      "exit_code": 101,
+      "first_run": "escaped",
+      "fix": "application check was masked by the backend's own schema check; test now asserts no backend read for another schema",
+      "rerun": "ONLY= rerun after the fix, focused tests failed"
+    },
+    "uncertain-update-blocks-item": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "reconcile-rewrites-only-uncertain": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "verified-only-after-comparison": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-revision-recheck": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-schema-exact": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-body-bound-to-revision": {
+      "caught_by_test": true,
+      "exit_code": 101,
+      "first_run": "escaped",
+      "fix": "two redundant clauses; kept the wire-level lastKnownRevisionDate check, mutation retargeted",
+      "rerun": "ONLY= rerun after the fix, focused tests failed"
+    },
+    "adapter-no-put-once-not-live": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-definite-rejections": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-response-identity": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-binding-checked": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-reconcile-unchanged-binding": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "adapter-reconcile-revision": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "capability-required": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "capability-exact-name": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "capability-shape-validated": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "capability-approve-only": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "core-update-block-validated": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "core-password-asserts-capability": {
+      "caught_by_test": true,
+      "exit_code": 101
+    },
+    "core-touch-id-asserts-capability": {
+      "caught_by_test": true,
+      "exit_code": 101
+    }
+  },
+  "restored_sha256": {
+    "src/access/policy.rs": "e4bfe89801f4664c6cc4222a493d087036d3ef9e716d2898d494b90c99cb1440",
+    "src/access/policy/update.rs": "65bc5e7be52553fae8988b5c2b4f1d8abf1a39234473bc6b500bfb8856060531",
+    "src/access/application.rs": "9c8af0882fbfb77be02b79dcbf99a8656fd4ba39903a5307ee8665d80ba3678d",
+    "src/access/application/update.rs": "0614eeb7d3b02bbcfe6b877cf7b5868ae693d3c793e5d5bc50bce65012f54def",
+    "src/access/provider.rs": "af23eb3821edcb23227a8b69c265933828bcadfd51bcfd38042c6fc2f7b748da",
+    "src/adapters/vaultwarden/update.rs": "8ec06ad5eaa69797ffed84e3c66120ff8de8fb907d79675937c245d5d01169af",
+    "src/adapters/companion.rs": "9397b3eebcef52bd379f85fff6ddff4b669f8a843aafc125c30a0cdd9daeac5b",
+    "companion/rust/src/provider/protocol.rs": "dce285a0b5eed6fd4017c3e57df6e412ab07133c9cf8ee84ca372bb451297d2e",
+    "companion/rust/src/provider/session.rs": "d513f847fb2bf1b6886ab1ed17b0b52b2b0369eec22f16f69849521935ac408f"
+  },
+  "restored_test_exit": 0,
+  "equivalent_excluded": {
+    "review-revision-validated": "bind_update revision check is backed by DirectRecord::validate before any state write"
+  },
+  "summary": "26 of 26 caught",
+  "host": "macOS arm64 (native fixtures), Rust 1.88.0"
+}

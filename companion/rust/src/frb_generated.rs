@@ -2667,6 +2667,19 @@ impl SseDecode for Option<crate::api::provider::ProviderReview> {
     }
 }
 
+impl SseDecode for Option<crate::api::provider::ProviderReviewUpdate> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::provider::ProviderReviewUpdate>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<u64> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2835,6 +2848,8 @@ impl SseDecode for crate::api::provider::ProviderReview {
         let mut var_expiresAtUnixSeconds = <u64>::sse_decode(deserializer);
         let mut var_oneTime = <String>::sse_decode(deserializer);
         let mut var_status = <String>::sse_decode(deserializer);
+        let mut var_update =
+            <Option<crate::api::provider::ProviderReviewUpdate>>::sse_decode(deserializer);
         return crate::api::provider::ProviderReview {
             id: var_id,
             requester: var_requester,
@@ -2849,6 +2864,7 @@ impl SseDecode for crate::api::provider::ProviderReview {
             expires_at_unix_seconds: var_expiresAtUnixSeconds,
             one_time: var_oneTime,
             status: var_status,
+            update: var_update,
         };
     }
 }
@@ -2861,6 +2877,30 @@ impl SseDecode for crate::api::provider::ProviderReviewCredential {
         return crate::api::provider::ProviderReviewCredential {
             label: var_label,
             use_type: var_useType,
+        };
+    }
+}
+
+impl SseDecode for crate::api::provider::ProviderReviewUpdate {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_server = <String>::sse_decode(deserializer);
+        let mut var_itemId = <String>::sse_decode(deserializer);
+        let mut var_accountId = <String>::sse_decode(deserializer);
+        let mut var_folder = <String>::sse_decode(deserializer);
+        let mut var_folderId = <String>::sse_decode(deserializer);
+        let mut var_reference = <String>::sse_decode(deserializer);
+        let mut var_fields = <Vec<String>>::sse_decode(deserializer);
+        let mut var_expectedRevision = <String>::sse_decode(deserializer);
+        return crate::api::provider::ProviderReviewUpdate {
+            server: var_server,
+            item_id: var_itemId,
+            account_id: var_accountId,
+            folder: var_folder,
+            folder_id: var_folderId,
+            reference: var_reference,
+            fields: var_fields,
+            expected_revision: var_expectedRevision,
         };
     }
 }
@@ -4322,6 +4362,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderReview {
             self.expires_at_unix_seconds.into_into_dart().into_dart(),
             self.one_time.into_into_dart().into_dart(),
             self.status.into_into_dart().into_dart(),
+            self.update.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4355,6 +4396,33 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::provider::ProviderReviewCrede
     for crate::api::provider::ProviderReviewCredential
 {
     fn into_into_dart(self) -> crate::api::provider::ProviderReviewCredential {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::provider::ProviderReviewUpdate {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.server.into_into_dart().into_dart(),
+            self.item_id.into_into_dart().into_dart(),
+            self.account_id.into_into_dart().into_dart(),
+            self.folder.into_into_dart().into_dart(),
+            self.folder_id.into_into_dart().into_dart(),
+            self.reference.into_into_dart().into_dart(),
+            self.fields.into_into_dart().into_dart(),
+            self.expected_revision.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::provider::ProviderReviewUpdate
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::provider::ProviderReviewUpdate>
+    for crate::api::provider::ProviderReviewUpdate
+{
+    fn into_into_dart(self) -> crate::api::provider::ProviderReviewUpdate {
         self
     }
 }
@@ -5250,6 +5318,16 @@ impl SseEncode for Option<crate::api::provider::ProviderReview> {
     }
 }
 
+impl SseEncode for Option<crate::api::provider::ProviderReviewUpdate> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::provider::ProviderReviewUpdate>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<u64> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5420,6 +5498,7 @@ impl SseEncode for crate::api::provider::ProviderReview {
         <u64>::sse_encode(self.expires_at_unix_seconds, serializer);
         <String>::sse_encode(self.one_time, serializer);
         <String>::sse_encode(self.status, serializer);
+        <Option<crate::api::provider::ProviderReviewUpdate>>::sse_encode(self.update, serializer);
     }
 }
 
@@ -5428,6 +5507,20 @@ impl SseEncode for crate::api::provider::ProviderReviewCredential {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.label, serializer);
         <String>::sse_encode(self.use_type, serializer);
+    }
+}
+
+impl SseEncode for crate::api::provider::ProviderReviewUpdate {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.server, serializer);
+        <String>::sse_encode(self.item_id, serializer);
+        <String>::sse_encode(self.account_id, serializer);
+        <String>::sse_encode(self.folder, serializer);
+        <String>::sse_encode(self.folder_id, serializer);
+        <String>::sse_encode(self.reference, serializer);
+        <Vec<String>>::sse_encode(self.fields, serializer);
+        <String>::sse_encode(self.expected_revision, serializer);
     }
 }
 

@@ -1,6 +1,7 @@
 //! Frozen v1 wire contract. No provider authority or synthetic proofs live here.
 use crate::api::provider::{
     ProviderHistoryEvent, ProviderHistoryOutcome, ProviderReview, ProviderReviewCredential,
+    ProviderReviewUpdate,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -11,6 +12,12 @@ pub const REQUEST_LIMIT: usize = 16_384;
 // both crates prevent a local constant change from silently widening this view.
 const MAX_ARGUMENTS: usize = 32;
 const MAX_CREDENTIALS: usize = 16;
+// The provider's update schema limits (issue 48 phase 2).
+const MAX_UPDATE_FIELDS: usize = 34;
+const MAX_UPDATE_TEXT: usize = 512;
+/// This client renders a review's `update` block; its decisions on such a
+/// review say so, or the provider refuses them.
+pub const UPDATE_REVIEW_CAPABILITY: &str = "update-review.v1";
 
 pub fn valid_id(value: &str) -> bool {
     value.len() == 43
@@ -74,11 +81,87 @@ pub struct Credential {
 }
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct UpdateDestination {
+    pub account_id: String,
+    pub folder: String,
+    pub folder_id: String,
+    pub reference: String,
+}
+/// Issue 48 phase 2: the existing item a protected update replaces fields of,
+/// its binding and the revision the provider read. Never a value.
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateReview {
+    pub server: String,
+    pub item_id: String,
+    pub destination: UpdateDestination,
+    pub fields: Vec<String>,
+    pub expected_revision: String,
+}
+impl UpdateReview {
+    fn valid(&self) -> bool {
+        let text = |s: &str| !s.is_empty() && s.len() <= MAX_UPDATE_TEXT;
+        !self.fields.is_empty()
+            && self.fields.len() <= MAX_UPDATE_FIELDS
+            && self.fields.iter().all(|f| text(f))
+            && [
+                &self.server,
+                &self.item_id,
+                &self.destination.account_id,
+                &self.destination.folder,
+                &self.destination.folder_id,
+                &self.destination.reference,
+                &self.expected_revision,
+            ]
+            .into_iter()
+            .all(|s| text(s))
+    }
+    fn projection(&self) -> ProviderReviewUpdate {
+        ProviderReviewUpdate {
+            server: visible(&self.server),
+            item_id: visible(&self.item_id),
+            account_id: visible(&self.destination.account_id),
+            folder: visible(&self.destination.folder),
+            folder_id: visible(&self.destination.folder_id),
+            reference: visible(&self.destination.reference),
+            fields: self.fields.iter().map(|field| visible(field)).collect(),
+            expected_revision: visible(&self.expected_revision),
+        }
+    }
+    fn rows(&self) -> Vec<String> {
+        let mut rows = vec![
+            "Vault update (existing item; no create):".to_string(),
+            format!("  Item: {}", visible(&self.item_id)),
+            format!("  Server: {}", visible(&self.server)),
+            format!("  Account: {}", visible(&self.destination.account_id)),
+            format!(
+                "  Folder: {} ({})",
+                visible(&self.destination.folder),
+                visible(&self.destination.folder_id)
+            ),
+            format!("  Reference: {}", visible(&self.destination.reference)),
+            format!("  Fields replaced ({}):", self.fields.len()),
+        ];
+        for field in &self.fields {
+            rows.push(format!("    {}", visible(field)));
+        }
+        rows.push(format!(
+            "  Expected revision: {}",
+            visible(&self.expected_revision)
+        ));
+        rows
+    }
+}
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Review {
     pub id: String,
     pub requester: String,
     pub operation: String,
     pub effect: String,
+    /// Optional in the provider's review; absent for every other operation.
+    #[serde(default)]
+    pub update: Option<UpdateReview>,
     pub target: String,
     pub arguments: Vec<String>,
     pub credentials: Vec<Credential>,
@@ -94,6 +177,7 @@ impl Review {
         valid_id(&self.id)
             && self.arguments.len() <= MAX_ARGUMENTS
             && self.credentials.len() <= MAX_CREDENTIALS
+            && self.update.as_ref().is_none_or(UpdateReview::valid)
             && [
                 &self.executable_digest,
                 &self.policy_digest,
@@ -124,6 +208,7 @@ impl Review {
             expires_at_unix_seconds: self.expires_at_unix_seconds,
             one_time: visible(&self.one_time),
             status: self.status.summary(),
+            update: self.update.as_ref().map(UpdateReview::projection),
         }
     }
     pub fn visible(&self) -> String {
@@ -133,8 +218,14 @@ impl Review {
             format!("Operation: {}", visible(&self.operation)),
             format!("Effect: {}", visible(&self.effect)),
             format!("Target: {}", visible(&self.target)),
-            format!("Arguments ({} separate values):", self.arguments.len()),
         ];
+        if let Some(update) = &self.update {
+            rows.extend(update.rows());
+        }
+        rows.push(format!(
+            "Arguments ({} separate values):",
+            self.arguments.len()
+        ));
         for (i, arg) in self.arguments.iter().enumerate() {
             rows.push(format!("  [{i}] {}", visible(arg)));
         }

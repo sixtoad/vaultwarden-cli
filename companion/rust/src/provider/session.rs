@@ -23,7 +23,8 @@ struct Flight {
     command: Command,
     id: String,
     started: Instant,
-    /// A version 2 review request, or a version 2 Touch ID decision.
+    /// A version 2 review request, a version 2 Touch ID decision, or a
+    /// version 2 password decision on an update review (issue 48 phase 2).
     v2: bool,
     proof: bool,
 }
@@ -203,6 +204,12 @@ impl ProviderSession {
                     return Err("A fresh complete review is required.");
                 }
                 let review = self.reviewed.take().expect("checked review");
+                // Issue 48 phase 2: approving an update review asserts that this
+                // client rendered its update block (a version 2 decision).
+                if command == Command::Approve && review.response.review.update.is_some() {
+                    request["version"] = 2.into();
+                    request["capabilities"] = serde_json::json!([UPDATE_REVIEW_CAPABILITY]);
+                }
                 request_id = review.response.review.id;
                 request["command"] = "decision".into();
                 request["request_id"] = request_id.clone().into();
@@ -369,7 +376,7 @@ impl ProviderSession {
         }
         let serial = self.serial.checked_add(1).ok_or(Refusal::Busy)?;
         let review = self.reviewed.take().ok_or(Refusal::NoDecidableReview)?;
-        let request = serde_json::json!({
+        let mut request = serde_json::json!({
             "version": 2,
             "command": "decision",
             "request_id": request_id,
@@ -377,6 +384,9 @@ impl ProviderSession {
             "decision": "approve",
             "proof": {"key_id": signing.key_id, "signature": v2::base64url(signature)},
         });
+        if review.response.review.update.is_some() {
+            request["capabilities"] = serde_json::json!([UPDATE_REVIEW_CAPABILITY]);
+        }
         let body = serde_json::to_vec(&request).map_err(|_| Refusal::RequestTooLarge)?;
         self.invalidate();
         if body.len() > REQUEST_LIMIT {
@@ -569,7 +579,7 @@ impl ProviderSession {
             }
             Command::Approve | Command::Deny | Command::Status => {
                 let reply: StatusResponse = decode(bytes)?;
-                if reply.version != if flight.proof { 2 } else { 1 } {
+                if reply.version != if flight.v2 { 2 } else { 1 } {
                     return Err("version");
                 }
                 if self.proof_id.as_deref() == Some(&flight.id) {

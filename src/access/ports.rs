@@ -415,6 +415,62 @@ pub trait SecretBackend: ProviderSession {
         Err(SessionError::BackendUnavailable)
     }
 
+    /// Issue 48 phase 2: the D1 binding checks from a fresh sync, then a GET of
+    /// the pinned item. Returns the revision the review binds. Sends nothing.
+    /// # Errors
+    /// Returns an error when the binding does not hold or the backend fails.
+    fn update_review(
+        &mut self,
+        _effect: &super::policy::UpdateEffect,
+    ) -> Result<String, SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+    /// Fresh sync and GET after approval; refuses unless the item still has the
+    /// reviewed revision and binding, then plans the body. Sends nothing.
+    /// # Errors
+    /// Returns an error for a stale revision, a binding mismatch, an input that
+    /// is not exactly the reviewed schema, or a backend failure.
+    fn update_prepare(
+        &mut self,
+        _review: &super::policy::UpdateReview,
+        _input: &crate::secret_storage::SecretImport,
+    ) -> Result<crate::secret_update::PreparedUpdate, SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+    /// Exactly one PUT of the prepared body; never retried.
+    /// # Errors
+    /// `Failed` for a definite rejection or a refusal before sending,
+    /// `Uncertain` when it may have committed.
+    fn update_secret(
+        &mut self,
+        _review: &super::policy::UpdateReview,
+        _prepared: &crate::secret_update::PreparedUpdate,
+        _live: &dyn Fn() -> bool,
+    ) -> Result<(), crate::secret_storage::WriteStatus> {
+        Err(crate::secret_storage::WriteStatus::Failed)
+    }
+    /// Fresh read compared with the sent body (D7, D14).
+    /// # Errors
+    /// Returns an error on any difference or backend failure.
+    fn verify_update(
+        &mut self,
+        _review: &super::policy::UpdateReview,
+        _prepared: &crate::secret_update::PreparedUpdate,
+        _input: &crate::secret_storage::SecretImport,
+    ) -> Result<(), SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+    /// D9, read-only: `Failed` when the item still has the expected revision
+    /// (and its binding holds), `UpdatedUnverified` when anything wrote since.
+    /// # Errors
+    /// Returns an error when the account binding or the read fails.
+    fn reconcile_update(
+        &mut self,
+        _review: &super::policy::UpdateReview,
+    ) -> Result<crate::secret_storage::WriteStatus, SessionError> {
+        Err(SessionError::BackendUnavailable)
+    }
+
     fn resolve_ssh(&mut self, _immutable_item_id: &str) -> Result<SensitiveString, SessionError> {
         Err(SessionError::BackendUnavailable)
     }
