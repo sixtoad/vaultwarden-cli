@@ -55,6 +55,7 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    crate::access::update_test_support::delegate_update_backend!();
     fn eligible(&mut self, _: &CredentialBinding<'_>) -> Result<bool, SessionError> {
         Ok(true)
     }
@@ -92,7 +93,7 @@ thread_local! {
     /// Passwords received by the synthetic create backend on this test thread.
     static NATIVE_CREATED: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
-struct Auth;
+pub(crate) struct Auth;
 impl ApprovalAuthenticator for Auth {
     fn authenticate(&self, password: SensitiveString) -> Result<(), SessionError> {
         if password.expose() == "synthetic-password" {
@@ -104,6 +105,7 @@ impl ApprovalAuthenticator for Auth {
 }
 pub(crate) fn operation_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        update: None,
         require_password: false,
         id: "native-version".into(),
         description: "Native synthetic approved launch".into(),
@@ -1144,6 +1146,7 @@ fn native_create_reaches_producer_and_posts_only_after_successful_reaped_exit() 
             .create_operation(
                 f.app().human_owner(),
                 OperationPolicyDraft {
+                    update: None,
                     require_password: false,
                     id: "native-create".into(),
                     description: "Native synthetic create".into(),

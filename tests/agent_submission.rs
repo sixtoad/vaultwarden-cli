@@ -262,6 +262,7 @@ fn real_linux_peer_matrix_and_noninteractive_cli() {
     std::fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
     let revision = app
         .activate_operation(OperationPolicyDraft {
+            update: None,
             require_password: false,
             create: None,
             ssh: None,

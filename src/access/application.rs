@@ -2,6 +2,7 @@
 use super::provisioning::{ProvisioningError, bounded};
 
 mod enrollment_service;
+mod update;
 use super::{direct_request::*, policy::OperationPolicyDraft, ports::*, provider::Provider};
 use std::{
     sync::{
@@ -730,10 +731,18 @@ impl ProviderApplication {
             if !live() {
                 return Err(AgentRejection::Locked);
             }
-            let review =
-                authority
-                    .provider
-                    .create_signed(owner.clone(), input, now, expires, live)?;
+            let update_revision = Self::update_revision(&mut authority, &input.operation_id)?;
+            if !live() {
+                return Err(AgentRejection::Locked);
+            }
+            let review = authority.provider.create_signed_bound(
+                owner.clone(),
+                input,
+                now,
+                expires,
+                update_revision,
+                live,
+            )?;
             drop(release);
             #[cfg(test)]
             SIGNED_COMMIT_HOOK.with(|hook| {
@@ -998,10 +1007,22 @@ impl ProviderApplication {
         if !Self::token_live(&token) {
             return Err(DirectRequestError::Unauthorized);
         }
+        let update_revision = match Self::update_revision(&mut authority, &input.operation) {
+            Ok(revision) => revision,
+            Err(error) => {
+                drop(release);
+                return Err(error.into());
+            }
+        };
         let result = match &agent_owner {
-            None => authority
-                .provider
-                .create_direct(owner, input, now, expires, live),
+            None => authority.provider.create_direct_bound(
+                owner,
+                input,
+                now,
+                expires,
+                update_revision,
+                live,
+            ),
             #[cfg(test)]
             Some(agent) => {
                 authority
@@ -1089,9 +1110,24 @@ impl ProviderApplication {
         }
         authority.backend.probe_compatibility()?;
         self.admit(&mut authority)?;
-        authority.backend.reconcile_secret(&effect, item_id)?;
+        let update_status = match &effect {
+            super::provider::WriteEffect::Create(effect) => {
+                authority.backend.reconcile_secret(effect, item_id)?;
+                None
+            }
+            // D9: read-only revision comparison; never a PUT. An update
+            // receipt always names its item, checked just above.
+            super::provider::WriteEffect::Update(review) => {
+                if review.item_id != item_id {
+                    return Err(DirectRequestError::InvalidRequest);
+                }
+                Some(authority.backend.reconcile_update(review)?)
+            }
+        };
         self.admit(&mut authority)?;
-        authority.provider.reconcile_write(request_id, item_id)
+        authority
+            .provider
+            .reconcile_write(request_id, item_id, update_status)
     }
     pub fn history(
         &self,
@@ -1474,6 +1510,7 @@ impl ProviderApplication {
         let mut material: Option<Box<dyn SshMaterial>> = None;
         let mut producer: Option<Box<dyn ProducerOutput>> = None;
         let mut create_effect = None;
+        let mut update_review = None;
         let result = (|| {
             let (policy, mut prepared) = preparation?;
             if let Some(effect) = policy.create() {
@@ -1484,6 +1521,21 @@ impl ProviderApplication {
                 );
                 authority.backend.create_eligible(effect)?;
                 create_effect = Some(effect.clone());
+            }
+            if policy.update().is_some() {
+                let review = authority
+                    .provider
+                    .direct_review(owner, id)?
+                    .update
+                    .ok_or(DirectRequestError::InvalidRequest)?;
+                producer = Some(
+                    preparer
+                        .prepare_producer(&mut prepared)
+                        .map_err(|_error| DirectRequestError::Unavailable)?,
+                );
+                authority.backend.probe_compatibility()?;
+                Self::update_still_reviewed(&mut authority, &review)?;
+                update_review = Some(review);
             }
             self.execution_authority_current(
                 &mut authority,
@@ -1705,6 +1757,19 @@ impl ProviderApplication {
                 report.outcome = Err(ExecutionError::ExecutionFailed);
             }
         }
+        if let Some(review) = update_review {
+            let write = self.write_update(
+                &review,
+                &report,
+                producer.as_mut(),
+                &control,
+                &binding,
+                revocation_epoch,
+            );
+            if write.is_err() && report.outcome == Ok(ExecutionOutcome::ExitedZero) {
+                report.outcome = Err(ExecutionError::ExecutionFailed);
+            }
+        }
         let finish = (|| {
             let durable_live = control.live();
             let release = self
@@ -1777,7 +1842,7 @@ impl ProviderApplication {
             .map_err(|_error| DirectRequestError::Unavailable)?;
         let (binding, policy, argv) =
             self.execution_authority(&mut authority, owner, id, None, false)?;
-        if policy.ssh().is_some() || policy.create().is_some() {
+        if policy.ssh().is_some() || policy.create().is_some() || policy.update().is_some() {
             return Err(DirectRequestError::Unavailable);
         }
         let preparation = preparer.prepare(policy.execution_image(), argv);
@@ -1931,6 +1996,28 @@ impl ProviderApplication {
                 if !Self::token_live(&token) {
                     return Err(DirectRequestError::Unauthorized);
                 }
+            }
+            if policy.update().is_some() {
+                // A request whose item changed since review cannot be approved.
+                let review = authority
+                    .provider
+                    .direct_review(
+                        AuthenticatedHuman::from_peer_uid(if binding.agent_owner.is_some() {
+                            authority.provider.owner_uid()
+                        } else {
+                            binding.requester_uid
+                        }),
+                        &binding.request_id,
+                    )?
+                    .update
+                    .ok_or(DirectRequestError::InvalidRequest)?;
+                let current = Self::update_still_reviewed(&mut authority, &review);
+                self.admit(&mut authority)?;
+                self.expire_requests(&mut authority)?;
+                if !Self::token_live(&token) {
+                    return Err(DirectRequestError::Unauthorized);
+                }
+                current?;
             }
             if let Some(ssh) = policy.ssh() {
                 let eligible = authority.backend.ssh_eligible(&ssh.credential.item_id);
@@ -2182,6 +2269,11 @@ impl ProviderApplication {
         probe?;
         if let Some(effect) = &draft.create {
             authority.backend.create_eligible(effect)?;
+            self.admit(&mut authority)?;
+        }
+        if let Some(effect) = &draft.update {
+            // The pinned item must exist under its binding when provisioned.
+            authority.backend.update_review(effect)?;
             self.admit(&mut authority)?;
         }
         let deadline = authority.deadline.ok_or(SessionError::Locked)?;
@@ -2561,6 +2653,7 @@ mod tests {
             }
             let result = if operation == "activate_probe" {
                 app.activate_operation(super::super::policy::OperationPolicyDraft {
+                    update: None,
                     require_password: false,
                     create: None,
                     ssh: None,
@@ -3003,6 +3096,7 @@ mod tests {
                 })
                 .collect();
             let draft = OperationPolicyDraft {
+                update: None,
                 require_password: false,
                 create: None,
                 ssh: None,
@@ -3030,6 +3124,7 @@ mod tests {
         let observed = Arc::new(Observed::default());
         let (dir, app) = fixture_with(backend(observed.clone()), Arc::new(AtomicU64::new(0)));
         let draft = || OperationPolicyDraft {
+            update: None,
             require_password: false,
             create: None,
             ssh: None,

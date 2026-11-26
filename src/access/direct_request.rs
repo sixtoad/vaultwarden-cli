@@ -148,6 +148,11 @@ pub struct DirectReview {
     pub effect: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub create: Option<super::policy::CreateEffect>,
+    /// Issue 48 phase 2: item, binding, fields and the revision read when the
+    /// request was created. Never a value. Covered by the record digest and
+    /// by the Touch ID v2 review digest like every other member.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update: Option<super::policy::UpdateReview>,
     pub target: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh: Option<super::policy::SshReview>,
@@ -630,18 +635,26 @@ impl DirectRecord {
         let r = &self.review;
         let text = |s: &str| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control);
         self.write_receipt.as_ref().is_none_or(|receipt| {
-            r.create.is_some()
-                && self.execution_claimed
+            use crate::secret_storage::WriteStatus as W;
+            self.execution_claimed
                 && receipt.attempt_id == r.id
                 && receipt
                     .item_id
                     .as_deref()
                     .is_none_or(crate::secret_storage::valid_id)
-                && (!matches!(
-                    receipt.status,
-                    crate::secret_storage::WriteStatus::Verified
-                        | crate::secret_storage::WriteStatus::CreatedUnverified
-                ) || receipt.item_id.is_some())
+                && match (&r.create, &r.update) {
+                    (Some(_), None) => {
+                        receipt.status != W::UpdatedUnverified
+                            && (!matches!(receipt.status, W::Verified | W::CreatedUnverified)
+                                || receipt.item_id.is_some())
+                    }
+                    // An update receipt always names the one item it targets.
+                    (None, Some(update)) => {
+                        receipt.status != W::CreatedUnverified
+                            && receipt.item_id.as_deref() == Some(update.item_id.as_str())
+                    }
+                    _ => false,
+                }
         }) && self.binding_digest == self.digest()
             && self
                 .replay_digest
@@ -673,8 +686,15 @@ impl DirectRecord {
             && r.create.as_ref().is_none_or(|c| {
                 c.valid()
                     && r.ssh.is_none()
+                    && r.update.is_none()
                     && r.effect == "CREATE personal vault item (no update)"
                     && r.target == c.destination.reference
+            })
+            && r.update.as_ref().is_none_or(|u| {
+                u.valid()
+                    && r.ssh.is_none()
+                    && r.effect == super::policy::UPDATE_EFFECT_LINE
+                    && r.target == u.destination.reference
             })
             && (if r.ssh.is_some() {
                 r.ssh.as_ref().is_some_and(|ssh| r.target == ssh.target())

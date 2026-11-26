@@ -35,6 +35,10 @@ pub(crate) mod provider_store;
 pub mod provisioning;
 #[cfg(all(test, target_os = "linux"))]
 mod provisioning_tests;
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod update_flow_tests;
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+pub(crate) mod update_test_support;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const MAX_OPERATION_ID_LEN: usize = 64;

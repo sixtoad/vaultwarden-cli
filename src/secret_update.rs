@@ -51,6 +51,40 @@ pub struct UpdatePlan {
     pub history: Vec<String>,
 }
 
+/// A planned update bound to the fresh read it was built from: what the
+/// protected provider journals, sends once and then verifies (issue 48 phase 2).
+pub struct PreparedUpdate {
+    before: ItemSnapshot,
+    plan: UpdatePlan,
+}
+impl PreparedUpdate {
+    #[must_use]
+    pub const fn new(before: ItemSnapshot, plan: UpdatePlan) -> Self {
+        Self { before, plan }
+    }
+    #[must_use]
+    pub const fn before(&self) -> &ItemSnapshot {
+        &self.before
+    }
+    /// The PUT body (ciphertext only).
+    #[must_use]
+    pub const fn body(&self) -> &Value {
+        &self.plan.body
+    }
+    /// A minimal plan for application tests whose fake backend never sends it.
+    /// # Panics
+    /// Never for the fixed synthetic item.
+    #[cfg(test)]
+    #[must_use]
+    pub fn synthetic(id: &str, revision: &str) -> Self {
+        let raw = serde_json::json!({"id": id, "revisionDate": revision, "type": 1, "login": {}});
+        Self::new(
+            ItemSnapshot::parse(raw, id).expect("synthetic item parses"),
+            UpdatePlan::default(),
+        )
+    }
+}
+
 /// `YYYY-MM-DDTHH:MM:SS.mmmZ` (UTC), the form Bitwarden clients send for
 /// `lastUsedDate` and `passwordRevisionDate`.
 #[must_use]

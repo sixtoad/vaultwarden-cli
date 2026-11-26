@@ -166,7 +166,9 @@ fn frame(bytes: &[u8], invalid: bool) -> Result<SecretImport, ExecutionError> {
     if len == 0 || len > MAX_IMPORT_BYTES || bytes.len() != 4 + len {
         return Err(ExecutionError::ExecutionFailed);
     }
-    SecretImport::parse(&bytes[4..]).map_err(|_error| ExecutionError::ExecutionFailed)
+    // The update shape admits notes alone (D5); the application requires the
+    // exact policy schema for both create and update before any write.
+    SecretImport::parse_update(&bytes[4..]).map_err(|_error| ExecutionError::ExecutionFailed)
 }
 
 #[cfg(test)]

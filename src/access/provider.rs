@@ -9,6 +9,12 @@ use super::policy::{OperationPolicy, OperationPolicyDraft};
 use super::ports::LoginEligibilityVerifier;
 use super::provider_store::{ProviderState, ProviderStore};
 
+/// The vault write a protected request performs; read back for reconciliation.
+pub(crate) enum WriteEffect {
+    Create(super::policy::CreateEffect),
+    Update(super::policy::UpdateReview),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProviderDiagnostic {
     UnsafeState,
@@ -254,12 +260,15 @@ impl Provider {
         Ok(super::direct_request::AgentOwner::from_binding(binding))
     }
 
-    pub(crate) fn create_signed(
+    /// `update_revision` is the revision the application read for an update
+    /// policy (issue 48 phase 2); it must be `None` for every other policy.
+    pub(crate) fn create_signed_bound(
         &mut self,
         owner: super::direct_request::AgentOwner,
         input: super::protocol::SignedSubmission,
         now: u64,
         expires: u64,
+        update_revision: Option<String>,
         still_authorized: impl Fn() -> bool,
     ) -> Result<super::direct_request::DirectReview, super::protocol::AgentRejection> {
         use super::{direct_request::DirectSubmission, protocol::AgentRejection};
@@ -292,6 +301,7 @@ impl Provider {
             },
             now,
             expires,
+            update_revision,
             still_authorized,
         )
         .map_err(Into::into)
@@ -453,12 +463,25 @@ impl Provider {
         }
         Ok(super::history::newest(recent, limit))
     }
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn create_direct(
         &mut self,
         owner: super::direct_request::AuthenticatedHuman,
         input: super::direct_request::DirectSubmission,
         now: u64,
         expires: u64,
+        still_authorized: impl Fn() -> bool,
+    ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
+    {
+        self.create_direct_bound(owner, input, now, expires, None, still_authorized)
+    }
+    pub(crate) fn create_direct_bound(
+        &mut self,
+        owner: super::direct_request::AuthenticatedHuman,
+        input: super::direct_request::DirectSubmission,
+        now: u64,
+        expires: u64,
+        update_revision: Option<String>,
         still_authorized: impl Fn() -> bool,
     ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
     {
@@ -469,6 +492,7 @@ impl Provider {
             input,
             now,
             expires,
+            update_revision,
             still_authorized,
         )
     }
@@ -489,6 +513,7 @@ impl Provider {
             input,
             now,
             expires,
+            None,
             still_authorized,
         )
     }
@@ -501,6 +526,7 @@ impl Provider {
         input: super::direct_request::DirectSubmission,
         now: u64,
         expires: u64,
+        update_revision: Option<String>,
         still_authorized: impl Fn() -> bool,
     ) -> Result<super::direct_request::DirectReview, super::direct_request::DirectRequestError>
     {
@@ -541,6 +567,9 @@ impl Provider {
             .as_str()
             .to_owned();
         let mut review = policy.direct_review(id.clone(), args, expires);
+        policy
+            .bind_update(&mut review, update_revision.as_deref())
+            .map_err(|_error| DirectRequestError::InvalidRequest)?;
         if let Some(owner) = &agent_owner {
             review.requester = owner.review_requester();
         }
@@ -837,6 +866,17 @@ impl Provider {
         );
         expected.status = direct.review.status.clone();
         expected.requester = direct.review.requester.clone();
+        // The reviewed revision is the only part a policy cannot rebuild.
+        policy
+            .bind_update(
+                &mut expected,
+                direct
+                    .review
+                    .update
+                    .as_ref()
+                    .map(|update| update.expected_revision.as_str()),
+            )
+            .map_err(|_error| DirectRequestError::InvalidRequest)?;
         if arguments != direct.review.arguments || expected != direct.review {
             return Err(DirectRequestError::InvalidRequest);
         }
@@ -882,10 +922,7 @@ impl Provider {
         &self,
         id: &str,
     ) -> Result<
-        (
-            super::policy::CreateEffect,
-            crate::secret_storage::WriteReceipt,
-        ),
+        (WriteEffect, crate::secret_storage::WriteReceipt),
         super::direct_request::DirectRequestError,
     > {
         use super::direct_request::DirectRequestError as E;
@@ -899,15 +936,23 @@ impl Provider {
         if !direct.review.status.is_terminal() {
             return Err(E::InvalidRequest);
         }
+        let effect = match (&direct.review.create, &direct.review.update) {
+            (Some(create), None) => WriteEffect::Create(create.clone()),
+            (None, Some(update)) => WriteEffect::Update(update.clone()),
+            _ => return Err(E::InvalidRequest),
+        };
         Ok((
-            direct.review.create.clone().ok_or(E::InvalidRequest)?,
+            effect,
             direct.write_receipt.clone().ok_or(E::InvalidRequest)?,
         ))
     }
+    /// `update_status` is the D9 result for an update receipt (`None` for a
+    /// create); it replaces only an `uncertain` receipt.
     pub(crate) fn reconcile_write(
         &mut self,
         id: &str,
         item_id: &str,
+        update_status: Option<crate::secret_storage::WriteStatus>,
     ) -> Result<crate::secret_storage::WriteReceipt, super::direct_request::DirectRequestError>
     {
         use super::direct_request::DirectRequestError as E;
@@ -933,9 +978,21 @@ impl Provider {
         {
             return Ok(receipt.clone());
         }
-        receipt.item_id = Some(item_id.to_owned());
-        if receipt.status != WriteStatus::Verified {
-            receipt.status = WriteStatus::CreatedUnverified;
+        match (direct.review.update.is_some(), update_status) {
+            (false, None) => {
+                receipt.item_id = Some(item_id.to_owned());
+                if receipt.status != WriteStatus::Verified {
+                    receipt.status = WriteStatus::CreatedUnverified;
+                }
+            }
+            (true, Some(status))
+                if matches!(status, WriteStatus::Failed | WriteStatus::UpdatedUnverified) =>
+            {
+                if receipt.status == WriteStatus::Uncertain {
+                    receipt.status = status;
+                }
+            }
+            _ => return Err(E::InvalidRequest),
         }
         let receipt = receipt.clone();
         direct.audit.push(super::history::HistoryEvent::snapshot(
@@ -972,26 +1029,23 @@ impl Provider {
         {
             return Err(DirectRequestError::AlreadyDecided);
         }
-        let effect = direct
-            .review
-            .create
-            .as_ref()
-            .ok_or(DirectRequestError::InvalidRequest)?;
-        if state
-            .requests
-            .iter()
-            .filter(|r| r.id != binding.request_id)
-            .filter_map(|r| r.direct.as_ref())
-            .any(|r| {
-                r.write_receipt.is_some()
-                    && r.review.create.as_ref().is_some_and(|c| {
-                        c.server.trim_end_matches('/') == effect.server.trim_end_matches('/')
-                            && c.destination == effect.destination
-                    })
-            })
-        {
-            return Err(DirectRequestError::AlreadyDecided);
-        }
+        let item_id = match (&direct.review.create, &direct.review.update) {
+            (Some(effect), None) => {
+                if Self::destination_written(&state, &binding.request_id, effect) {
+                    return Err(DirectRequestError::AlreadyDecided);
+                }
+                None
+            }
+            // D8: an uncertain update of the same item blocks another until
+            // it is reconciled; earlier definite updates never do.
+            (None, Some(update)) => {
+                if Self::update_uncertain(&state, &binding.request_id, update) {
+                    return Err(DirectRequestError::AlreadyDecided);
+                }
+                Some(update.item_id.clone())
+            }
+            _ => return Err(DirectRequestError::InvalidRequest),
+        };
         let direct = state
             .requests
             .iter_mut()
@@ -1000,12 +1054,52 @@ impl Provider {
             .ok_or(DirectRequestError::NotFound)?;
         direct.write_receipt = Some(WriteReceipt {
             attempt_id: binding.request_id.clone(),
-            item_id: None,
+            item_id,
             status: WriteStatus::Uncertain,
         });
         self.store.write_state(&state)?;
         self.state = state;
         Ok(())
+    }
+    /// Create's destination slot is permanent: any earlier write attempt holds it.
+    fn destination_written(
+        state: &super::provider_store::ProviderState,
+        request_id: &str,
+        effect: &super::policy::CreateEffect,
+    ) -> bool {
+        state
+            .requests
+            .iter()
+            .filter(|r| r.id != request_id)
+            .filter_map(|r| r.direct.as_ref())
+            .any(|r| {
+                r.write_receipt.is_some()
+                    && r.review.create.as_ref().is_some_and(|c| {
+                        c.server.trim_end_matches('/') == effect.server.trim_end_matches('/')
+                            && c.destination == effect.destination
+                    })
+            })
+    }
+    /// Whether another provider attempt to update the same item is uncertain.
+    pub(crate) fn update_uncertain(
+        state: &super::provider_store::ProviderState,
+        request_id: &str,
+        update: &super::policy::UpdateReview,
+    ) -> bool {
+        state
+            .requests
+            .iter()
+            .filter(|r| r.id != request_id)
+            .filter_map(|r| r.direct.as_ref())
+            .any(|r| {
+                r.write_receipt
+                    .as_ref()
+                    .is_some_and(|w| w.status == crate::secret_storage::WriteStatus::Uncertain)
+                    && r.review.update.as_ref().is_some_and(|u| {
+                        u.server.trim_end_matches('/') == update.server.trim_end_matches('/')
+                            && u.item_id == update.item_id
+                    })
+            })
     }
     pub(crate) fn record_write(
         &mut self,
@@ -1466,6 +1560,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            update: None,
             require_password: false,
             create: None,
             ssh: None,

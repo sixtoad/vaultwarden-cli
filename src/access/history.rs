@@ -54,6 +54,9 @@ pub struct HistoryEvent {
     pub credentials: Vec<ReviewCredential>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub create: Option<super::policy::CreateEffect>,
+    /// Item, binding, selectors and expected revision only; never a value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update: Option<super::policy::UpdateReview>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub write_receipt: Option<crate::secret_storage::WriteReceipt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -80,6 +83,8 @@ struct HistoryEventWire {
     #[serde(default)]
     create: Option<super::policy::CreateEffect>,
     #[serde(default)]
+    update: Option<super::policy::UpdateReview>,
+    #[serde(default)]
     write_receipt: Option<crate::secret_storage::WriteReceipt>,
     #[serde(default)]
     ssh: Option<super::policy::SshReview>,
@@ -103,6 +108,7 @@ impl TryFrom<HistoryEventWire> for HistoryEvent {
             policy_revision: w.policy_revision,
             credentials: w.credentials,
             create: w.create,
+            update: w.update,
             write_receipt: w.write_receipt,
             ssh: w.ssh,
             created_at_unix_seconds: w.created_at_unix_seconds,
@@ -145,6 +151,7 @@ impl HistoryEvent {
             policy_revision: record.review.policy_digest.clone(),
             credentials: record.review.credentials.clone(),
             create: record.review.create.clone(),
+            update: record.review.update.clone(),
             write_receipt: record.write_receipt.clone(),
             ssh: record.review.ssh.clone(),
             created_at_unix_seconds: record.created_at_unix_seconds,
@@ -174,6 +181,7 @@ impl HistoryEvent {
             && self.credentials.iter().all(|c| text(&c.label))
             && (self.at_unix_seconds.is_some() || self.outcome == HistoryOutcome::LegacyUnknown)
             && self.ssh.as_ref().is_none_or(|ssh| ssh.valid())
+            && self.update.as_ref().is_none_or(|update| update.valid())
             && self.approval.as_ref().is_none_or(|method| match method {
                 ApprovalMethod::Biometric { key_id } => {
                     self.outcome == HistoryOutcome::Approved && super::valid_sha256(key_id)
