@@ -288,6 +288,8 @@ fn producer_schema_mismatch_denial_expiry_and_lock_never_put() {
         };
         assert!(env.run(&id, &producer).is_err(), "{case}");
         vault::with(|item| assert_eq!(item.puts, 0, "{case}"));
+        // The application refuses another schema before reading the item again.
+        vault::with(|item| assert_eq!(item.prepares, 0, "{case}"));
     }
 }
 

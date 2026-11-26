@@ -5,7 +5,8 @@ Each mutation removes or weakens one guard and must make the focused tests
 fail; sources are restored exactly and the baseline is retested.
 Usage: python3 scripts/mutate-provider-update.py EVIDENCE_DIR
 Runs on Linux and on native macOS. Honors CARGO_BUILD_JOBS and RUSTUP_TOOLCHAIN;
-BUILD_LOCK=PATH serializes each test command with other builds on the host.
+BUILD_LOCK=PATH serializes each test command with other builds on the host;
+ONLY=name,name reruns selected mutations.
 """
 import hashlib
 import json
@@ -73,8 +74,8 @@ mutations = {
         "if input.selectors() != effect.sorted_fields() {",
         "if input.selectors().is_empty() {")),
     "adapter-body-bound-to-revision": (ADAPTER, (
-        "        if prepared.before().revision() != review.expected_revision\n            || prepared",
-        "        if prepared.before().revision().is_empty()\n            || prepared")),
+        "            != Some(review.expected_revision.as_str())\n        {",
+        "            == Some(\"never\")\n        {")),
     "adapter-no-put-once-not-live": (ADAPTER, (
         "        if !live() {\n            return Err(WriteStatus::Failed);\n        }\n        let response",
         "        let response")),
@@ -119,6 +120,9 @@ mutations = {
         "        if review.response.review.update.is_some() {\n            request[\"capabilities\"]",
         "        if review.response.review.update.is_none() {\n            request[\"capabilities\"]")),
 }
+only = [n for n in os.environ.get("ONLY", "").split(",") if n]
+if only:
+    mutations = {n: m for n, m in mutations.items() if n in only}
 originals = {file: (root / file).read_bytes() for file, _ in mutations.values()}
 cargo = ["cargo", "test", "--locked", "--offline"]
 commands = [

@@ -721,7 +721,11 @@ revision recheck, schema, body binding, liveness, D11 mapping, response
 identity, binding check, reconcile binding and revision; companion capability
 requirement, exact name, list shape, approve-only; core block validation and
 both capability assertions) and requires the focused tests to fail. The
-report is `issue-48-phase2-mutations/report.json`. Weakening only
+report is `issue-48-phase2-mutations/report.json` (26 of 26 caught). Two
+first-run escapes were fixed: the application's producer-schema check was
+masked by the fake backend's own check (the test now requires no item read for
+another schema), and the adapter's body binding had two redundant clauses (the
+wire-level `lastKnownRevisionDate` check is kept). Weakening only
 `OperationPolicy::bind_update`'s revision check is an equivalent mutant: the
 record validation (`UpdateReview::valid`) refuses the same request before any
 state write, so the campaign mutates the shared `valid_revision` bound instead.

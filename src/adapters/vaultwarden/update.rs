@@ -89,12 +89,11 @@ impl VaultwardenBackend {
         }
         let (token, _) = self.session.as_ref().ok_or(WriteStatus::Failed)?;
         // The body is bound to the reviewed revision (`lastKnownRevisionDate`).
-        if prepared.before().revision() != review.expected_revision
-            || prepared
-                .body()
-                .get("lastKnownRevisionDate")
-                .and_then(serde_json::Value::as_str)
-                != Some(review.expected_revision.as_str())
+        if prepared
+            .body()
+            .get("lastKnownRevisionDate")
+            .and_then(serde_json::Value::as_str)
+            != Some(review.expected_revision.as_str())
         {
             return Err(WriteStatus::Failed);
         }
