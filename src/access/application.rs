@@ -2722,6 +2722,7 @@ mod tests {
                 serde_json::json!([test_approved_image(dir.path(), "deploy-image")]);
             std::fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
             let draft = OperationPolicyDraft {
+                update: None,
                 require_password: false,
                 create: None,
                 ssh: None,
