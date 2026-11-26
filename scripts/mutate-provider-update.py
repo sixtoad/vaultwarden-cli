@@ -156,8 +156,6 @@ try:
         report["mutations"][name] = {"caught_by_test": caught, "exit_code": code}
         (root / file).write_bytes(originals[file])
         print(f"{name}: {'caught' if caught else 'ESCAPED'}", flush=True)
-        if not caught:
-            raise RuntimeError(f"{name}: escaped or failed compilation")
 finally:
     for file, original in originals.items():
         (root / file).write_bytes(original)
@@ -165,5 +163,8 @@ finally:
                                  for n in originals}
     report["restored_test_exit"] = run("restored")
     (evidence / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+escaped = [n for n, r in report["mutations"].items() if not r["caught_by_test"]]
+if escaped:
+    raise SystemExit(f"escaped or failed compilation: {', '.join(escaped)}")
 if report["restored_test_exit"] != 0:
     raise SystemExit("restored baseline failed")
