@@ -55,6 +55,21 @@ pub struct ProviderReview {
     pub expires_at_unix_seconds: u64,
     pub one_time: String,
     pub status: String,
+    /// Issue 48 phase 2: present only for an update of an existing item.
+    pub update: Option<ProviderReviewUpdate>,
+}
+
+/// The update block of a review, every value escaped like the rest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProviderReviewUpdate {
+    pub server: String,
+    pub item_id: String,
+    pub account_id: String,
+    pub folder: String,
+    pub folder_id: String,
+    pub reference: String,
+    pub fields: Vec<String>,
+    pub expected_revision: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
