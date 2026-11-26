@@ -224,6 +224,12 @@ fn approved_update_runs_the_producer_once_puts_once_and_records_verified_without
     );
     assert_eq!(last.update.as_ref().unwrap().fields, ["password"]);
     assert!(!serde_json::to_string(&history).unwrap().contains(SECRET));
+    // Reconciling a definite receipt never rewrites it (the revision moved).
+    let receipt = env
+        .app()
+        .reconcile_write(env.app().human_owner(), &id, ITEM)
+        .unwrap();
+    assert_eq!(receipt.status, WriteStatus::Verified);
 }
 
 #[test]

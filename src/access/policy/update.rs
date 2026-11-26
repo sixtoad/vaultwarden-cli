@@ -174,6 +174,53 @@ mod tests {
     }
 
     #[test]
+    fn update_policy_is_exclusive_with_create_ssh_credentials_and_arguments() {
+        use super::super::{
+            ArgumentSpec, CreateEffect, CredentialUse, LoginCredentialDraft, OperationPolicyDraft,
+            validate_draft,
+        };
+        let draft = || OperationPolicyDraft {
+            id: "rotate-token".into(),
+            description: "Rotate".into(),
+            image_id: "image".into(),
+            targets: vec![],
+            arguments: vec![],
+            credentials: vec![],
+            ssh: None,
+            create: None,
+            update: Some(effect()),
+            require_password: false,
+        };
+        assert!(validate_draft(&draft()).is_ok());
+        let mut both = draft();
+        both.create = Some(CreateEffect {
+            server: "https://vault.example".into(),
+            destination: effect().destination,
+            fields: vec!["password".into()],
+            eligibility_marker: "deploy".into(),
+        });
+        assert!(validate_draft(&both).is_err(), "create");
+        let mut credentials = draft();
+        credentials.credentials = vec![LoginCredentialDraft {
+            namespace: None,
+            item_id: "11111111-1111-1111-1111-111111111111".into(),
+            label: "x".into(),
+            use_type: CredentialUse::Login,
+            field_mappings: vec![],
+        }];
+        assert!(validate_draft(&credentials).is_err(), "credentials");
+        let mut arguments = draft();
+        arguments.arguments = vec![ArgumentSpec::Target];
+        assert!(validate_draft(&arguments).is_err(), "arguments");
+        let mut targets = draft();
+        targets.targets = vec!["staging".into()];
+        assert!(validate_draft(&targets).is_err(), "targets");
+        let mut invalid = draft();
+        invalid.update.as_mut().unwrap().fields = vec!["custom:vw-access".into()];
+        assert!(validate_draft(&invalid).is_err(), "marker");
+    }
+
+    #[test]
     fn update_review_binds_a_printable_bounded_revision() {
         let review = effect().review("2026-11-22T09:30:00.123456Z".into());
         assert!(review.valid());
