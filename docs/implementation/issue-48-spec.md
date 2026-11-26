@@ -721,4 +721,7 @@ revision recheck, schema, body binding, liveness, D11 mapping, response
 identity, binding check, reconcile binding and revision; companion capability
 requirement, exact name, list shape, approve-only; core block validation and
 both capability assertions) and requires the focused tests to fail. The
-report is `issue-48-phase2-mutations/report.json`.
+report is `issue-48-phase2-mutations/report.json`. Weakening only
+`OperationPolicy::bind_update`'s revision check is an equivalent mutant: the
+record validation (`UpdateReview::valid`) refuses the same request before any
+state write, so the campaign mutates the shared `valid_revision` bound instead.

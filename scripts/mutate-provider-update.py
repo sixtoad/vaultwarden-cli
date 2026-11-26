@@ -41,9 +41,9 @@ mutations = {
     "policy-notes-only-allowed": (EFFECT, (
         "(matches!(f.as_str(), \"password\" | \"notes\")",
         "(matches!(f.as_str(), \"password\")")),
-    "review-revision-validated": (POLICY, (
-        "(Some(effect), Some(revision)) if update::valid_revision(revision) => {",
-        "(Some(effect), Some(revision)) => {")),
+    # `bind_update`'s revision check is backed by `DirectRecord::validate`
+    # (`UpdateReview::valid`) before any state write: weakening one alone is
+    # not observable (equivalent), so the shared bound itself is mutated below.
     "review-revision-bounded": (EFFECT, (
         "!value.is_empty() && value.len() <= MAX_REVISION_LEN",
         "value.len() <= MAX_REVISION_LEN + 1")),
