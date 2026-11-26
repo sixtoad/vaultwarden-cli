@@ -1,4 +1,5 @@
 //! Offline, provider-owned companion enrollment. This is separate from agent pairings.
+use crate::access::approval_key_class::KeyClass;
 use crate::access::{approval_v2, ports::SessionError};
 use rustls::pki_types::{CertificateDer, UnixTime, pem::PemObject};
 use serde::{Deserialize, Serialize};
@@ -32,8 +33,10 @@ const MAX_BIOMETRIC_AUDIT: usize = 64;
 const MAX_REGISTRY_BYTES: usize = 65536;
 /// Highest registry format this provider reads. Writers emit the lowest
 /// version that represents the content: version 2 (byte-compatible with the
-/// previous release) unless Touch ID state or audit exists, then version 3.
-const REGISTRY_VERSION: u8 = 3;
+/// previous release) unless Touch ID state or audit exists, then version 3;
+/// version 4 only while an enrolled key has a non-`biometric` class
+/// (desktop-approval-spec D-7), so an older binary refuses it.
+const REGISTRY_VERSION: u8 = 4;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnrolledCompanion {
@@ -68,6 +71,9 @@ struct BiometricEnrollment {
     /// Unpadded base64url of the 65-byte uncompressed SEC1 P-256 point.
     public_key: String,
     enrolled_generation: u64,
+    /// v4: omitted for `biometric` (every key enrolled before classes).
+    #[serde(default, skip_serializing_if = "KeyClass::is_biometric")]
+    key_class: KeyClass,
 }
 impl BiometricEnrollment {
     fn decoded(&self) -> Option<Vec<u8>> {
@@ -275,6 +281,7 @@ fn valid_biometric(registry: &Registry) -> bool {
                     .iter()
                     .any(|identity| identity.fingerprint == entry.fingerprint)
                 && entry.decoded().is_some()
+                && (registry.version >= 4 || entry.key_class.is_biometric())
         })
 }
 /// The current production approval key of an ENABLED approval client.
@@ -298,6 +305,7 @@ pub(crate) fn biometric_key(
             Some(approval_v2::EnrolledKey {
                 key_id: entry.key_id.clone(),
                 public_key: entry.decoded()?,
+                class: entry.key_class,
             })
         }))
 }
@@ -307,6 +315,7 @@ pub(crate) fn enroll_biometric_online(
     root: &Path,
     fingerprint: &str,
     public_key: &[u8],
+    key_class: KeyClass,
     generation: u64,
 ) -> Result<String, SessionError> {
     use base64::Engine;
@@ -334,6 +343,7 @@ pub(crate) fn enroll_biometric_online(
         key_id: key_id.clone(),
         public_key: base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key),
         enrolled_generation: generation,
+        key_class,
     });
     biometric_audit(
         &mut registry,
@@ -616,8 +626,14 @@ fn serialize(registry: &mut Registry) -> Result<Vec<u8>, SessionError> {
         && !registry.audit.iter().any(|e| e.action.biometric())
     {
         2
-    } else {
+    } else if registry
+        .biometric
+        .iter()
+        .all(|e| e.key_class.is_biometric())
+    {
         3
+    } else {
+        4
     };
     serde_json::to_vec(registry).map_err(unavailable)
 }

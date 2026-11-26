@@ -468,11 +468,24 @@ impl PreparedApproval {
         let transcript =
             v2::approval_transcript(context, &self.binding, self.generation, &enrolled.key_id)
                 .ok_or(DirectRequestError::AuthenticationFailed)?;
+        // The enrolled class, never the proof, decides the verification.
+        let message = super::approval_key_class::signed_message(
+            enrolled.class,
+            &transcript,
+            proof.authenticator_data.as_deref(),
+        )
+        .ok_or(DirectRequestError::AuthenticationFailed)?;
         verifier
-            .verify(&enrolled.public_key, &transcript, &proof.signature)
+            .verify(&enrolled.public_key, &message, &proof.signature)
             .map_err(|_error| DirectRequestError::AuthenticationFailed)?;
-        let method = super::history::ApprovalMethod::Biometric {
-            key_id: enrolled.key_id.clone(),
+        let key_id = enrolled.key_id.clone();
+        let method = match enrolled.class {
+            super::approval_key_class::KeyClass::Biometric => {
+                super::history::ApprovalMethod::Biometric { key_id }
+            }
+            super::approval_key_class::KeyClass::WindowsHello => {
+                super::history::ApprovalMethod::WindowsHello { key_id }
+            }
         };
         Ok(AuthenticatedApproval(self, Some(method)))
     }

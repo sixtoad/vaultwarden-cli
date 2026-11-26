@@ -159,8 +159,10 @@ pub(super) fn valid(command: &Command) -> Option<bool> {
             password,
             public_key,
             enroll_signature,
+            key_class,
+            enroll_authenticator_data,
         } => {
-            *version == 2
+            enroll_class(*version, *key_class, enroll_authenticator_data.as_deref()).is_some()
                 && valid_request_id(action_id)
                 && identity::valid_fingerprint(ticket)
                 && valid_password(password)
@@ -738,13 +740,18 @@ fn biometric(
             })))
         }
         Command::BiometricEnroll {
+            version,
             action_id,
             ticket,
             password,
             public_key,
             enroll_signature,
-            ..
+            key_class,
+            enroll_authenticator_data,
         } => {
+            let (class, authenticator_data) =
+                enroll_class(version, key_class, enroll_authenticator_data.as_deref())
+                    .ok_or(Error::Invalid)?;
             let target = Target {
                 kind: Kind::ApprovalClient,
                 id: actor.into(),
@@ -780,9 +787,15 @@ fn biometric(
                 &action_id,
             )
             .ok_or(Error::Invalid)?;
+            let message = crate::access::approval_key_class::signed_message(
+                class,
+                &transcript,
+                authenticator_data.as_deref(),
+            )
+            .ok_or(Error::Authentication)?;
             service
                 .biometric_verifier
-                .verify(&key, &transcript, &signature)
+                .verify(&key, &message, &signature)
                 .map_err(|_error| Error::Authentication)?;
             service
                 .approval_authenticator
@@ -795,11 +808,12 @@ fn biometric(
                 .lock()
                 .map_err(|_error| Error::Unavailable)?;
             recheck(service, actor, &ticket, app)?;
-            let key_id = identity::enroll_biometric_online(root, actor, &key, ticket.generation)
-                .map_err(|error| match error {
-                    SessionError::InvalidRequest => Error::Invalid,
-                    _ => Error::Unavailable,
-                })?;
+            let key_id =
+                identity::enroll_biometric_online(root, actor, &key, class, ticket.generation)
+                    .map_err(|error| match error {
+                        SessionError::InvalidRequest => Error::Invalid,
+                        _ => Error::Unavailable,
+                    })?;
             Ok(Response::ok(serde_json::json!({
                 "version": 2,
                 "operation": BiometricOperation::Enroll,
@@ -1050,4 +1064,24 @@ pub(super) fn receipt_authorized(service: &Companion, actor: &str, command: &Com
             .iter()
             .any(|a| a.actor == actor && a.action_id == *action_id && a.target == *target)
     })
+}
+
+/// The class a `biometric_enroll` enrolls and its decoded authenticator data
+/// (desktop-approval-spec D-7): version 2 is always `biometric` with no
+/// authenticator data; version 3 requires an explicit non-`biometric` class
+/// and, for `windows_hello`, exactly 37 bytes of authenticator data.
+fn enroll_class(
+    version: u8,
+    class: Option<crate::access::approval_key_class::KeyClass>,
+    authenticator_data: Option<&str>,
+) -> Option<(crate::access::approval_key_class::KeyClass, Option<Vec<u8>>)> {
+    use crate::access::approval_key_class::{AUTHENTICATOR_DATA_LEN, KeyClass};
+    match (version, class, authenticator_data) {
+        (2, None, None) => Some((KeyClass::Biometric, None)),
+        (3, Some(KeyClass::WindowsHello), Some(data)) => {
+            let data = decode_binary(data).filter(|d| d.len() == AUTHENTICATOR_DATA_LEN)?;
+            Some((KeyClass::WindowsHello, Some(data)))
+        }
+        _ => None,
+    }
 }

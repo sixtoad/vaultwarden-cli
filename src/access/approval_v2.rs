@@ -42,11 +42,15 @@ pub(crate) struct ApprovalContext<'a> {
 pub struct BiometricProof {
     pub key_id: String,
     pub signature: Vec<u8>,
+    /// `WindowsHello` keys only: the 37-byte WebAuthn authenticator data.
+    pub authenticator_data: Option<Vec<u8>>,
 }
 /// The device's currently enrolled key as recorded by the provider.
 pub struct EnrolledKey {
     pub key_id: String,
     pub public_key: Vec<u8>,
+    /// Fixed at enrollment; selects the verification and the recorded method.
+    pub class: super::approval_key_class::KeyClass,
 }
 
 pub(crate) fn hex32(value: &str) -> Option<[u8; 32]> {

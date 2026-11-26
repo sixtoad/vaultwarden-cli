@@ -34,14 +34,17 @@ pub enum HistoryOutcome {
     LegacyUnknown,
     Reconciled,
 }
-/// How an approval was authenticated. Recorded only on biometric approvals:
-/// an `Approved` event without it was authenticated by a fresh password (every
+/// How an approval was authenticated. Recorded only on key approvals: an
+/// `Approved` event without it was authenticated by a fresh password (every
 /// legacy and password approval), so existing records and projections stay
 /// byte-identical. Never carries a signature, password or public key.
+/// `WindowsHello` is a Windows Hello credential (fingerprint, face or the
+/// Windows Hello PIN): never recorded as `Biometric`.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ApprovalMethod {
     Biometric { key_id: String },
+    WindowsHello { key_id: String },
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "HistoryEventWire")]
@@ -175,7 +178,7 @@ impl HistoryEvent {
             && (self.at_unix_seconds.is_some() || self.outcome == HistoryOutcome::LegacyUnknown)
             && self.ssh.as_ref().is_none_or(|ssh| ssh.valid())
             && self.approval.as_ref().is_none_or(|method| match method {
-                ApprovalMethod::Biometric { key_id } => {
+                ApprovalMethod::Biometric { key_id } | ApprovalMethod::WindowsHello { key_id } => {
                     self.outcome == HistoryOutcome::Approved && super::valid_sha256(key_id)
                 }
             })
