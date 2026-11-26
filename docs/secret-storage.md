@@ -185,8 +185,7 @@ a reviewed self-contained executable. The human operator creates a policy with
 
 Provisioning and execution verify the account and uniquely resolved folder ID.
 The schema must match producer output exactly. This version accepts a fixed
-producer with empty arguments/targets/credentials and no SSH effect. Update effects
-are not part of the closed policy schema. Normal signed agent submission and
+producer with empty arguments/targets/credentials and no SSH effect. Normal signed agent submission and
 fresh human approval are still required for every execution. Reviews on loopback
 and native macOS show the create effect, namespace, schema and marker.
 
@@ -233,6 +232,46 @@ Put this object in that read operation's `credentials` array. `"notes"` is also 
 supported selector. Read policies retain their own pinned executable, mappings,
 marker and fresh approval. Agent replies and history contain no secret values.
 
+### Protected update of an existing item
+
+A policy may instead carry an `update` effect (issue 48 phase 2), mutually
+exclusive with `create`, SSH and credentials. It pins one existing personal Login
+item by ID and its full binding; it never pins a revision:
+
+```json
+{
+  "id": "rotate-deploy-token",
+  "description": "Rotate the deploy credential",
+  "image_id": "reviewed-producer",
+  "targets": [],
+  "arguments": [],
+  "credentials": [],
+  "update": {
+    "server": "https://vault.example",
+    "item_id": "33333333-3333-3333-3333-333333333333",
+    "destination": {
+      "account_id": "11111111-1111-1111-1111-111111111111",
+      "folder": "homelab/production",
+      "folder_id": "22222222-2222-2222-2222-222222222222",
+      "reference": "homelab/production/github/deploy-token"
+    },
+    "fields": ["password"]
+  }
+}
+```
+
+`fields` lists existing fields to replace (`password`, `notes`, `custom:NAME`;
+notes alone is allowed; `custom:vw-access` never). Each request reads the item
+and its review shows `UPDATE personal vault item (no create)`, the item, binding,
+fields and the revision read. After approval the producer writes the new values on
+fd 3 exactly as for create; the provider then rereads the item and writes nothing
+if anything changed it since the review. One PUT replaces only the selected values
+(old password and hidden values go to password history, as in official clients)
+and the receipt ends `verified` only after an exact read-back. A companion approves
+an update only if it shows the update block (`update-review.v1`, see
+[companion protocol](companion-protocol.md)); otherwise use the loopback review.
+Details: [issue 48 spec, section 7](implementation/issue-48-spec.md#7-phase-2-implemented-protected-provider-update).
+
 ## Recovery without another creation
 
 Before POST, trusted imports fsync a metadata-only journal under the CLI config
@@ -276,3 +315,11 @@ Recovered values cannot be compared to originals after restart, so recovery yiel
 that status. Reconciliation never authorizes execution, creates another item, or
 provisions read access. If no candidate can be established, leave it uncertain and
 investigate using the vault's trusted administration tools.
+
+For a protected **update** (issue 48 phase 2), `vw-access reconcile-write
+REQUEST_ID ITEM_UUID` must name the request's own item and compares the item's
+revision with the reviewed one: unchanged (binding intact) gives `failed`, any
+later write gives `updated_unverified`. It rewrites only an `uncertain`
+receipt and never sends a PUT; until then, the uncertain update blocks further
+provider updates of that item. See
+[the issue 48 spec](implementation/issue-48-spec.md#7-phase-2-implemented-protected-provider-update).
