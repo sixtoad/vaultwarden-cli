@@ -26,11 +26,20 @@ enum KeyOutcome {
 enum KeyPurpose { approve, enroll }
 
 class KeyReply {
-  KeyReply(this.outcome, [Uint8List? publicKey, Uint8List? signature])
-    : publicKey = publicKey ?? Uint8List(0),
-      signature = signature ?? Uint8List(0);
+  KeyReply(
+    this.outcome, [
+    Uint8List? publicKey,
+    Uint8List? signature,
+    Uint8List? authenticatorData,
+  ]) : publicKey = publicKey ?? Uint8List(0),
+       signature = signature ?? Uint8List(0),
+       authenticatorData = authenticatorData ?? Uint8List(0);
   final KeyOutcome outcome;
   final Uint8List publicKey, signature;
+
+  /// Windows Hello only (desktop-approval-spec D-8): the WebAuthn
+  /// authenticator data the signature covers. Empty on every native channel.
+  final Uint8List authenticatorData;
 }
 
 /// The pinned identities a production key is bound to: the provider TLS

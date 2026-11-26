@@ -27,6 +27,8 @@ class ProviderSettings extends StatelessWidget {
     required this.onDedicated,
     required this.endpoint,
     required this.pin,
+    this.caPath,
+    this.identityPath,
     required this.importPassword,
     required this.pilotBundle,
     required this.touchIdPassword,
@@ -49,6 +51,10 @@ class ProviderSettings extends StatelessWidget {
   final bool dedicated;
   final ValueChanged<bool> onDedicated;
   final TextEditingController endpoint, pin, importPassword, pilotBundle;
+
+  /// Set on Windows and Linux: the CA and the PKCS#12 are read by absolute
+  /// path (desktop-approval-spec D-4); null where native dialogs select them.
+  final TextEditingController? caPath, identityPath;
   final TextEditingController touchIdPassword;
   final VoidCallback onSetupPilot, onSetup, onOpenSynthetic;
 
@@ -120,8 +126,10 @@ class ProviderSettings extends StatelessWidget {
             title: const Text('Advanced development provider setup'),
             initiallyExpanded: !config.configured,
             children: [
-              const Text(
-                'Use a separately issued and enrolled Flutter development client certificate. Do not import the installed Swift companion identity. Select the private CA in DER format and the dedicated PKCS#12 in the native file dialogs.',
+              Text(
+                caPath == null
+                    ? 'Use a separately issued and enrolled Flutter development client certificate. Do not import the installed Swift companion identity. Select the private CA in DER format and the dedicated PKCS#12 in the native file dialogs.'
+                    : 'Use a separately issued and enrolled development client certificate. Enter the absolute paths of the private CA in DER format and the dedicated PKCS#12. The files are read once; the identity is then kept for your user account only.',
               ),
               TextField(
                 controller: endpoint,
@@ -137,6 +145,24 @@ class ProviderSettings extends StatelessWidget {
                   labelText: 'Trusted server leaf SHA-256 (64 lowercase hex)',
                 ),
               ),
+              if (caPath case final caPath?)
+                TextField(
+                  key: const Key('setup-ca-path'),
+                  controller: caPath,
+                  enabled: controller.canSetup,
+                  decoration: const InputDecoration(
+                    labelText: 'Provider CA path (DER)',
+                  ),
+                ),
+              if (identityPath case final identityPath?)
+                TextField(
+                  key: const Key('setup-identity-path'),
+                  controller: identityPath,
+                  enabled: controller.canSetup,
+                  decoration: const InputDecoration(
+                    labelText: 'Client identity path (PKCS#12)',
+                  ),
+                ),
               accessPassword(importPassword, 'PKCS#12 import passphrase'),
               CheckboxListTile(
                 value: dedicated,
@@ -149,7 +175,11 @@ class ProviderSettings extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: controller.canSetup && dedicated ? onSetup : null,
-                child: const Text('Select CA and import dedicated identity'),
+                child: Text(
+                  caPath == null
+                      ? 'Select CA and import dedicated identity'
+                      : 'Import CA and dedicated identity',
+                ),
               ),
             ],
           ),

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../platform/approval_client.dart';
 import '../platform/approval_key.dart';
+import '../platform/core_approval_key.dart';
+import '../platform/core_provider.dart';
 import '../platform/installation.dart';
 import '../platform/notifications.dart';
 import '../platform/provider.dart';
@@ -70,6 +72,10 @@ class _ProviderPageState extends State<ProviderPage>
   String notificationRequest = '';
   String notificationNote = '';
   final endpoint = TextEditingController(), pin = TextEditingController();
+
+  /// Windows and Linux setup reads the CA and PKCS#12 by path (spec D-4).
+  final caPath = TextEditingController(),
+      identityPath = TextEditingController();
   final importPassword = TextEditingController(),
       approvalPassword = TextEditingController(),
       unlockPassword = TextEditingController();
@@ -122,7 +128,10 @@ class _ProviderPageState extends State<ProviderPage>
     enrollment = EnrollmentFlow(controller)..addListener(changed);
     touchId = TouchIdController(
       controller,
-      widget.approvalKeys ?? NativeApprovalKeyPlatform(),
+      widget.approvalKeys ??
+          (isCoreTransportSystem(os)
+              ? CoreApprovalKeyPlatform(operatingSystem: os)
+              : NativeApprovalKeyPlatform()),
       operatingSystem: os,
     )..addListener(changed);
     touchId.onExemptionEnded = applyLifecycle;
@@ -472,7 +481,16 @@ class _ProviderPageState extends State<ProviderPage>
     final secret = importPassword
         .text; // secrets-ignore: runtime input, not a credential literal
     clearPasswords();
-    unawaited(controller.setup(endpoint.text, pin.text, secret));
+    final paths = widget.platform is PathSetupPlatform;
+    unawaited(
+      controller.setup(
+        endpoint.text,
+        pin.text,
+        secret,
+        caPath: paths ? caPath.text : null,
+        identityPath: paths ? identityPath.text : null,
+      ),
+    );
   }
 
   Future<void> openSynthetic() async {
@@ -584,6 +602,10 @@ class _ProviderPageState extends State<ProviderPage>
         onDedicated: (value) => setState(() => dedicated = value),
         endpoint: endpoint,
         pin: pin,
+        caPath: widget.platform is PathSetupPlatform ? caPath : null,
+        identityPath: widget.platform is PathSetupPlatform
+            ? identityPath
+            : null,
         importPassword: importPassword, // secrets-ignore: UI controller
         pilotBundle: pilotBundle,
         touchIdPassword: touchIdPassword, // secrets-ignore: UI controller
@@ -619,7 +641,7 @@ class _ProviderPageState extends State<ProviderPage>
               children: [
                 if (!widget.platform.available) ...[
                   const StatusLabel(
-                    'Provider transport unavailable on this platform. Provider approvals require macOS.',
+                    'Provider transport unavailable on this platform. Provider approvals need macOS, Windows, Linux, Android or iOS.',
                     key: Key('provider-unavailable'),
                   ),
                   const SizedBox(height: 16),

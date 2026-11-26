@@ -177,6 +177,36 @@ vector with the inputs, canonical review JSON, transcripts and signatures is in
   `"approval":{"method":"biometric","key_id":"hex"}` on the approved event;
   absence means password. Signatures and passwords are never logged or stored.
 
+### Key classes (desktop-approval-spec D-7, D-8)
+
+Every enrolled key has a closed class, fixed at enrollment. `biometric` (the
+class of every key enrolled with `biometric_enroll` version 2: Secure
+Enclave, Android Keystore) signs the transcript itself. `windows_hello` (a
+Windows Hello WebAuthn platform credential, which also accepts the Windows
+Hello PIN) signs `authenticatorData || SHA-256(clientData)` where:
+
+* `clientData` is exactly
+  `{"type":"webauthn.get","challenge":"<b64url(SHA-256(transcript))>","origin":"vaultwarden-access.approval-v2"}`
+  (no whitespace, members in that order), built by both sides, never parsed;
+* `authenticatorData` is exactly 37 bytes: `SHA-256("vaultwarden-access.approval-v2")`,
+  flags exactly UP|UV (`0x05`: BE, BS, AT, ED and reserved bits clear), and a
+  signature counter that is not checked.
+
+The same wrapping proves possession at enrollment over the enrollment
+transcript. A decision proof for a `windows_hello` key carries
+`"authenticator_data":"b64url"` (37 bytes); a `biometric` key's proof must
+not, and the other way round is `authentication_failed`: the enrolled
+class, never the proof, selects the verification. History records
+`"approval":{"method":"windows_hello","key_id":"hex"}` for such an approval.
+
+`{"version":3,"command":"biometric_enroll",...,"key_class":"windows_hello","enroll_authenticator_data":"b64url"}`
+enrolls a `windows_hello` key (version 3 requires both members; `key_class`
+`biometric` is refused at version 3, and version 2 refuses both members).
+The response is the version 2 enrollment response. The registry entry
+gains `key_class` (omitted for `biometric`); the registry is written as
+version 4 only while such a key is enrolled, and a version 3 file naming a
+class is refused (an older provider refuses version 4: fail closed).
+
 ### Key management (version 2 management commands)
 
 Any enabled approval client may manage its own key; no administrator is needed.

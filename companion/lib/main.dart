@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
 import 'platform/signer.dart';
 import 'design/access_theme.dart';
 import 'platform/core_loader.dart';
+import 'platform/core_provider.dart';
 import 'platform/provider.dart';
 import 'provider/page.dart';
 import 'src/rust/api.dart' as core;
@@ -19,7 +21,9 @@ Future<void> main() async {
         theme: accessTheme(Brightness.light),
         darkTheme: accessTheme(Brightness.dark),
         home: ProviderPage(
-          platform: NativeProviderPlatform(),
+          platform: isCoreTransportSystem(Platform.operatingSystem)
+              ? CoreProviderPlatform()
+              : NativeProviderPlatform(),
           syntheticBuilder: (_) =>
               CompanionReview(platform: NativeApprovalPlatform()),
         ),

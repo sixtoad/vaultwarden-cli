@@ -278,11 +278,19 @@ class TouchIdController extends ChangeNotifier {
       }
       await provider.perform(
         core.ProviderCommand.approve,
-        begin: () => bio.providerBiometricBegin(
-          handle: request.handle,
-          keyId: request.keyId,
-          signature: reply.signature,
-        ),
+        // A Windows Hello key proves with a WebAuthn-wrapped signature.
+        begin: () => reply.authenticatorData.isEmpty
+            ? bio.providerBiometricBegin(
+                handle: request.handle,
+                keyId: request.keyId,
+                signature: reply.signature,
+              )
+            : bio.providerBiometricBeginWrapped(
+                handle: request.handle,
+                keyId: request.keyId,
+                signature: reply.signature,
+                authenticatorData: reply.authenticatorData,
+              ),
       );
       if (!provider.lastPerformSent) {
         message = notSent;
@@ -409,11 +417,18 @@ class TouchIdController extends ChangeNotifier {
         return;
       }
       await provider.performKey(
-        () => bio.biometricKeyBeginEnroll(
-          password: password,
-          publicKey: key.publicKey,
-          signature: proof.signature,
-        ),
+        () => proof.authenticatorData.isEmpty
+            ? bio.biometricKeyBeginEnroll(
+                password: password,
+                publicKey: key.publicKey,
+                signature: proof.signature,
+              )
+            : bio.biometricKeyBeginEnrollWrapped(
+                password: password,
+                publicKey: key.publicKey,
+                signature: proof.signature,
+                authenticatorData: proof.authenticatorData,
+              ),
       );
       message = provider.keys.message;
     } finally {

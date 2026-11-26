@@ -9,8 +9,8 @@ The approved first-slice specification is [the shell specification](../../_bmad-
 | Platform | Existing evidence in this checkout | Remaining dependency |
 |---|---|---|
 | macOS | Flutter password approvals through native pinned TLS to Linux; separate synthetic Secure Enclave signer | Production distribution, guided enrollment, notification parity; integrated provider biometric approval |
-| Linux | Protected CLI/provider execution; Flutter desktop build | Flutter native transport/identity adapter and approval integration |
-| Windows | Flutter desktop build | Native provider transport/identity/authentication integration |
+| Linux | Protected CLI/provider execution; Flutter desktop build; Rust-core pinned-TLS transport and password approval ([desktop approval](desktop-approval-spec.md)) | Hardware evidence; no approval key by decision (D-9) |
+| Windows | Flutter desktop build; Rust-core pinned-TLS transport, password approval and Windows Hello key approval ([desktop approval](desktop-approval-spec.md)) | Windows Hello/TPM evidence on real hardware |
 | Android | No Android project directory or native adapter | Committed first-class approval client: project, secure transport/storage, lifecycle/authentication, notifications and enrollment |
 | iOS | No iOS project directory or native adapter | Same committed native delivery, including Face ID/Touch ID and phone lifecycle qualification |
 

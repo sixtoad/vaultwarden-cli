@@ -89,7 +89,8 @@ platforms, and without calling an approval `biometric` when it is not.
     under `$XDG_CONFIG_HOME` (same user-level protection, no daemon); (c) a TPM
     (tpm2-tss system library, not present on the build hosts).
 - **Choice.** Windows (b), Linux (b). PKCS#12 parsing in Rust with the
-  `p12-keystore` crate (3DES/SHA-1 and PBES2 bags). The PKCS#12 bytes and the
+  `p12-keystore` crate (3DES/SHA-1 and PBES2 bags; its `aes` dependency is
+  held at 0.9.2 in `companion/rust/Cargo.lock` for the Rust 1.88 MSRV). The PKCS#12 bytes and the
   passphrase are dropped right after import; only the key and the leaf/chain
   are stored.
 - **Reason.** Both give the protection the platform actually offers to a
@@ -157,7 +158,13 @@ platforms, and without calling an approval `biometric` when it is not.
      is still DER ECDSA P-256 SHA-256 by the same kind of key (key id = SHA-256
      of the 65-byte point), but over `authenticatorData || SHA-256(clientData)`,
      so the provider needs one closed, versioned wrapping (D-7).
-- **Choice.** 4.
+- **Choice.** 4. `webauthn.dll` is loaded at run time from System32 only, so
+  a Windows without it reports Windows Hello unavailable (password approval)
+  instead of failing to load the core. Deleting a key forgets the credential
+  id; the platform credential stays in Windows Hello until the user removes
+  it (it is never used again). A credential that is backup eligible or
+  synchronised (BE/BS) is refused: such a Windows (synced passkeys) has no
+  Windows Hello approval.
 - **Reason.** It is the only option that is documented, P-256, Hello-gated and
   cancellable; the wrapping is small, fully deterministic and verifiable, and
   it gives the provider an authenticator-asserted UV flag the raw paths do not.
@@ -190,9 +197,10 @@ platforms, and without calling an approval `biometric` when it is not.
     `authenticator_data`; the proof of a `biometric` key must not. A mismatch
     is `authentication_failed` (no class downgrade or upgrade by the client).
   - History: `ApprovalMethod::WindowsHello { key_id }`.
-  - Registry version 4 is written only when a `windows_hello` key, or its
-    audit record, exists; version 3 stays byte-identical otherwise, so a
-    macOS/mobile-only provider can still roll back exactly as before.
+  - Registry version 4 is written only while an enrolled key has the
+    `windows_hello` class; version 3 stays byte-identical otherwise, so a
+    macOS/mobile-only provider can still roll back exactly as before. A
+    version 3 (or older) file that names a class is refused on read.
 - **Reason.** Honest records; the verification of an existing `biometric` key
   is byte-for-byte the same code path; an unknown class fails closed.
 - **Residual risk.** The class is declared by the enrolling client (mTLS,
@@ -201,9 +209,9 @@ platforms, and without calling an approval `biometric` when it is not.
   platform (no attestation is verified). The `windows_hello` class at least
   requires authenticator data with UV set.
 - **Reverse.** Stop accepting version 3 enrollment; existing `windows_hello`
-  keys can be revoked (`biometric_revoke`) and the registry then returns to
-  version 3 content (it stays version 4 while retired ids or audit records of
-  that class exist, as version 3 does for Touch ID).
+  keys can be revoked (`biometric_revoke`), and the next registry write is
+  version 3 again (retired ids carry no class). History events recorded as
+  `windows_hello` stay readable only by a provider that knows the method.
 
 ### D-8. The WebAuthn wrapping (verification class `windows_hello`)
 
