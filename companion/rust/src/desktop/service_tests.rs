@@ -132,6 +132,31 @@ fn a_sent_decision_stays_uncertain_and_blocks_setup_until_settled() {
     assert!(s.configure(port).is_ok());
 }
 
+/// Issue 48 phase 2: the Windows/Linux transport carries a version 2 approve
+/// decision, its `update-review.v1` capability and Windows Hello proof, byte
+/// for byte (the Rust session builds it; the transport never rewrites it).
+#[test]
+fn an_update_approval_reaches_the_provider_with_its_capability() {
+    let s = setup();
+    let (port, server) = serve(Some(http(
+        "200 OK",
+        "Content-Type: application/json\r\n",
+        r#"{"version":2,"status":{"status":"approved"}}"#,
+    )));
+    s.configure(port).unwrap();
+    let decision = serde_json::json!({
+        "version": 2, "command": "decision", "request_id": ID,
+        "ticket": "d".repeat(64), "decision": "approve",
+        "proof": {"key_id": "e".repeat(64), "signature": "c2ln", "authenticator_data": "ZGF0YQ"},
+        "capabilities": ["update-review.v1"],
+    })
+    .to_string();
+    assert!(s.service.send(decision.as_bytes(), true).is_ok());
+    let (request, _) = server.join().unwrap().unwrap();
+    assert!(request.ends_with(decision.as_bytes()));
+    assert_eq!(s.service.configuration().unwrap().uncertain_id, ID);
+}
+
 #[test]
 fn a_failed_exchange_keeps_the_marker_and_frees_the_slot() {
     let s = setup();

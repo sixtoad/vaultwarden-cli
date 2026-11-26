@@ -207,6 +207,42 @@ gains `key_class` (omitted for `biometric`); the registry is written as
 version 4 only while such a key is enrolled, and a version 3 file naming a
 class is refused (an older provider refuses version 4: fail closed).
 
+### Update reviews and the `update-review.v1` capability (issue 48 phase 2)
+
+A protected update's `DirectReview` carries an optional `update` member,
+`{"server","item_id","destination":{"account_id","folder","folder_id","reference"},"fields":[...],"expected_revision"}`,
+with `effect` `UPDATE personal vault item (no create)`. It holds no value. Like
+every other review member it is covered by the record digest and by the
+version 2 `review_digest` (transcript field 14); the transcript is unchanged.
+A companion that does not know the member refuses the whole review (closed
+schema), so it can neither show nor decide it.
+
+Capability element (version 1 of `update-review`):
+
+* Name: `update-review.v1`. Meaning: this client renders the review's
+  `update` block (item, server, account, folder, reference, fields replaced,
+  expected revision) before any approval.
+* Where: an optional `"capabilities":["update-review.v1", ...]` member of a
+  version 2 `decision` with `"decision":"approve"`, alongside exactly one of
+  `password` or `proof`. Clients send it only when approving a review that has
+  an `update` member, so older providers (which never produce one) never see
+  it. A version 1 decision cannot carry it, so a companion approves an update
+  with a version 2 password decision (reply `{"version":2,"status":...}`).
+* Shape: 1 to 16 distinct names, each at most 64 bytes, lowercase letters,
+  digits and inner `-`, then `.v` and a version without a leading zero.
+  Malformed lists, lists on version 1 decisions and on denials are
+  `invalid_request`. Unknown well-formed names are ignored.
+* Authentication and binding: the decision travels on the device's mutually
+  authenticated connection and consumes that device's single-use ticket, which
+  binds the certificate fingerprint, the exact review and the authority
+  generation. The claim is not part of the signed transcript.
+* Enforcement: approving a review with an `update` member, by proof or by
+  password, without `update-review.v1` is `authentication_failed` (422); the
+  ticket is consumed and the request stays pending. `biometric_allowed` in the
+  approval binding is unchanged (key and policy eligibility only).
+  Denial needs no capability. The local loopback review always shows the
+  update block and remains the password fallback.
+
 ### Key management (version 2 management commands)
 
 Any enabled approval client may manage its own key; no administrator is needed.

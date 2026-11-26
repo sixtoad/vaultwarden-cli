@@ -100,6 +100,7 @@ fn hello_proof(
         decision,
         password,
         proof: Some(mut proof),
+        capabilities,
     } = proof(id, ticket, key_id, signature)
     else {
         panic!("the helper builds this command")
@@ -112,6 +113,7 @@ fn hello_proof(
         decision,
         password,
         proof: Some(proof),
+        capabilities,
     }
 }
 fn registry_version(s: &Svc) -> serde_json::Value {
@@ -354,4 +356,49 @@ fn key_class_registry_refuses_a_class_below_version_4_and_unknown_classes() {
     v5["version"] = 5.into();
     assert!(write(v5).is_err());
     assert!(write(raw).is_ok());
+}
+
+/// Issue 48 phase 2 applies to every key class: a Windows Hello proof for an
+/// update review is refused unless the decision asserts `update-review.v1`.
+#[test]
+fn key_class_windows_hello_update_review_needs_the_capability() {
+    use super::update_review::with_capabilities;
+    use crate::access::update_test_support as vault;
+    vault::reset();
+    let s = setup(false);
+    let key = software_key();
+    let key_id = s.enroll_hello(&key);
+    let id = s.update_request();
+    let data = authenticator_data(UP_UV);
+    let signed = |review: &serde_json::Value| {
+        let transcript = companion_transcript(review, &key_id);
+        hello_proof(
+            &id,
+            &ticket(review),
+            &key_id,
+            &hello_sign(&key, &transcript, &data),
+            Some(&data),
+        )
+    };
+    let review = s.review(&id);
+    assert!(review["review"]["update"].is_object());
+    let response = s.send(&me(), signed(&review));
+    assert_eq!(response.status, 422, "{}", response.body);
+    assert_eq!(s.status(&id), DirectStatus::Pending);
+    let review = s.review(&id);
+    let response = s.send(
+        &me(),
+        with_capabilities(signed(&review), &[UPDATE_REVIEW_CAPABILITY]),
+    );
+    assert_eq!(response.status, 200, "{}", response.body);
+    assert_eq!(s.status(&id), DirectStatus::Approved);
+    let history = s.env.app().companion_history(None).unwrap();
+    let approved = history
+        .iter()
+        .find(|e| e.request_id == id && e.outcome == HistoryOutcome::Approved)
+        .unwrap();
+    assert_eq!(
+        approved.approval,
+        Some(ApprovalMethod::WindowsHello { key_id })
+    );
 }

@@ -2601,6 +2601,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProviderReviewUpdate dco_decode_box_autoadd_provider_review_update(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_provider_review_update(raw);
+  }
+
+  @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_u_64(raw);
@@ -2943,6 +2951,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProviderReviewUpdate? dco_decode_opt_box_autoadd_provider_review_update(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_provider_review_update(raw);
+  }
+
+  @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_64(raw);
@@ -3014,8 +3032,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ProviderReview dco_decode_provider_review(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 13)
-      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return ProviderReview(
       id: dco_decode_String(arr[0]),
       requester: dco_decode_String(arr[1]),
@@ -3030,6 +3048,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       expiresAtUnixSeconds: dco_decode_u_64(arr[10]),
       oneTime: dco_decode_String(arr[11]),
       status: dco_decode_String(arr[12]),
+      update: dco_decode_opt_box_autoadd_provider_review_update(arr[13]),
     );
   }
 
@@ -3042,6 +3061,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return ProviderReviewCredential(
       label: dco_decode_String(arr[0]),
       useType: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ProviderReviewUpdate dco_decode_provider_review_update(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return ProviderReviewUpdate(
+      server: dco_decode_String(arr[0]),
+      itemId: dco_decode_String(arr[1]),
+      accountId: dco_decode_String(arr[2]),
+      folder: dco_decode_String(arr[3]),
+      folderId: dco_decode_String(arr[4]),
+      reference: dco_decode_String(arr[5]),
+      fields: dco_decode_list_String(arr[6]),
+      expectedRevision: dco_decode_String(arr[7]),
     );
   }
 
@@ -3375,6 +3412,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_provider_review(deserializer));
+  }
+
+  @protected
+  ProviderReviewUpdate sse_decode_box_autoadd_provider_review_update(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_provider_review_update(deserializer));
   }
 
   @protected
@@ -3848,6 +3893,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProviderReviewUpdate? sse_decode_opt_box_autoadd_provider_review_update(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_provider_review_update(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -3959,6 +4017,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_expiresAtUnixSeconds = sse_decode_u_64(deserializer);
     var var_oneTime = sse_decode_String(deserializer);
     var var_status = sse_decode_String(deserializer);
+    var var_update = sse_decode_opt_box_autoadd_provider_review_update(
+      deserializer,
+    );
     return ProviderReview(
       id: var_id,
       requester: var_requester,
@@ -3973,6 +4034,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       expiresAtUnixSeconds: var_expiresAtUnixSeconds,
       oneTime: var_oneTime,
       status: var_status,
+      update: var_update,
     );
   }
 
@@ -3984,6 +4046,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_label = sse_decode_String(deserializer);
     var var_useType = sse_decode_String(deserializer);
     return ProviderReviewCredential(label: var_label, useType: var_useType);
+  }
+
+  @protected
+  ProviderReviewUpdate sse_decode_provider_review_update(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_server = sse_decode_String(deserializer);
+    var var_itemId = sse_decode_String(deserializer);
+    var var_accountId = sse_decode_String(deserializer);
+    var var_folder = sse_decode_String(deserializer);
+    var var_folderId = sse_decode_String(deserializer);
+    var var_reference = sse_decode_String(deserializer);
+    var var_fields = sse_decode_list_String(deserializer);
+    var var_expectedRevision = sse_decode_String(deserializer);
+    return ProviderReviewUpdate(
+      server: var_server,
+      itemId: var_itemId,
+      accountId: var_accountId,
+      folder: var_folder,
+      folderId: var_folderId,
+      reference: var_reference,
+      fields: var_fields,
+      expectedRevision: var_expectedRevision,
+    );
   }
 
   @protected
@@ -4321,6 +4408,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_provider_review(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_provider_review_update(
+    ProviderReviewUpdate self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_provider_review_update(self, serializer);
   }
 
   @protected
@@ -4706,6 +4802,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_provider_review_update(
+    ProviderReviewUpdate? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_provider_review_update(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -4804,6 +4913,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_64(self.expiresAtUnixSeconds, serializer);
     sse_encode_String(self.oneTime, serializer);
     sse_encode_String(self.status, serializer);
+    sse_encode_opt_box_autoadd_provider_review_update(self.update, serializer);
   }
 
   @protected
@@ -4814,6 +4924,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.label, serializer);
     sse_encode_String(self.useType, serializer);
+  }
+
+  @protected
+  void sse_encode_provider_review_update(
+    ProviderReviewUpdate self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.server, serializer);
+    sse_encode_String(self.itemId, serializer);
+    sse_encode_String(self.accountId, serializer);
+    sse_encode_String(self.folder, serializer);
+    sse_encode_String(self.folderId, serializer);
+    sse_encode_String(self.reference, serializer);
+    sse_encode_list_String(self.fields, serializer);
+    sse_encode_String(self.expectedRevision, serializer);
   }
 
   @protected

@@ -176,7 +176,9 @@ impl crate::access::ports::ProducerOutput for PrivateProducerOutput {
         self.0
             .read_exact_at(&mut bytes, 4)
             .map_err(|_error| ExecutionError::ExecutionFailed)?;
-        crate::secret_storage::SecretImport::parse(&bytes)
+        // The update shape admits notes alone (D5); the application requires the
+        // exact policy schema for both create and update before any write.
+        crate::secret_storage::SecretImport::parse_update(&bytes)
             .map_err(|_error| ExecutionError::ExecutionFailed)
     }
 }

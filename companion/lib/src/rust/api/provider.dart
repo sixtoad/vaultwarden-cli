@@ -8,7 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `session`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 ProviderSnapshot providerSnapshot() =>
     RustLib.instance.api.crateApiProviderProviderSnapshot();
@@ -144,6 +144,9 @@ class ProviderReview {
   final String oneTime;
   final String status;
 
+  /// Issue 48 phase 2: present only for an update of an existing item.
+  final ProviderReviewUpdate? update;
+
   const ProviderReview({
     required this.id,
     required this.requester,
@@ -158,6 +161,7 @@ class ProviderReview {
     required this.expiresAtUnixSeconds,
     required this.oneTime,
     required this.status,
+    this.update,
   });
 
   @override
@@ -174,7 +178,8 @@ class ProviderReview {
       argumentsDigest.hashCode ^
       expiresAtUnixSeconds.hashCode ^
       oneTime.hashCode ^
-      status.hashCode;
+      status.hashCode ^
+      update.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -193,7 +198,8 @@ class ProviderReview {
           argumentsDigest == other.argumentsDigest &&
           expiresAtUnixSeconds == other.expiresAtUnixSeconds &&
           oneTime == other.oneTime &&
-          status == other.status;
+          status == other.status &&
+          update == other.update;
 }
 
 class ProviderReviewCredential {
@@ -212,6 +218,54 @@ class ProviderReviewCredential {
           runtimeType == other.runtimeType &&
           label == other.label &&
           useType == other.useType;
+}
+
+/// The update block of a review, every value escaped like the rest.
+class ProviderReviewUpdate {
+  final String server;
+  final String itemId;
+  final String accountId;
+  final String folder;
+  final String folderId;
+  final String reference;
+  final List<String> fields;
+  final String expectedRevision;
+
+  const ProviderReviewUpdate({
+    required this.server,
+    required this.itemId,
+    required this.accountId,
+    required this.folder,
+    required this.folderId,
+    required this.reference,
+    required this.fields,
+    required this.expectedRevision,
+  });
+
+  @override
+  int get hashCode =>
+      server.hashCode ^
+      itemId.hashCode ^
+      accountId.hashCode ^
+      folder.hashCode ^
+      folderId.hashCode ^
+      reference.hashCode ^
+      fields.hashCode ^
+      expectedRevision.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProviderReviewUpdate &&
+          runtimeType == other.runtimeType &&
+          server == other.server &&
+          itemId == other.itemId &&
+          accountId == other.accountId &&
+          folder == other.folder &&
+          folderId == other.folderId &&
+          reference == other.reference &&
+          fields == other.fields &&
+          expectedRevision == other.expectedRevision;
 }
 
 class ProviderSnapshot {

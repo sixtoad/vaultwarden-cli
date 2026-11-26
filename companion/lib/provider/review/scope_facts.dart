@@ -5,6 +5,7 @@ import '../../design/components.dart';
 import '../../design/typography.dart';
 import '../../src/rust/api/provider.dart' as core;
 import 'review_status.dart';
+import 'update_facts.dart';
 
 /// A selectable value under a stable key (the key names the exact fact).
 Widget _value(
@@ -103,6 +104,7 @@ class ScopeFacts extends StatelessWidget {
               _value(context, 'review-target', review.target, mono: true),
             ],
           ),
+          if (review.update case final update?) UpdateFacts(update: update),
           FactGroup(
             'Credentials (${credentials.length})',
             children: [

@@ -64,6 +64,7 @@ impl ProviderSession for Backend {
     }
 }
 impl SecretBackend for Backend {
+    crate::access::update_test_support::delegate_update_backend!();
     fn reconcile_secret(&mut self, _: &CreateEffect, id: &str) -> Result<(), SessionError> {
         if id == "33333333-3333-3333-3333-333333333333" {
             Ok(())
@@ -220,6 +221,7 @@ fn fixture_with_lifetime(lifetime: Duration) -> Fixture {
 }
 pub(crate) fn operation_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        update: None,
         require_password: false,
         create: None,
         ssh: None,

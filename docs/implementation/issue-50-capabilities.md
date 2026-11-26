@@ -43,7 +43,9 @@ physical biometric/lifecycle evidence remains tracked in [#41](https://github.co
   Reviews exceeding the existing provider limits of 32 arguments or 16 credentials
   are rejected before display or decision admission; prior review authority clears.
   Existing `create`/`ssh` extensions and unknown fields remain rejected in full;
-  adding complete support requires another slice. See the
+  adding complete support requires another slice. The `update` extension
+  (issue 48 phase 2) is admitted and rendered, and approving it asserts the
+  `update-review.v1` capability ([companion protocol](../companion-protocol.md)). See the
   [structured-review spec](../../_bmad-output/implementation-artifacts/spec-50-typed-request-review.md).
   This records implementation; its new verification evidence must be recorded
   separately from the first-slice results below.

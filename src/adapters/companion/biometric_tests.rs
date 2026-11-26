@@ -78,6 +78,8 @@ mod platform {
     }
 }
 use platform::Env;
+#[path = "update_review_tests.rs"]
+mod update_review;
 
 struct Password(AtomicUsize);
 impl ApprovalAuthenticator for Password {
@@ -295,6 +297,7 @@ fn companion_transcript(review: &serde_json::Value, key_id: &str) -> Vec<u8> {
 }
 fn proof(id: &str, ticket: &str, key_id: &str, signature: &[u8]) -> Command {
     Command::Decision {
+        capabilities: None,
         version: 2,
         request_id: id.into(),
         ticket: ticket.into(),
@@ -309,6 +312,7 @@ fn proof(id: &str, ticket: &str, key_id: &str, signature: &[u8]) -> Command {
 }
 fn password_decision(id: &str, ticket: &str) -> Command {
     Command::Decision {
+        capabilities: None,
         version: 2,
         request_id: id.into(),
         ticket: ticket.into(),
@@ -522,6 +526,7 @@ fn biometric_password_and_proof_are_exclusive_and_sizes_are_bounded() {
     let sig = URL_SAFE_NO_PAD.encode([0x30u8; 70]);
     let decision = |version, decision, password: Option<&str>, proof: Option<(&str, &str)>| {
         Command::Decision {
+            capabilities: None,
             version,
             request_id: id.clone(),
             ticket: t.clone(),

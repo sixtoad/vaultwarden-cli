@@ -20,6 +20,9 @@ use std::path::{Component, Path, PathBuf};
 
 use super::{valid_operation_id, valid_sha256};
 
+pub mod update;
+pub use update::{UPDATE_EFFECT_LINE, UpdateEffect, UpdateReview};
+
 const MAX_DESCRIPTION_LEN: usize = 256;
 const MAX_TARGETS: usize = 64;
 const MAX_ARGUMENTS: usize = 32;
@@ -45,6 +48,10 @@ pub struct OperationPolicyDraft {
     pub ssh: Option<SshOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub create: Option<CreateEffect>,
+    /// Replace selected fields of one existing item (issue 48 phase 2).
+    /// Mutually exclusive with `create`, `ssh` and credentials.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update: Option<UpdateEffect>,
     /// Refuse biometric (Touch ID) approval for requests under this policy;
     /// only a fresh password approves. Absent means false. Bound into the
     /// policy revision only when true, so existing revisions are unchanged.
@@ -384,6 +391,8 @@ pub(crate) struct OperationPolicy {
     ssh: Option<SshOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     create: Option<CreateEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    update: Option<UpdateEffect>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     require_password: bool,
     revision: String,
@@ -428,6 +437,7 @@ impl OperationPolicy {
                 credentials: self.credentials.clone(),
                 ssh: self.ssh.clone(),
                 create: self.create.clone(),
+                update: self.update.clone(),
                 require_password: self.require_password,
             },
             revision: self.revision.clone(),
@@ -460,6 +470,7 @@ impl OperationPolicy {
             credentials: draft.credentials,
             ssh: draft.ssh,
             create: draft.create,
+            update: draft.update,
             require_password: draft.require_password,
             revision,
         })
@@ -494,6 +505,25 @@ impl OperationPolicy {
     }
     pub(crate) const fn create(&self) -> Option<&CreateEffect> {
         self.create.as_ref()
+    }
+    pub(crate) const fn update(&self) -> Option<&UpdateEffect> {
+        self.update.as_ref()
+    }
+    /// Bind the revision the provider read when the request was created. An
+    /// update policy needs exactly one valid revision; any other policy none.
+    pub(crate) fn bind_update(
+        &self,
+        review: &mut super::direct_request::DirectReview,
+        revision: Option<&str>,
+    ) -> Result<(), PolicyValidationError> {
+        review.update = match (&self.update, revision) {
+            (None, None) => None,
+            (Some(effect), Some(revision)) if update::valid_revision(revision) => {
+                Some(effect.review(revision.to_owned()))
+            }
+            _ => return Err(PolicyValidationError),
+        };
+        Ok(())
     }
     pub(crate) fn ssh(&self) -> Option<&SshOperation> {
         self.ssh.as_ref()
@@ -566,18 +596,27 @@ impl OperationPolicy {
             operation: self.id.clone(),
             effect: if self.create.is_some() {
                 "CREATE personal vault item (no update)".into()
+            } else if self.update.is_some() {
+                UPDATE_EFFECT_LINE.into()
             } else {
                 self.description.clone()
             },
             create: self.create.clone(),
-            target: self.create.as_ref().map_or_else(
-                || {
+            update: None,
+            target: self
+                .create
+                .as_ref()
+                .map(|c| c.destination.reference.clone())
+                .or_else(|| {
+                    self.update
+                        .as_ref()
+                        .map(|u| u.destination.reference.clone())
+                })
+                .unwrap_or_else(|| {
                     self.ssh
                         .as_ref()
                         .map_or(target, |ssh| ssh.review().target())
-                },
-                |c| c.destination.reference.clone(),
-            ),
+                }),
             ssh: self.ssh.as_ref().map(SshOperation::review),
             arguments_digest: arguments_digest(&arguments),
             arguments,
@@ -590,6 +629,10 @@ impl OperationPolicy {
                 })
                 .chain(self.create.iter().map(|c| ReviewCredential {
                     label: c.destination.reference.clone(),
+                    use_type: CredentialUse::Login,
+                }))
+                .chain(self.update.iter().map(|u| ReviewCredential {
+                    label: u.destination.reference.clone(),
                     use_type: CredentialUse::Login,
                 }))
                 .chain(self.ssh.iter().map(|ssh| ReviewCredential {
@@ -623,6 +666,7 @@ impl OperationPolicy {
                 credentials: self.credentials.clone(),
                 ssh: self.ssh.clone(),
                 create: self.create.clone(),
+                update: self.update.clone(),
             },
             &image,
         )?;
@@ -655,6 +699,8 @@ struct StoredOperationPolicy {
     ssh: Option<SshOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     create: Option<CreateEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    update: Option<UpdateEffect>,
     #[serde(default)]
     require_password: bool,
     revision: String,
@@ -680,6 +726,7 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
                 credentials: stored.credentials,
                 ssh: stored.ssh,
                 create: stored.create,
+                update: stored.update,
                 require_password: stored.require_password,
             },
             &image,
@@ -693,6 +740,22 @@ impl TryFrom<StoredOperationPolicy> for OperationPolicy {
 }
 
 fn validate_draft(draft: &OperationPolicyDraft) -> Result<(), PolicyValidationError> {
+    if let Some(update) = &draft.update {
+        return if valid_operation_id(&draft.id)
+            && valid_display_text(&draft.description, MAX_DESCRIPTION_LEN)
+            && valid_operation_id(&draft.image_id)
+            && draft.create.is_none()
+            && draft.ssh.is_none()
+            && draft.credentials.is_empty()
+            && draft.targets.is_empty()
+            && draft.arguments.is_empty()
+            && update.valid()
+        {
+            Ok(())
+        } else {
+            Err(PolicyValidationError)
+        };
+    }
     if let Some(create) = &draft.create {
         return if valid_operation_id(&draft.id)
             && valid_display_text(&draft.description, MAX_DESCRIPTION_LEN)
@@ -1032,7 +1095,10 @@ fn revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
     }
 }
 fn base_revision_for(draft: &OperationPolicyDraft, image: &ResolvedImage) -> String {
-    if draft.create.is_some() || draft.credentials.iter().any(|c| c.namespace.is_some()) {
+    if draft.create.is_some()
+        || draft.update.is_some()
+        || draft.credentials.iter().any(|c| c.namespace.is_some())
+    {
         return hex_digest(
             &serde_json::to_vec(&(4u8, draft, image)).expect("policy projection serializes"),
         );
@@ -1139,6 +1205,7 @@ pub(crate) fn test_approved_image(root: &Path, id: &str) -> ApprovedImage {
 #[cfg(all(test, target_os = "linux"))]
 pub(crate) fn test_ssh_draft() -> OperationPolicyDraft {
     OperationPolicyDraft {
+        update: None,
         require_password: false,
         create: None,
         id: "ssh-backup".into(),
@@ -1491,6 +1558,7 @@ mod tests {
     }
     fn draft() -> OperationPolicyDraft {
         OperationPolicyDraft {
+            update: None,
             require_password: false,
             create: None,
             ssh: None,
@@ -2240,6 +2308,7 @@ mod create_boundary_tests {
             effect.fields.extend(["password".into(), "notes".into()]);
             assert!(effect.valid());
             let draft = OperationPolicyDraft {
+                update: None,
                 require_password: false,
                 id: "create-secret".into(),
                 description: "Create".into(),
@@ -2267,6 +2336,7 @@ mod require_password_tests {
     use super::*;
     fn draft(require_password: bool) -> OperationPolicyDraft {
         OperationPolicyDraft {
+            update: None,
             require_password,
             id: "deploy".into(),
             description: "Deploy".into(),

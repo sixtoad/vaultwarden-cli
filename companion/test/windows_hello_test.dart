@@ -14,12 +14,18 @@ import 'package:companion_slice/src/rust/frb_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'provider_support.dart';
+import 'review_authorization_test.dart' show typePassword;
 import 'touch_id_support.dart';
+import 'update_review_test.dart' show updateReview;
 
 /// SHA-256("vaultwarden-access.approval-v2"): the Windows Hello RP id hash
 /// (desktop-approval-spec D-8), pinned in Rust by both sides.
 const rpIdHash =
     '9304ca3fa326db0b0f074d7157175dbe763381d50b99f366757ee493d2dcbc45';
+
+/// `v2::review_digest` of [updateReview]'s review (computed by the Rust core).
+const updateReviewDigest =
+    '01b14d8b4eba33200f06b91cdcf588a226c40f2a4c3a10390e3886da47eded52';
 
 Uint8List authenticatorData(int flags) => Uint8List.fromList([
   for (var i = 0; i < 64; i += 2)
@@ -136,4 +142,65 @@ void main() {
     expect(find.byKey(const Key('touch-id-keys')), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  // Issue 48 phase 2 on Windows and Linux: the update block is shown and the
+  // approval asserts `update-review.v1`, exactly as on macOS.
+  test(
+    'a Windows Hello approval of an update asserts the capability',
+    () async {
+      final native = FixtureProviderPlatform()
+        ..reviewReply = updateReview()
+        ..approvalBinding = (reply) => {
+          ...binding(reply)!,
+          'review_digest': updateReviewDigest,
+        };
+      final keys = HelloKeys();
+      final (provider, macWording) = await reviewed(native, keys);
+      macWording.dispose();
+      final touchId = TouchIdController(
+        provider,
+        keys,
+        operatingSystem: 'windows',
+      );
+      await touchId.refreshLocal();
+      await provider.review(providerId);
+      await touchId.approve();
+      final decision = decisions(native).single;
+      expect(decision['version'], 2);
+      expect(decision['capabilities'], ['update-review.v1']);
+      final proof = decision['proof'] as Map<String, dynamic>;
+      expect(
+        proof['authenticator_data'],
+        base64Url.encode(keys.data).replaceAll('=', ''),
+      );
+      expect(touchId.message, 'Approved once with Windows Hello.');
+      touchId.dispose();
+      provider.dispose();
+    },
+  );
+
+  testWidgets(
+    'Linux shows the update block and its password approval asserts the capability',
+    (tester) async {
+      final native = FixtureProviderPlatform()..reviewReply = updateReview();
+      final keys = FakeKeys()..available = false;
+      await tester.pumpWidget(page(native, keys, 'linux'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(requestRow(providerId));
+      await tester.tap(requestRow(providerId));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('review-update')), findsOneWidget);
+      expect(find.text('Fields replaced (2)'), findsOneWidget);
+      await startAuthorization(tester);
+      await typePassword(tester);
+      await tester.ensureVisible(find.byKey(const Key('approve-password')));
+      await tester.tap(find.byKey(const Key('approve-password')));
+      await tester.pumpAndSettle();
+      final decision = decisions(native).single;
+      expect(decision['decision'], 'approve');
+      expect(decision['version'], 2);
+      expect(decision['capabilities'], ['update-review.v1']);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

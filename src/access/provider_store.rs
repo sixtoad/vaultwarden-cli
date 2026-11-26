@@ -710,6 +710,7 @@ mod tests {
     fn operation(image: &ApprovedImage, target: &str) -> OperationPolicy {
         OperationPolicy::from_draft(
             OperationPolicyDraft {
+                update: None,
                 require_password: false,
                 create: None,
                 ssh: None,

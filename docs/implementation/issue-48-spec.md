@@ -1,8 +1,8 @@
 # Issue 48: approved updates and rotation of existing secrets
 
-Status: phase 1 (trusted CLI `update`) implemented on
-`feature/issue-48-update-secrets`; phase 2 (protected provider `update`) is
-specified here and deferred to the next PR.
+Status: phase 1 (trusted CLI `update`) implemented in PR #91; phase 2
+(protected provider `update`, section 7) implemented on
+`feature/issue-48-provider-update`.
 
 Background: the create-only feature (#43, PR #44) is described in
 [secret-storage.md](../secret-storage.md). This document reuses its vocabulary:
@@ -424,54 +424,225 @@ then-current revision.
   is no snapshot isolation across a run's separate reads. Operators who need
   a consistent set should rotate between runs.
 
-## 7. Phase 2 (specified, not implemented): protected provider `update`
+## 7. Phase 2 (implemented): protected provider `update`
 
-Analogous to the protected create (`CreateEffect`, fd 3 producer frame).
+Implemented on `feature/issue-48-provider-update`. Analogous to the protected
+create (`CreateEffect`, fd 3 producer frame); decisions D15 to D24 below.
 
-- **Policy**: a new closed `update` effect alongside `create`, mutually
-  exclusive with it, `ssh` and credentials:
+- **Policy** (`src/access/policy/update.rs`): a closed `update` effect,
+  mutually exclusive with `create`, `ssh`, credentials, targets and arguments:
   `{"server","item_id","destination":{account_id,folder,folder_id,reference},"fields":[...]}`.
-  `fields` uses the create selector rules; `custom:vw-access` is refused. The
-  policy pins the item ID and binding; it **cannot** pin a revision (it changes
-  on every update and would make the policy single-use).
-- **Request/review**: at review time the provider performs the D1 binding
-  checks and a GET, and puts into `DirectReview` an `update` object:
-  `{item_id, destination, fields, expected_revision}` plus the effect line
-  `UPDATE personal vault item (no create)`. Values are never present: the
-  producer has not run yet. The reviewer sees item, binding, fields and the
-  expected revision.
-- **Execution**: after approval, run the producer exactly as for create (fd 3
-  frame, same schema must equal `fields` exactly, same limits). Then fresh sync
-  and GET; refuse if the revision differs from the reviewed
-  `expected_revision` (the approval is stale and consumed), journal in private
-  provider state, PUT with `lastKnownRevisionDate`, verify as D7. The provider
-  never reruns a producer or a PUT; an uncertain result is reconciled with
-  `vw-access reconcile-write` using D9's revision comparison.
+  `fields` uses the create selector rules except that `notes` alone is valid
+  (D5); `custom:vw-access`, duplicates and unknown selectors are refused. The
+  policy pins the item ID and binding; it **cannot** pin a revision. No
+  eligibility marker is required (D20). Provisioning reads the item once
+  (`SecretBackend::update_review`), so a policy for a missing or mis-bound
+  item is refused. The policy revision binds the effect (projection 4);
+  existing revisions are unchanged.
+- **Request/review**: when a request is created (human `vw-access request` or
+  a signed agent submission) the provider performs the D1 binding checks
+  (fresh sync, folder and account, then a GET of the pinned item: ID, not
+  deleted, personal Login, folder, decrypted name) and binds the item's
+  `revisionDate` into the review: `DirectReview.update =
+  {server, item_id, destination, fields, expected_revision}` plus the effect
+  line `UPDATE personal vault item (no create)` and the reference as target
+  and credential label (D18). Values are never present. A broken binding
+  refuses the request. The record digest covers the block; the provider
+  rebuilds it from the current policy plus the stored revision before every
+  execution.
+- **Approval**: committing an approval rereads the item and refuses a review
+  whose revision has changed (D18). Companion approvals, by password or by
+  Touch ID proof, need the `update-review.v1` capability (D15, D16); the
+  loopback review shows the update block and stays the fallback.
+- **Execution** (`src/access/application/update.rs`): the item is checked
+  again before the producer starts (a stale approval never runs it). The
+  producer runs exactly as for create (fd 3 frame, same limits); its
+  selectors must equal `fields` exactly. Then a fresh sync and GET
+  (`update_prepare`): a revision other than `expected_revision` consumes the
+  approval with nothing journaled or sent. The plan is built by
+  `secret_update::plan_update` (D6 history, D7 verbatim preservation). The
+  attempt is journaled `uncertain` in private provider state (the request's
+  `write_receipt`, item ID always set, D19) before exactly one PUT with
+  `lastKnownRevisionDate`; HTTP outcomes map as D11; verification is D7/D14.
+  The provider never reruns a producer or a PUT.
+- **Uncertain results**: an `uncertain` update receipt blocks every further
+  provider update of the same server and item (D8 semantics, D19). `vw-access
+  reconcile-write REQUEST_ID ITEM_UUID` resolves it read-only with D9's
+  revision comparison: unchanged revision and binding → `failed`; any newer
+  revision → `updated_unverified`. Only an `uncertain` receipt is rewritten;
+  the first resolution stands (D24).
 - **Touch ID v2 transcript**: unchanged. The `update` object is an optional
-  member of the review JSON, so the existing `review_digest` (field 14)
-  already binds item, fields and expected revision; the record and policy
-  digests bind the policy. A revision change after approval is caught by the
-  execution check above.
-- **Two prerequisites that do not exist yet** (phase 2 must add both before
-  any update review can be approved biometrically):
-  1. **A new protocol element for companion capability.** No `update-review`
-     capability exists today: neither the companion protocol
-     ([companion-protocol.md](../companion-protocol.md)) nor the capability
-     design ([issue-50-capabilities.md](issue-50-capabilities.md)) defines a
-     way for a companion to state that it renders and understands an `update`
-     block. Phase 2 must specify that element (name, where it is sent, how it
-     is authenticated and bound to the pairing) and version it.
-  2. **A provider-side refusal.** Today `biometric_allowed` is advisory: it is
-     computed for the review (`src/adapters/companion.rs`, the
-     `approval_binding` object, `key_id.is_some() && !password_required`), and
-     the biometric proof path refuses only when the policy requires a
-     password (`require_password`). A companion that ignored the flag could
-     still sign. Phase 2 must make the provider refuse a biometric proof for
-     an update review unless the approving companion advertised the new
-     capability, and test that refusal; password approval with the loopback
-     review showing the update block remains the fallback.
-- **History and replies**: agent replies and human history carry the receipt
-  and selectors only, never values.
+  member of the review JSON, so `review_digest` (field 14) already binds
+  item, fields and expected revision; the record and policy digests bind the
+  policy.
+- **History and replies**: the human history event carries the update block
+  (item, binding, selectors, expected revision) and the write receipt
+  (`attempt_id`, `item_id`, `status`); agent replies and the companion's
+  closed history projection carry neither. No value is ever stored.
+- **Compatibility and rollback**: an update policy, review or history event
+  serializes new members only when present, so existing policy revisions,
+  record digests and history are unchanged. Once an update request exists, an
+  older provider binary refuses the state file (closed schemas), exactly as
+  after the first create; roll back only after archiving those requests. An
+  older companion refuses update reviews (closed review schema) and cannot
+  approve them.
+
+### D15. The `update-review.v1` capability is asserted in the version 2 decision
+
+- Context: phase 2 needs a protocol element by which a companion states that
+  it renders and understands a review's `update` block, authenticated and
+  bound to the pairing, so the provider can refuse a biometric proof from a
+  client that did not show it.
+- Options: (a) a review command version 3 carrying `capabilities`, recorded
+  on the ticket: precise `biometric_allowed`, but an older provider refuses
+  version 3, so every client needs a third fallback level; (b) an optional
+  `capabilities` member on the version 2 review: an older provider refuses
+  the unknown member and the existing fallback silently drops Touch ID for
+  every request; (c) a persistent per-pairing record written at Touch ID
+  enrollment: survives across requests but needs a registry version bump,
+  migration and revocation rules; (d) `capabilities` in the version 2
+  approve decision, sent by the client only when the review it approves has
+  an `update` block; (e) a new transcript field: the companion core builds
+  the transcript itself, so signing the claim adds no assurance over the
+  authenticated request, and it would break the golden vector.
+- Choice: (d). The name is `update-review.v1` (lowercase words, `.v` and a
+  version number). The decision arrives on the device's mutually
+  authenticated TLS connection and consumes that device's single-use ticket,
+  which is bound to its certificate fingerprint, the exact review and the
+  authority generation: that is the authentication and the pairing binding.
+  `approval_binding.biometric_allowed` keeps its meaning (key and policy
+  eligibility); the refusal happens at the decision.
+- Reason: no change for any non-update request or any older provider (they
+  never produce an update review); no extra round trip or registry state; an
+  older companion cannot even parse an update review (closed schema), and a
+  client that strips the block cannot approve it.
+- Limit: like any capability claim it states the client's behaviour; it
+  cannot prove what a modified client displayed. The provider-side guarantee
+  is that an unmodified older client cannot approve an update it never
+  showed. Reverse: drop the check in `Companion::dispatch` (decision arm) and
+  the `capabilities` member; or move to (a) by recording the list on the
+  ticket.
+
+### D16. The capability gates companion password approvals too
+
+- Context: the spec required refusing a biometric proof without the
+  capability. A companion password approval of an update has the same flaw:
+  the human typed the password after looking at a screen that may not have
+  shown the update block.
+- Options: (a) gate the proof only; (b) gate every companion approval.
+- Choice: (b). A version 1 decision cannot carry capabilities, so a companion
+  approves an update with a version 2 password decision; the provider answers
+  it with a version 2 status. Denial needs nothing. Reason: the loopback
+  review, which always shows the block, is the stated fallback; nothing else
+  needs to approve an update from an unknown client. Reverse: apply the check
+  only in the `(None, Some(proof))` arm.
+
+### D17. Capability list rules
+
+- Choice: optional, version 2 approve decisions only, 1 to 16 distinct names,
+  each at most 64 bytes, shaped `[a-z0-9-]+.vN` (no leading/trailing `-`, no
+  leading zero). A malformed list, a list on version 1 or on a denial is
+  `invalid_request`. Unknown well-formed names are ignored (they confer
+  nothing), so a future client may announce more. An update approval without
+  `update-review.v1` is `authentication_failed` (422), like a
+  `require_password` refusal; the ticket is consumed and the request stays
+  pending. Options considered: refuse unknown names (strict, but every
+  future capability would break against this provider); `invalid_request`
+  for the missing capability (reads as a client bug rather than a refusal).
+  Reverse: `valid_capabilities` and the decision arm in
+  `src/adapters/companion.rs`.
+
+### D18. The revision is read at request creation and rechecked three times
+
+- Context: the review must show the revision the approval covers; the
+  provider has the backend, the policy does not.
+- Options: (a) read at review display time (each review could show a
+  different revision; the record digest would change after sealing); (b) read
+  once when the request is created and seal it into the record (chosen).
+- Choice: (b), then recheck the revision when an approval is committed, before
+  the producer starts and after it (fresh read just before journaling); each
+  mismatch refuses with nothing sent, and the last two consume the approval.
+  The server-side `lastKnownRevisionDate` check (D2) covers the final GET→PUT
+  window as in phase 1. Reason: the earlier checks avoid running a producer
+  (which may itself rotate an external credential) for an approval that can
+  no longer write. Cost: up to four reads per request. Reverse: drop the
+  checks in `commit_decision` and before `prepare_producer`
+  (`update_still_reviewed`); the decisive one stays in `update_prepare`.
+
+### D19. The journal is the request's durable write receipt in provider state
+
+- Context: create already journals in provider state (`write_receipt`,
+  written before the POST); the trusted CLI journals under the user's config
+  directory.
+- Choice: reuse the provider-state receipt. For an update it always names
+  the item (`item_id` is set when the attempt begins). `begin_write` refuses
+  while another provider request for the same server and item holds an
+  `uncertain` receipt. The provider and the trusted CLI run as different
+  accounts with separate stores, so a CLI journal does not block a provider
+  update or vice versa; Vaultwarden's `lastKnownRevisionDate` check and the
+  revision rechecks still refuse a write over the other's change.
+  Reverse: a cross-store scan would need a shared, mutually writable
+  directory, which the account separation forbids.
+
+### D20. No eligibility marker for updates
+
+- Context: create writes a `vw-access=<marker>` field that protected reads
+  require. An update targets an item the operator names by ID.
+- Options: (a) require the item to carry a marker; (b) pin the immutable ID
+  and the full destination binding (D1) only.
+- Choice: (b), as the phase 1 command does. Reason: the operator-approved
+  policy already names the exact item, and requiring a marker would exclude
+  items created by Bitwarden clients. `custom:vw-access` itself can never be
+  replaced. Reverse: add `eligibility_marker` to `UpdateEffect` and check it
+  in `bound_item`.
+
+### D21. Producer frames are parsed with the update shape
+
+- Context: the fd 3 readers (`execution.rs`, `native/producer.rs`) parsed
+  with `SecretImport::parse`, which requires a password or a custom field; a
+  notes-only update would always fail.
+- Choice: parse with `parse_update` (also accepts notes alone; every other
+  limit unchanged). The application still requires the producer's selectors
+  to equal the policy's fields exactly, for create and update alike, so a
+  create still cannot store notes alone. Reverse: parse per effect.
+
+### D22. Refusals before the PUT leave no receipt, cancellation after journaling records `failed`
+
+- Choice: a stale revision, a broken binding or a schema mismatch refuses
+  before `begin_write`: no receipt, no block. If access ends between the
+  journal and the PUT, the receipt is recorded `failed` (nothing was sent)
+  instead of staying `uncertain`, which would block the item until a
+  reconcile. A refusal inside `update_secret` before sending is also
+  `failed`. Reverse: leave the receipt `uncertain` as create does.
+
+### D23. Live CI covers the shared core, not the provider adapter
+
+- Context: the live Vaultwarden 1.36.0 job runs integration tests that can
+  only use the public CLI and library API. The provider backend is
+  constructed only from a provider setup file, accepts only HTTPS, and keeps
+  its session in the Secret Service keyring, which the isolated live job
+  disables.
+- Options: (a) add test-only constructors or HTTP allowances to the
+  production adapter; (b) run a full provider with images and a keyring in
+  the live job (the disposable real-Vaultwarden pilot does this by hand);
+  (c) keep the live job on the shared core and test the adapter's HTTP
+  contract against a stateful mock.
+- Choice: (c). The body, history and verification come from the same
+  `secret_update` functions the phase 1 live test runs against 1.36.0 (D14
+  included); the provider adapter adds only the blocking PUT and the
+  response checks, tested in `src/adapters/vaultwarden/update_tests.rs`.
+  Residual risk: a difference between the blocking and async clients' PUT
+  serialization would only show in a real provider run. Reverse: extend
+  `scripts/pilot-real-vaultwarden-companion.sh` with an update operation.
+
+### D24. Reconciliation rewrites only an uncertain update receipt
+
+- Choice: `vw-access reconcile-write` on an update compares revisions (D9)
+  and replaces the receipt only while it is `uncertain`; a verified,
+  failed or unverified receipt is returned unchanged, and a second reconcile
+  returns the first resolution (the Reconciled history event marks it).
+  Its exit behaviour is unchanged from create. Reverse:
+  `Provider::reconcile_write`.
 
 ## 8. Acceptance tests (phase 1)
 
@@ -511,7 +682,50 @@ real test weaknesses (tampered values encrypted under the wrong key, so a MAC
 failure masked the comparison; a PascalCase probe that serde already refused)
 and were fixed in the tests.
 
-Phase 2 acceptance (next PR): denial, expiry, cancellation, lock during a
-pending request, stale revision after approval, producer failure, interrupted
-PUT, Touch ID v2 review digest over the update block, consumption after
-rotation.
+## 9. Acceptance tests (phase 2)
+
+- `src/access/update_flow_tests.rs` (Linux and native macOS fixtures, a
+  synthetic item in `src/access/update_test_support.rs`): the revision bound
+  at submission; a broken binding refuses the request; approved update runs
+  the producer once, PUTs once, records `verified` with no value in state or
+  history; a write since review before the producer (producer never runs,
+  approval consumed) and between producer and PUT (no journal); producer
+  schema mismatch, denial, expiry and lock never PUT; an uncertain update
+  blocks the item until reconciled and is never repeated; reconcile
+  `failed`/`updated_unverified`, idempotent, refuses another item, keeps a
+  verified receipt; a stale review cannot be approved; definite rejection and
+  failed verification keep honest receipts.
+- `src/adapters/vaultwarden/update_tests.rs` (stateful mock Vaultwarden):
+  one PUT bound to the reviewed revision with ciphertext only and official
+  history; verification catches an authenticated replacement; stale revision,
+  wrong schema and every broken binding refuse before any PUT; no PUT once not
+  live, for another server or another revision; D11 outcome mapping; D9
+  reconcile including a renamed item and the account binding.
+- `src/adapters/companion/update_review_tests.rs` (real companion dispatch,
+  software P-256 keys): the update block under the review digest; a valid
+  proof without the capability, or with only unknown names, is refused (422,
+  still pending); with it, approved; the same for password approvals;
+  capability list shape rules.
+- Companion core `companion/rust/tests/update_review.rs` and Flutter
+  `companion/test/update_review_test.dart`: the block is admitted, escaped and
+  rendered; malformed blocks never create a review; approving sends a
+  version 2 decision with the capability (password and Touch ID), denial and
+  other reviews keep their wire shape; the signed transcript's digest covers
+  the block.
+
+`scripts/mutate-provider-update.py EVIDENCE_DIR` weakens each phase 2 guard
+in turn (policy exclusivity, marker, notes-only, revision validation and
+bound; stale checks before approval and before the producer; exact producer
+schema; uncertain block; reconcile rewrites; verification gate; adapter
+revision recheck, schema, body binding, liveness, D11 mapping, response
+identity, binding check, reconcile binding and revision; companion capability
+requirement, exact name, list shape, approve-only; core block validation and
+both capability assertions) and requires the focused tests to fail. The
+report is `issue-48-phase2-mutations/report.json` (26 of 26 caught). Two
+first-run escapes were fixed: the application's producer-schema check was
+masked by the fake backend's own check (the test now requires no item read for
+another schema), and the adapter's body binding had two redundant clauses (the
+wire-level `lastKnownRevisionDate` check is kept). Weakening only
+`OperationPolicy::bind_update`'s revision check is an equivalent mutant: the
+record validation (`UpdateReview::valid`) refuses the same request before any
+state write, so the campaign mutates the shared `valid_revision` bound instead.

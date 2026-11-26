@@ -511,6 +511,7 @@ fn application_scenario(
     }
     f.app
         .activate_operation(OperationPolicyDraft {
+            update: None,
             require_password: false,
             create: None,
             ssh: None,

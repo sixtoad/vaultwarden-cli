@@ -268,6 +268,26 @@ platforms, and without calling an approval `biometric` when it is not.
 | Approval | `admits` check of the 14 fields (same as macOS), then GetAssertion; proof `{key_id, signature, authenticator_data}` | rebuilds the transcript, checks D-8, records `windows_hello` |
 | Cancel | `WebAuthNCancelCurrentOperation` on the attempt's GUID | ticket consumed only on send |
 
+## Integration with issue 48 phase 2 (protected updates)
+
+PR #93 (issue-48-spec D15-D24) landed while this work was open. No new
+decision was needed: both features meet in code that is already shared.
+
+- Provider: the `update-review.v1` refusal runs before the proof is
+  dispatched by key class, so a `windows_hello` proof (and a companion
+  password approval from Windows or Linux) of an update review without the
+  capability is `authentication_failed`, exactly as for `biometric`.
+- Companion: the Rust session builds every decision body, Windows Hello's
+  wrapped proof included (`begin_biometric_wrapped` shares `begin_proof` with
+  Touch ID), and adds the capability to a version 2 approve of an update
+  review; the Windows/Linux transport (D-2) sends that body byte for byte.
+  The review page (`update_facts.dart`) is platform independent.
+- Tests: provider `key_class_windows_hello_update_review_needs_the_capability`;
+  core `windows_hello_proof_of_an_update_asserts_the_capability` and
+  `an_update_approval_reaches_the_provider_with_its_capability` (loopback
+  TLS); Dart Windows Hello and Linux password approvals of an update in
+  `windows_hello_test.dart`.
+
 ## Tests
 
 - Provider (Rust): enrollment v3 accepted/refused (unknown class, `biometric`

@@ -1159,6 +1159,7 @@ mod tests {
         use crate::access::history::{HistoryEvent, HistoryOutcome, RequesterSnapshot};
         let event = HistoryEvent {
             create: None,
+            update: None,
             write_receipt: None,
             ssh: None,
             version: 1,

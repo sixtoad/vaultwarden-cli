@@ -36,3 +36,23 @@
   still show the Mac wording in `TouchIdKeyPanel` (pre-existing).
 - Hardware evidence: the Windows Hello prompt, TPM backing, cancellation and
   the platform's real authenticator flags (UV, BE/BS) are untested on a PC.
+
+## Issue 48 phase 2 (protected provider update): low-severity follow-ups
+
+- Source: self-review of `feature/issue-48-provider-update`, 2026-11-26.
+- A value a producer generated is lost when the post-producer read refuses
+  (stale revision, binding change, network failure): nothing is stored and no
+  receipt exists. The rotation guidance (spec section 6) already says to
+  revoke a new credential whose store did not end `verified`; a future
+  producer protocol could report "issued externally" so history records it.
+- Requests now read the vault while holding the authority gate (up to the
+  10 s client timeout per read, four reads per update request). Measure on a
+  slow server before adding a separate read path.
+- `vw-access reconcile-write` prints the update receipt and keeps create's exit
+  behaviour; the trusted CLI's update reconcile exits non-zero unless
+  `verified` (D9). Align the two if operators script around exit codes.
+- The provider and the trusted CLI keep separate write journals (D19); an
+  uncertain update in one store does not block the other. Revision rechecks and
+  `lastKnownRevisionDate` still refuse a write over the other's change.
+- Real Touch ID hardware and a real provider update against Vaultwarden 1.36.0
+  are not exercised by CI (D23); extend the disposable real-Vaultwarden pilot.

@@ -78,6 +78,8 @@ struct SshSecretBody {
     private: String,
 }
 
+mod update;
+
 pub struct VaultwardenBackend {
     config: Config,
     client: Client,
@@ -558,6 +560,41 @@ impl SecretBackend for VaultwardenBackend {
             Some(&effect.eligibility_marker),
         )
         .map_err(|_error| SessionError::BackendUnavailable)
+    }
+    fn update_review(
+        &mut self,
+        effect: &crate::access::policy::UpdateEffect,
+    ) -> Result<String, SessionError> {
+        self.review_update(effect)
+    }
+    fn update_prepare(
+        &mut self,
+        review: &crate::access::policy::UpdateReview,
+        input: &crate::secret_storage::SecretImport,
+    ) -> Result<crate::secret_update::PreparedUpdate, SessionError> {
+        self.prepare_update(review, input)
+    }
+    fn update_secret(
+        &mut self,
+        review: &crate::access::policy::UpdateReview,
+        prepared: &crate::secret_update::PreparedUpdate,
+        live: &dyn Fn() -> bool,
+    ) -> Result<(), crate::secret_storage::WriteStatus> {
+        self.put_update(review, prepared, live)
+    }
+    fn verify_update(
+        &mut self,
+        review: &crate::access::policy::UpdateReview,
+        prepared: &crate::secret_update::PreparedUpdate,
+        input: &crate::secret_storage::SecretImport,
+    ) -> Result<(), SessionError> {
+        self.check_update(review, prepared, input)
+    }
+    fn reconcile_update(
+        &mut self,
+        review: &crate::access::policy::UpdateReview,
+    ) -> Result<crate::secret_storage::WriteStatus, SessionError> {
+        self.reconcile_item(review)
     }
     fn resolve_ssh(&mut self, immutable_item_id: &str) -> Result<SensitiveString, SessionError> {
         // Recheck exact metadata on the same response that supplies the selected encrypted key.
@@ -1505,6 +1542,7 @@ mod tests {
                 .collect(),
         };
         app.activate_operation(OperationPolicyDraft {
+            update: None,
             require_password: false,
             create: None,
             ssh: None,
