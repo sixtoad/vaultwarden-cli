@@ -2,7 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:companion_slice/platform/approval_key.dart';
+import 'package:companion_slice/provider/page.dart';
 import 'package:companion_slice/provider/touch_id.dart';
+import 'package:flutter/material.dart';
+
+import 'installation_settings_test.dart' show FakeInstallation;
+
 import 'package:companion_slice/src/rust/api/biometric.dart' as bio;
 import 'package:companion_slice/src/rust/frb_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,5 +87,48 @@ void main() {
     );
     touchId.dispose();
     provider.dispose();
+  });
+
+  Widget page(FixtureProviderPlatform native, FakeKeys keys, String os) =>
+      MaterialApp(
+        home: ProviderPage(
+          platform: native,
+          syntheticBuilder: (_) => const SizedBox(),
+          approvalKeys: keys,
+          operatingSystem: os,
+          installation: FakeInstallation(),
+        ),
+      );
+
+  testWidgets('Windows names Windows Hello on the authorization step', (
+    tester,
+  ) async {
+    final native = FixtureProviderPlatform()..approvalBinding = binding;
+    await tester.pumpWidget(page(native, HelloKeys(), 'windows'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(requestRow(providerId));
+    await tester.tap(requestRow(providerId));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Windows Hello or password next'),
+      findsOneWidget,
+    );
+    await startAuthorization(tester);
+    expect(find.text('Approve once with Windows Hello'), findsOneWidget);
+    expect(find.textContaining('Touch ID'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Linux settings offer no approval key and never say Touch ID', (
+    tester,
+  ) async {
+    final keys = FakeKeys()..available = false;
+    await tester.pumpWidget(page(FixtureProviderPlatform(), keys, 'linux'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination-settings')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('linux-password-approval')), findsOneWidget);
+    expect(find.byKey(const Key('touch-id-keys')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }

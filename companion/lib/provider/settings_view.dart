@@ -87,7 +87,14 @@ class ProviderSettings extends StatelessWidget {
           const SizedBox(height: 24),
           if (installationControls)
             InstallationSettings(platform: installation),
-          if (config.configured) ...[
+          if (config.configured && touchId.operatingSystem == 'linux') ...[
+            // No hardware user-verification key on Linux (spec D-9).
+            const Text(
+              'Approval key: none on Linux. Approve each request with your provider password.',
+              key: Key('linux-password-approval'),
+            ),
+            const SizedBox(height: 24),
+          ] else if (config.configured) ...[
             TouchIdKeyPanel(
               touchId: touchId,
               keys: controller.keys,
