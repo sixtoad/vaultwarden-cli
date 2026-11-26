@@ -281,14 +281,18 @@ jobs:
             companion/build/app/reports/tests
 
   ios-approval-client:
-    # RunnerTests boots an iPhone simulator on the hosted ARM64 image.
+    # RunnerTests boots an iPhone simulator, which needs a logged-in GUI session:
+    # the same disposable guest as the Flutter desktop job, else hosted ARM64.
     name: Unsigned iOS approval client
-    runs-on: macos-26
+    runs-on: *macos-gui
     timeout-minutes: 75
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
+      - name: Verify disposable macOS guest and GUI session
+        if: runner.environment == 'self-hosted'
+        run: python3 scripts/disposable_macos_ci.py
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
@@ -296,9 +300,12 @@ jobs:
         with:
           flutter-version: '3.47.7'
           channel: stable
-          cache: true
+          # Each GUI clone already has the pinned SDK with the framework's original modes.
+          cache: ${{ runner.environment != 'self-hosted' }}
       - name: Build and test the unsigned iOS approval client
-        run: bash scripts/test-ios-companion.sh "$RUNNER_TEMP/ios-evidence"
+        run: |
+          source .github/ci/disposable-gui-build.sh
+          bash scripts/test-ios-companion.sh "$RUNNER_TEMP/ios-evidence"
       - name: Preserve iOS evidence
         if: always()
         uses: actions/upload-artifact@v4
