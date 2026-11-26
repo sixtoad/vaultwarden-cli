@@ -187,6 +187,12 @@ fn update_request_binds_the_revision_read_at_submission_into_the_review() {
     vault::with(|item| {
         assert_eq!((item.reviews, item.prepares, item.puts), (2, 0, 0));
     });
+    // A revision the provider cannot bind refuses the request.
+    for revision in [String::new(), "2026\n".to_owned(), "x".repeat(65)] {
+        vault::with(|item| item.revision.clone_from(&revision));
+        assert!(env.submit().is_err(), "{revision:?}");
+    }
+    vault::with(|item| item.revision = FIRST_REVISION.into());
     // A broken binding refuses the request: nothing to review.
     vault::with(|item| item.binding_ok = false);
     assert!(env.submit().is_err());

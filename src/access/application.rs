@@ -719,6 +719,9 @@ impl ProviderApplication {
                     && self.clock.now() < session_deadline
                     && self.clock.now() < deadline
             };
+            // Issue 48 phase 2: read the item before taking the release gate,
+            // so a slow vault never delays lock or revocation.
+            let update_revision = Self::update_revision(&mut authority, &input.operation_id)?;
             // Same gate -> release order as execution. Revocation intent either
             // wins before this check, or waits until the guarded snapshot commits.
             let release = self
@@ -728,10 +731,6 @@ impl ProviderApplication {
             if !Self::token_live(&token) {
                 return Err(AgentRejection::Unauthorized);
             }
-            if !live() {
-                return Err(AgentRejection::Locked);
-            }
-            let update_revision = Self::update_revision(&mut authority, &input.operation_id)?;
             if !live() {
                 return Err(AgentRejection::Locked);
             }
@@ -995,6 +994,8 @@ impl ProviderApplication {
                 && self.clock.now() < session_deadline
                 && self.clock.now() < deadline
         };
+        // Issue 48 phase 2: the item is read before any release gate is held.
+        let update_revision = Self::update_revision(&mut authority, &input.operation)?;
         let release = if agent_owner.is_some() {
             Some(
                 self.release_gate
@@ -1007,13 +1008,6 @@ impl ProviderApplication {
         if !Self::token_live(&token) {
             return Err(DirectRequestError::Unauthorized);
         }
-        let update_revision = match Self::update_revision(&mut authority, &input.operation) {
-            Ok(revision) => revision,
-            Err(error) => {
-                drop(release);
-                return Err(error.into());
-            }
-        };
         let result = match &agent_owner {
             None => authority.provider.create_direct_bound(
                 owner,
