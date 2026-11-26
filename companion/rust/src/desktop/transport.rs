@@ -155,12 +155,32 @@ pub fn send(exchange: &Exchange<'_>, body: &[u8]) -> Result<Vec<u8>, TransportEr
     let config = config(exchange).ok_or(TransportError::Transport)?;
     let name = ServerName::try_from(exchange.endpoint.host.clone())
         .map_err(|_| TransportError::Transport)?;
-    let address = (exchange.endpoint.host.as_str(), exchange.endpoint.port)
+    let addresses: Vec<_> = (exchange.endpoint.host.as_str(), exchange.endpoint.port)
         .to_socket_addrs()
         .map_err(|_| TransportError::Transport)?
-        .next()
-        .ok_or(TransportError::Transport)?;
-    let stream = TcpStream::connect_timeout(&address, timeout).map_err(io)?;
+        .take(8)
+        .collect();
+    // Every resolved address in turn (IPv6 and IPv4 for a name), within the
+    // exchange deadline; the last failure is reported.
+    let mut last = TransportError::Transport;
+    let mut connected = None;
+    for address in &addresses {
+        let Some(left) = deadline
+            .checked_duration_since(Instant::now())
+            .filter(|d| !d.is_zero())
+        else {
+            last = TransportError::Timeout;
+            break;
+        };
+        match TcpStream::connect_timeout(address, left) {
+            Ok(stream) => {
+                connected = Some(stream);
+                break;
+            }
+            Err(error) => last = io(error),
+        }
+    }
+    let stream = connected.ok_or(last)?;
     let connection = rustls::ClientConnection::new(Arc::new(config), name)
         .map_err(|_| TransportError::Transport)?;
     let mut tls = rustls::StreamOwned::new(connection, Deadline { stream, deadline });

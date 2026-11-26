@@ -33,7 +33,22 @@ pub(crate) fn serve(response: Option<Vec<u8>>) -> (u16, JoinHandle<Seen>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let handle = std::thread::spawn(move || {
-        let (socket, _) = listener.accept().ok()?;
+        // A client that never connects (refused earlier) ends the server.
+        listener.set_nonblocking(true).ok()?;
+        let started = Instant::now();
+        let socket = loop {
+            match listener.accept() {
+                Ok((socket, _)) => break socket,
+                Err(e)
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        && started.elapsed() < Duration::from_secs(10) =>
+                {
+                    std::thread::sleep(Duration::from_millis(20))
+                }
+                Err(_) => return None,
+            }
+        };
+        socket.set_nonblocking(false).ok()?;
         let mut roots = rustls::RootCertStore::empty();
         roots.add(CertificateDer::from(der(CLIENT_CA))).unwrap();
         let provider = Arc::new(rustls::crypto::ring::default_provider());

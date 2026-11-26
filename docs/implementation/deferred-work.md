@@ -21,8 +21,8 @@
 - Source: self-review of `feature/desktop-approval-win-linux`, 2026-11-26
   (spec: [desktop approval](desktop-approval-spec.md)).
 - DNS resolution in `companion/rust/src/desktop/transport.rs` is not bounded
-  by the 5 s exchange deadline, and only the first resolved address is
-  tried. A hung resolver delays one exchange; it grants nothing.
+  by the 5 s exchange deadline (connecting to each resolved address is). A
+  hung resolver delays one exchange; it grants nothing.
 - Deleting a Windows Hello key forgets its credential id; the platform
   credential stays in Windows Hello until the user removes it in Settings
   (never used again; spec D-6). `WebAuthNDeletePlatformCredential` (API v4)
