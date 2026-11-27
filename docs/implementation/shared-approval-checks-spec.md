@@ -103,7 +103,8 @@ macOS, and Rust only checked its DER shape before building the proof.
   signer still calls it). `companion/rust/tests/admission_vectors.rs` (cases
   in `tests/support/admission_cases.rs`) writes
   `companion/fixtures/approval-v2-admission.json` (51 cases, 4 admitted) with
-  `UPDATE_ADMISSION_VECTORS=1` and otherwise requires it unchanged. Swift
+  `UPDATE_ADMISSION_VECTORS=1` and otherwise requires it unchanged (compared
+  as parsed JSON, so a Windows checkout's CRLF line endings do not count). Swift
   (`native_tests/ProductionContractTests.swift`, the macOS and iOS source) and
   Kotlin (`ApprovalTranscriptTest`) loop over it.
 - **Reason.** The rule is specified once; a native copy that diverges fails its
