@@ -51,6 +51,12 @@ fn every_case_matches_the_rust_reference_and_the_committed_vectors() {
     if std::env::var_os("UPDATE_ADMISSION_VECTORS").is_some() {
         std::fs::write(&path, &text).unwrap();
     }
+    // Compared as JSON values: a Windows checkout may turn the file's line
+    // endings into CRLF, which changes the text but not the vectors.
     let committed = std::fs::read_to_string(&path).unwrap_or_default();
-    assert!(committed == text, "{VECTORS} is stale: regenerate it");
+    let committed: Option<Value> = serde_json::from_str(&committed).ok();
+    assert!(
+        committed.as_ref() == Some(&document(&cases)),
+        "{VECTORS} is stale: regenerate it"
+    );
 }
