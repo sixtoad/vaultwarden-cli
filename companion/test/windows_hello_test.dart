@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'installation_settings_test.dart' show FakeInstallation;
 
 import 'package:companion_slice/src/rust/api/biometric.dart' as bio;
+import 'package:crypto/crypto.dart';
 import 'package:companion_slice/src/rust/frb_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,6 +45,19 @@ class HelloKeys extends FakeKeys implements UserVerificationPlatform {
       available ? UserVerification.windowsHello : UserVerification.unavailable;
 
   Uint8List data = authenticatorData(0x05);
+
+  /// `authenticatorData || SHA-256(clientData)` (desktop-approval-spec D-8).
+  @override
+  List<int> signedMessage(Uint8List transcript) {
+    final challenge = base64Url
+        .encode(sha256.convert(transcript).bytes)
+        .replaceAll('=', '');
+    final clientData = utf8.encode(
+      '{"type":"webauthn.get","challenge":"$challenge","origin":"vaultwarden-access.approval-v2"}',
+    );
+    return [...data, ...sha256.convert(clientData).bytes];
+  }
+
   @override
   Future<KeyReply> sign(
     KeyBinding b,
@@ -76,7 +90,7 @@ void main() {
     await provider.review(providerId);
     await touchId.approve();
     final proof = decisions(native).single['proof'] as Map<String, dynamic>;
-    expect(proof['key_id'], goldenKeyId);
+    expect(proof['key_id'], approvalKeyId);
     expect(
       proof['authenticator_data'],
       base64Url.encode(keys.data).replaceAll('=', ''),

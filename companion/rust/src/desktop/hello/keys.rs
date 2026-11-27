@@ -3,9 +3,9 @@
 //! macOS/Android admission gate (one signature at a time, strictly
 //! increasing tokens per session). The authenticator is a trait so the
 //! contract runs in tests with a software key; Windows supplies WebAuthn.
-use super::admit::{admits, Binding, Purpose};
 use super::attested;
 use crate::desktop::identity::{hex, unhex};
+use crate::provider::admission::{admits, Binding, Purpose};
 use crate::provider::{approval_v2 as v2, key_class};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

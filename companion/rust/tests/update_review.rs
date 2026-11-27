@@ -239,7 +239,7 @@ fn touch_id_signs_the_digest_over_the_update_block_and_asserts_the_capability() 
     let signature: Signature = key().sign(&request.transcript);
     let signature = signature.to_der().as_bytes().to_vec();
     let work = session
-        .begin_biometric(request.handle, &request.key_id, &signature)
+        .begin_biometric(request.handle, &pk(), &signature)
         .unwrap();
     let body: Value = serde_json::from_slice(&work.body).unwrap();
     assert_eq!(body["capabilities"], json!([UPDATE_REVIEW_CAPABILITY]));
@@ -262,7 +262,7 @@ fn windows_hello_proof_of_an_update_asserts_the_capability() {
     let signature: Signature = key().sign(&message);
     let signature = signature.to_der().as_bytes().to_vec();
     let work = session
-        .begin_biometric_wrapped(request.handle, &request.key_id, &signature, &data)
+        .begin_biometric_wrapped(request.handle, &pk(), &signature, &data)
         .unwrap();
     let body: Value = serde_json::from_slice(&work.body).unwrap();
     assert_eq!(body["capabilities"], json!([UPDATE_REVIEW_CAPABILITY]));

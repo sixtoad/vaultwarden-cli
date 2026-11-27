@@ -5,7 +5,10 @@ import Foundation
 /// only transcripts that Rust built for the provider's v2 verifier, and only
 /// when the framed fields bind it to its own provider and approval client.
 /// This is a second line of defence: Rust and the provider remain the
-/// authorities. The synthetic demonstration contract
+/// authorities. Kept native on purpose (independent of Dart and Rust, and it
+/// binds the prompt's purpose to the signed bytes); held to the Rust
+/// reference by the shared vectors `companion/fixtures/approval-v2-admission.json`
+/// (shared-approval-checks-spec S-1, S-2). The synthetic demonstration contract
 /// (`dev.vaultwarden.companion.synthetic.v1`, `NativeTestKey`) never reaches
 /// this code and this key never signs its transcripts.
 enum ProductionDomain {

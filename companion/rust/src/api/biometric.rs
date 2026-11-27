@@ -202,15 +202,18 @@ pub fn provider_biometric_state() -> Result<ProviderBiometricState, BiometricRef
 pub fn provider_biometric_prepare() -> Result<BiometricSigningRequest, BiometricRefusal> {
     provider(|s| s.prepare_biometric())?
 }
-/// Send the Touch ID approval. Consumes the review exactly as a password
+/// Send the Touch ID approval. `public_key` and `signature` are the signer's
+/// reply: the signature must verify over the prepared transcript with that
+/// key, whose key id must be the review's (refused locally otherwise:
+/// nothing sent, the review kept). Consumes the review exactly as a password
 /// approval does; finish with `provider_finish`.
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_biometric_begin(
     handle: u64,
-    key_id: String,
+    public_key: Vec<u8>,
     signature: Vec<u8>,
 ) -> Result<ProviderWork, BiometricRefusal> {
-    provider(|s| s.begin_biometric(handle, &key_id, &signature))?
+    provider(|s| s.begin_biometric(handle, &public_key, &signature))?
 }
 
 /// `provider_biometric_begin` for a Windows Hello key (desktop-approval-spec
@@ -219,11 +222,11 @@ pub fn provider_biometric_begin(
 #[flutter_rust_bridge::frb(sync)]
 pub fn provider_biometric_begin_wrapped(
     handle: u64,
-    key_id: String,
+    public_key: Vec<u8>,
     signature: Vec<u8>,
     authenticator_data: Vec<u8>,
 ) -> Result<ProviderWork, BiometricRefusal> {
-    provider(|s| s.begin_biometric_wrapped(handle, &key_id, &signature, &authenticator_data))?
+    provider(|s| s.begin_biometric_wrapped(handle, &public_key, &signature, &authenticator_data))?
 }
 
 /// Pin the key session with the SAME values just given to

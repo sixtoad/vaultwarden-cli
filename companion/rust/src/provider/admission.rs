@@ -1,6 +1,11 @@
-//! The native second line of defence, identical to `ProductionTranscript.admits`
-//! (macOS) and `ApprovalTranscript.admits` (Android): the key signs only a
-//! well-formed v2 transcript bound to its own provider, client and key.
+//! The signer's admission rule: the key signs only a well-formed v2
+//! transcript of the prompted purpose, bound to its own provider, client and
+//! key. This is the reference (shared-approval-checks-spec S-2): the Windows
+//! Hello signer calls it, and the independent native guards on the other
+//! platforms (`ProductionTranscript.admits` on macOS and iOS,
+//! `ApprovalTranscript.admits` on Android) are held to it by the shared
+//! vectors in `companion/fixtures/approval-v2-admission.json`, which
+//! `tests/admission_vectors.rs` generates and checks.
 use crate::provider::approval_v2::{hex32, APPROVAL_DOMAIN, ENROLL_DOMAIN};
 use sha2::{Digest, Sha256};
 

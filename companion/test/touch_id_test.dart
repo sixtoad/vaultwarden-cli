@@ -42,7 +42,7 @@ void main() {
     expect(decision['version'], 2);
     expect(decision['decision'], 'approve');
     expect(decision.containsKey('password'), isFalse);
-    expect(decision['proof']['key_id'], goldenKeyId);
+    expect(decision['proof']['key_id'], approvalKeyId);
     expect(touchId.message, 'Approved once with Touch ID.');
     expect(
       bio.providerBiometricState().result,

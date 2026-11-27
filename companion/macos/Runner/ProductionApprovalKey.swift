@@ -196,7 +196,8 @@ enum ProductionApprovalKey {
             guard let failure = error?.takeRetainedValue() else { return ProductionReply(outcome: .failed) }
             return classify(domain: CFErrorGetDomain(failure) as String, code: CFErrorGetCode(failure))
         }
-        guard (8...72).contains(signature.count) else { return ProductionReply(outcome: .failed) }
+        // ASN.1 DER as SecKey made it; Rust checks the encoding and verifies it
+        // over the transcript before any proof is sent (shared-approval-checks-spec S-3).
         return ProductionReply(outcome: .signed, publicKey: publicKey, signature: signature)
     }
 

@@ -1,4 +1,3 @@
-import CryptoKit
 import LocalAuthentication
 import Security
 import UIKit
@@ -47,19 +46,6 @@ final class RunnerTests: XCTestCase {
         XCTAssertTrue(ProductionTranscript.admits(enroll, purpose: .enroll, binding: binding, publicKey: publicKey))
         XCTAssertFalse(ProductionTranscript.admits(approval, purpose: .enroll, binding: binding, publicKey: publicKey))
         XCTAssertFalse(ProductionTranscript.admits(enroll, purpose: .approve, binding: binding, publicKey: publicKey))
-    }
-
-    func testOnlyAVerifyingDERSignatureLeavesTheChannel() throws {
-        for name in ["approval", "enroll"] {
-            let (transcript, signature) = try section(name)
-            XCTAssertEqual(MobileApproval.checked(outcome: "signed", publicKey: publicKey, signature: signature,
-                                                  transcript: transcript).outcome, "signed")
-            let raw = try P256.Signing.ECDSASignature(derRepresentation: signature).rawRepresentation
-            XCTAssertEqual(MobileApproval.checked(outcome: "signed", publicKey: publicKey, signature: raw,
-                                                  transcript: transcript).outcome, "failed")
-            XCTAssertTrue(MobileApproval.checked(outcome: "cancelled", publicKey: publicKey, signature: signature,
-                                                 transcript: transcript).signature.isEmpty)
-        }
     }
 
     func testKeyAttributesAsCompiledForIOS() throws {

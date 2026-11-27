@@ -354,29 +354,31 @@ impl ProviderSession {
     }
     /// Send a Touch ID approval (Decision v2 with `proof`, never `password`).
     /// Same single-shot and uncertain-outcome rules as a password approval.
+    /// `public_key` is the 65-byte SEC1 point the signer returned; the proof
+    /// is checked against it and the transcript before anything is sent.
     pub fn begin_biometric(
         &mut self,
         handle: u64,
-        key_id: &str,
+        public_key: &[u8],
         signature: &[u8],
     ) -> Result<ProviderWork, Refusal> {
-        self.begin_proof(handle, key_id, signature, None)
+        self.begin_proof(handle, public_key, signature, None)
     }
     /// A Windows Hello (`windows_hello` key class) proof: the signature is
     /// over `authenticator_data || SHA-256(clientData)` (desktop-approval-spec D-8).
     pub fn begin_biometric_wrapped(
         &mut self,
         handle: u64,
-        key_id: &str,
+        public_key: &[u8],
         signature: &[u8],
         authenticator_data: &[u8],
     ) -> Result<ProviderWork, Refusal> {
-        self.begin_proof(handle, key_id, signature, Some(authenticator_data))
+        self.begin_proof(handle, public_key, signature, Some(authenticator_data))
     }
     fn begin_proof(
         &mut self,
         handle: u64,
-        key_id: &str,
+        public_key: &[u8],
         signature: &[u8],
         authenticator_data: Option<&[u8]>,
     ) -> Result<ProviderWork, Refusal> {
@@ -388,14 +390,7 @@ impl ProviderSession {
         }
         // Every binding check runs again against the review as it is now.
         let (request_id, signing) = self.signing_transcript()?;
-        if key_id != signing.key_id {
-            return Err(Refusal::KeyMismatch);
-        }
-        if !v2::valid_signature(signature)
-            || authenticator_data.is_some_and(|d| !super::key_class::valid_authenticator_data(d))
-        {
-            return Err(Refusal::InvalidSignature);
-        }
+        super::proof_check::approval_proof(&signing, public_key, signature, authenticator_data)?;
         let serial = self.serial.checked_add(1).ok_or(Refusal::Busy)?;
         let review = self.reviewed.take().ok_or(Refusal::NoDecidableReview)?;
         let mut proof =

@@ -33,15 +33,18 @@ ProviderBiometricState providerBiometricState() =>
 BiometricSigningRequest providerBiometricPrepare() =>
     RustLib.instance.api.crateApiBiometricProviderBiometricPrepare();
 
-/// Send the Touch ID approval. Consumes the review exactly as a password
+/// Send the Touch ID approval. `public_key` and `signature` are the signer's
+/// reply: the signature must verify over the prepared transcript with that
+/// key, whose key id must be the review's (refused locally otherwise:
+/// nothing sent, the review kept). Consumes the review exactly as a password
 /// approval does; finish with `provider_finish`.
 ProviderWork providerBiometricBegin({
   required BigInt handle,
-  required String keyId,
+  required List<int> publicKey,
   required List<int> signature,
 }) => RustLib.instance.api.crateApiBiometricProviderBiometricBegin(
   handle: handle,
-  keyId: keyId,
+  publicKey: publicKey,
   signature: signature,
 );
 
@@ -50,12 +53,12 @@ ProviderWork providerBiometricBegin({
 /// client data built from the transcript; the proof carries the data.
 ProviderWork providerBiometricBeginWrapped({
   required BigInt handle,
-  required String keyId,
+  required List<int> publicKey,
   required List<int> signature,
   required List<int> authenticatorData,
 }) => RustLib.instance.api.crateApiBiometricProviderBiometricBeginWrapped(
   handle: handle,
-  keyId: keyId,
+  publicKey: publicKey,
   signature: signature,
   authenticatorData: authenticatorData,
 );

@@ -71,16 +71,13 @@ final class MobileApprovalKeyChannel {
             let reason = MobileApproval.reason(purpose: purpose.rawValue, biometry: biometry.rawValue)
             let queue = worker
             worker.async {
+                // Rust checks and verifies the signature before any proof is
+                // sent (shared-approval-checks-spec S-3); this channel only signs.
                 ProductionApprovalKey.sign(binding, purpose: purpose, transcript: transcript, reason: reason,
                                            context: context, worker: queue) { reply in
-                    // Never hand Flutter a signature that does not verify over these bytes.
-                    let checked = MobileApproval.checked(outcome: reply.outcome.rawValue, publicKey: reply.publicKey,
-                                                         signature: reply.signature, transcript: transcript)
                     DispatchQueue.main.async {
                         self.gate.finish(session: session, token: token)
-                        result(["outcome": checked.outcome,
-                                "publicKey": FlutterStandardTypedData(bytes: checked.publicKey),
-                                "signature": FlutterStandardTypedData(bytes: checked.signature)])
+                        result(Self.encode(reply))
                     }
                 }
             }

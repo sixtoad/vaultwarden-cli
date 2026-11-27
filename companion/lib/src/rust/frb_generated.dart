@@ -298,13 +298,13 @@ abstract class RustLibApi extends BaseApi {
 
   ProviderWork crateApiBiometricProviderBiometricBegin({
     required BigInt handle,
-    required String keyId,
+    required List<int> publicKey,
     required List<int> signature,
   });
 
   ProviderWork crateApiBiometricProviderBiometricBeginWrapped({
     required BigInt handle,
-    required String keyId,
+    required List<int> publicKey,
     required List<int> signature,
     required List<int> authenticatorData,
   });
@@ -2042,7 +2042,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   ProviderWork crateApiBiometricProviderBiometricBegin({
     required BigInt handle,
-    required String keyId,
+    required List<int> publicKey,
     required List<int> signature,
   }) {
     return handler.executeSync(
@@ -2050,7 +2050,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_64(handle, serializer);
-          sse_encode_String(keyId, serializer);
+          sse_encode_list_prim_u_8_loose(publicKey, serializer);
           sse_encode_list_prim_u_8_loose(signature, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 58)!;
         },
@@ -2059,7 +2059,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_biometric_refusal,
         ),
         constMeta: kCrateApiBiometricProviderBiometricBeginConstMeta,
-        argValues: [handle, keyId, signature],
+        argValues: [handle, publicKey, signature],
         apiImpl: this,
       ),
     );
@@ -2068,13 +2068,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBiometricProviderBiometricBeginConstMeta =>
       const TaskConstMeta(
         debugName: "provider_biometric_begin",
-        argNames: ["handle", "keyId", "signature"],
+        argNames: ["handle", "publicKey", "signature"],
       );
 
   @override
   ProviderWork crateApiBiometricProviderBiometricBeginWrapped({
     required BigInt handle,
-    required String keyId,
+    required List<int> publicKey,
     required List<int> signature,
     required List<int> authenticatorData,
   }) {
@@ -2083,7 +2083,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_64(handle, serializer);
-          sse_encode_String(keyId, serializer);
+          sse_encode_list_prim_u_8_loose(publicKey, serializer);
           sse_encode_list_prim_u_8_loose(signature, serializer);
           sse_encode_list_prim_u_8_loose(authenticatorData, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 59)!;
@@ -2093,7 +2093,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_biometric_refusal,
         ),
         constMeta: kCrateApiBiometricProviderBiometricBeginWrappedConstMeta,
-        argValues: [handle, keyId, signature, authenticatorData],
+        argValues: [handle, publicKey, signature, authenticatorData],
         apiImpl: this,
       ),
     );
@@ -2102,7 +2102,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBiometricProviderBiometricBeginWrappedConstMeta =>
       const TaskConstMeta(
         debugName: "provider_biometric_begin_wrapped",
-        argNames: ["handle", "keyId", "signature", "authenticatorData"],
+        argNames: ["handle", "publicKey", "signature", "authenticatorData"],
       );
 
   @override

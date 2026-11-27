@@ -60,6 +60,10 @@ class ApprovalBinding private constructor(val providerIdentity: ByteArray, val a
  * the provider verifies every proof; this is the native second line of
  * defence, identical to `ProductionTranscript.admits` on macOS: the key signs
  * only a well-formed transcript bound to its own provider, client and key.
+ * Kept native on purpose (independent of Dart and Rust, and it binds the
+ * prompt's purpose to the signed bytes); held to the Rust reference by the
+ * shared vectors `companion/fixtures/approval-v2-admission.json`
+ * (shared-approval-checks-spec S-1, S-2).
  */
 object ApprovalTranscript {
     val approvalDomain = "dev.vaultwarden.provider.approval.v2".toByteArray(Charsets.US_ASCII)
