@@ -35,11 +35,14 @@ different key still fails closed. The queries are pure and tested on the host
 
 iOS-only code lives in `companion/ios/Runner`:
 
-- `MobileApprovalContract.swift`: UIKit-free rules, tested on the macOS host by
-  `swift test` (`companion/mobile_native_tests`) and on a simulator by
-  `ios/RunnerTests`. A signature leaves the channel only when it is canonical
-  DER and verifies over the exact transcript with the key's public point;
-  anything that is not `signed` carries no bytes.
+- `MobileApprovalContract.swift`: UIKit-free rules (availability names,
+  prompt reasons, lifecycle triggers), tested on the macOS host by `swift
+  test` (`companion/mobile_native_tests`) and on a simulator by
+  `ios/RunnerTests`. The signature leaves the channel as the Secure Enclave
+  made it; the Rust core checks its encoding and verifies it over the exact
+  transcript with the key's public point before any proof is sent
+  (`docs/implementation/shared-approval-checks-spec.md` S-3). Anything that is
+  not `signed` carries no bytes (Dart's `parseKeyReply` refuses it otherwise).
 - `MobileApprovalKeyChannel.swift`: the `approvalKey` channel, same methods
   and replies as macOS. `availability` answers `faceID`, `touchID` or
   `unavailable`.
