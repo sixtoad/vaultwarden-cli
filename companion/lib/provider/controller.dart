@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../platform/core_provider.dart';
 import '../platform/provider.dart';
 import '../src/rust/api/provider.dart' as core;
 import '../src/rust/api/management.dart' as manage;
@@ -401,7 +402,15 @@ class ProviderController extends ChangeNotifier {
     }
   }
 
-  Future<void> setup(String endpoint, String pin, String passphrase) async {
+  /// [caPath] and [identityPath]: a [PathSetupPlatform] reads the files
+  /// itself (Windows and Linux, desktop-approval-spec D-4).
+  Future<void> setup(
+    String endpoint,
+    String pin,
+    String passphrase, {
+    String? caPath,
+    String? identityPath,
+  }) async {
     if (!canSetup) return;
     invalidate();
     _ready = false;
@@ -410,7 +419,18 @@ class ProviderController extends ChangeNotifier {
     diagnostic = '';
     _publish();
     try {
-      await platform.setup(endpoint, pin, passphrase);
+      if (platform case final PathSetupPlatform files
+          when caPath != null && identityPath != null) {
+        await files.setupFromFiles(
+          endpoint,
+          pin,
+          caPath,
+          identityPath,
+          passphrase,
+        );
+      } else {
+        await platform.setup(endpoint, pin, passphrase);
+      }
     } catch (_) {
       diagnostic = 'Setup cancelled or unavailable. Check HTTPS, CA, leaf pin and dedicated PKCS#12.';
     } finally {

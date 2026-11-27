@@ -16,6 +16,27 @@
   conversion paths, rerun crypto/provider-session tests, and document the limits
   of memory zeroization rather than claiming forensic erasure of all copies.
 
+## Desktop approval on Windows and Linux: review LOWs (PR #94)
+
+- Source: self-review of `feature/desktop-approval-win-linux`, 2026-11-26
+  (spec: [desktop approval](desktop-approval-spec.md)).
+- DNS resolution in `companion/rust/src/desktop/transport.rs` is not bounded
+  by the 5 s exchange deadline (connecting to each resolved address is). A
+  hung resolver delays one exchange; it grants nothing.
+- Deleting a Windows Hello key forgets its credential id; the platform
+  credential stays in Windows Hello until the user removes it in Settings
+  (never used again; spec D-6). `WebAuthNDeletePlatformCredential` (API v4)
+  could remove it.
+- `hello::keys::Keys::create` is not serialised against a concurrent create
+  of the same binding; Dart serialises key operations today.
+- No native sleep or screen-lock notification on Windows/Linux: Flutter's
+  `inactive`/`hidden` drive invalidation (spec D-5 residual).
+- The closing paragraph of `ProviderCapabilities` and the synthetic signing
+  demonstration button remain macOS-centric on Windows and Linux; phones
+  still show the Mac wording in `TouchIdKeyPanel` (pre-existing).
+- Hardware evidence: the Windows Hello prompt, TPM backing, cancellation and
+  the platform's real authenticator flags (UV, BE/BS) are untested on a PC.
+
 ## Issue 48 phase 2 (protected provider update): low-severity follow-ups
 
 - Source: self-review of `feature/issue-48-provider-update`, 2026-11-26.

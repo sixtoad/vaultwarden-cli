@@ -79,6 +79,14 @@ enum Command {
         public_key: String,
         /// Unpadded base64url ASN.1 DER ECDSA signature over the enroll transcript.
         enroll_signature: String,
+        /// Version 3 only (required there): the key's class. Version 2
+        /// always enrolls a `biometric` key.
+        #[serde(default)]
+        key_class: Option<crate::access::approval_key_class::KeyClass>,
+        /// Version 3 `windows_hello` only: the enrollment assertion's 37-byte
+        /// authenticator data, unpadded base64url.
+        #[serde(default)]
+        enroll_authenticator_data: Option<String>,
     },
     BiometricRevoke {
         version: u8,
@@ -173,15 +181,26 @@ struct ProofWire {
     key_id: String,
     /// Unpadded base64url ASN.1 DER ECDSA P-256 signature (at most 72 bytes).
     signature: String,
+    /// `windows_hello` keys only: unpadded base64url, exactly 37 bytes of
+    /// WebAuthn authenticator data (desktop-approval-spec D-8).
+    #[serde(default)]
+    authenticator_data: Option<String>,
 }
 impl ProofWire {
     fn decode(&self) -> Option<crate::access::approval_v2::BiometricProof> {
         let signature = decode_binary(&self.signature)?;
+        let authenticator_data = match &self.authenticator_data {
+            None => None,
+            Some(value) => Some(decode_binary(value).filter(|data| {
+                data.len() == crate::access::approval_key_class::AUTHENTICATOR_DATA_LEN
+            })?),
+        };
         (identity::valid_fingerprint(&self.key_id)
             && crate::access::approval_v2::valid_signature_len(&signature))
         .then(|| crate::access::approval_v2::BiometricProof {
             key_id: self.key_id.clone(),
             signature,
+            authenticator_data,
         })
     }
 }

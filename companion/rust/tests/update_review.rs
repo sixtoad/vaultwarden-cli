@@ -246,3 +246,30 @@ fn touch_id_signs_the_digest_over_the_update_block_and_asserts_the_capability() 
     assert_eq!(body["version"], 2);
     assert!(body.get("password").is_none());
 }
+
+/// Windows Hello (desktop-approval-spec D-8) approves an update with the same
+/// v2 decision as Touch ID: the capability rides beside the wrapped proof.
+#[test]
+fn windows_hello_proof_of_an_update_asserts_the_capability() {
+    use companion_core::provider::key_class;
+    let value = update_review_v2();
+    let mut session = reviewed(&value, true);
+    let request = session.prepare_biometric().unwrap();
+    let mut data = key_class::rp_id_hash().to_vec();
+    data.push(0x05);
+    data.extend_from_slice(&[0; 4]);
+    let message = key_class::signed_message(&request.transcript, &data).unwrap();
+    let signature: Signature = key().sign(&message);
+    let signature = signature.to_der().as_bytes().to_vec();
+    let work = session
+        .begin_biometric_wrapped(request.handle, &request.key_id, &signature, &data)
+        .unwrap();
+    let body: Value = serde_json::from_slice(&work.body).unwrap();
+    assert_eq!(body["capabilities"], json!([UPDATE_REVIEW_CAPABILITY]));
+    assert_eq!(body["version"], 2);
+    assert_eq!(
+        body["proof"]["authenticator_data"],
+        json!(v2::base64url(&data))
+    );
+    assert!(body.get("password").is_none());
+}

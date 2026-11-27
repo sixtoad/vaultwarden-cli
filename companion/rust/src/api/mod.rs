@@ -1,6 +1,8 @@
 use crate::lifecycle::Core;
 use std::sync::{Mutex, OnceLock};
 pub mod biometric;
+pub mod desktop_key;
+pub mod desktop_provider;
 pub mod enrollment;
 pub mod installation;
 pub mod management;

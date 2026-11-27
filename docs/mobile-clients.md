@@ -22,7 +22,10 @@ never a partial or synthesized success.
 | `initializePackagedCore` / `packagedCorePath` (`core_loader.dart`) | — | Rust core loader |
 
 `approvalClientSystems` (`macos`, `android`, `ios`) decides where the native
-channel clients are live; Linux and Windows stay transport-less as before.
+channel clients are live. Linux and Windows have no native channels: their
+transport and approval key are the Rust core (`coreTransportSystems`,
+`CoreProviderPlatform`, `CoreApprovalKeyPlatform`), with the same methods,
+closed replies and limits; see "Windows and Linux" below.
 `mobileSystems` (`android`, `ios`) decides what a phone never shows: desktop
 installation controls (`DeviceCapabilities.cliInstall` is false there).
 
@@ -195,6 +198,33 @@ call with a missing-symbol error. A Debug build (Xcode 16+,
 `Runner.app/Runner.debug.dylib`, not the `Runner` stub; `dlsym` finds them
 there, and `scripts/test-ios-companion.sh` checks that image in Debug and
 `Runner` in Release.
+
+## Windows and Linux (desktop-approval-spec)
+
+[`docs/implementation/desktop-approval-spec.md`](implementation/desktop-approval-spec.md)
+records the decisions (D-1 to D-10). In short:
+
+- **Transport** (`companion/rust/src/desktop/`): pinned mutual TLS in Rust
+  (`rustls`, the provider's TLS stack), the same endpoint, status/body,
+  recovery-marker and management-gate rules as macOS and Android. Setup
+  reads the CA (DER) and the PKCS#12 by absolute path; Dart never holds
+  them. **Desktop identity at rest:** Windows keeps the PKCS#8 key under
+  DPAPI (current user), Linux in a 0600 file under `$XDG_CONFIG_HOME`; any
+  process of the same user can use either, as with an unlocked keyring. The
+  identity is an mTLS credential, not an approval factor.
+- **Windows approval key:** a Windows Hello WebAuthn platform credential
+  (ES256, user verification required, device-bound) per binding. Its proof
+  is the provider's `windows_hello` key class: the signature covers the
+  authenticator data and the fixed client data built from the v2
+  transcript. The provider records such an approval as `windows_hello`,
+  never `biometric`, because Windows Hello also accepts its PIN.
+  `availability` replies `windowsHello`.
+- **Linux:** no approval key (`unavailable`); approval is by the provider
+  password.
+- **Lifecycle:** Flutter's lifecycle drives invalidation: leaving `resumed`
+  discards prepared administrative tickets; `hidden`, `paused` and
+  `detached` retire the provider session. `inactive` alone does not (the
+  Windows Hello prompt deactivates the window).
 
 ## Lifecycle rules (shared Dart, every platform)
 

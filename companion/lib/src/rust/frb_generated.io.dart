@@ -5,6 +5,8 @@
 
 import 'api.dart';
 import 'api/biometric.dart';
+import 'api/desktop_key.dart';
+import 'api/desktop_provider.dart';
 import 'api/enrollment.dart';
 import 'api/installation.dart';
 import 'api/management.dart';
@@ -109,6 +111,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Completion dco_decode_completion(dynamic raw);
+
+  @protected
+  DesktopKeyReply dco_decode_desktop_key_reply(dynamic raw);
+
+  @protected
+  DesktopProviderConfiguration dco_decode_desktop_provider_configuration(
+    dynamic raw,
+  );
 
   @protected
   EnrolleeRole dco_decode_enrollee_role(dynamic raw);
@@ -382,6 +392,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Completion sse_decode_completion(SseDeserializer deserializer);
+
+  @protected
+  DesktopKeyReply sse_decode_desktop_key_reply(SseDeserializer deserializer);
+
+  @protected
+  DesktopProviderConfiguration sse_decode_desktop_provider_configuration(
+    SseDeserializer deserializer,
+  );
 
   @protected
   EnrolleeRole sse_decode_enrollee_role(SseDeserializer deserializer);
@@ -715,6 +733,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_completion(Completion self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_desktop_key_reply(
+    DesktopKeyReply self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_desktop_provider_configuration(
+    DesktopProviderConfiguration self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_enrollee_role(EnrolleeRole self, SseSerializer serializer);

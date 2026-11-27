@@ -53,6 +53,7 @@ void main() {
       'touchId',
       'faceId',
       'biometric',
+      'windowsHello',
       'unavailable',
     ]);
     expect(

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'package:companion_slice/main.dart';
 import 'package:companion_slice/platform/core_loader.dart';
+import 'package:companion_slice/platform/core_provider.dart';
 import 'package:companion_slice/platform/signer.dart';
 import 'package:companion_slice/src/rust/api.dart' as core;
 import 'package:companion_slice/platform/provider.dart';
@@ -130,9 +131,15 @@ Future<void> main() async {
     if (!Platform.isMacOS) {
       require(
         text.contains(
-          'Provider transport unavailable on this platform. Provider approvals require macOS.',
+          'Provider transport unavailable on this platform. Provider approvals need macOS, Windows, Linux, Android or iOS.',
         ),
         'release unsupported provider screen',
+      );
+      // Windows and Linux approve through the Rust core instead (spec D-2).
+      require(
+        CoreProviderPlatform().available ==
+            (Platform.isWindows || Platform.isLinux),
+        'release core transport selection',
       );
     }
     if (Platform.isWindows) {

@@ -258,6 +258,8 @@ fn enroll_command(
         password: SensitiveString::new(password.into()),
         public_key: URL_SAFE_NO_PAD.encode(public_key),
         enroll_signature: URL_SAFE_NO_PAD.encode(signature),
+        key_class: None,
+        enroll_authenticator_data: None,
     }
 }
 /// Rebuild the transcript solely from the v2 Review response, as PR B will.
@@ -304,6 +306,7 @@ fn proof(id: &str, ticket: &str, key_id: &str, signature: &[u8]) -> Command {
         proof: Some(ProofWire {
             key_id: key_id.into(),
             signature: URL_SAFE_NO_PAD.encode(signature),
+            authenticator_data: None,
         }),
     }
 }
@@ -532,6 +535,7 @@ fn biometric_password_and_proof_are_exclusive_and_sizes_are_bounded() {
             proof: proof.map(|(key_id, signature)| ProofWire {
                 key_id: key_id.into(),
                 signature: signature.into(),
+                authenticator_data: None,
             }),
         }
     };
@@ -570,6 +574,8 @@ fn biometric_password_and_proof_are_exclusive_and_sizes_are_bounded() {
         password: SensitiveString::new(PASSWORD.into()),
         public_key: URL_SAFE_NO_PAD.encode(key),
         enroll_signature: URL_SAFE_NO_PAD.encode(vec![0x30u8; sig_len]),
+        key_class: None,
+        enroll_authenticator_data: None,
     };
     assert!(enroll(&public_key, 70).valid());
     assert!(!enroll(&public_key[..33], 70).valid());
@@ -1573,3 +1579,6 @@ fn biometric_identity_detail_v3_is_self_service_and_everything_else_stays_admin_
         assert_eq!(body(&response)["identity"]["id"], target.as_str());
     }
 }
+
+#[path = "key_class_tests.rs"]
+mod key_class;

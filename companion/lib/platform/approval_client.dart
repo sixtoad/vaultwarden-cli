@@ -26,6 +26,10 @@ enum UserVerification {
 
   /// Android Class 3 (strong) biometrics.
   biometric('biometrics'),
+
+  /// Windows Hello: fingerprint, face or the Windows Hello PIN (never
+  /// recorded as biometric by the provider, desktop-approval-spec D-7).
+  windowsHello('Windows Hello'),
   unavailable('unavailable');
 
   const UserVerification(this.label);
@@ -44,6 +48,7 @@ const verificationReplies = <String, Map<String, UserVerification>>{
     'faceID': UserVerification.faceId,
   },
   'android': {'biometric': UserVerification.biometric},
+  'windows': {'windowsHello': UserVerification.windowsHello},
 };
 
 UserVerification parseUserVerification(String operatingSystem, Object? reply) =>
@@ -62,6 +67,12 @@ class VerificationWording {
     String operatingSystem,
     UserVerification verification,
   ) {
+    // A desktop names the verification its key reports: only a Windows
+    // Hello key says Windows Hello. Linux never offers a key (spec D-9).
+    if (operatingSystem == 'windows' &&
+        verification == UserVerification.windowsHello) {
+      return windows;
+    }
     if (!isMobileSystem(operatingSystem)) return macOS;
     final method = verification != UserVerification.unavailable
         ? verification.label
@@ -75,6 +86,13 @@ class VerificationWording {
     'Touch ID',
     'this Mac',
     'fingerprint',
+  );
+
+  /// Windows Hello approval key (desktop-approval-spec D-10).
+  static const windows = VerificationWording._(
+    'Windows Hello',
+    'this PC',
+    'Windows Hello sign-in',
   );
 
   /// The verification as written mid-sentence ("Touch ID", "biometrics").

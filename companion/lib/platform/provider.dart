@@ -159,3 +159,8 @@ class NativeProviderPlatform
     };
   }
 }
+
+/// The closed `configuration` reply schema, for transports that are not a
+/// native channel (Windows and Linux, `core_provider.dart`).
+ProviderConfiguration parseProviderConfiguration(Object? value) =>
+    NativeProviderPlatform(macOS: false)._parse(value);

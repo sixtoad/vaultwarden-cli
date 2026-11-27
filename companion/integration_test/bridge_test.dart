@@ -8,6 +8,11 @@ import 'package:companion_slice/main.dart';
 import 'package:companion_slice/platform/signer.dart';
 import 'package:companion_slice/platform/core_loader.dart';
 import 'package:companion_slice/src/rust/api.dart' as core;
+import 'package:companion_slice/src/rust/frb_generated.dart';
+import 'package:companion_slice/platform/approval_client.dart';
+import 'package:companion_slice/platform/approval_key.dart';
+import 'package:companion_slice/platform/core_approval_key.dart';
+import 'package:companion_slice/platform/core_provider.dart';
 import 'package:companion_slice/platform/provider.dart';
 
 import 'provider_checks.dart';
@@ -78,6 +83,40 @@ void main() {
       expect(state.verified, 0);
       expect(state.hasKey, false);
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'Windows and Linux reach the Rust-core transport and key through the packaged bridge',
+    (tester) async {
+      // The first test of this file already loaded the packaged core.
+      if (!RustLib.instance.initialized) await initializePackagedCore();
+      final os = Platform.operatingSystem;
+      final transport = CoreProviderPlatform();
+      expect(transport.available, isCoreTransportSystem(os));
+      if (!transport.available) return;
+      // Reads only this user's (fresh CI) configuration; nothing is written.
+      await transport.configuration();
+      await expectLater(
+        transport.setupFromFiles('http://x', 'a' * 64, '/n', '/n', ''),
+        throwsA(anything),
+      );
+      final keys = CoreApprovalKeyPlatform();
+      final verification = await keys.verification();
+      if (os == 'linux') {
+        expect(verification, UserVerification.unavailable);
+      } else {
+        expect(
+          verification,
+          anyOf(UserVerification.windowsHello, UserVerification.unavailable),
+        );
+      }
+      // A malformed binding is refused before any authenticator call.
+      final refused = await keys.read(const KeyBinding('x', 'y'));
+      expect(
+        refused.outcome,
+        os == 'linux' ? KeyOutcome.unavailable : KeyOutcome.failed,
+      );
     },
   );
 }

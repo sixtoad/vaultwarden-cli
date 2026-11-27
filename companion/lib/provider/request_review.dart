@@ -38,7 +38,11 @@ class RequestReview extends StatelessWidget {
     this.onTouchId,
     this.touchIdNote = '',
     this.touchIdMessage = '',
+    this.touchIdMethod = 'Touch ID',
   });
+
+  /// `VerificationWording.method` of this device's approval key.
+  final String touchIdMethod;
   final core.ProviderSnapshot state;
   final String endpoint, origin;
   final TextEditingController password;
@@ -145,6 +149,7 @@ class RequestReview extends StatelessWidget {
         touchIdOffered: touchIdOffered,
         onTouchId: onTouchId,
         touchIdNote: touchIdNote,
+        touchIdMethod: touchIdMethod,
       ),
       ReviewStep.deny => DenyConfirm(
         requestId: review.id,
@@ -200,7 +205,7 @@ class RequestReview extends StatelessWidget {
           width: double.infinity,
           child: Text(
             touchIdOffered && onTouchId != null
-                ? 'Touch ID or password next · approval applies to this request only'
+                ? '${touchIdMethod[0].toUpperCase()}${touchIdMethod.substring(1)} or password next · approval applies to this request only'
                 : 'Password required next · approval applies to this request only',
             textAlign: TextAlign.center,
             style: small,

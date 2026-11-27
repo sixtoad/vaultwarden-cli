@@ -5,6 +5,8 @@
 
 import 'api.dart';
 import 'api/biometric.dart';
+import 'api/desktop_key.dart';
+import 'api/desktop_provider.dart';
 import 'api/enrollment.dart';
 import 'api/installation.dart';
 import 'api/management.dart';
@@ -72,7 +74,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1639414828;
+  int get rustContentHash => 271591479;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -105,6 +107,13 @@ abstract class RustLibApi extends BaseApi {
     required List<int> signature,
   });
 
+  ProviderWork crateApiBiometricBiometricKeyBeginEnrollWrapped({
+    required String password,
+    required List<int> publicKey,
+    required List<int> signature,
+    required List<int> authenticatorData,
+  });
+
   ProviderWork crateApiBiometricBiometricKeyBeginRevoke({
     required String password,
   });
@@ -130,6 +139,65 @@ abstract class RustLibApi extends BaseApi {
   Future<BiometricKeyState> crateApiBiometricBiometricKeyStateDefault();
 
   Future<BiometricSupport> crateApiBiometricBiometricSupportDefault();
+
+  Future<String> crateApiDesktopKeyDesktopKeyAvailability();
+
+  void crateApiDesktopKeyDesktopKeyCancel({
+    required String session,
+    required int token,
+  });
+
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyCreate({
+    required String providerIdentity,
+    required String approvalClient,
+  });
+
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyDelete({
+    required String providerIdentity,
+    required String approvalClient,
+  });
+
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyRead({
+    required String providerIdentity,
+    required String approvalClient,
+  });
+
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyReplyDefault();
+
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeySign({
+    required String providerIdentity,
+    required String approvalClient,
+    required String session,
+    required int token,
+    required String purpose,
+    required List<int> transcript,
+  });
+
+  Future<DesktopProviderConfiguration>
+  crateApiDesktopProviderDesktopProviderConfiguration();
+
+  Future<DesktopProviderConfiguration>
+  crateApiDesktopProviderDesktopProviderConfigurationDefault();
+
+  void crateApiDesktopProviderDesktopProviderInvalidate();
+
+  Future<Uint8List> crateApiDesktopProviderDesktopProviderSend({
+    required List<int> body,
+    required bool foreground,
+  });
+
+  Future<void> crateApiDesktopProviderDesktopProviderSettle({
+    required String id,
+  });
+
+  Future<DesktopProviderConfiguration>
+  crateApiDesktopProviderDesktopProviderSetup({
+    required String endpoint,
+    required String pin,
+    required String caPath,
+    required String identityPath,
+    required String passphrase,
+  });
 
   Future<String> crateApiInstallationEnableCommands({
     required String root,
@@ -232,6 +300,13 @@ abstract class RustLibApi extends BaseApi {
     required BigInt handle,
     required String keyId,
     required List<int> signature,
+  });
+
+  ProviderWork crateApiBiometricProviderBiometricBeginWrapped({
+    required BigInt handle,
+    required String keyId,
+    required List<int> signature,
+    required List<int> authenticatorData,
   });
 
   ProviderBiometricState crateApiBiometricProviderBiometricPin({
@@ -472,6 +547,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  ProviderWork crateApiBiometricBiometricKeyBeginEnrollWrapped({
+    required String password,
+    required List<int> publicKey,
+    required List<int> signature,
+    required List<int> authenticatorData,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          sse_encode_list_prim_u_8_loose(publicKey, serializer);
+          sse_encode_list_prim_u_8_loose(signature, serializer);
+          sse_encode_list_prim_u_8_loose(authenticatorData, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricBiometricKeyBeginEnrollWrappedConstMeta,
+        argValues: [password, publicKey, signature, authenticatorData],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricBiometricKeyBeginEnrollWrappedConstMeta =>
+      const TaskConstMeta(
+        debugName: "biometric_key_begin_enroll_wrapped",
+        argNames: ["password", "publicKey", "signature", "authenticatorData"],
+      );
+
+  @override
   ProviderWork crateApiBiometricBiometricKeyBeginRevoke({
     required String password,
   }) {
@@ -480,7 +589,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -510,7 +619,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(providerIdentity, serializer);
           sse_encode_String(approvalClient, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_key_snapshot,
@@ -538,7 +647,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_list_prim_u_8_loose(publicKey, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_enroll_request,
@@ -568,7 +677,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_key_snapshot,
@@ -596,7 +705,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 13,
             port: port_,
           );
         },
@@ -623,7 +732,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_key_snapshot,
@@ -648,7 +757,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 15,
             port: port_,
           );
         },
@@ -678,7 +787,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 16,
             port: port_,
           );
         },
@@ -697,6 +806,454 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "biometric_support_default", argNames: []);
 
   @override
+  Future<String> crateApiDesktopKeyDesktopKeyAvailability() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeyAvailabilityConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeyAvailabilityConstMeta =>
+      const TaskConstMeta(debugName: "desktop_key_availability", argNames: []);
+
+  @override
+  void crateApiDesktopKeyDesktopKeyCancel({
+    required String session,
+    required int token,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(session, serializer);
+          sse_encode_u_32(token, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeyCancelConstMeta,
+        argValues: [session, token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeyCancelConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_key_cancel",
+        argNames: ["session", "token"],
+      );
+
+  @override
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyCreate({
+    required String providerIdentity,
+    required String approvalClient,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerIdentity, serializer);
+          sse_encode_String(approvalClient, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_key_reply,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeyCreateConstMeta,
+        argValues: [providerIdentity, approvalClient],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeyCreateConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_key_create",
+        argNames: ["providerIdentity", "approvalClient"],
+      );
+
+  @override
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyDelete({
+    required String providerIdentity,
+    required String approvalClient,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerIdentity, serializer);
+          sse_encode_String(approvalClient, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 20,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_key_reply,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeyDeleteConstMeta,
+        argValues: [providerIdentity, approvalClient],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeyDeleteConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_key_delete",
+        argNames: ["providerIdentity", "approvalClient"],
+      );
+
+  @override
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyRead({
+    required String providerIdentity,
+    required String approvalClient,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerIdentity, serializer);
+          sse_encode_String(approvalClient, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_key_reply,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeyReadConstMeta,
+        argValues: [providerIdentity, approvalClient],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeyReadConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_key_read",
+        argNames: ["providerIdentity", "approvalClient"],
+      );
+
+  @override
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeyReplyDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_key_reply,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeyReplyDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeyReplyDefaultConstMeta =>
+      const TaskConstMeta(debugName: "desktop_key_reply_default", argNames: []);
+
+  @override
+  Future<DesktopKeyReply> crateApiDesktopKeyDesktopKeySign({
+    required String providerIdentity,
+    required String approvalClient,
+    required String session,
+    required int token,
+    required String purpose,
+    required List<int> transcript,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerIdentity, serializer);
+          sse_encode_String(approvalClient, serializer);
+          sse_encode_String(session, serializer);
+          sse_encode_u_32(token, serializer);
+          sse_encode_String(purpose, serializer);
+          sse_encode_list_prim_u_8_loose(transcript, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_key_reply,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopKeyDesktopKeySignConstMeta,
+        argValues: [
+          providerIdentity,
+          approvalClient,
+          session,
+          token,
+          purpose,
+          transcript,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopKeyDesktopKeySignConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_key_sign",
+        argNames: [
+          "providerIdentity",
+          "approvalClient",
+          "session",
+          "token",
+          "purpose",
+          "transcript",
+        ],
+      );
+
+  @override
+  Future<DesktopProviderConfiguration>
+  crateApiDesktopProviderDesktopProviderConfiguration() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_provider_configuration,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta:
+            kCrateApiDesktopProviderDesktopProviderConfigurationConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiDesktopProviderDesktopProviderConfigurationConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_provider_configuration",
+        argNames: [],
+      );
+
+  @override
+  Future<DesktopProviderConfiguration>
+  crateApiDesktopProviderDesktopProviderConfigurationDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_provider_configuration,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiDesktopProviderDesktopProviderConfigurationDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiDesktopProviderDesktopProviderConfigurationDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_provider_configuration_default",
+        argNames: [],
+      );
+
+  @override
+  void crateApiDesktopProviderDesktopProviderInvalidate() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDesktopProviderDesktopProviderInvalidateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiDesktopProviderDesktopProviderInvalidateConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_provider_invalidate",
+        argNames: [],
+      );
+
+  @override
+  Future<Uint8List> crateApiDesktopProviderDesktopProviderSend({
+    required List<int> body,
+    required bool foreground,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_8_loose(body, serializer);
+          sse_encode_bool(foreground, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiDesktopProviderDesktopProviderSendConstMeta,
+        argValues: [body, foreground],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopProviderDesktopProviderSendConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_provider_send",
+        argNames: ["body", "foreground"],
+      );
+
+  @override
+  Future<void> crateApiDesktopProviderDesktopProviderSettle({
+    required String id,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 28,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiDesktopProviderDesktopProviderSettleConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopProviderDesktopProviderSettleConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_provider_settle",
+        argNames: ["id"],
+      );
+
+  @override
+  Future<DesktopProviderConfiguration>
+  crateApiDesktopProviderDesktopProviderSetup({
+    required String endpoint,
+    required String pin,
+    required String caPath,
+    required String identityPath,
+    required String passphrase,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(endpoint, serializer);
+          sse_encode_String(pin, serializer);
+          sse_encode_String(caPath, serializer);
+          sse_encode_String(identityPath, serializer);
+          sse_encode_String(passphrase, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_desktop_provider_configuration,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiDesktopProviderDesktopProviderSetupConstMeta,
+        argValues: [endpoint, pin, caPath, identityPath, passphrase],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDesktopProviderDesktopProviderSetupConstMeta =>
+      const TaskConstMeta(
+        debugName: "desktop_provider_setup",
+        argNames: ["endpoint", "pin", "caPath", "identityPath", "passphrase"],
+      );
+
+  @override
   Future<String> crateApiInstallationEnableCommands({
     required String root,
     required String directory,
@@ -710,7 +1267,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 30,
             port: port_,
           );
         },
@@ -740,7 +1297,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 31,
             port: port_,
           );
         },
@@ -767,7 +1324,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_enrollment_admin_request(request, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -792,7 +1349,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_enrollment_admin_snapshot,
@@ -823,7 +1380,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_enrollment_admin_snapshot,
@@ -848,7 +1405,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_enrollment_admin_snapshot,
@@ -873,7 +1430,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -898,7 +1455,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_enrollment_admin_snapshot,
@@ -924,7 +1481,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 38,
             port: port_,
           );
         },
@@ -959,7 +1516,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(invitation, serializer);
           sse_encode_String(deviceFingerprint, serializer);
           sse_encode_String(providerPin, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -991,7 +1548,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_joiner_command(command, serializer);
           sse_encode_String(deviceFingerprint, serializer);
           sse_encode_String(providerPin, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -1021,7 +1578,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_joiner_snapshot,
@@ -1046,7 +1603,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_joiner_snapshot,
@@ -1068,7 +1625,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_joiner_snapshot,
@@ -1100,7 +1657,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(token, serializer);
           sse_encode_u_32(epoch, serializer);
           sse_encode_box_autoadd_completion(completion, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -1132,7 +1689,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1160,7 +1717,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_invalidation(reason, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -1185,7 +1742,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 47,
             port: port_,
           );
         },
@@ -1212,7 +1769,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 48,
             port: port_,
           );
         },
@@ -1239,7 +1796,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 49,
             port: port_,
           );
         },
@@ -1266,7 +1823,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1299,7 +1856,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_identity_kind(kind, serializer);
           sse_encode_String(id, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -1327,7 +1884,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(recovery, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 52)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -1357,7 +1914,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -1382,7 +1939,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 54)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -1407,7 +1964,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 55,
             port: port_,
           );
         },
@@ -1434,7 +1991,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_management_snapshot,
@@ -1463,7 +2020,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_provider_command(command, serializer);
           sse_encode_String(requestId, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 57)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -1495,7 +2052,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_64(handle, serializer);
           sse_encode_String(keyId, serializer);
           sse_encode_list_prim_u_8_loose(signature, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 58)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_work,
@@ -1515,6 +2072,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  ProviderWork crateApiBiometricProviderBiometricBeginWrapped({
+    required BigInt handle,
+    required String keyId,
+    required List<int> signature,
+    required List<int> authenticatorData,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_64(handle, serializer);
+          sse_encode_String(keyId, serializer);
+          sse_encode_list_prim_u_8_loose(signature, serializer);
+          sse_encode_list_prim_u_8_loose(authenticatorData, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 59)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_provider_work,
+          decodeErrorData: sse_decode_biometric_refusal,
+        ),
+        constMeta: kCrateApiBiometricProviderBiometricBeginWrappedConstMeta,
+        argValues: [handle, keyId, signature, authenticatorData],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBiometricProviderBiometricBeginWrappedConstMeta =>
+      const TaskConstMeta(
+        debugName: "provider_biometric_begin_wrapped",
+        argNames: ["handle", "keyId", "signature", "authenticatorData"],
+      );
+
+  @override
   ProviderBiometricState crateApiBiometricProviderBiometricPin({
     required String providerIdentity,
     required String approvalClient,
@@ -1525,7 +2116,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(providerIdentity, serializer);
           sse_encode_String(approvalClient, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 60)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_biometric_state,
@@ -1550,7 +2141,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 61)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_biometric_signing_request,
@@ -1575,7 +2166,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 62)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_biometric_state,
@@ -1600,7 +2191,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(uncertainId, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 63)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1630,7 +2221,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(token, serializer);
           sse_encode_list_prim_u_8_loose(response, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 64)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1658,7 +2249,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 65,
             port: port_,
           );
         },
@@ -1685,7 +2276,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 66)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1710,7 +2301,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 67,
             port: port_,
           );
         },
@@ -1734,7 +2325,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 68)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_provider_snapshot,
@@ -1760,7 +2351,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 69,
             port: port_,
           );
         },
@@ -1788,7 +2379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(id, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 55)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 70)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -1810,7 +2401,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 71)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_snapshot,
@@ -2033,6 +2624,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       outcome: dco_decode_outcome(arr[0]),
       publicKey: dco_decode_list_prim_u_8_strict(arr[1]),
       signature: dco_decode_list_prim_u_8_strict(arr[2]),
+    );
+  }
+
+  @protected
+  DesktopKeyReply dco_decode_desktop_key_reply(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return DesktopKeyReply(
+      outcome: dco_decode_String(arr[0]),
+      publicKey: dco_decode_list_prim_u_8_strict(arr[1]),
+      signature: dco_decode_list_prim_u_8_strict(arr[2]),
+      authenticatorData: dco_decode_list_prim_u_8_strict(arr[3]),
+    );
+  }
+
+  @protected
+  DesktopProviderConfiguration dco_decode_desktop_provider_configuration(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return DesktopProviderConfiguration(
+      configured: dco_decode_bool(arr[0]),
+      endpoint: dco_decode_String(arr[1]),
+      pin: dco_decode_String(arr[2]),
+      fingerprint: dco_decode_String(arr[3]),
+      uncertainId: dco_decode_String(arr[4]),
+      managementRecovery: dco_decode_String(arr[5]),
     );
   }
 
@@ -2815,6 +3438,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       outcome: var_outcome,
       publicKey: var_publicKey,
       signature: var_signature,
+    );
+  }
+
+  @protected
+  DesktopKeyReply sse_decode_desktop_key_reply(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_outcome = sse_decode_String(deserializer);
+    var var_publicKey = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_signature = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_authenticatorData = sse_decode_list_prim_u_8_strict(deserializer);
+    return DesktopKeyReply(
+      outcome: var_outcome,
+      publicKey: var_publicKey,
+      signature: var_signature,
+      authenticatorData: var_authenticatorData,
+    );
+  }
+
+  @protected
+  DesktopProviderConfiguration sse_decode_desktop_provider_configuration(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_configured = sse_decode_bool(deserializer);
+    var var_endpoint = sse_decode_String(deserializer);
+    var var_pin = sse_decode_String(deserializer);
+    var var_fingerprint = sse_decode_String(deserializer);
+    var var_uncertainId = sse_decode_String(deserializer);
+    var var_managementRecovery = sse_decode_String(deserializer);
+    return DesktopProviderConfiguration(
+      configured: var_configured,
+      endpoint: var_endpoint,
+      pin: var_pin,
+      fingerprint: var_fingerprint,
+      uncertainId: var_uncertainId,
+      managementRecovery: var_managementRecovery,
     );
   }
 
@@ -3772,6 +4431,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_outcome(self.outcome, serializer);
     sse_encode_list_prim_u_8_strict(self.publicKey, serializer);
     sse_encode_list_prim_u_8_strict(self.signature, serializer);
+  }
+
+  @protected
+  void sse_encode_desktop_key_reply(
+    DesktopKeyReply self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.outcome, serializer);
+    sse_encode_list_prim_u_8_strict(self.publicKey, serializer);
+    sse_encode_list_prim_u_8_strict(self.signature, serializer);
+    sse_encode_list_prim_u_8_strict(self.authenticatorData, serializer);
+  }
+
+  @protected
+  void sse_encode_desktop_provider_configuration(
+    DesktopProviderConfiguration self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.configured, serializer);
+    sse_encode_String(self.endpoint, serializer);
+    sse_encode_String(self.pin, serializer);
+    sse_encode_String(self.fingerprint, serializer);
+    sse_encode_String(self.uncertainId, serializer);
+    sse_encode_String(self.managementRecovery, serializer);
   }
 
   @protected

@@ -160,7 +160,7 @@ class ProviderCapabilities extends StatelessWidget {
       ),
       SizedBox(height: 8),
       Text(
-        'Windows and Linux: desktop shell builds; provider transport and identity integration are unavailable.',
+        'Windows and Linux: pinned-TLS provider transport in the Rust core and explicit password approval. Windows also approves with a Windows Hello key enrolled in Settings, recorded by the provider as Windows Hello, never as biometric. Linux approves with the password only (no hardware user-verification key).',
       ),
       SizedBox(height: 8),
       Text(

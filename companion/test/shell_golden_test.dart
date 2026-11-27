@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:companion_slice/platform/core_provider.dart';
+import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/provider/page.dart';
 import 'package:companion_slice/src/rust/frb_generated.dart';
 
@@ -43,6 +45,23 @@ class InventoryProvider extends FixtureProviderPlatform {
       },
     });
   }
+}
+
+/// Windows and Linux setup (desktop-approval-spec D-4): an unconfigured
+/// transport that reads the CA and PKCS#12 by path.
+class PathSetupProvider extends FixtureProviderPlatform
+    implements PathSetupPlatform {
+  PathSetupProvider() {
+    saved = const ProviderConfiguration(configured: false);
+  }
+  @override
+  Future<ProviderConfiguration> setupFromFiles(
+    String endpoint,
+    String pin,
+    String caPath,
+    String identityPath,
+    String passphrase,
+  ) async => saved;
 }
 
 /// Shell captures (#50 slice 1, cleanup): the Requests list in five states
@@ -87,6 +106,7 @@ void main() {
     'devices': ('devices', FixtureProviderPlatform.new),
     'inventory': ('devices', InventoryProvider.new),
     'settings': ('settings', FixtureProviderPlatform.new),
+    'filesetup': ('settings', PathSetupProvider.new),
   };
   // 200% text (compact window) for the workpages only.
   const largeScenes = {'devices', 'inventory', 'settings'};
@@ -131,6 +151,13 @@ void main() {
           final destination = scene.value.$1;
           if (destination != 'requests') {
             await tester.tap(find.byKey(Key('destination-$destination')));
+            await tester.pumpAndSettle();
+          }
+          if (scene.key == 'filesetup') {
+            await Scrollable.ensureVisible(
+              tester.element(find.byKey(const Key('setup-ca-path'))),
+              alignment: 0.2,
+            );
             await tester.pumpAndSettle();
           }
           if (scene.key == 'inventory') {

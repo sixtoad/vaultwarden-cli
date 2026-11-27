@@ -6,7 +6,7 @@ use crate::access::update_test_support::{
     self as vault, FIRST_REVISION, update_draft, update_submission,
 };
 
-fn with_capabilities(mut command: Command, names: &[&str]) -> Command {
+pub(super) fn with_capabilities(mut command: Command, names: &[&str]) -> Command {
     let Command::Decision { capabilities, .. } = &mut command else {
         panic!("a decision command");
     };
@@ -14,7 +14,7 @@ fn with_capabilities(mut command: Command, names: &[&str]) -> Command {
     command
 }
 impl Svc {
-    fn update_request(&self) -> String {
+    pub(super) fn update_request(&self) -> String {
         let app = self.env.app();
         app.create_operation(app.human_owner(), update_draft(&self.env.draft().image_id))
             .unwrap();

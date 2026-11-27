@@ -45,6 +45,21 @@ ProviderWork providerBiometricBegin({
   signature: signature,
 );
 
+/// `provider_biometric_begin` for a Windows Hello key (desktop-approval-spec
+/// D-8): the signature is over the WebAuthn authenticator data and the
+/// client data built from the transcript; the proof carries the data.
+ProviderWork providerBiometricBeginWrapped({
+  required BigInt handle,
+  required String keyId,
+  required List<int> signature,
+  required List<int> authenticatorData,
+}) => RustLib.instance.api.crateApiBiometricProviderBiometricBeginWrapped(
+  handle: handle,
+  keyId: keyId,
+  signature: signature,
+  authenticatorData: authenticatorData,
+);
+
 /// Pin the key session with the SAME values just given to
 /// `provider_biometric_pin` (refused `NotPinned` otherwise). Every key call
 /// re-checks that rule; `provider_configure` resets the key session.
@@ -78,6 +93,20 @@ ProviderWork biometricKeyBeginEnroll({
   password: password,
   publicKey: publicKey,
   signature: signature,
+);
+
+/// `biometric_key_begin_enroll` for a Windows Hello key: version 3,
+/// `key_class: "windows_hello"`, proof wrapped as in D-8.
+ProviderWork biometricKeyBeginEnrollWrapped({
+  required String password,
+  required List<int> publicKey,
+  required List<int> signature,
+  required List<int> authenticatorData,
+}) => RustLib.instance.api.crateApiBiometricBiometricKeyBeginEnrollWrapped(
+  password: password,
+  publicKey: publicKey,
+  signature: signature,
+  authenticatorData: authenticatorData,
 );
 
 ProviderWork biometricKeyBeginRevoke({required String password}) => RustLib

@@ -18,7 +18,12 @@ class AuthorizationStep extends StatelessWidget {
     this.touchIdOffered = false,
     this.onTouchId,
     this.touchIdNote = '',
+    this.touchIdMethod = 'Touch ID',
   });
+
+  /// How this device's key verification is named ("Touch ID", "Windows
+  /// Hello", ...): `VerificationWording.method`.
+  final String touchIdMethod;
   final core.ProviderReview review;
   final TextEditingController password;
 
@@ -36,7 +41,7 @@ class AuthorizationStep extends StatelessWidget {
     final small = Theme.of(context).textTheme.labelSmall;
     final touchPrimary = touchIdOffered && onTouchId != null;
     const touchKey = Key('approve-touch-id');
-    const touchLabel = Text('Approve once with Touch ID');
+    final touchLabel = Text('Approve once with $touchIdMethod');
     final touchHandler = enabled ? onTouchId : null;
     final Widget touchButton = touchPrimary
         ? FilledButton.icon(
@@ -85,7 +90,7 @@ class AuthorizationStep extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           Text(
-            'Touch ID signs this exact review after fetching it again. If it is unavailable, dismissed or refused, nothing is sent and you can approve with your password instead.',
+            '${touchIdMethod[0].toUpperCase()}${touchIdMethod.substring(1)} signs this exact review after fetching it again. If it is unavailable, dismissed or refused, nothing is sent and you can approve with your password instead.',
             style: small,
           ),
           const SizedBox(height: 16),

@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1639414828;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 271591479;
 
 // Section: executor
 
@@ -267,6 +267,44 @@ fn wire__crate__api__biometric__biometric_key_begin_enroll_impl(
                     api_password,
                     api_public_key,
                     api_signature,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__biometric__biometric_key_begin_enroll_wrapped_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "biometric_key_begin_enroll_wrapped",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_public_key = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_signature = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_authenticator_data = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::biometric::BiometricRefusal>((move || {
+                let output_ok = crate::api::biometric::biometric_key_begin_enroll_wrapped(
+                    api_password,
+                    api_public_key,
+                    api_signature,
+                    api_authenticator_data,
                 )?;
                 std::result::Result::Ok(output_ok)
             })())
@@ -522,6 +560,471 @@ fn wire__crate__api__biometric__biometric_support_default_impl(
                 transform_result_sse::<_, ()>((move || {
                     let output_ok =
                         Ok::<_, ()>(crate::api::biometric::BiometricSupport::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_availability_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_availability",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Ok::<_, ()>(crate::api::desktop_key::desktop_key_availability())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_cancel_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_cancel",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_session = <String>::sse_decode(&mut deserializer);
+            let api_token = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>({
+                    crate::api::desktop_key::desktop_key_cancel(api_session, api_token);
+                })?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_create_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_create",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_provider_identity = <String>::sse_decode(&mut deserializer);
+            let api_approval_client = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::desktop_key::desktop_key_create(
+                        api_provider_identity,
+                        api_approval_client,
+                    ))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_delete_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_delete",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_provider_identity = <String>::sse_decode(&mut deserializer);
+            let api_approval_client = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::desktop_key::desktop_key_delete(
+                        api_provider_identity,
+                        api_approval_client,
+                    ))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_read_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_read",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_provider_identity = <String>::sse_decode(&mut deserializer);
+            let api_approval_client = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::desktop_key::desktop_key_read(
+                        api_provider_identity,
+                        api_approval_client,
+                    ))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_reply_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_reply_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Ok::<_, ()>(crate::api::desktop_key::DesktopKeyReply::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_key__desktop_key_sign_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_key_sign",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_provider_identity = <String>::sse_decode(&mut deserializer);
+            let api_approval_client = <String>::sse_decode(&mut deserializer);
+            let api_session = <String>::sse_decode(&mut deserializer);
+            let api_token = <u32>::sse_decode(&mut deserializer);
+            let api_purpose = <String>::sse_decode(&mut deserializer);
+            let api_transcript = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::desktop_key::desktop_key_sign(
+                        api_provider_identity,
+                        api_approval_client,
+                        api_session,
+                        api_token,
+                        api_purpose,
+                        api_transcript,
+                    ))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_provider__desktop_provider_configuration_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_provider_configuration",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::desktop_provider::desktop_provider_configuration()?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_provider__desktop_provider_configuration_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_provider_configuration_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(
+                        crate::api::desktop_provider::DesktopProviderConfiguration::default(),
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_provider__desktop_provider_invalidate_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_provider_invalidate",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>({
+                    crate::api::desktop_provider::desktop_provider_invalidate();
+                })?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__desktop_provider__desktop_provider_send_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_provider_send",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_body = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_foreground = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::desktop_provider::desktop_provider_send(
+                        api_body,
+                        api_foreground,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_provider__desktop_provider_settle_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_provider_settle",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::desktop_provider::desktop_provider_settle(api_id)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__desktop_provider__desktop_provider_setup_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "desktop_provider_setup",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_endpoint = <String>::sse_decode(&mut deserializer);
+            let api_pin = <String>::sse_decode(&mut deserializer);
+            let api_ca_path = <String>::sse_decode(&mut deserializer);
+            let api_identity_path = <String>::sse_decode(&mut deserializer);
+            let api_passphrase = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::desktop_provider::desktop_provider_setup(
+                        api_endpoint,
+                        api_pin,
+                        api_ca_path,
+                        api_identity_path,
+                        api_passphrase,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1469,6 +1972,44 @@ fn wire__crate__api__biometric__provider_biometric_begin_impl(
         },
     )
 }
+fn wire__crate__api__biometric__provider_biometric_begin_wrapped_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "provider_biometric_begin_wrapped",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <u64>::sse_decode(&mut deserializer);
+            let api_key_id = <String>::sse_decode(&mut deserializer);
+            let api_signature = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_authenticator_data = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::biometric::BiometricRefusal>((move || {
+                let output_ok = crate::api::biometric::provider_biometric_begin_wrapped(
+                    api_handle,
+                    api_key_id,
+                    api_signature,
+                    api_authenticator_data,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__biometric__provider_biometric_pin_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -2149,6 +2690,42 @@ impl SseDecode for crate::api::Completion {
             outcome: var_outcome,
             public_key: var_publicKey,
             signature: var_signature,
+        };
+    }
+}
+
+impl SseDecode for crate::api::desktop_key::DesktopKeyReply {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_outcome = <String>::sse_decode(deserializer);
+        let mut var_publicKey = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_signature = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_authenticatorData = <Vec<u8>>::sse_decode(deserializer);
+        return crate::api::desktop_key::DesktopKeyReply {
+            outcome: var_outcome,
+            public_key: var_publicKey,
+            signature: var_signature,
+            authenticator_data: var_authenticatorData,
+        };
+    }
+}
+
+impl SseDecode for crate::api::desktop_provider::DesktopProviderConfiguration {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configured = <bool>::sse_decode(deserializer);
+        let mut var_endpoint = <String>::sse_decode(deserializer);
+        let mut var_pin = <String>::sse_decode(deserializer);
+        let mut var_fingerprint = <String>::sse_decode(deserializer);
+        let mut var_uncertainId = <String>::sse_decode(deserializer);
+        let mut var_managementRecovery = <String>::sse_decode(deserializer);
+        return crate::api::desktop_provider::DesktopProviderConfiguration {
+            configured: var_configured,
+            endpoint: var_endpoint,
+            pin: var_pin,
+            fingerprint: var_fingerprint,
+            uncertain_id: var_uncertainId,
+            management_recovery: var_managementRecovery,
         };
     }
 }
@@ -3084,85 +3661,145 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__biometric__biometric_key_outcome_default_impl(
+        13 => wire__crate__api__biometric__biometric_key_outcome_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        14 => wire__crate__api__biometric__biometric_key_state_default_impl(
+        15 => wire__crate__api__biometric__biometric_key_state_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__api__biometric__biometric_support_default_impl(
+        16 => wire__crate__api__biometric__biometric_support_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        16 => {
+        17 => wire__crate__api__desktop_key__desktop_key_availability_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        19 => wire__crate__api__desktop_key__desktop_key_create_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        20 => wire__crate__api__desktop_key__desktop_key_delete_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        21 => {
+            wire__crate__api__desktop_key__desktop_key_read_impl(port, ptr, rust_vec_len, data_len)
+        }
+        22 => wire__crate__api__desktop_key__desktop_key_reply_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        23 => {
+            wire__crate__api__desktop_key__desktop_key_sign_impl(port, ptr, rust_vec_len, data_len)
+        }
+        24 => wire__crate__api__desktop_provider__desktop_provider_configuration_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        25 => wire__crate__api__desktop_provider__desktop_provider_configuration_default_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        27 => wire__crate__api__desktop_provider__desktop_provider_send_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        28 => wire__crate__api__desktop_provider__desktop_provider_settle_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        29 => wire__crate__api__desktop_provider__desktop_provider_setup_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        30 => {
             wire__crate__api__installation__enable_commands_impl(port, ptr, rust_vec_len, data_len)
         }
-        17 => wire__crate__api__enrollment__enrollee_role_default_impl(
+        31 => wire__crate__api__enrollment__enrollee_role_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        24 => wire__crate__api__enrollment__enrollment_admin_snapshot_default_impl(
+        38 => wire__crate__api__enrollment__enrollment_admin_snapshot_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__installation__inspect_installation_impl(
+        45 => wire__crate__api__installation__inspect_installation_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        33 => wire__crate__api__management__inventory_state_default_impl(
+        47 => wire__crate__api__management__inventory_state_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        34 => {
+        48 => {
             wire__crate__api__enrollment__joiner_end_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        35 => wire__crate__api__enrollment__joiner_phase_default_impl(
+        49 => wire__crate__api__enrollment__joiner_phase_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        36 => wire__crate__api__enrollment__joiner_snapshot_default_impl(
+        50 => wire__crate__api__enrollment__joiner_snapshot_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        41 => wire__crate__api__management__management_outcome_default_impl(
+        55 => wire__crate__api__management__management_outcome_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        50 => wire__crate__api__provider__provider_history_state_default_impl(
+        65 => wire__crate__api__provider__provider_history_state_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        52 => wire__crate__api__provider__provider_outcome_default_impl(
+        67 => wire__crate__api__provider__provider_outcome_default_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        54 => wire__crate__api__provider__provider_status_progress_default_impl(
+        69 => wire__crate__api__provider__provider_status_progress_default_impl(
             port,
             ptr,
             rust_vec_len,
@@ -3187,86 +3824,104 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__biometric__biometric_key_begin_revoke_impl(
+        8 => wire__crate__api__biometric__biometric_key_begin_enroll_wrapped_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__biometric__biometric_key_configure_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__biometric__biometric_key_enroll_transcript_impl(
+        9 => wire__crate__api__biometric__biometric_key_begin_revoke_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__biometric__biometric_key_finish_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__biometric__biometric_key_snapshot_impl(ptr, rust_vec_len, data_len),
-        18 => {
+        10 => {
+            wire__crate__api__biometric__biometric_key_configure_impl(ptr, rust_vec_len, data_len)
+        }
+        11 => wire__crate__api__biometric__biometric_key_enroll_transcript_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        12 => wire__crate__api__biometric__biometric_key_finish_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__biometric__biometric_key_snapshot_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__desktop_key__desktop_key_cancel_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__desktop_provider__desktop_provider_invalidate_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        32 => {
             wire__crate__api__enrollment__enrollment_admin_begin_impl(ptr, rust_vec_len, data_len)
         }
-        19 => wire__crate__api__enrollment__enrollment_admin_dismiss_invitation_impl(
+        33 => wire__crate__api__enrollment__enrollment_admin_dismiss_invitation_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        20 => {
+        34 => {
             wire__crate__api__enrollment__enrollment_admin_finish_impl(ptr, rust_vec_len, data_len)
         }
-        21 => wire__crate__api__enrollment__enrollment_admin_invalidate_impl(
+        35 => wire__crate__api__enrollment__enrollment_admin_invalidate_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        22 => wire__crate__api__enrollment__enrollment_admin_invitation_code_impl(
+        36 => wire__crate__api__enrollment__enrollment_admin_invitation_code_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        23 => wire__crate__api__enrollment__enrollment_admin_snapshot_impl(
+        37 => wire__crate__api__enrollment__enrollment_admin_snapshot_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        25 => wire__crate__api__enrollment__enrollment_join_impl(ptr, rust_vec_len, data_len),
-        26 => {
+        39 => wire__crate__api__enrollment__enrollment_join_impl(ptr, rust_vec_len, data_len),
+        40 => {
             wire__crate__api__enrollment__enrollment_joiner_begin_impl(ptr, rust_vec_len, data_len)
         }
-        27 => {
+        41 => {
             wire__crate__api__enrollment__enrollment_joiner_finish_impl(ptr, rust_vec_len, data_len)
         }
-        28 => {
+        42 => {
             wire__crate__api__enrollment__enrollment_joiner_reset_impl(ptr, rust_vec_len, data_len)
         }
-        29 => wire__crate__api__enrollment__enrollment_joiner_snapshot_impl(
+        43 => wire__crate__api__enrollment__enrollment_joiner_snapshot_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__finish_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__invalidate_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__management__management_begin_impl(ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__management__management_configure_impl(ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__management__management_finish_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__management__management_invalidate_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__management__management_snapshot_impl(ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__provider__provider_begin_impl(ptr, rust_vec_len, data_len),
-        44 => {
+        44 => wire__crate__api__finish_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__invalidate_impl(ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__management__management_begin_impl(ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__management__management_configure_impl(ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__management__management_finish_impl(ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__management__management_invalidate_impl(ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__management__management_snapshot_impl(ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__provider__provider_begin_impl(ptr, rust_vec_len, data_len),
+        58 => {
             wire__crate__api__biometric__provider_biometric_begin_impl(ptr, rust_vec_len, data_len)
         }
-        45 => wire__crate__api__biometric__provider_biometric_pin_impl(ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__biometric__provider_biometric_prepare_impl(
+        59 => wire__crate__api__biometric__provider_biometric_begin_wrapped_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        47 => {
+        60 => wire__crate__api__biometric__provider_biometric_pin_impl(ptr, rust_vec_len, data_len),
+        61 => wire__crate__api__biometric__provider_biometric_prepare_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        62 => {
             wire__crate__api__biometric__provider_biometric_state_impl(ptr, rust_vec_len, data_len)
         }
-        48 => wire__crate__api__provider__provider_configure_impl(ptr, rust_vec_len, data_len),
-        49 => wire__crate__api__provider__provider_finish_impl(ptr, rust_vec_len, data_len),
-        51 => wire__crate__api__provider__provider_invalidate_impl(ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__provider__provider_snapshot_impl(ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__select_fixture_impl(ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__snapshot_impl(ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__provider__provider_configure_impl(ptr, rust_vec_len, data_len),
+        64 => wire__crate__api__provider__provider_finish_impl(ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__provider__provider_invalidate_impl(ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__provider__provider_snapshot_impl(ptr, rust_vec_len, data_len),
+        70 => wire__crate__api__select_fixture_impl(ptr, rust_vec_len, data_len),
+        71 => wire__crate__api__snapshot_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3685,6 +4340,54 @@ impl flutter_rust_bridge::IntoDart for crate::api::Completion {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::Completion {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::Completion> for crate::api::Completion {
     fn into_into_dart(self) -> crate::api::Completion {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::desktop_key::DesktopKeyReply {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.outcome.into_into_dart().into_dart(),
+            self.public_key.into_into_dart().into_dart(),
+            self.signature.into_into_dart().into_dart(),
+            self.authenticator_data.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::desktop_key::DesktopKeyReply
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::desktop_key::DesktopKeyReply>
+    for crate::api::desktop_key::DesktopKeyReply
+{
+    fn into_into_dart(self) -> crate::api::desktop_key::DesktopKeyReply {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::desktop_provider::DesktopProviderConfiguration {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.configured.into_into_dart().into_dart(),
+            self.endpoint.into_into_dart().into_dart(),
+            self.pin.into_into_dart().into_dart(),
+            self.fingerprint.into_into_dart().into_dart(),
+            self.uncertain_id.into_into_dart().into_dart(),
+            self.management_recovery.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::desktop_provider::DesktopProviderConfiguration
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::desktop_provider::DesktopProviderConfiguration>
+    for crate::api::desktop_provider::DesktopProviderConfiguration
+{
+    fn into_into_dart(self) -> crate::api::desktop_provider::DesktopProviderConfiguration {
         self
     }
 }
@@ -4864,6 +5567,28 @@ impl SseEncode for crate::api::Completion {
         <crate::api::Outcome>::sse_encode(self.outcome, serializer);
         <Vec<u8>>::sse_encode(self.public_key, serializer);
         <Vec<u8>>::sse_encode(self.signature, serializer);
+    }
+}
+
+impl SseEncode for crate::api::desktop_key::DesktopKeyReply {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.outcome, serializer);
+        <Vec<u8>>::sse_encode(self.public_key, serializer);
+        <Vec<u8>>::sse_encode(self.signature, serializer);
+        <Vec<u8>>::sse_encode(self.authenticator_data, serializer);
+    }
+}
+
+impl SseEncode for crate::api::desktop_provider::DesktopProviderConfiguration {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.configured, serializer);
+        <String>::sse_encode(self.endpoint, serializer);
+        <String>::sse_encode(self.pin, serializer);
+        <String>::sse_encode(self.fingerprint, serializer);
+        <String>::sse_encode(self.uncertain_id, serializer);
+        <String>::sse_encode(self.management_recovery, serializer);
     }
 }
 

@@ -233,6 +233,7 @@ class RequestDetailPane extends StatelessWidget {
       onReload: onReload,
       onActivity: onActivity,
       touchIdOffered: touchId.available,
+      touchIdMethod: touchId.wording.method,
       onTouchId: touchId.canApprove ? () => unawaited(touchId.approve()) : null,
       touchIdNote: touchId.working ? '' : touchId.unavailableReason,
       touchIdMessage: touchId.messageFor(state.reviewId),
