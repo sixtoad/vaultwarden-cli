@@ -374,7 +374,7 @@ pub fn run_cli(
     let mut answered_secret = false;
     let mut answered_decision = false;
     loop {
-        if let Some((master, _slave)) = terminal.as_mut() {
+        if let Some((master, slave)) = terminal.as_mut() {
             let mut buffer = [0u8; 4096];
             match master.read(&mut buffer) {
                 Ok(n) => transcript.extend_from_slice(&buffer[..n]),
@@ -387,7 +387,10 @@ pub fn run_cli(
             if let Some(secret) = password
                 && !answered_secret
                 && text.ends_with("Secret password: ")
+                && echo_is_off(slave)
             {
+                // The prompt is printed before echo is turned off; typing earlier makes the
+                // terminal itself echo the secret. A prompt that never hides input times out.
                 master.write_all(format!("{secret}\n").as_bytes()).unwrap();
                 answered_secret = true;
             }
@@ -430,4 +433,18 @@ pub fn run_cli(
         output: child.wait_with_output().unwrap(),
         terminal: String::from_utf8_lossy(&transcript).into_owned(),
     }
+}
+
+/// Whether the pseudo-terminal currently has echo disabled.
+fn echo_is_off(terminal: &std::fs::File) -> bool {
+    use std::os::fd::AsRawFd;
+    let mut settings: libc::termios = unsafe { std::mem::zeroed() };
+    let read = unsafe { libc::tcgetattr(terminal.as_raw_fd(), &mut settings) };
+    assert_eq!(
+        read,
+        0,
+        "tcgetattr failed: {}",
+        std::io::Error::last_os_error()
+    );
+    settings.c_lflag & libc::ECHO == 0
 }
