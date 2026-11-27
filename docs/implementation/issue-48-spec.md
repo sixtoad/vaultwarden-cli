@@ -1,8 +1,7 @@
 # Issue 48: approved updates and rotation of existing secrets
 
 Status: phase 1 (trusted CLI `update`) implemented in PR #91; phase 2
-(protected provider `update`, section 7) implemented on
-`feature/issue-48-provider-update`.
+(protected provider `update`, section 7) implemented in PR #93.
 
 Background: the create-only feature (#43, PR #44) is described in
 [secret-storage.md](../secret-storage.md). This document reuses its vocabulary:
@@ -426,7 +425,7 @@ then-current revision.
 
 ## 7. Phase 2 (implemented): protected provider `update`
 
-Implemented on `feature/issue-48-provider-update`. Analogous to the protected
+Implemented in PR #93. Analogous to the protected
 create (`CreateEffect`, fd 3 producer frame); decisions D15 to D24 below.
 
 - **Policy** (`src/access/policy/update.rs`): a closed `update` effect,
