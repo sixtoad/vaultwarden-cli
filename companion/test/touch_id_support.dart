@@ -8,6 +8,7 @@ import 'package:companion_slice/platform/provider.dart';
 import 'package:companion_slice/provider/controller.dart';
 import 'package:companion_slice/provider/touch_id.dart';
 
+import 'p256_test_key.dart';
 import 'provider_support.dart';
 
 /// SHA-256 of the canonical JSON of `tests/fixtures/companion/review.json`'s
@@ -21,6 +22,12 @@ Uint8List b64(String text) =>
     base64Url.decode(text.padRight((text.length + 3) & ~3, '='));
 final publicKey = b64(golden['public_key'] as String);
 final goldenKeyId = golden['approval']['key_id'] as String;
+
+/// The approval key of the fake signer: the golden vector has no private
+/// key, and Rust verifies every approval signature before sending it
+/// (shared-approval-checks-spec S-3), so approvals are really signed.
+final approvalKey = TestP256Key(BigInt.from(0x77) << 200 | BigInt.from(7));
+final approvalKeyId = approvalKey.keyId;
 
 class FakeKeys implements ApprovalKeyPlatform {
   bool available = true, present = true;
@@ -40,7 +47,11 @@ class FakeKeys implements ApprovalKeyPlatform {
   Completer<void>? prompt;
   void Function()? onPrompt;
   final cancelled = <int>[];
-  Uint8List signature = b64(golden['approval']['signature'] as String);
+
+  /// A fixed signature (the golden enrollment proof, with the golden public
+  /// key). Unset, an approval is signed with [approvalKey] over the
+  /// transcript given, and an enrollment gets the golden approval signature.
+  Uint8List? signature;
   final signed = <(KeyPurpose, Uint8List)>[];
   final created = <KeyBinding>[], deleted = <KeyBinding>[];
   @override
@@ -88,10 +99,25 @@ class FakeKeys implements ApprovalKeyPlatform {
     if (presentOutcome == KeyOutcome.invalidated) {
       return KeyReply(KeyOutcome.invalidated);
     }
-    return signOutcome == KeyOutcome.signed
-        ? KeyReply(KeyOutcome.signed, publicKey, signature)
-        : KeyReply(signOutcome);
+    if (signOutcome != KeyOutcome.signed) return KeyReply(signOutcome);
+    final fixed = signature;
+    if (fixed != null || purpose == KeyPurpose.enroll) {
+      return KeyReply(
+        KeyOutcome.signed,
+        publicKey,
+        fixed ?? b64(golden['approval']['signature'] as String),
+      );
+    }
+    return KeyReply(
+      KeyOutcome.signed,
+      approvalKey.publicKey,
+      approvalKey.sign(signedMessage(transcript)),
+    );
   }
+
+  /// What the key signs for [transcript]: the transcript itself (Windows
+  /// Hello overrides this with its WebAuthn message).
+  List<int> signedMessage(Uint8List transcript) => transcript;
 
   @override
   Future<void> cancel(int token) async => cancelled.add(token);
@@ -107,7 +133,7 @@ Map<String, dynamic>? binding(
   'action': 'approve',
   'provider_identity': 'a' * 64,
   'approval_client': 'b' * 64,
-  'key_id': allowed ? (keyId ?? goldenKeyId) : null,
+  'key_id': allowed ? (keyId ?? approvalKeyId) : null,
   'biometric_allowed': allowed,
   'request_id': providerId,
   'record_digest': '3d' * 32,

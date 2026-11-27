@@ -278,16 +278,17 @@ class TouchIdController extends ChangeNotifier {
       }
       await provider.perform(
         core.ProviderCommand.approve,
+        // Rust verifies the signature with the reply's key before sending.
         // A Windows Hello key proves with a WebAuthn-wrapped signature.
         begin: () => reply.authenticatorData.isEmpty
             ? bio.providerBiometricBegin(
                 handle: request.handle,
-                keyId: request.keyId,
+                publicKey: reply.publicKey,
                 signature: reply.signature,
               )
             : bio.providerBiometricBeginWrapped(
                 handle: request.handle,
-                keyId: request.keyId,
+                publicKey: reply.publicKey,
                 signature: reply.signature,
                 authenticatorData: reply.authenticatorData,
               ),

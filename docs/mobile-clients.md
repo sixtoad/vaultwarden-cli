@@ -129,7 +129,14 @@ refused failed unsafe`). `publicKey` is empty or the 65-byte SEC1 uncompressed
 point; `signature` is non-empty only for `signed` and is the **ASN.1 DER
 ECDSA-SHA256** signature (8–72 bytes) over the transcript bytes as given
 (the platform hashes; Dart sends the message, not a digest), exactly as
-`SecKeyCreateSignature(.ecdsaSignatureMessageX962SHA256)` produces it.
+`SecKeyCreateSignature(.ecdsaSignatureMessageX962SHA256)` produces it. The
+native side returns the signature as the platform made it and does not check
+or verify it: the Rust core checks the DER encoding, that SHA-256 of
+`publicKey` is the review's key id, and that the signature verifies over the
+transcript with `publicKey` before any proof is built
+(`provider_biometric_begin(handle, publicKey, signature)`; a refusal sends
+nothing and keeps the review). See
+`docs/implementation/shared-approval-checks-spec.md` S-3.
 
 ### Bound to the exact request
 
@@ -144,7 +151,11 @@ enforces the parts it can see:
    and refuses (`refused`) unless: field 0 is the domain for `purpose`, the
    provider identity and approval client equal the key's binding, and (approve)
    the key id equals SHA-256 of this key's public point, with the fixed field
-   sizes (`ProductionApprovalContract.admits`).
+   sizes (`ProductionApprovalContract.admits`). This guard is deliberately
+   native, independent of Dart and Rust, and every platform's copy must give
+   the Rust reference's verdict on the shared vectors
+   (`companion/fixtures/approval-v2-admission.json`;
+   `shared-approval-checks-spec.md` S-1, S-2).
 3. One prompt is one signature over that one transcript; it is never cached,
    reused or replayed. `session` (32 lowercase hex) and `token` (strictly
    increasing within a session) identify the attempt; an overlapping or

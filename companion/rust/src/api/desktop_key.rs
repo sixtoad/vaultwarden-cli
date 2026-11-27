@@ -4,10 +4,11 @@
 //! `unavailable` (Linux approves with the password, D-9).
 #[cfg(windows)]
 use crate::desktop::hello::{
-    admit::{Binding, Purpose},
     keys::{Keys, Outcome, Reply},
     webauthn::WebAuthn,
 };
+#[cfg(windows)]
+use crate::provider::admission::{Binding, Purpose};
 
 /// The closed key reply: `outcome` is a Dart `KeyOutcome` name.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

@@ -1958,13 +1958,13 @@ fn wire__crate__api__biometric__provider_biometric_begin_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_handle = <u64>::sse_decode(&mut deserializer);
-            let api_key_id = <String>::sse_decode(&mut deserializer);
+            let api_public_key = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_signature = <Vec<u8>>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, crate::api::biometric::BiometricRefusal>((move || {
                 let output_ok = crate::api::biometric::provider_biometric_begin(
                     api_handle,
-                    api_key_id,
+                    api_public_key,
                     api_signature,
                 )?;
                 std::result::Result::Ok(output_ok)
@@ -1994,14 +1994,14 @@ fn wire__crate__api__biometric__provider_biometric_begin_wrapped_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_handle = <u64>::sse_decode(&mut deserializer);
-            let api_key_id = <String>::sse_decode(&mut deserializer);
+            let api_public_key = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_signature = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_authenticator_data = <Vec<u8>>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, crate::api::biometric::BiometricRefusal>((move || {
                 let output_ok = crate::api::biometric::provider_biometric_begin_wrapped(
                     api_handle,
-                    api_key_id,
+                    api_public_key,
                     api_signature,
                     api_authenticator_data,
                 )?;

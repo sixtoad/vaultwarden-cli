@@ -114,35 +114,10 @@ class KeyPolicyTest {
         val sec1 = SignatureEncoding.sec1(key)!!
         assertEquals(65, sec1.size)
         assertEquals(0x04.toByte(), sec1[0])
-        assertEquals(key.w, Sec1.publicKey(sec1).w)
+        assertEquals(key.w.affineX, BigInteger(1, sec1.copyOfRange(1, 33)))
+        assertEquals(key.w.affineY, BigInteger(1, sec1.copyOfRange(33, 65)))
         val p384 = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp384r1")) }
             .generateKeyPair().public as ECPublicKey
         assertNull(SignatureEncoding.sec1(p384))
-    }
-
-    @Test fun derMustBeStrict() {
-        val n = BigInteger("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", 16)
-        fun int(value: ByteArray) = byteArrayOf(0x02, value.size.toByte()) + value
-        fun seq(vararg parts: ByteArray): ByteArray {
-            val body = parts.fold(ByteArray(0)) { a, b -> a + b }
-            return byteArrayOf(0x30, body.size.toByte()) + body
-        }
-        val one = byteArrayOf(1)
-        assertTrue(SignatureEncoding.isStrictDer(seq(int(one), int(one))))
-        assertTrue(SignatureEncoding.isStrictDer(seq(int(byteArrayOf(0, 0x80.toByte())), int(one))))
-        val nMinusOne = n.subtract(BigInteger.ONE).toByteArray()
-        assertTrue(SignatureEncoding.isStrictDer(seq(int(nMinusOne), int(nMinusOne))))
-        val rejected = listOf(
-            seq(int(byteArrayOf(0)), int(one)), // zero
-            seq(int(byteArrayOf(0x80.toByte())), int(one)), // negative
-            seq(int(byteArrayOf(0, 1)), int(one)), // not minimal
-            seq(int(n.toByteArray()), int(one)), // r = n
-            seq(int(one), int(one)) + byteArrayOf(0), // trailing
-            seq(int(one)), // one integer
-            byteArrayOf(0x31, 6) + int(one) + int(one), // not a sequence
-            seq(int(one), int(one), int(one)), // three integers
-        )
-        rejected.forEachIndexed { index, bytes -> assertFalse("case $index", SignatureEncoding.isStrictDer(bytes)) }
-        assertFalse(SignatureEncoding.isStrictDer(ByteArray(73)))
     }
 }

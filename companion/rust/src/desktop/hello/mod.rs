@@ -3,7 +3,6 @@
 //! signs the v2 transcript through the `windows_hello` wrapping. The pure
 //! parts compile and run their tests everywhere; the WebAuthn calls exist
 //! only on Windows.
-pub mod admit;
 pub mod attested;
 pub mod keys;
 #[cfg(windows)]

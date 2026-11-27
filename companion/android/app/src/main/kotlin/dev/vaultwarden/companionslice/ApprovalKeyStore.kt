@@ -158,7 +158,10 @@ object ApprovalKeyStore {
 
     /**
      * The one operation the authentication admitted. [authorized] must be the
-     * `Signature` BiometricPrompt returned in its `CryptoObject`.
+     * `Signature` BiometricPrompt returned in its `CryptoObject`. The DER
+     * signature is returned as the Keystore made it: Rust checks its encoding
+     * and verifies it over the transcript with [Prepared.publicKey] before
+     * any proof is sent (shared-approval-checks-spec S-3).
      */
     fun complete(binding: ApprovalBinding, purpose: ApprovalPurpose, transcript: ByteArray,
                  prepared: Prepared, authorized: Signature): KeyReply {
@@ -166,26 +169,11 @@ object ApprovalKeyStore {
         if (!ApprovalTranscript.admits(transcript, purpose, binding, prepared.publicKey)) return KeyReply(KeyOutcome.refused)
         return try {
             authorized.update(transcript)
-            val der = authorized.sign()
-            if (!SignatureEncoding.isStrictDer(der) || !verifies(prepared.publicKey, transcript, der)) {
-                KeyReply(KeyOutcome.failed)
-            } else {
-                KeyReply(KeyOutcome.signed, prepared.publicKey, der)
-            }
+            KeyReply(KeyOutcome.signed, prepared.publicKey, authorized.sign())
         } catch (_: KeyPermanentlyInvalidatedException) {
             KeyReply(KeyOutcome.invalidated)
         } catch (_: Exception) {
             KeyReply(KeyOutcome.failed)
         }
-    }
-
-    private fun verifies(publicKey: ByteArray, transcript: ByteArray, der: ByteArray): Boolean = try {
-        Signature.getInstance("SHA256withECDSA").run {
-            initVerify(Sec1.publicKey(publicKey))
-            update(transcript)
-            verify(der)
-        }
-    } catch (_: Exception) {
-        false
     }
 }

@@ -13,7 +13,7 @@ import sys
 
 root = Path(__file__).resolve().parents[1]
 base = root / "companion/rust/src/provider"
-originals = {name: (base / name).read_bytes() for name in ["protocol.rs", "session.rs", "approval_v2.rs", "biometric.rs"]}
+originals = {name: (base / name).read_bytes() for name in ["protocol.rs", "session.rs", "approval_v2.rs", "biometric.rs", "proof_check.rs"]}
 parser = argparse.ArgumentParser()
 parser.add_argument("evidence", nargs="?", type=Path, default=root / "companion/build/provider-mutations")
 parser.add_argument("--only", nargs="+")
@@ -53,7 +53,12 @@ mutations = {
     "v2-generation-binding": ("approval_v2.rs", [("if binding.generation != received.generation {", "if false {")]),
     "v2-ticket-binding": ("approval_v2.rs", [("if received.ticket != Some(binding.ticket.as_str()) {", "if false {")]),
     "v2-proof-handle": ("session.rs", [("if self.prepared != Some(handle) || handle != self.epoch {", "if false {")]),
-    "v2-proof-key": ("session.rs", [("if key_id != signing.key_id {", "if false {")]),
+    # The one check of the signer's reply before a proof leaves the device
+    # (shared-approval-checks-spec S-3): key id, point and verification.
+    "v2-proof-key": ("proof_check.rs", [("if v2::key_id(public_key) != signing.key_id {", "if false {")]),
+    "v2-proof-point": ("proof_check.rs", [("if !v2::valid_public_key(public_key) {", "if false {")]),
+    "v2-proof-verification": ("proof_check.rs", [("if message.is_some_and(|message| v2::verify(public_key, &message, signature)) {", "if message.is_some() {")]),
+    "v2-proof-check-called": ("session.rs", [("super::proof_check::approval_proof(&signing, public_key, signature, authenticator_data)?;", "let _ = (public_key, authenticator_data);")]),
     "v2-enroll-provider-pin": ("biometric.rs", [("|| r.provider_identity != pin.provider_identity", "|| false")]),
     "v2-enroll-local-proof": ("biometric.rs", [("if !message.is_some_and(|message| v2::verify(public_key, &message, signature)) {", "if false {")]),
     # PR B patch round: sticky fallback, result lifetime, pin rule, ticket kept.

@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// iOS approval-client rules kept free of UIKit and of the shared key code,
@@ -6,23 +5,6 @@ import Foundation
 /// Secure Enclave key itself is the shared `ProductionApprovalKey`
 /// (companion/macos/Runner), compiled into this Runner unchanged.
 enum MobileApproval {
-    /// The last native check on a `sign` reply before it leaves this
-    /// process: only a `signed` reply whose bytes are a canonical ASN.1 DER
-    /// ECDSA P-256 signature that verifies over the exact transcript with the
-    /// reply's own public key is returned. Anything else signed becomes
-    /// `failed` with no bytes. A reply that is not `signed` (cancel, error,
-    /// refusal) never carries a signature or key.
-    static func checked(outcome: String, publicKey: Data, signature: Data, transcript: Data)
-        -> (outcome: String, publicKey: Data, signature: Data) {
-        guard outcome == "signed" else { return (outcome, Data(), Data()) }
-        guard (8...72).contains(signature.count),
-              let key = try? P256.Signing.PublicKey(x963Representation: publicKey),
-              let parsed = try? P256.Signing.ECDSASignature(derRepresentation: signature),
-              parsed.derRepresentation == signature,
-              key.isValidSignature(parsed, for: transcript) else { return ("failed", Data(), Data()) }
-        return (outcome, publicKey, signature)
-    }
-
     /// The `availability` reply: the sensor that gates the key, else unavailable.
     static func availabilityName(_ biometry: String?) -> String {
         guard let biometry, ["faceID", "touchID"].contains(biometry) else { return "unavailable" }

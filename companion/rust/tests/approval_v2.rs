@@ -519,7 +519,7 @@ fn proof_sent() -> (ProviderSession, u32, Value) {
     let request = session.prepare_biometric().unwrap();
     let signature = sign(&key(), &request.transcript);
     let work = session
-        .begin_biometric(request.handle, &request.key_id, &signature)
+        .begin_biometric(request.handle, &pk_of(&key()), &signature)
         .unwrap();
     let body: Value = serde_json::from_slice(&work.body).unwrap();
     assert_eq!(
@@ -639,14 +639,18 @@ fn submit_rechecks_handle_key_and_signature_before_sending() {
     let good = sign(&key(), &request.transcript);
     assert_eq!(
         session
-            .begin_biometric(request.handle + 1, &request.key_id, &good)
+            .begin_biometric(request.handle + 1, &pk_of(&key()), &good)
             .err()
             .unwrap(),
         Refusal::StaleHandle
     );
     assert_eq!(
         session
-            .begin_biometric(request.handle, &"f".repeat(64), &good)
+            .begin_biometric(
+                request.handle,
+                &pk_of(&SigningKey::from_slice(&[8; 32]).unwrap()),
+                &good
+            )
             .err()
             .unwrap(),
         Refusal::KeyMismatch
@@ -656,13 +660,24 @@ fn submit_rechecks_handle_key_and_signature_before_sending() {
         vec![0x30; 73],
         vec![0; 70],
         [good.clone(), vec![0]].concat(),
+        // Well-formed DER by the bound key, but not over this transcript
+        // (shared-approval-checks-spec S-3: verified before anything leaves).
+        sign(&key(), b"another transcript"),
     ] {
         assert_eq!(
             session
-                .begin_biometric(request.handle, &request.key_id, &bad)
+                .begin_biometric(request.handle, &pk_of(&key()), &bad)
                 .err()
                 .unwrap(),
             Refusal::InvalidSignature
+        );
+    }
+    let mut not_a_point = pk_of(&key());
+    not_a_point[0] = 0x03;
+    for bad in [Vec::new(), not_a_point] {
+        assert_eq!(
+            session.begin_biometric(request.handle, &bad, &good).err(),
+            Some(Refusal::InvalidPublicKey)
         );
     }
     assert!(
@@ -678,14 +693,14 @@ fn submit_rechecks_handle_key_and_signature_before_sending() {
     );
     assert_eq!(
         session
-            .begin_biometric(request.handle, &request.key_id, &good)
+            .begin_biometric(request.handle, &pk_of(&key()), &good)
             .err()
             .unwrap(),
         Refusal::StaleHandle
     );
     let handle = session.prepare_biometric().unwrap().handle;
     assert!(session
-        .begin_biometric(handle, &request.key_id, &good)
+        .begin_biometric(handle, &pk_of(&key()), &good)
         .is_ok());
 }
 
@@ -1119,7 +1134,7 @@ fn windows_hello_proof_carries_the_authenticator_data_and_refuses_bad_flags() {
             session
                 .begin_biometric_wrapped(
                     request.handle,
-                    &request.key_id,
+                    &pk_of(&key()),
                     &signature,
                     &hello_data(flags)
                 )
@@ -1130,12 +1145,12 @@ fn windows_hello_proof_carries_the_authenticator_data_and_refuses_bad_flags() {
     }
     assert_eq!(
         session
-            .begin_biometric_wrapped(request.handle, &request.key_id, &signature, &data[..36])
+            .begin_biometric_wrapped(request.handle, &pk_of(&key()), &signature, &data[..36])
             .err(),
         Some(Refusal::InvalidSignature)
     );
     let work = session
-        .begin_biometric_wrapped(request.handle, &request.key_id, &signature, &data)
+        .begin_biometric_wrapped(request.handle, &pk_of(&key()), &signature, &data)
         .unwrap();
     let body: Value = serde_json::from_slice(&work.body).unwrap();
     assert_eq!(

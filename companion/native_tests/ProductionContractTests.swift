@@ -5,8 +5,10 @@ import Security
 import XCTest
 @testable import NativeContract
 
-/// Production approval v2 contract against the provider's golden vector
-/// (`tests/fixtures/approval-v2-golden.json`, verify only, no private key).
+/// Production approval v2 contract: the native signer guard against the
+/// shared admission vectors, the synthetic-domain separation, the key binding
+/// tag and the key access control. The signature check is Rust's
+/// (shared-approval-checks-spec S-3).
 final class ProductionContractTests: XCTestCase {
     private var golden: [String: Any] = [:]
     private var publicKey = Data()
@@ -35,20 +37,30 @@ final class ProductionContractTests: XCTestCase {
         return Data(base64Encoded: text)
     }
 
-    func testGoldenApprovalAndEnrollmentTranscriptsAreAdmittedOnlyForTheirPurpose() throws {
-        let approval = try transcript("approval"), enroll = try transcript("enroll")
-        XCTAssertTrue(ProductionTranscript.admits(approval, purpose: .approve, binding: binding, publicKey: publicKey))
-        XCTAssertTrue(ProductionTranscript.admits(enroll, purpose: .enroll, binding: binding, publicKey: publicKey))
-        XCTAssertFalse(ProductionTranscript.admits(approval, purpose: .enroll, binding: binding, publicKey: publicKey))
-        XCTAssertFalse(ProductionTranscript.admits(enroll, purpose: .approve, binding: binding, publicKey: publicKey))
-        // The golden signatures verify over exactly these bytes.
-        let key = try P256.Signing.PublicKey(x963Representation: publicKey)
-        for section in ["approval", "enroll"] {
-            let value = try XCTUnwrap(golden[section] as? [String: Any])
-            let der = try XCTUnwrap(base64url(value["signature"] as? String))
-            XCTAssertTrue(key.isValidSignature(try P256.Signing.ECDSASignature(derRepresentation: der),
-                                               for: try transcript(section)))
+    /// The shared admission vectors (`companion/fixtures/approval-v2-admission.json`,
+    /// generated and checked by the Rust reference, shared-approval-checks-spec
+    /// S-2): this native guard must give every case the Rust verdict.
+    func testEverySharedAdmissionVectorGetsTheRustVerdict() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("companion/fixtures/approval-v2-admission.json"))
+        let document = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let cases = try XCTUnwrap(document["cases"] as? [[String: Any]])
+        XCTAssertGreaterThan(cases.count, 40)
+        var admitted = 0
+        for vector in cases {
+            let name = try XCTUnwrap(vector["name"] as? String)
+            let purpose = try XCTUnwrap((vector["purpose"] as? String).flatMap(ProductionPurpose.init(rawValue:)))
+            let binding = try ProductionBinding(providerHex: try XCTUnwrap(vector["provider_identity"] as? String),
+                                                clientHex: try XCTUnwrap(vector["approval_client"] as? String))
+            let key = try XCTUnwrap(Data(lowerHex: try XCTUnwrap(vector["public_key_hex"] as? String)))
+            let transcript = try XCTUnwrap(Data(lowerHex: try XCTUnwrap(vector["transcript_hex"] as? String)))
+            let expected = try XCTUnwrap(vector["admitted"] as? Bool)
+            XCTAssertEqual(ProductionTranscript.admits(transcript, purpose: purpose, binding: binding, publicKey: key),
+                           expected, name)
+            if expected { admitted += 1 }
         }
+        XCTAssertEqual(admitted, 4, "only the golden transcripts and their sized-field variants")
     }
 
     func testProductionKeyRefusesSyntheticTranscriptsAndTheReverse() throws {
@@ -71,43 +83,13 @@ final class ProductionContractTests: XCTestCase {
         XCTAssertFalse(String(decoding: NativeTestKey.tag, as: UTF8.self).hasPrefix(ProductionBinding.tagPrefix))
     }
 
-    func testEveryBindingFieldIsChecked() throws {
-        let approval = try XCTUnwrap(ProductionTranscript.fields(try transcript("approval")))
-        let enroll = try XCTUnwrap(ProductionTranscript.fields(try transcript("enroll")))
-        for index in 0..<approval.count {
-            var mutated = approval
-            mutated[index] = index == 5 ? Data(repeating: 0x41, count: 42) : mutated[index] + Data([0])
-            XCTAssertFalse(ProductionTranscript.admits(frame(mutated), purpose: .approve, binding: binding,
-                                                       publicKey: publicKey), "approval field \(index)")
-        }
-        for index in 0..<enroll.count {
-            var mutated = enroll
-            mutated[index] = mutated[index] + Data([0])
-            XCTAssertFalse(ProductionTranscript.admits(frame(mutated), purpose: .enroll, binding: binding,
-                                                       publicKey: publicKey), "enroll field \(index)")
-        }
-        var action = approval
-        action[1] = Data("deny".utf8)
-        XCTAssertFalse(ProductionTranscript.admits(frame(action), purpose: .approve, binding: binding, publicKey: publicKey))
-        // Another provider, another client or another key never signs.
+    func testAnotherBindingSelectsAnotherKeyTag() throws {
         let other = try ProductionBinding(providerIdentity: Data(repeating: 0x99, count: 32),
                                           approvalClient: binding.approvalClient)
         let client = try ProductionBinding(providerIdentity: binding.providerIdentity,
                                            approvalClient: Data(repeating: 0x99, count: 32))
-        for b in [other, client] {
-            XCTAssertFalse(ProductionTranscript.admits(try transcript("approval"), purpose: .approve, binding: b, publicKey: publicKey))
-            XCTAssertFalse(ProductionTranscript.admits(try transcript("enroll"), purpose: .enroll, binding: b, publicKey: publicKey))
-            XCTAssertNotEqual(b.tag, binding.tag)
-        }
-        var otherKey = publicKey
-        otherKey[64] ^= 1
-        XCTAssertFalse(ProductionTranscript.admits(try transcript("approval"), purpose: .approve, binding: binding, publicKey: otherKey))
-        XCTAssertFalse(ProductionTranscript.admits(try transcript("enroll"), purpose: .enroll, binding: binding, publicKey: otherKey))
-        // Framing: trailing, truncated and extra fields are refused.
-        let full = try transcript("approval")
-        XCTAssertFalse(ProductionTranscript.admits(full + Data([0]), purpose: .approve, binding: binding, publicKey: publicKey))
-        XCTAssertFalse(ProductionTranscript.admits(full.dropLast(), purpose: .approve, binding: binding, publicKey: publicKey))
-        XCTAssertFalse(ProductionTranscript.admits(frame(approval + [Data()]), purpose: .approve, binding: binding, publicKey: publicKey))
+        XCTAssertNotEqual(other.tag, binding.tag)
+        XCTAssertNotEqual(client.tag, binding.tag)
     }
 
     func testBindingParsingAndAccessControl() {
